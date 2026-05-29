@@ -35,6 +35,7 @@ export function getAllowedNav(ruolo: User['ruolo']): NavItem[] {
     { name: 'Amministrazione', href: '/amministrazione' },
     { name: 'Comunicazioni', href: '/comunicazioni' },
     { name: 'Workflow', href: '/workflow' },
+    { name: 'Pratiche', href: '/pratiche' },
     { name: 'Utenti', href: '/utenti' },
     { name: 'Impostazioni', href: '/impostazioni' },
   ]
@@ -43,11 +44,11 @@ export function getAllowedNav(ruolo: User['ruolo']): NavItem[] {
     case 'Admin':
       return all
     case 'Manager':
-      return all.filter(n => ['/dashboard', '/eventi', '/task', '/calendario', '/comunicazioni', '/workflow'].includes(n.href))
+      return all.filter(n => ['/dashboard', '/eventi', '/task', '/calendario', '/comunicazioni', '/workflow', '/pratiche'].includes(n.href))
     case 'Operativo':
       return all.filter(n => ['/dashboard', '/task', '/calendario', '/comunicazioni'].includes(n.href))
     case 'Finance':
-      return all.filter(n => ['/dashboard', '/amministrazione', '/eventi', '/calendario'].includes(n.href))
+      return all.filter(n => ['/dashboard', '/amministrazione', '/eventi', '/calendario', '/pratiche'].includes(n.href))
     case 'Commerciale':
       return all.filter(n => ['/dashboard', '/crm', '/eventi', '/calendario', '/comunicazioni'].includes(n.href))
     case 'Fornitore':

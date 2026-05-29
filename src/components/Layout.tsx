@@ -19,6 +19,7 @@ import {
   LogOut,
   ChevronDown,
   SlidersHorizontal,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { loadUser, clearUser, getAllowedNav } from '@/lib/auth'
@@ -33,6 +34,7 @@ const iconMap: Record<string, React.ElementType> = {
   '/amministrazione': Settings,
   '/comunicazioni': MessageSquare,
   '/workflow': GitBranch,
+  '/pratiche': FileText,
   '/utenti': UserCog,
   '/impostazioni': SlidersHorizontal,
 }

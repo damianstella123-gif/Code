@@ -10,6 +10,7 @@ import Amministrazione from './pages/Amministrazione'
 import Comunicazioni from './pages/Comunicazioni'
 import Workflow from './pages/Workflow'
 import Utenti from './pages/Utenti'
+import Pratiche from './pages/Pratiche'
 import Impostazioni from './pages/Impostazioni'
 import Login from './pages/Login'
 import { loadUser } from './lib/auth'
@@ -36,6 +37,7 @@ export default function App() {
       <Route path="/amministrazione" element={<RequireAuth><Layout><Amministrazione /></Layout></RequireAuth>} />
       <Route path="/comunicazioni" element={<RequireAuth><Layout><Comunicazioni /></Layout></RequireAuth>} />
       <Route path="/workflow" element={<RequireAuth><Layout><Workflow /></Layout></RequireAuth>} />
+      <Route path="/pratiche" element={<RequireAuth><Layout><Pratiche /></Layout></RequireAuth>} />
       <Route path="/utenti" element={<RequireAuth><Layout><Utenti /></Layout></RequireAuth>} />
       <Route path="/impostazioni" element={<RequireAuth><Layout><Impostazioni /></Layout></RequireAuth>} />
 
