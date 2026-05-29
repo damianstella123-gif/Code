@@ -21,9 +21,8 @@ import {
 } from 'lucide-react'
 import { users } from '@/data/users'
 import { uscite } from '@/data/amministrazione'
-import { pratiche } from '@/data/pratiche'
 import { loadUser } from '@/lib/auth'
-import { loadTasksFromStorage, loadEventsFromStorage, STORAGE_KEYS } from '@/lib/storage'
+import { loadTasksFromStorage, loadEventsFromStorage, loadPraticheFromStorage, STORAGE_KEYS } from '@/lib/storage'
 import { daysLeft, fmtShort, fmtLong, toISO, addDays } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
@@ -883,7 +882,7 @@ export default function Calendario() {
         t.assegnatario === currentUser?.id || (t.evento && myIds.includes(t.evento)))
     }
 
-    const visiblePratiche = pratiche.filter(p => p.stato !== 'completata')
+    const visiblePratiche = loadPraticheFromStorage().filter(p => p.stato !== 'completata')
 
     return [
       ...filteredEvents.map(e => ({ type: 'event' as const, data: e })),

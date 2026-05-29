@@ -349,9 +349,10 @@ interface ThreadProps {
   onBack: () => void
   onReply: (original: Messaggio) => void
   onMarkRead: (id: string) => void
+  onDelete: (id: string) => void
 }
 
-function MessageThread({ msg, currentUserId, onBack, onReply, onMarkRead }: ThreadProps) {
+function MessageThread({ msg, currentUserId, onBack, onReply, onMarkRead, onDelete }: ThreadProps) {
   const isUnread = !msg.letto.includes(currentUserId)
 
   const evName = eventName(msg.eventoId)
@@ -490,14 +491,21 @@ function MessageThread({ msg, currentUserId, onBack, onReply, onMarkRead }: Thre
           </div>
         </div>
 
-        {/* Reply button */}
-        <div style={{ borderTop: '1px solid var(--line)', paddingTop: '1rem' }}>
+        {/* Actions */}
+        <div className="flex items-center gap-3" style={{ borderTop: '1px solid var(--line)', paddingTop: '1rem' }}>
           <button
             onClick={() => onReply(msg)}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90"
             style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}
           >
             <Send className="w-4 h-4" /> Rispondi
+          </button>
+          <button
+            onClick={() => { if (confirm('Eliminare questo messaggio?')) onDelete(msg.id) }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-red-500/10"
+            style={{ color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.2)' }}
+          >
+            <X className="w-4 h-4" /> Elimina
           </button>
         </div>
       </div>
@@ -657,6 +665,15 @@ export default function Comunicazioni() {
     setView('sent')
   }
 
+  function deleteMsg(id: string) {
+    setMsgs(prev => {
+      const updated = prev.filter(m => m.id !== id)
+      saveMsgs(updated)
+      return updated
+    })
+    setSelected(null)
+  }
+
   function openMsg(m: Messaggio) {
     setSelected(m)
     markRead(m.id)
@@ -692,6 +709,7 @@ export default function Comunicazioni() {
           onBack={() => setSelected(null)}
           onReply={handleReply}
           onMarkRead={markRead}
+          onDelete={deleteMsg}
         />
         {showComposer && (
           <Composer

@@ -24,11 +24,10 @@ import {
 } from 'lucide-react'
 import { workflowsDemo } from '@/data/workflow'
 import type { EventoWorkflow, WorkflowFase, FaseStato, LogTipo } from '@/data/workflow'
-import { events } from '@/data/events'
-import { tasks } from '@/data/tasks'
 import { users } from '@/data/users'
 import { suppliers } from '@/data/suppliers'
 import { loadUser } from '@/lib/auth'
+import { loadTasksFromStorage, loadEventsFromStorage } from '@/lib/storage'
 
 // ─── localStorage ─────────────────────────────────────────────────────────────
 
@@ -43,6 +42,8 @@ function loadWFs(): EventoWorkflow[] {
 function saveWFs(wfs: EventoWorkflow[]) {
   localStorage.setItem(SK, JSON.stringify(wfs))
 }
+function getEvents() { return loadEventsFromStorage() }
+function getTasks() { return loadTasksFromStorage() }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -222,7 +223,7 @@ function FaseCard({ fase, isCurrent, isNext, canAdvance, blockingTasks, onAdvanc
   const Icon = statoIcon(fase.stato)
   const color = statoColor(fase.stato)
   const dl = daysLeft(fase.deadline)
-  const phaseTasks = tasks.filter(t => fase.taskIds.includes(t.id))
+  const phaseTasks = getTasks().filter(t => fase.taskIds.includes(t.id))
   const phaseSuppliers = suppliers.filter(s => fase.fornitoriIds.includes(s.id))
   const responsible = users.find(u => u.id === fase.responsabileId)
 
@@ -516,7 +517,7 @@ function WorkflowDetail({ wf: initWf, onBack }: { wf: EventoWorkflow; onBack: ()
   ]))
 
   const currentUser = loadUser()
-  const evento = events.find(e => e.id === wf.eventoId)
+  const evento = getEvents().find(e => e.id === wf.eventoId)
   const avanzamento = wfAvanzamentoGlobale(wf)
 
   function persist(updated: EventoWorkflow) {
@@ -607,8 +608,9 @@ function WorkflowDetail({ wf: initWf, onBack }: { wf: EventoWorkflow; onBack: ()
   }
 
   function getBlockingTasks(fase: WorkflowFase): string[] {
+    const allTasks = getTasks()
     return fase.taskCriticiIds
-      .map(tid => tasks.find(t => t.id === tid))
+      .map(tid => allTasks.find(t => t.id === tid))
       .filter(t => t && t.stato !== 'completato')
       .map(t => t!.titolo)
   }
@@ -689,10 +691,10 @@ function WorkflowDetail({ wf: initWf, onBack }: { wf: EventoWorkflow; onBack: ()
           },
           {
             label: 'Task aperti',
-            value: String(wf.fasi.flatMap(f => f.taskIds).filter(tid => {
-              const t = tasks.find(x => x.id === tid)
+            value: String((() => { const at = getTasks(); return wf.fasi.flatMap(f => f.taskIds).filter(tid => {
+              const t = at.find(x => x.id === tid)
               return t && t.stato !== 'completato'
-            }).length),
+            }).length })()),
             color: 'var(--yellow)',
           },
           {
@@ -755,11 +757,12 @@ function WorkflowDetail({ wf: initWf, onBack }: { wf: EventoWorkflow; onBack: ()
 // ─── Workflow list card ───────────────────────────────────────────────────────
 
 function WorkflowCard({ wf, onClick }: { wf: EventoWorkflow; onClick: () => void }) {
-  const evento = events.find(e => e.id === wf.eventoId)
+  const evento = getEvents().find(e => e.id === wf.eventoId)
   const avanzamento = wfAvanzamentoGlobale(wf)
   const faseAttiva = wf.fasi.find(f => f.ordine === wf.faseCorrenteOrdine)
+  const allTasks = getTasks()
   const taskAperti = wf.fasi.flatMap(f => f.taskCriticiIds).filter(tid => {
-    const t = tasks.find(x => x.id === tid)
+    const t = allTasks.find(x => x.id === tid)
     return t && t.stato !== 'completato'
   }).length
   const hasAlert = taskAperti > 0 || wf.fasi.some(f => f.stato === 'critica' || f.stato === 'bloccata')
@@ -837,7 +840,7 @@ export default function Workflow() {
     const ruolo = currentUser.ruolo
     if (ruolo === 'Admin' || ruolo === 'Finance') return workflows
     if (ruolo === 'Manager' || ruolo === 'Operativo') {
-      const myEventIds = events
+      const myEventIds = getEvents()
         .filter(e => e.responsabile === currentUser.id || e.team.includes(currentUser.id))
         .map(e => e.id)
       return workflows.filter(w => myEventIds.includes(w.eventoId))
@@ -845,12 +848,13 @@ export default function Workflow() {
     return workflows
   }, [workflows, currentUser])
 
+  const allTasksMain = getTasks()
   const totAvanzamento = Math.round(visibleWfs.reduce((s, w) => s + wfAvanzamentoGlobale(w), 0) / (visibleWfs.length || 1))
   const completati = visibleWfs.filter(w => w.fasi.every(f => f.stato === 'completata')).length
   const inCorso = visibleWfs.filter(w => w.fasi.some(f => f.stato === 'in_corso')).length
   const critici = visibleWfs.filter(w =>
     w.fasi.flatMap(f => f.taskCriticiIds).some(tid => {
-      const t = tasks.find(x => x.id === tid)
+      const t = allTasksMain.find(x => x.id === tid)
       return t && t.stato !== 'completato'
     })
   ).length

@@ -1000,6 +1000,7 @@ function TabCreative({ event }: { event: Event }) {
             const Icon = t.icon
             return (
               <button key={i} className="flex items-center gap-4 p-4 rounded-xl text-left transition-all hover:bg-white/5"
+                onClick={() => alert(`Download "${t.nome}" avviato (demo)`)}
                 style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ background: 'rgba(208,0,58,0.1)' }}>

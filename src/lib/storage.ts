@@ -1,13 +1,16 @@
 import { tasks } from '@/data/tasks'
 import { events } from '@/data/events'
+import { pratiche as praticheDemo } from '@/data/pratiche'
 import { entrate, uscite } from '@/data/amministrazione'
 import { workflowsDemo } from '@/data/workflow'
 import type { Task } from '@/data/tasks'
 import type { Event } from '@/data/events'
+import type { Pratica } from '@/data/pratiche'
 
 export const STORAGE_KEYS = {
   tasks: 'cal_tasks',
   events: 'cal_events',
+  pratiche: 'simmetria_pratiche',
   workflows: 'simmetria_workflows',
   entrate: 'simmetria_entrate',
   uscite: 'simmetria_uscite',
@@ -43,4 +46,8 @@ export function loadEntrateFromStorage() {
 
 export function loadUsciteFromStorage() {
   return safeRead(STORAGE_KEYS.uscite, uscite)
+}
+
+export function loadPraticheFromStorage(): Pratica[] {
+  return safeRead(STORAGE_KEYS.pratiche, praticheDemo)
 }
