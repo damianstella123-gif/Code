@@ -54,12 +54,10 @@ const CATEGORIE: { id: CategoriaPratica; label: string; icon: React.ElementType;
 ]
 
 const STATI: { id: StatoPratica; label: string; color: string }[] = [
-  { id: 'bozza', label: 'Bozza', color: 'var(--muted)' },
+  { id: 'da_aprire', label: 'Da aprire', color: 'var(--muted)' },
   { id: 'in_lavorazione', label: 'In lavorazione', color: 'var(--blue)' },
-  { id: 'in_approvazione', label: 'In approvazione', color: 'var(--yellow)' },
-  { id: 'approvata', label: 'Approvata', color: 'var(--green)' },
-  { id: 'scaduta', label: 'Scaduta', color: 'var(--red2)' },
-  { id: 'archiviata', label: 'Archiviata', color: 'var(--muted)' },
+  { id: 'in_attesa', label: 'In attesa', color: 'var(--yellow)' },
+  { id: 'completata', label: 'Completata', color: 'var(--green)' },
 ]
 
 function statoColor(stato: StatoPratica) {
@@ -119,11 +117,11 @@ export default function Pratiche() {
   // Dashboard KPIs
   const kpi = useMemo(() => {
     const totali = allPratiche.length
-    const inCorso = allPratiche.filter(p => p.stato === 'in_lavorazione' || p.stato === 'in_approvazione').length
-    const scadute = allPratiche.filter(p => p.stato !== 'approvata' && p.stato !== 'archiviata' && daysLeft(p.scadenza) < 0).length
-    const inRitardo = allPratiche.filter(p => p.stato !== 'approvata' && p.stato !== 'archiviata' && daysLeft(p.scadenza) >= 0 && daysLeft(p.scadenza) <= 7).length
-    const approvate = allPratiche.filter(p => p.stato === 'approvata').length
-    const importoTotale = allPratiche.filter(p => p.importo && p.stato !== 'archiviata').reduce((s, p) => s + (p.importo ?? 0), 0)
+    const inCorso = allPratiche.filter(p => p.stato === 'in_lavorazione' || p.stato === 'in_attesa').length
+    const scadute = allPratiche.filter(p => p.stato !== 'completata' && daysLeft(p.scadenza) < 0).length
+    const inRitardo = allPratiche.filter(p => p.stato !== 'completata' && daysLeft(p.scadenza) >= 0 && daysLeft(p.scadenza) <= 7).length
+    const approvate = allPratiche.filter(p => p.stato === 'completata').length
+    const importoTotale = allPratiche.filter(p => p.importo).reduce((s, p) => s + (p.importo ?? 0), 0)
     return { totali, inCorso, scadute, inRitardo, approvate, importoTotale }
   }, [allPratiche])
 
@@ -283,7 +281,7 @@ export default function Pratiche() {
         ) : (
           filtered.map((p, i) => {
             const dl = daysLeft(p.scadenza)
-            const overdue = p.stato !== 'approvata' && p.stato !== 'archiviata' && dl < 0
+            const overdue = p.stato !== 'completata' && dl < 0
             const CatIcon = catIcon(p.categoria)
             const evento = p.eventoId ? events.find(e => e.id === p.eventoId) : null
             const resp = users.find(u => u.id === p.responsabileId)
@@ -371,7 +369,7 @@ function DetailView({ pratica, onBack, onEdit, onDelete }: {
   const evento = pratica.eventoId ? events.find(e => e.id === pratica.eventoId) : null
   const resp = users.find(u => u.id === pratica.responsabileId)
   const dl = daysLeft(pratica.scadenza)
-  const overdue = pratica.stato !== 'approvata' && pratica.stato !== 'archiviata' && dl < 0
+  const overdue = pratica.stato !== 'completata' && dl < 0
   const CatIcon = catIcon(pratica.categoria)
 
   return (
@@ -491,7 +489,7 @@ function FormView({ pratica, onSave, onCancel }: {
   const [titolo, setTitolo] = useState(pratica?.titolo ?? '')
   const [descrizione, setDescrizione] = useState(pratica?.descrizione ?? '')
   const [categoria, setCategoria] = useState<CategoriaPratica>(pratica?.categoria ?? 'contratto')
-  const [stato, setStato] = useState<StatoPratica>(pratica?.stato ?? 'bozza')
+  const [stato, setStato] = useState<StatoPratica>(pratica?.stato ?? 'da_aprire')
   const [priorita, setPriorita] = useState<PrioritaPratica>(pratica?.priorita ?? 'media')
   const [eventoId, setEventoId] = useState<string>(pratica?.eventoId ?? '')
   const [responsabileId, setResponsabileId] = useState<string>(pratica?.responsabileId ?? (loadUser()?.id ?? ''))

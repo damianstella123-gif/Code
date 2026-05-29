@@ -108,9 +108,9 @@ function flyRespond(input: string): { text: string; chips?: string[] } {
   // Greetings
   if (/^(ciao|hey|salve|hello|hi|buon|come stai|chi sei)/.test(q)) {
     const greets = [
-      `Ehi ${firstName}! 👋 Sono Fly, il tuo assistente operativo personale. Sono già dentro i dati — dimmi cosa ti serve!`,
-      `Ciao! Fly in posizione. 🚀 Ho già controllato tutto e ho qualche aggiornamento per te.`,
-      `Hola ${firstName}! Sono operativo al 100%. Cosa posso fare per te oggi?`,
+      `Woof! Ehi ${firstName}! Sono Fly, il tuo fedele assistente a 4 zampe. Ho il naso dentro tutti i dati — dimmi cosa devo fiutare!`,
+      `Ciao ${firstName}! *scodinzola* Fly qui, pronto a scavare nei numeri. Ho già annusato qualche novita per te!`,
+      `Bau! ${firstName}! Sono operativo al 100% — coda dritta, orecchie dritte, dati sotto controllo. Cosa posso fare?`,
     ]
     return {
       text: greets[Math.floor(Math.random() * greets.length)],
@@ -343,9 +343,9 @@ function flyRespond(input: string): { text: string; chips?: string[] } {
 
   // Default
   const fallbacks = [
-    `Non ho capito bene, ma sono qui. 😅 Prova con: "task urgenti", "budget", "eventi in corso" o "situazione generale".`,
-    `Hmm, questa non l'avevo prevista. 🤔 Sono ancora in training per cose così filosofiche. Dimmi qualcosa di più operativo!`,
-    `Ottima domanda — ma fuori dal mio perimetro per ora. Prova "situazione generale" per un riepilogo completo.`,
+    `*inclina la testa* Non ho capito bene... Prova con: "task urgenti", "budget", "eventi in corso" o "situazione generale".`,
+    `Hmm, questa mi fa drizzare le orecchie ma non so come rispondere. Dimmi qualcosa di piu operativo!`,
+    `*annusa confuso* Ottima domanda ma fuori dal mio territorio. Prova "situazione generale" per un riepilogo completo.`,
   ]
   return {
     text: fallbacks[Math.floor(Math.random() * fallbacks.length)],
@@ -396,9 +396,9 @@ function getProactiveNotif(): FlyNotif | null {
   return pool[Math.floor(Math.random() * pool.length)]
 }
 
-// ─── FLY SVG Mascot ───────────────────────────────────────────────────────────
+// ─── FLY SVG Mascot (Cartoon Dog — Beige Labrador/Segugio mix) ────────────────
 
-function FlyMascot({ size = 56, blink = true }: { size?: number; blink?: boolean }) {
+function FlyMascot({ size = 56, blink = true, mood = 'happy' }: { size?: number; blink?: boolean; mood?: 'happy' | 'alert' | 'thinking' }) {
   const s = size
 
   return (
@@ -411,97 +411,105 @@ function FlyMascot({ size = 56, blink = true }: { size?: number; blink?: boolean
       style={{ display: 'block' }}
     >
       {/* Glow backdrop */}
-      <circle cx="28" cy="30" r="20" fill="rgba(208,0,58,0.12)" />
+      <circle cx="28" cy="30" r="22" fill="rgba(208,0,58,0.08)" />
 
-      {/* Hoodie body */}
-      <g className="fly-hoodie-sway" style={{ transformOrigin: '28px 36px' }}>
-        {/* Main hoodie shape */}
-        <path
-          d="M14 38 Q12 52 28 52 Q44 52 42 38 L38 30 Q34 27 28 27 Q22 27 18 30 Z"
-          fill="#1a1a2e"
-          stroke="rgba(208,0,58,0.4)"
-          strokeWidth="0.8"
-        />
-        {/* Hoodie pocket */}
-        <path
-          d="M22 43 Q28 41 34 43 Q34 48 28 48 Q22 48 22 43 Z"
-          fill="rgba(208,0,58,0.15)"
-          stroke="rgba(208,0,58,0.25)"
-          strokeWidth="0.5"
-        />
-        {/* Hoodie front zipper line */}
-        <line x1="28" y1="30" x2="28" y2="47" stroke="rgba(208,0,58,0.2)" strokeWidth="0.6" strokeDasharray="2 1.5" />
-        {/* Shoulder highlights */}
-        <path d="M18 30 Q16 34 15 38" stroke="rgba(255,255,255,0.06)" strokeWidth="1" fill="none" />
-        <path d="M38 30 Q40 34 41 38" stroke="rgba(255,255,255,0.06)" strokeWidth="1" fill="none" />
-        {/* Hoodie string */}
-        <circle cx="26" cy="31" r="0.8" fill="rgba(208,0,58,0.5)" />
-        <circle cx="30" cy="31" r="0.8" fill="rgba(208,0,58,0.5)" />
+      {/* Body — beige with white chest patch */}
+      <g className="fly-hoodie-sway" style={{ transformOrigin: '28px 44px' }}>
+        <ellipse cx="28" cy="46" rx="11" ry="9" fill="#d4a96a" />
+        {/* White chest patch */}
+        <ellipse cx="28" cy="47" rx="6" ry="7" fill="#f5ead6" />
+        {/* Collar with red tag */}
+        <path d="M21 40 Q28 42 35 40" stroke="#cc1a3a" strokeWidth="2" fill="none" strokeLinecap="round" />
+        <circle cx="28" cy="42" r="2.2" fill="#cc1a3a" />
+        <path d="M27 42 L28 44 L29 42" fill="#ffd700" />
       </g>
-
-      {/* Neck */}
-      <rect x="24.5" y="24" width="7" height="5" rx="2" fill="#2a1a24" />
 
       {/* Head */}
-      <circle cx="28" cy="19" r="11" fill="#1e1030" />
-      <circle cx="28" cy="19" r="11" fill="url(#headGrad)" />
+      <ellipse cx="28" cy="24" rx="14" ry="13" fill="#d4a96a" />
+      {/* Muzzle lighter area */}
+      <ellipse cx="28" cy="28" rx="7" ry="6" fill="#e8c98a" />
 
-      {/* Head rim glow */}
-      <circle cx="28" cy="19" r="11" fill="none" stroke="rgba(208,0,58,0.3)" strokeWidth="0.8" />
-
-      {/* Ear left */}
-      <ellipse cx="17.5" cy="19" rx="2.2" ry="3" fill="#1e1030" stroke="rgba(208,0,58,0.2)" strokeWidth="0.5" />
-      <ellipse cx="17.5" cy="19" rx="1" ry="1.8" fill="rgba(208,0,58,0.15)" />
-      {/* Ear right */}
-      <ellipse cx="38.5" cy="19" rx="2.2" ry="3" fill="#1e1030" stroke="rgba(208,0,58,0.2)" strokeWidth="0.5" />
-      <ellipse cx="38.5" cy="19" rx="1" ry="1.8" fill="rgba(208,0,58,0.15)" />
+      {/* Floppy ears — Labrador/Segugio style */}
+      <g className="fly-float">
+        {/* Left ear */}
+        <ellipse cx="15" cy="24" rx="5" ry="10" fill="#b8884a" transform="rotate(-10 15 24)" />
+        <ellipse cx="15.5" cy="24" rx="3" ry="7" fill="#c99a5c" transform="rotate(-10 15 24)" />
+        {/* Right ear */}
+        <ellipse cx="41" cy="24" rx="5" ry="10" fill="#b8884a" transform="rotate(10 41 24)" />
+        <ellipse cx="40.5" cy="24" rx="3" ry="7" fill="#c99a5c" transform="rotate(10 41 24)" />
+      </g>
 
       {/* Eyes group */}
-      <g className={blink ? 'fly-blink' : ''} style={{ transformOrigin: '28px 19px' }}>
-        {/* Left eye white */}
-        <ellipse cx="23.5" cy="18.5" rx="3.2" ry="3.5" fill="white" />
-        {/* Right eye white */}
-        <ellipse cx="32.5" cy="18.5" rx="3.2" ry="3.5" fill="white" />
+      <g className={blink ? 'fly-blink' : ''} style={{ transformOrigin: '28px 22px' }}>
+        {/* Left eye */}
+        <ellipse cx="23" cy="22" rx="3.5" ry="3.8" fill="white" />
+        {/* Right eye */}
+        <ellipse cx="33" cy="22" rx="3.5" ry="3.8" fill="white" />
         {/* Left pupil */}
-        <g className="fly-eye-look" style={{ transformOrigin: '23.5px 18.5px' }}>
-          <circle cx="23.5" cy="19" r="2" fill="#0e0820" />
-          <circle cx="24.2" cy="17.8" r="0.7" fill="white" />
-          <circle cx="23" cy="20" r="0.35" fill="rgba(208,0,58,0.7)" />
+        <g className="fly-eye-look" style={{ transformOrigin: '23px 22px' }}>
+          <circle cx="23" cy="22.5" r="2.2" fill="#2c1810" />
+          <circle cx="24" cy="21.3" r="0.9" fill="white" />
+          <circle cx="22.5" cy="23.2" r="0.4" fill="rgba(208,0,58,0.5)" />
         </g>
         {/* Right pupil */}
-        <g className="fly-eye-look" style={{ transformOrigin: '32.5px 18.5px' }}>
-          <circle cx="32.5" cy="19" r="2" fill="#0e0820" />
-          <circle cx="33.2" cy="17.8" r="0.7" fill="white" />
-          <circle cx="32" cy="20" r="0.35" fill="rgba(208,0,58,0.7)" />
+        <g className="fly-eye-look" style={{ transformOrigin: '33px 22px' }}>
+          <circle cx="33" cy="22.5" r="2.2" fill="#2c1810" />
+          <circle cx="34" cy="21.3" r="0.9" fill="white" />
+          <circle cx="32.5" cy="23.2" r="0.4" fill="rgba(208,0,58,0.5)" />
         </g>
       </g>
 
-      {/* Eyebrows */}
-      <path d="M20.5 14.5 Q23.5 13 26.5 14.5" stroke="rgba(208,0,58,0.8)" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-      <path d="M29.5 14.5 Q32.5 13 35.5 14.5" stroke="rgba(208,0,58,0.8)" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+      {/* Eyebrows — expressive based on mood */}
+      {mood === 'alert' ? (
+        <>
+          <path d="M19.5 18 L26 19" stroke="#8b5e3c" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+          <path d="M30 19 L36.5 18" stroke="#8b5e3c" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+        </>
+      ) : mood === 'thinking' ? (
+        <>
+          <path d="M20 18.5 Q23 17 26 19" stroke="#8b5e3c" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          <path d="M30 18 Q33 17 36 18.5" stroke="#8b5e3c" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <path d="M20 19 Q23 17.5 26 19" stroke="#8b5e3c" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          <path d="M30 19 Q33 17.5 36 19" stroke="#8b5e3c" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+        </>
+      )}
 
-      {/* Nose */}
-      <ellipse cx="28" cy="21.5" rx="1.2" ry="0.8" fill="rgba(208,0,58,0.3)" />
+      {/* Nose — big black dog nose */}
+      <ellipse cx="28" cy="28" rx="3" ry="2.4" fill="#2c1810" />
+      <ellipse cx="27" cy="27.3" rx="1" ry="0.6" fill="rgba(255,255,255,0.25)" />
 
-      {/* Mouth — small smile */}
-      <path d="M25.5 23.5 Q28 25.5 30.5 23.5" stroke="rgba(208,0,58,0.7)" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+      {/* Mouth */}
+      {mood === 'happy' ? (
+        <>
+          <path d="M28 30 L28 32" stroke="#2c1810" strokeWidth="1" strokeLinecap="round" />
+          <path d="M23 32 Q28 36 33 32" stroke="#2c1810" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          {/* Tongue */}
+          <ellipse cx="28" cy="34" rx="2.2" ry="1.8" fill="#e85a7a" />
+          <ellipse cx="28" cy="33.5" rx="1.5" ry="1" fill="#f08090" />
+        </>
+      ) : (
+        <>
+          <path d="M28 30 L28 31" stroke="#2c1810" strokeWidth="1" strokeLinecap="round" />
+          <path d="M25 32 Q28 33.5 31 32" stroke="#2c1810" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+        </>
+      )}
 
-      {/* Blush dots */}
-      <circle cx="20" cy="21.5" r="2" fill="rgba(208,0,58,0.12)" />
-      <circle cx="36" cy="21.5" r="2" fill="rgba(208,0,58,0.12)" />
+      {/* Whisker dots */}
+      <circle cx="20" cy="28" r="0.6" fill="#8b5e3c" />
+      <circle cx="19" cy="29.5" r="0.6" fill="#8b5e3c" />
+      <circle cx="36" cy="28" r="0.6" fill="#8b5e3c" />
+      <circle cx="37" cy="29.5" r="0.6" fill="#8b5e3c" />
 
-      {/* Antenna with data glow */}
-      <line x1="28" y1="8" x2="28" y2="12" stroke="rgba(208,0,58,0.5)" strokeWidth="1" />
-      <circle cx="28" cy="7" r="2" fill="rgba(208,0,58,0.9)" />
-      <circle cx="28" cy="7" r="3.5" fill="none" stroke="rgba(208,0,58,0.3)" strokeWidth="0.6" />
+      {/* Tech headset — small earpiece */}
+      <path d="M13 21 Q11 21 11 24 Q11 27 13 27" stroke="rgba(208,0,58,0.7)" strokeWidth="1.5" fill="none" />
+      <circle cx="12" cy="24" r="2" fill="rgba(208,0,58,0.9)" />
+      <circle cx="12" cy="24" r="1" fill="rgba(255,255,255,0.3)" />
 
-      {/* Gradients */}
-      <defs>
-        <radialGradient id="headGrad" cx="40%" cy="35%" r="65%">
-          <stop offset="0%" stopColor="rgba(255,255,255,0.04)" />
-          <stop offset="100%" stopColor="rgba(0,0,0,0)" />
-        </radialGradient>
-      </defs>
+      {/* Status indicator on headset */}
+      <circle cx="12" cy="24" r="3" fill="none" stroke="rgba(208,0,58,0.3)" strokeWidth="0.5" className="fly-glow-pulse" />
     </svg>
   )
 }
@@ -563,7 +571,7 @@ export default function FlyAssistant() {
     return [{
       id: 'welcome',
       from: 'fly',
-      text: `Hey! Sono Fly, il tuo co-pilota operativo di Simmetria Hub. 🚀\n\nSono già dentro i dati dell'app. Dimmi cosa vuoi sapere — task, eventi, budget, fornitori... tutto.`,
+      text: `Woof! Sono Fly, il tuo fedele co-pilota di Simmetria Hub. *scodinzola*\n\nHo il naso in tutti i dati dell'app — task, eventi, budget, fornitori. Dimmi cosa devo fiutare!`,
       time: new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
       chips: ['Situazione generale', 'Task urgenti', 'Budget oggi'],
     }]
@@ -641,7 +649,7 @@ export default function FlyAssistant() {
     const welcome: FlyMessage = {
       id: 'welcome_reset',
       from: 'fly',
-      text: `Memoria pulita! Ripartiamo. 🧹 Cosa ti serve?`,
+      text: `*scuote le orecchie* Memoria azzerata! Ripartiamo con il fiuto fresco. Cosa sniffo per te?`,
       time: new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
       chips: ['Situazione generale', 'Task urgenti', 'Budget oggi'],
     }
@@ -651,6 +659,7 @@ export default function FlyAssistant() {
 
   const ctx = useMemo(() => analyzeContext(), [messages])
   const alertCount = ctx.taskBlocked.length + ctx.taskScaduti.length + ctx.pagamentiScaduti.length + ctx.contrattiScadenza.length
+  const flyMood: 'happy' | 'alert' | 'thinking' = typing ? 'thinking' : alertCount > 3 ? 'alert' : 'happy'
 
   return (
     <>
@@ -697,7 +706,7 @@ export default function FlyAssistant() {
             }}
           >
             <div className="fly-float" style={{ flexShrink: 0 }}>
-              <FlyMascot size={40} />
+              <FlyMascot size={40} mood={flyMood} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -716,7 +725,7 @@ export default function FlyAssistant() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
-                <span style={{ fontSize: '11px', color: 'var(--muted)' }}>Assistente operativo · online</span>
+                <span style={{ fontSize: '11px', color: 'var(--muted)' }}>Il tuo segugio digitale · online</span>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
@@ -961,13 +970,13 @@ export default function FlyAssistant() {
         }}
         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.1)' }}
         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
-        title="Fly — Assistente operativo"
+        title="Fly — Il tuo segugio digitale"
       >
         <div className={open ? '' : 'fly-float'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {open ? (
             <X style={{ width: 22, height: 22, color: 'var(--red2)' }} />
           ) : (
-            <FlyMascot size={46} />
+            <FlyMascot size={46} mood={flyMood} />
           )}
         </div>
 

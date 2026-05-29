@@ -17,14 +17,17 @@ import {
   ArrowRight,
   Tag,
   Zap,
+  FileText,
 } from 'lucide-react'
 import { users } from '@/data/users'
 import { uscite } from '@/data/amministrazione'
+import { pratiche } from '@/data/pratiche'
 import { loadUser } from '@/lib/auth'
 import { loadTasksFromStorage, loadEventsFromStorage, STORAGE_KEYS } from '@/lib/storage'
 import { daysLeft, fmtShort, fmtLong, toISO, addDays } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
+import type { Pratica } from '@/data/pratiche'
 
 function saveTasks(t: Task[]) { localStorage.setItem(STORAGE_KEYS.tasks, JSON.stringify(t)) }
 function saveEvents(e: Event[]) { localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(e)) }
@@ -60,6 +63,12 @@ function taskColor(t: Task): string {
   if (t.priorita === 'media') return '#ffc24b'
   return '#9ba3aa'
 }
+function praticaColor(p: Pratica): string {
+  if (p.stato === 'completata') return '#38d27d'
+  if (p.priorita === 'alta') return '#ff9500'
+  if (p.priorita === 'media') return '#ffc24b'
+  return '#9ba3aa'
+}
 function statoTaskLabel(s: string) {
   return { da_fare: 'Da fare', in_corso: 'In corso', completato: 'Completato' }[s] ?? s
 }
@@ -72,7 +81,7 @@ function userAvatar(id: string) { return users.find(u => u.id === id)?.avatar }
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ViewMode = 'month' | 'week' | 'day' | 'agenda'
-type CalItem = { type: 'event'; data: Event } | { type: 'task'; data: Task }
+type CalItem = { type: 'event'; data: Event } | { type: 'task'; data: Task } | { type: 'pratica'; data: Pratica }
 
 // ─── Detail popup ─────────────────────────────────────────────────────────────
 
@@ -159,6 +168,66 @@ function DetailPopup({ item, onClose, onTaskStateChange }: {
                     ) : null
                   })}
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Pratica detail
+  if (item.type === 'pratica') {
+    const p = item.data as Pratica
+    const color = praticaColor(p)
+    const dl = daysLeft(p.scadenza)
+    const categoriaLabel = { contratto: 'Contratto', preventivo: 'Preventivo', permesso: 'Permesso', assicurazione: 'Assicurazione', fattura: 'Fattura', documento: 'Documento' }[p.categoria] ?? p.categoria
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+        onClick={onClose}>
+        <div className="w-full max-w-md rounded-2xl overflow-hidden animate-fade-in"
+          style={{ background: 'var(--panel)', border: `1px solid ${color}30`, boxShadow: `0 24px 80px rgba(0,0,0,0.7), 0 0 40px ${color}15` }}
+          onClick={e => e.stopPropagation()}>
+          <div className="p-5"
+            style={{ background: `linear-gradient(135deg, ${color}12 0%, transparent 70%)`, borderBottom: '1px solid var(--line)' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} />
+                  <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Pratica</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: `${color}18`, color }}>{categoriaLabel}</span>
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{p.titolo}</h3>
+                <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>{p.descrizione}</p>
+              </div>
+              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0">
+                <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+              </button>
+            </div>
+          </div>
+          <div className="p-5 space-y-3">
+            <div className="flex items-center gap-3">
+              <Clock className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+              <span className="text-sm" style={{ color: dl < 0 ? 'var(--red2)' : 'var(--text)' }}>
+                Scadenza: {fmtLong(p.scadenza)} {dl < 0 ? `(${Math.abs(dl)}g scaduto)` : dl <= 3 ? `(tra ${dl}g)` : ''}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <User className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+              <span className="text-sm" style={{ color: 'var(--text)' }}>Controparte: {p.controparte}</span>
+            </div>
+            {p.importo && (
+              <div className="flex items-center gap-3">
+                <Euro className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                <span className="text-sm" style={{ color: 'var(--text)' }}>
+                  Importo: {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(p.importo)}
+                </span>
+              </div>
+            )}
+            {p.note && (
+              <div className="pt-2" style={{ borderTop: '1px solid var(--line)' }}>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>{p.note}</p>
               </div>
             )}
           </div>
@@ -264,16 +333,33 @@ function DetailPopup({ item, onClose, onTaskStateChange }: {
 function CalPill({ item, onClick, onDragStart }: {
   item: CalItem
   onClick: () => void
-  onDragStart: (e: React.DragEvent) => void
+  onDragStart?: (e: React.DragEvent) => void
 }) {
-  const color = item.type === 'event' ? eventColor(item.data as Event) : taskColor(item.data as Task)
-  const label = item.type === 'event' ? (item.data as Event).nome : (item.data as Task).titolo
+  const color = item.type === 'event'
+    ? eventColor(item.data as Event)
+    : item.type === 'task'
+      ? taskColor(item.data as Task)
+      : praticaColor(item.data as Pratica)
+  const label = item.type === 'event'
+    ? (item.data as Event).nome
+    : item.type === 'task'
+      ? (item.data as Task).titolo
+      : (item.data as Pratica).titolo
   const urgent = item.type === 'task' && (item.data as Task).priorita === 'alta' && (item.data as Task).stato !== 'completato'
-  const dl = item.type === 'task' ? daysLeft((item.data as Task).scadenza) : daysLeft((item.data as Event).dataInizio)
-  const isOverdue = dl < 0 && (item.type === 'task' ? (item.data as Task).stato !== 'completato' : (item.data as Event).stato !== 'completato')
+  const dl = item.type === 'event'
+    ? daysLeft((item.data as Event).dataInizio)
+    : item.type === 'task'
+      ? daysLeft((item.data as Task).scadenza)
+      : daysLeft((item.data as Pratica).scadenza)
+  const isDone = item.type === 'event'
+    ? (item.data as Event).stato === 'completato'
+    : item.type === 'task'
+      ? (item.data as Task).stato === 'completato'
+      : (item.data as Pratica).stato === 'completata'
+  const isOverdue = dl < 0 && !isDone
 
   return (
-    <div draggable onDragStart={onDragStart}
+    <div draggable={!!onDragStart} onDragStart={onDragStart}
       onClick={e => { e.stopPropagation(); onClick() }}
       className="truncate rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer transition-all hover:brightness-110 select-none"
       style={{
@@ -282,7 +368,7 @@ function CalPill({ item, onClick, onDragStart }: {
         borderLeft: `3px solid ${color}`,
         border: `1px solid ${color}30`,
         borderLeftWidth: 3,
-        opacity: item.type === 'task' && (item.data as Task).stato === 'completato' ? 0.5 : 1,
+        opacity: isDone && item.type !== 'event' ? 0.5 : 1,
         outline: isOverdue ? `1px dashed ${color}60` : 'none',
       }}>
       {urgent && <Zap style={{ display: 'inline', width: 9, height: 9, marginRight: 2, marginBottom: 1 }} />}
@@ -312,6 +398,9 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
       if (item.type === 'event') {
         const ev = item.data as Event
         return day >= new Date(ev.dataInizio) && day <= new Date(ev.dataFine)
+      }
+      if (item.type === 'pratica') {
+        return sameDay(day, new Date((item.data as Pratica).scadenza))
       }
       return sameDay(day, new Date((item.data as Task).scadenza))
     })
@@ -359,14 +448,14 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
               </div>
               <div className="px-1 pb-1 space-y-0.5 mt-0.5">
                 {dayItems.slice(0, 3).map(item => {
-                  const id = item.type === 'event' ? (item.data as Event).id : (item.data as Task).id
+                  const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : (item.data as Pratica).id
                   return (
                     <CalPill key={id} item={item}
                       onClick={() => onItemClick(item)}
-                      onDragStart={e => {
-                        setDragging({ id, type: item.type })
+                      onDragStart={item.type !== 'pratica' ? e => {
+                        setDragging({ id, type: item.type as 'event' | 'task' })
                         e.dataTransfer.setData('text/plain', `${item.type}:${id}`)
-                      }} />
+                      } : undefined} />
                   )
                 })}
                 {dayItems.length > 3 && (
@@ -397,6 +486,9 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
       if (item.type === 'event') {
         const ev = item.data as Event
         return day >= new Date(ev.dataInizio) && day <= new Date(ev.dataFine)
+      }
+      if (item.type === 'pratica') {
+        return sameDay(day, new Date((item.data as Pratica).scadenza))
       }
       return sameDay(day, new Date((item.data as Task).scadenza))
     })
@@ -444,14 +536,14 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
                 setDragging(null)
               }}>
               {dayItems.map(item => {
-                const id = item.type === 'event' ? (item.data as Event).id : (item.data as Task).id
+                const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : (item.data as Pratica).id
                 return (
                   <CalPill key={id} item={item}
                     onClick={() => onItemClick(item)}
-                    onDragStart={e => {
-                      setDragging({ id, type: item.type })
+                    onDragStart={item.type !== 'pratica' ? e => {
+                      setDragging({ id, type: item.type as 'event' | 'task' })
                       e.dataTransfer.setData('text/plain', `${item.type}:${id}`)
-                    }} />
+                    } : undefined} />
                 )
               })}
             </div>
@@ -472,6 +564,9 @@ function DayView({ day, items, onItemClick }: {
       const ev = item.data as Event
       return day >= new Date(ev.dataInizio) && day <= new Date(ev.dataFine)
     }
+    if (item.type === 'pratica') {
+      return sameDay(day, new Date((item.data as Pratica).scadenza))
+    }
     return sameDay(day, new Date((item.data as Task).scadenza))
   })
 
@@ -486,10 +581,12 @@ function DayView({ day, items, onItemClick }: {
 
   const evItems = dayItems.filter(i => i.type === 'event')
   const taskItems = dayItems.filter(i => i.type === 'task')
+  const praticaItems = dayItems.filter(i => i.type === 'pratica')
   const blocks = [
     { label: 'Mattina', range: '08:00 – 12:00', emoji: '🌅', items: evItems.slice(0, Math.ceil(evItems.length / 2)) },
     { label: 'Pomeriggio', range: '13:00 – 18:00', emoji: '☀️', items: evItems.slice(Math.ceil(evItems.length / 2)) },
     { label: 'Scadenze task', range: 'Task del giorno', emoji: '📋', items: taskItems },
+    { label: 'Pratiche', range: 'Scadenze pratiche', emoji: '📄', items: praticaItems },
   ].filter(b => b.items.length > 0)
 
   return (
@@ -520,13 +617,27 @@ function DayView({ day, items, onItemClick }: {
           </div>
           <div className="space-y-2 pl-4 border-l-2" style={{ borderColor: 'var(--line)' }}>
             {block.items.map(item => {
-              const color = item.type === 'event' ? eventColor(item.data as Event) : taskColor(item.data as Task)
-              const label = item.type === 'event' ? (item.data as Event).nome : (item.data as Task).titolo
+              const color = item.type === 'event'
+                ? eventColor(item.data as Event)
+                : item.type === 'task'
+                  ? taskColor(item.data as Task)
+                  : praticaColor(item.data as Pratica)
+              const label = item.type === 'event'
+                ? (item.data as Event).nome
+                : item.type === 'task'
+                  ? (item.data as Task).titolo
+                  : (item.data as Pratica).titolo
               const sub = item.type === 'event'
                 ? (item.data as Event).location
-                : `Assegnato a ${userName((item.data as Task).assegnatario)}`
+                : item.type === 'task'
+                  ? `Assegnato a ${userName((item.data as Task).assegnatario)}`
+                  : (item.data as Pratica).controparte
               const urgent = item.type === 'task' && (item.data as Task).priorita === 'alta' && (item.data as Task).stato !== 'completato'
-              const id = item.type === 'event' ? (item.data as Event).id : (item.data as Task).id
+              const id = item.type === 'event'
+                ? (item.data as Event).id
+                : item.type === 'task'
+                  ? (item.data as Task).id
+                  : (item.data as Pratica).id
               return (
                 <button key={item.type + id}
                   onClick={() => onItemClick(item)}
@@ -543,7 +654,9 @@ function DayView({ day, items, onItemClick }: {
                   <span className="text-xs px-2 py-0.5 rounded flex-shrink-0" style={{ background: `${color}18`, color }}>
                     {item.type === 'event'
                       ? (item.data as Event).stato
-                      : statoTaskLabel((item.data as Task).stato)}
+                      : item.type === 'task'
+                        ? statoTaskLabel((item.data as Task).stato)
+                        : (item.data as Pratica).categoria}
                   </span>
                 </button>
               )
@@ -561,28 +674,28 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
+  function getItemDate(item: CalItem): string {
+    if (item.type === 'event') return (item.data as Event).dataInizio
+    if (item.type === 'pratica') return (item.data as Pratica).scadenza
+    return (item.data as Task).scadenza
+  }
+  function isItemDone(item: CalItem): boolean {
+    if (item.type === 'event') return (item.data as Event).stato === 'completato'
+    if (item.type === 'pratica') return (item.data as Pratica).stato === 'completata'
+    return (item.data as Task).stato === 'completato'
+  }
+
   const overdue = items.filter(item => {
-    const d = item.type === 'event' ? (item.data as Event).dataInizio : (item.data as Task).scadenza
-    const done = item.type === 'task'
-      ? (item.data as Task).stato === 'completato'
-      : (item.data as Event).stato === 'completato'
-    return new Date(d) < today && !done
+    return new Date(getItemDate(item)) < today && !isItemDone(item)
   })
 
   const upcoming = [...items]
-    .filter(item => {
-      const d = item.type === 'event' ? (item.data as Event).dataInizio : (item.data as Task).scadenza
-      return new Date(d) >= today
-    })
-    .sort((a, b) => {
-      const da = a.type === 'event' ? (a.data as Event).dataInizio : (a.data as Task).scadenza
-      const db = b.type === 'event' ? (b.data as Event).dataInizio : (b.data as Task).scadenza
-      return da.localeCompare(db)
-    })
+    .filter(item => new Date(getItemDate(item)) >= today)
+    .sort((a, b) => getItemDate(a).localeCompare(getItemDate(b)))
 
   const grouped: Record<string, CalItem[]> = {}
   upcoming.forEach(item => {
-    const iso = item.type === 'event' ? (item.data as Event).dataInizio : (item.data as Task).scadenza
+    const iso = getItemDate(item)
     ;(grouped[iso] ??= []).push(item)
   })
 
@@ -598,17 +711,30 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
           </div>
           <div className="space-y-1.5">
             {overdue.map(item => {
-              const color = item.type === 'event' ? eventColor(item.data as Event) : taskColor(item.data as Task)
-              const label = item.type === 'event' ? (item.data as Event).nome : (item.data as Task).titolo
-              const d = item.type === 'event' ? (item.data as Event).dataInizio : (item.data as Task).scadenza
-              const id = item.type === 'event' ? (item.data as Event).id : (item.data as Task).id
+              const color = item.type === 'event'
+                ? eventColor(item.data as Event)
+                : item.type === 'task'
+                  ? taskColor(item.data as Task)
+                  : praticaColor(item.data as Pratica)
+              const label = item.type === 'event'
+                ? (item.data as Event).nome
+                : item.type === 'task'
+                  ? (item.data as Task).titolo
+                  : (item.data as Pratica).titolo
+              const d = getItemDate(item)
+              const id = item.type === 'event'
+                ? (item.data as Event).id
+                : item.type === 'task'
+                  ? (item.data as Task).id
+                  : (item.data as Pratica).id
+              const typeLabel = item.type === 'event' ? 'Evento' : item.type === 'task' ? 'Task' : 'Pratica'
               return (
                 <button key={item.type + id} onClick={() => onItemClick(item)}
                   className="w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all hover:bg-white/5">
                   <div className="w-1.5 h-8 rounded-full flex-shrink-0" style={{ background: color }} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate" style={{ color: 'var(--text)' }}>{label}</p>
-                    <p className="text-xs" style={{ color: 'var(--muted)' }}>{fmtShort(d)} · {item.type === 'event' ? 'Evento' : 'Task'}</p>
+                    <p className="text-xs" style={{ color: 'var(--muted)' }}>{fmtShort(d)} · {typeLabel}</p>
                   </div>
                   <span className="text-xs flex-shrink-0" style={{ color: 'var(--red2)' }}>{Math.abs(daysLeft(d))}g fa</span>
                 </button>
@@ -663,12 +789,26 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
             </div>
             <div>
               {dayItems.map((item, ii) => {
-                const color = item.type === 'event' ? eventColor(item.data as Event) : taskColor(item.data as Task)
-                const label = item.type === 'event' ? (item.data as Event).nome : (item.data as Task).titolo
+                const color = item.type === 'event'
+                  ? eventColor(item.data as Event)
+                  : item.type === 'task'
+                    ? taskColor(item.data as Task)
+                    : praticaColor(item.data as Pratica)
+                const label = item.type === 'event'
+                  ? (item.data as Event).nome
+                  : item.type === 'task'
+                    ? (item.data as Task).titolo
+                    : (item.data as Pratica).titolo
                 const sub = item.type === 'event'
                   ? (item.data as Event).location
-                  : `${statoTaskLabel((item.data as Task).stato)} · ${prioritaLabel((item.data as Task).priorita)}`
-                const id = item.type === 'event' ? (item.data as Event).id : (item.data as Task).id
+                  : item.type === 'task'
+                    ? `${statoTaskLabel((item.data as Task).stato)} · ${prioritaLabel((item.data as Task).priorita)}`
+                    : `${(item.data as Pratica).categoria} · ${(item.data as Pratica).controparte}`
+                const id = item.type === 'event'
+                  ? (item.data as Event).id
+                  : item.type === 'task'
+                    ? (item.data as Task).id
+                    : (item.data as Pratica).id
                 const urgentItem = item.type === 'task' && (item.data as Task).priorita === 'alta' && (item.data as Task).stato !== 'completato'
                 return (
                   <button key={item.type + id}
@@ -679,7 +819,9 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
                       style={{ background: `${color}18` }}>
                       {item.type === 'event'
                         ? <Calendar className="w-3.5 h-3.5" style={{ color }} />
-                        : <CheckSquare className="w-3.5 h-3.5" style={{ color }} />}
+                        : item.type === 'task'
+                          ? <CheckSquare className="w-3.5 h-3.5" style={{ color }} />
+                          : <FileText className="w-3.5 h-3.5" style={{ color }} />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
@@ -741,9 +883,12 @@ export default function Calendario() {
         t.assegnatario === currentUser?.id || (t.evento && myIds.includes(t.evento)))
     }
 
+    const visiblePratiche = pratiche.filter(p => p.stato !== 'completata')
+
     return [
       ...filteredEvents.map(e => ({ type: 'event' as const, data: e })),
       ...filteredTasks.map(t => ({ type: 'task' as const, data: t })),
+      ...visiblePratiche.map(p => ({ type: 'pratica' as const, data: p })),
     ]
   }, [allTasks, allEvents, ruolo, currentUser])
 

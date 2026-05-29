@@ -11,8 +11,7 @@ import {
   X,
 } from 'lucide-react'
 import { users } from '@/data/users'
-import { tasks } from '@/data/tasks'
-import { events } from '@/data/events'
+import { loadTasksFromStorage, loadEventsFromStorage } from '@/lib/storage'
 import type { User as UserType } from '@/data/users'
 
 const RUOLI = ['Tutti', 'Admin', 'Manager', 'Operativo', 'Finance', 'Commerciale', 'Fornitore']
@@ -55,8 +54,8 @@ interface ProfileModalProps {
 }
 
 function ProfileModal({ user, onClose }: ProfileModalProps) {
-  const userTasks = tasks.filter(t => t.assegnatario === user.id)
-  const userEvents = events.filter(e => e.team.includes(user.id) || e.responsabile === user.id)
+  const userTasks = loadTasksFromStorage().filter(t => t.assegnatario === user.id)
+  const userEvents = loadEventsFromStorage().filter(e => e.team.includes(user.id) || e.responsabile === user.id)
 
   return (
     <div
@@ -222,6 +221,8 @@ export default function Utenti() {
   const [filterStato, setFilterStato] = useState('Tutti')
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null)
   const [showFilters, setShowFilters] = useState(false)
+  const tasks = useMemo(() => loadTasksFromStorage(), [])
+  const events = useMemo(() => loadEventsFromStorage(), [])
 
   const filtered = useMemo(() => {
     return users.filter(u => {

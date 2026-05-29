@@ -510,6 +510,7 @@ function SicurezzaSection({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSett
               </button>
             </div>
             <button className="px-4 py-3 rounded-xl text-sm font-medium"
+              onClick={() => alert('Password aggiornata (demo)')}
               style={{ background: 'var(--panel2)', color: 'var(--muted)', border: '1px solid var(--line)' }}>
               Aggiorna
             </button>

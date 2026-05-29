@@ -16,6 +16,8 @@ import {
   Lock,
   Receipt,
   X,
+  Trash2,
+  Edit3,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import {
@@ -420,6 +422,38 @@ export default function Amministrazione() {
       const updated = prev.map(u =>
         u.id === id ? { ...u, stato: 'pagato' as StatoPagamento, dataPagamento: new Date().toISOString().slice(0, 10) } : u
       )
+      save(SK_USCITE, updated)
+      return updated
+    })
+  }
+
+  function eliminaEntrata(id: string) {
+    setEntrate(prev => {
+      const updated = prev.filter(e => e.id !== id)
+      save(SK_ENTRATE, updated)
+      return updated
+    })
+  }
+
+  function eliminaUscita(id: string) {
+    setUscite(prev => {
+      const updated = prev.filter(u => u.id !== id)
+      save(SK_USCITE, updated)
+      return updated
+    })
+  }
+
+  function editEntrata(id: string, importo: number, note: string) {
+    setEntrate(prev => {
+      const updated = prev.map(e => e.id === id ? { ...e, importo, note } : e)
+      save(SK_ENTRATE, updated)
+      return updated
+    })
+  }
+
+  function editUscita(id: string, importo: number, note: string) {
+    setUscite(prev => {
+      const updated = prev.map(u => u.id === id ? { ...u, importo, note } : u)
       save(SK_USCITE, updated)
       return updated
     })
@@ -899,24 +933,43 @@ export default function Amministrazione() {
                       <span className="text-xs truncate block" style={{ color: 'var(--muted)' }}>{e.note}</span>
                     </td>
                     <td className="px-4 py-3">
-                      {e.stato !== 'pagato' && e.stato !== 'annullato' && (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {e.stato !== 'pagato' && e.stato !== 'annullato' && (
+                          <button
+                            onClick={() => segnaEntrataPagata(e.id)}
+                            className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 whitespace-nowrap"
+                            style={{ background: 'rgba(56,210,125,0.12)', color: 'var(--green)', border: '1px solid rgba(56,210,125,0.25)' }}
+                          >
+                            Segna pagato
+                          </button>
+                        )}
+                        {!e.fatturaId && (
+                          <button
+                            onClick={() => generaFattura('entrata', e.clienteId, clientName(e.clienteId), e.importo, e.eventoId)}
+                            className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 whitespace-nowrap"
+                            style={{ background: 'rgba(77,180,255,0.1)', color: 'var(--blue)', border: '1px solid rgba(77,180,255,0.25)' }}
+                          >
+                            Fattura
+                          </button>
+                        )}
                         <button
-                          onClick={() => segnaEntrataPagata(e.id)}
-                          className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 whitespace-nowrap"
-                          style={{ background: 'rgba(56,210,125,0.12)', color: 'var(--green)', border: '1px solid rgba(56,210,125,0.25)' }}
+                          onClick={() => {
+                            const newAmt = prompt('Nuovo importo:', String(e.importo))
+                            if (newAmt) editEntrata(e.id, parseFloat(newAmt) || e.importo, e.note)
+                          }}
+                          className="p-1.5 rounded-lg transition-all hover:bg-white/10"
+                          title="Modifica importo"
                         >
-                          Segna pagato
+                          <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
                         </button>
-                      )}
-                      {!e.fatturaId && (
                         <button
-                          onClick={() => generaFattura('entrata', e.clienteId, clientName(e.clienteId), e.importo, e.eventoId)}
-                          className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 whitespace-nowrap ml-1"
-                          style={{ background: 'rgba(77,180,255,0.1)', color: 'var(--blue)', border: '1px solid rgba(77,180,255,0.25)' }}
+                          onClick={() => { if (confirm('Eliminare questa entrata?')) eliminaEntrata(e.id) }}
+                          className="p-1.5 rounded-lg transition-all hover:bg-white/10"
+                          title="Elimina"
                         >
-                          Fattura
+                          <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -978,24 +1031,43 @@ export default function Amministrazione() {
                         <span className="text-xs truncate block" style={{ color: 'var(--muted)' }}>{u.note}</span>
                       </td>
                       <td className="px-4 py-3">
-                        {u.stato !== 'pagato' && u.stato !== 'annullato' && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {u.stato !== 'pagato' && u.stato !== 'annullato' && (
+                            <button
+                              onClick={() => segnaUscitaPagata(u.id)}
+                              className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 whitespace-nowrap"
+                              style={{ background: 'rgba(56,210,125,0.12)', color: 'var(--green)', border: '1px solid rgba(56,210,125,0.25)' }}
+                            >
+                              Segna pagato
+                            </button>
+                          )}
+                          {!u.fatturaId && (
+                            <button
+                              onClick={() => generaFattura('uscita', u.fornitoreId, supplierName(u.fornitoreId), u.importo, u.eventoId)}
+                              className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 whitespace-nowrap"
+                              style={{ background: 'rgba(77,180,255,0.1)', color: 'var(--blue)', border: '1px solid rgba(77,180,255,0.25)' }}
+                            >
+                              Fattura
+                            </button>
+                          )}
                           <button
-                            onClick={() => segnaUscitaPagata(u.id)}
-                            className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 whitespace-nowrap"
-                            style={{ background: 'rgba(56,210,125,0.12)', color: 'var(--green)', border: '1px solid rgba(56,210,125,0.25)' }}
+                            onClick={() => {
+                              const newAmt = prompt('Nuovo importo:', String(u.importo))
+                              if (newAmt) editUscita(u.id, parseFloat(newAmt) || u.importo, u.note)
+                            }}
+                            className="p-1.5 rounded-lg transition-all hover:bg-white/10"
+                            title="Modifica importo"
                           >
-                            Segna pagato
+                            <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
                           </button>
-                        )}
-                        {!u.fatturaId && (
                           <button
-                            onClick={() => generaFattura('uscita', u.fornitoreId, supplierName(u.fornitoreId), u.importo, u.eventoId)}
-                            className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 whitespace-nowrap ml-1"
-                            style={{ background: 'rgba(77,180,255,0.1)', color: 'var(--blue)', border: '1px solid rgba(77,180,255,0.25)' }}
+                            onClick={() => { if (confirm('Eliminare questa uscita?')) eliminaUscita(u.id) }}
+                            className="p-1.5 rounded-lg transition-all hover:bg-white/10"
+                            title="Elimina"
                           >
-                            Fattura
+                            <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
                           </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   )

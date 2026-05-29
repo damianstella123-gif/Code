@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import {
   ArrowLeft,
   Phone,
@@ -23,14 +23,31 @@ import {
   Hash,
   MessageSquare,
   Download,
+  Plus,
+  Edit3,
+  Trash2,
+  Save,
 } from 'lucide-react'
-import { suppliers } from '@/data/suppliers'
+import { suppliers as defaultSuppliers } from '@/data/suppliers'
 import { events } from '@/data/events'
 import { users } from '@/data/users'
-import { tasks } from '@/data/tasks'
 import { uscite } from '@/data/amministrazione'
 import { loadUser } from '@/lib/auth'
+import { loadTasksFromStorage } from '@/lib/storage'
 import type { Supplier, StatoContratto } from '@/data/suppliers'
+
+const STORAGE_KEY_FORNITORI = 'simmetria_fornitori'
+
+function loadSuppliersFromStorage(): Supplier[] {
+  try {
+    const r = localStorage.getItem(STORAGE_KEY_FORNITORI)
+    return r ? JSON.parse(r) : defaultSuppliers
+  } catch { return defaultSuppliers }
+}
+
+function saveSuppliersToStorage(list: Supplier[]) {
+  localStorage.setItem(STORAGE_KEY_FORNITORI, JSON.stringify(list))
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -98,16 +115,286 @@ function RatingStars({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'l
   )
 }
 
+// ─── Supplier Form Modal ──────────────────────────────────────────────────────
+
+function SupplierFormModal({ supplier, onSave, onCancel }: {
+  supplier?: Supplier; onSave: (s: Supplier) => void; onCancel: () => void
+}) {
+  const [nome, setNome] = useState(supplier?.nome ?? '')
+  const [email, setEmail] = useState(supplier?.email ?? '')
+  const [telefono, setTelefono] = useState(supplier?.telefono ?? '')
+  const [categoria, setCategoria] = useState(supplier?.categoria ?? '')
+  const [referente, setReferente] = useState(supplier?.referente ?? '')
+  const [referenteTelefono, setReferenteTelefono] = useState(supplier?.referenteTelefono ?? '')
+  const [location, setLocation] = useState(supplier?.location ?? '')
+  const [sito, setSito] = useState(supplier?.sito ?? '')
+  const [piva, setPiva] = useState(supplier?.piva ?? '')
+  const [stato, setStato] = useState<'attivo' | 'inattivo'>(supplier?.stato ?? 'attivo')
+  const [statoContratto, setStatoContratto] = useState<StatoContratto>(supplier?.statoContratto ?? 'attivo')
+  const [scadenzaContratto, setScadenzaContratto] = useState(supplier?.scadenzaContratto ?? '')
+  const [servizi, setServizi] = useState(supplier?.servizi?.join(', ') ?? '')
+  const [noteOperative, setNoteOperative] = useState(supplier?.noteOperative ?? '')
+  const [eventiId, setEventiId] = useState<string[]>(supplier?.eventiId ?? [])
+  const [costoMedio, setCostoMedio] = useState(supplier?.costoMedioPerEvento?.toString() ?? '')
+  const [costoMin, setCostoMin] = useState(supplier?.costoMinimo?.toString() ?? '')
+  const [costoMax, setCostoMax] = useState(supplier?.costoMassimo?.toString() ?? '')
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!nome.trim() || !email.trim()) return
+    const updated: Supplier = {
+      id: supplier?.id ?? `sup_${Date.now()}`,
+      nome: nome.trim(),
+      email: email.trim(),
+      telefono: telefono.trim(),
+      categoria: categoria.trim(),
+      referente: referente.trim(),
+      referenteTelefono: referenteTelefono.trim(),
+      rating: supplier?.rating ?? 0,
+      stato,
+      statoContratto,
+      scadenzaContratto,
+      servizi: servizi.split(',').map(s => s.trim()).filter(Boolean),
+      location: location.trim(),
+      sito: sito.trim(),
+      costoMedioPerEvento: parseInt(costoMedio) || 0,
+      costoMinimo: parseInt(costoMin) || 0,
+      costoMassimo: parseInt(costoMax) || 0,
+      noteOperative: noteOperative.trim(),
+      eventiId,
+      documenti: supplier?.documenti ?? [],
+      recensioni: supplier?.recensioni ?? [],
+      piva: piva.trim(),
+    }
+    onSave(updated)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6"
+        style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
+            {supplier ? 'Modifica Fornitore' : 'Nuovo Fornitore'}
+          </h2>
+          <button onClick={onCancel} className="p-2 rounded-lg transition-all hover:bg-white/5">
+            <X className="w-5 h-5" style={{ color: 'var(--muted)' }} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Nome azienda *</label>
+              <input type="text" value={nome} onChange={e => setNome(e.target.value)} required
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Categoria</label>
+              <input type="text" value={categoria} onChange={e => setCategoria(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                placeholder="Es. Audio/Video, Catering..." />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Email *</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Telefono</label>
+              <input type="text" value={telefono} onChange={e => setTelefono(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Referente</label>
+              <input type="text" value={referente} onChange={e => setReferente(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Tel. referente</label>
+              <input type="text" value={referenteTelefono} onChange={e => setReferenteTelefono(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Location</label>
+              <input type="text" value={location} onChange={e => setLocation(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Sito web</label>
+              <input type="text" value={sito} onChange={e => setSito(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>P.IVA</label>
+              <input type="text" value={piva} onChange={e => setPiva(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Stato</label>
+              <select value={stato} onChange={e => setStato(e.target.value as 'attivo' | 'inattivo')}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <option value="attivo">Attivo</option>
+                <option value="inattivo">Inattivo</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Stato contratto</label>
+              <select value={statoContratto} onChange={e => setStatoContratto(e.target.value as StatoContratto)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <option value="attivo">Attivo</option>
+                <option value="in_scadenza">In Scadenza</option>
+                <option value="in_rinnovo">In Rinnovo</option>
+                <option value="scaduto">Scaduto</option>
+                <option value="sospeso">Sospeso</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Scadenza contratto</label>
+              <input type="date" value={scadenzaContratto} onChange={e => setScadenzaContratto(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Costo medio/evento</label>
+              <input type="number" value={costoMedio} onChange={e => setCostoMedio(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Costo minimo</label>
+              <input type="number" value={costoMin} onChange={e => setCostoMin(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Costo massimo</label>
+              <input type="number" value={costoMax} onChange={e => setCostoMax(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Servizi (separati da virgola)</label>
+            <input type="text" value={servizi} onChange={e => setServizi(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              placeholder="Es. Impianti audio, Video proiezione, Illuminazione" />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium mb-2 block" style={{ color: 'var(--muted)' }}>Eventi collegati</label>
+            <div className="flex flex-wrap gap-2">
+              {events.map(ev => (
+                <button key={ev.id} type="button"
+                  onClick={() => setEventiId(prev => prev.includes(ev.id) ? prev.filter(x => x !== ev.id) : [...prev, ev.id])}
+                  className="px-3 py-1.5 rounded-lg text-xs transition-all"
+                  style={{
+                    background: eventiId.includes(ev.id) ? 'rgba(208,0,58,0.12)' : 'var(--panel)',
+                    color: eventiId.includes(ev.id) ? 'var(--red2)' : 'var(--muted)',
+                    border: `1px solid ${eventiId.includes(ev.id) ? 'rgba(208,0,58,0.3)' : 'var(--line)'}`,
+                  }}>
+                  {ev.nome}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Note operative</label>
+            <textarea value={noteOperative} onChange={e => setNoteOperative(e.target.value)} rows={3}
+              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
+              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          </div>
+
+          <div className="flex gap-3 pt-4" style={{ borderTop: '1px solid var(--line)' }}>
+            <button type="submit" className="btn-primary flex-1 py-3 rounded-xl text-sm font-semibold">
+              {supplier ? 'Salva Modifiche' : 'Crea Fornitore'}
+            </button>
+            <button type="button" onClick={onCancel}
+              className="px-6 py-3 rounded-xl text-sm font-medium"
+              style={{ background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>
+              Annulla
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Delete Confirm ──────────────────────────────────────────────────────────
+
+function DeleteConfirm({ name, onConfirm, onCancel }: {
+  name: string; onConfirm: () => void; onCancel: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+      <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,49,95,0.12)' }}>
+            <Trash2 className="w-5 h-5" style={{ color: 'var(--red2)' }} />
+          </div>
+          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Elimina fornitore</h3>
+        </div>
+        <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>
+          Sei sicuro di voler eliminare <strong style={{ color: 'var(--text)' }}>"{name}"</strong>?
+        </p>
+        <div className="flex gap-3">
+          <button onClick={onConfirm}
+            className="flex-1 py-3 rounded-xl text-sm font-semibold text-white"
+            style={{ background: 'var(--red2)' }}>Elimina</button>
+          <button onClick={onCancel}
+            className="flex-1 py-3 rounded-xl text-sm font-medium"
+            style={{ background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>Annulla</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Supplier Detail ──────────────────────────────────────────────────────────
 
 interface DetailProps {
   supplier: Supplier
   onBack: () => void
   showFinance: boolean
+  onEdit: (s: Supplier) => void
+  onDelete: (s: Supplier) => void
+  onSaveNotes: (s: Supplier, notes: string) => void
 }
 
-function SupplierDetail({ supplier, onBack, showFinance }: DetailProps) {
+function SupplierDetail({ supplier, onBack, showFinance, onEdit, onDelete, onSaveNotes }: DetailProps) {
   const [tab, setTab] = useState<'overview' | 'eventi' | 'documenti' | 'recensioni'>('overview')
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [notesText, setNotesText] = useState(supplier.noteOperative)
 
   const linkedEvents = events.filter(e => supplier.eventiId.includes(e.id))
   const totalSpeso = showFinance
@@ -125,13 +412,27 @@ function SupplierDetail({ supplier, onBack, showFinance }: DetailProps) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-sm transition-all hover:opacity-80"
-        style={{ color: 'var(--muted)' }}
-      >
-        <ArrowLeft className="w-4 h-4" /> Torna ai fornitori
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-sm transition-all hover:opacity-80"
+          style={{ color: 'var(--muted)' }}
+        >
+          <ArrowLeft className="w-4 h-4" /> Torna ai fornitori
+        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => onEdit(supplier)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5"
+            style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+            <Edit3 className="w-4 h-4" /> Modifica
+          </button>
+          <button onClick={() => onDelete(supplier)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5"
+            style={{ background: 'rgba(255,49,95,0.08)', border: '1px solid rgba(255,49,95,0.2)', color: 'var(--red2)' }}>
+            <Trash2 className="w-4 h-4" /> Elimina
+          </button>
+        </div>
+      </div>
 
       {/* Hero */}
       <div className="panel p-6 relative overflow-hidden">
@@ -325,8 +626,29 @@ function SupplierDetail({ supplier, onBack, showFinance }: DetailProps) {
 
           {/* Note operative */}
           <div className="panel p-5 md:col-span-2">
-            <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Note operative</p>
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{supplier.noteOperative}</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Note operative</p>
+              {editingNotes ? (
+                <button onClick={() => { onSaveNotes(supplier, notesText); setEditingNotes(false) }}
+                  className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg"
+                  style={{ background: 'rgba(56,210,125,0.12)', color: 'var(--green)', border: '1px solid rgba(56,210,125,0.3)' }}>
+                  <Save className="w-3 h-3" /> Salva
+                </button>
+              ) : (
+                <button onClick={() => setEditingNotes(true)}
+                  className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg"
+                  style={{ background: 'var(--panel2)', color: 'var(--muted)', border: '1px solid var(--line)' }}>
+                  <Edit3 className="w-3 h-3" /> Modifica
+                </button>
+              )}
+            </div>
+            {editingNotes ? (
+              <textarea value={notesText} onChange={e => setNotesText(e.target.value)} rows={4}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            ) : (
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{supplier.noteOperative || 'Nessuna nota operativa.'}</p>
+            )}
           </div>
 
           {/* Performance */}
@@ -381,9 +703,8 @@ function SupplierDetail({ supplier, onBack, showFinance }: DetailProps) {
           ) : linkedEvents.map(ev => {
             const statoColor = { in_corso: 'var(--red2)', pianificazione: 'var(--blue)', completato: 'var(--green)', bozza: 'var(--yellow)' }[ev.stato]
             const statoLabel = { in_corso: 'In Corso', pianificazione: 'Pianificazione', completato: 'Completato', bozza: 'Bozza' }[ev.stato]
-            const evTasks = tasks.filter(t => t.evento === ev.id && (
-              supplier.eventiId.includes(ev.id)
-            ))
+            const allTasks = loadTasksFromStorage()
+            const evTasks = allTasks.filter(t => t.evento === ev.id)
             const spesaEvento = showFinance
               ? uscite.filter(u => u.fornitoreId === supplier.id && u.eventoId === ev.id).reduce((s, u) => s + u.importo, 0)
               : 0
@@ -513,11 +834,47 @@ const CONTRATTO_FILTERS: { id: string; label: string }[] = [
 
 export default function Fornitori() {
   const currentUser = loadUser()
+  const [supplierList, setSupplierList] = useState<Supplier[]>(() => loadSuppliersFromStorage())
   const [selected, setSelected] = useState<Supplier | null>(null)
   const [search, setSearch] = useState('')
   const [filterCategoria, setFilterCategoria] = useState('Tutte')
   const [filterContratto, setFilterContratto] = useState('tutti')
   const [filterRating, setFilterRating] = useState('tutti')
+  const [showForm, setShowForm] = useState(false)
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | undefined>(undefined)
+  const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null)
+
+  const handleSave = useCallback((s: Supplier) => {
+    setSupplierList(prev => {
+      const exists = prev.find(x => x.id === s.id)
+      const updated = exists ? prev.map(x => x.id === s.id ? s : x) : [s, ...prev]
+      saveSuppliersToStorage(updated)
+      return updated
+    })
+    setShowForm(false)
+    setEditingSupplier(undefined)
+    if (selected && selected.id === s.id) setSelected(s)
+  }, [selected])
+
+  const handleDelete = useCallback((s: Supplier) => {
+    setSupplierList(prev => {
+      const updated = prev.filter(x => x.id !== s.id)
+      saveSuppliersToStorage(updated)
+      return updated
+    })
+    setDeletingSupplier(null)
+    setSelected(null)
+  }, [])
+
+  const handleSaveNotes = useCallback((s: Supplier, notes: string) => {
+    const updated = { ...s, noteOperative: notes }
+    setSupplierList(prev => {
+      const newList = prev.map(x => x.id === s.id ? updated : x)
+      saveSuppliersToStorage(newList)
+      return newList
+    })
+    if (selected && selected.id === s.id) setSelected(updated)
+  }, [selected])
 
   if (!currentUser) return null
 
@@ -529,27 +886,23 @@ export default function Fornitori() {
     if (ruolo === 'Admin' || ruolo === 'Manager') return 'all'
     if (ruolo === 'Finance') return 'all'
     if (ruolo === 'Fornitore') {
-      // Fornitore sees only their own supplier entry matched by user id
-      // Convention: user usr_011 maps to sup_001 (only one fornitore in demo)
-      // We match by showing all — in a real app would match by userId
-      return suppliers.filter(s => s.referente === currentUser.nome || s.stato === 'attivo').map(s => s.id).slice(0, 1)
+      return supplierList.filter(s => s.referente === currentUser.nome || s.stato === 'attivo').map(s => s.id).slice(0, 1)
     }
     if (ruolo === 'Operativo') {
-      // Sees suppliers linked to events where they are team member
       const myEventIds = events
         .filter(e => e.team.includes(currentUser.id) || e.responsabile === currentUser.id)
         .map(e => e.id)
-      return suppliers.filter(s => s.eventiId.some(eid => myEventIds.includes(eid))).map(s => s.id)
+      return supplierList.filter(s => s.eventiId.some(eid => myEventIds.includes(eid))).map(s => s.id)
     }
     if (ruolo === 'Commerciale') {
-      return suppliers.filter(s => s.stato === 'attivo').map(s => s.id)
+      return supplierList.filter(s => s.stato === 'attivo').map(s => s.id)
     }
     return 'all'
-  }, [ruolo, currentUser])
+  }, [ruolo, currentUser, supplierList])
 
   const baseList = useMemo(() =>
-    allowedIds === 'all' ? suppliers : suppliers.filter(s => allowedIds.includes(s.id)),
-    [allowedIds])
+    allowedIds === 'all' ? supplierList : supplierList.filter(s => allowedIds.includes(s.id)),
+    [allowedIds, supplierList])
 
   const filtered = useMemo(() => {
     return baseList.filter(s => {
@@ -573,19 +926,55 @@ export default function Fornitori() {
   const scaduti = baseList.filter(s => s.statoContratto === 'scaduto').length
 
   if (selected) {
+    const liveSupplier = supplierList.find(s => s.id === selected.id) ?? selected
     return (
-      <SupplierDetail
-        supplier={selected}
-        onBack={() => setSelected(null)}
-        showFinance={showFinance}
-      />
+      <>
+        {showForm && (
+          <SupplierFormModal
+            supplier={editingSupplier}
+            onSave={handleSave}
+            onCancel={() => { setShowForm(false); setEditingSupplier(undefined) }}
+          />
+        )}
+        {deletingSupplier && (
+          <DeleteConfirm
+            name={deletingSupplier.nome}
+            onConfirm={() => handleDelete(deletingSupplier)}
+            onCancel={() => setDeletingSupplier(null)}
+          />
+        )}
+        <SupplierDetail
+          supplier={liveSupplier}
+          onBack={() => setSelected(null)}
+          showFinance={showFinance}
+          onEdit={(s) => { setEditingSupplier(s); setShowForm(true) }}
+          onDelete={(s) => setDeletingSupplier(s)}
+          onSaveNotes={handleSaveNotes}
+        />
+      </>
     )
   }
 
   return (
     <div className="space-y-6">
+      {showForm && (
+        <SupplierFormModal
+          supplier={editingSupplier}
+          onSave={handleSave}
+          onCancel={() => { setShowForm(false); setEditingSupplier(undefined) }}
+        />
+      )}
+      {deletingSupplier && (
+        <DeleteConfirm
+          name={deletingSupplier.nome}
+          onConfirm={() => handleDelete(deletingSupplier)}
+          onCancel={() => setDeletingSupplier(null)}
+        />
+      )}
+
       {/* Header */}
-      <div>
+      <div className="flex items-center justify-between">
+        <div>
         <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Fornitori</h1>
         <p className="mt-1" style={{ color: 'var(--muted)' }}>
           {filtered.length} fornitori visibili
@@ -600,6 +989,11 @@ export default function Fornitori() {
             </span>
           )}
         </p>
+        </div>
+        <button onClick={() => { setEditingSupplier(undefined); setShowForm(true) }}
+          className="btn-primary flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold">
+          <Plus className="w-4 h-4" /> Nuovo fornitore
+        </button>
       </div>
 
       {/* Alerts */}

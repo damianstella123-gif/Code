@@ -172,6 +172,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
 function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
   const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
   const user = loadUser()
 
   const handleLogout = () => {
@@ -204,19 +205,56 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
-          <button className="relative p-2 rounded-lg transition-all hover:bg-white/5">
-            <Bell className="w-5 h-5" style={{ color: 'var(--muted)' }} />
-            <span
-              className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full"
-              style={{ background: 'var(--red)' }}
-            />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => { setNotifOpen(v => !v); setUserMenuOpen(false) }}
+              className="relative p-2 rounded-lg transition-all hover:bg-white/5"
+            >
+              <Bell className="w-5 h-5" style={{ color: 'var(--muted)' }} />
+              <span
+                className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full"
+                style={{ background: 'var(--red)' }}
+              />
+            </button>
+            {notifOpen && (
+              <div
+                className="absolute right-0 top-full mt-2 w-80 rounded-xl overflow-hidden animate-fade-in"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+              >
+                <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--line)' }}>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Notifiche</p>
+                </div>
+                <div className="max-h-72 overflow-y-auto">
+                  {[
+                    { text: 'Nuovo task assegnato: Conferma venue', time: '2 min fa', read: false },
+                    { text: 'Corporate Summit passa a "in_corso"', time: '1 ora fa', read: false },
+                    { text: 'Budget evento aggiornato da Marco', time: '3 ore fa', read: true },
+                    { text: 'Fornitore TechnoStage ha risposto', time: 'Ieri', read: true },
+                  ].map((n, i) => (
+                    <div key={i} className="px-4 py-3 flex items-start gap-3 transition-all hover:bg-white/5" style={{ borderBottom: '1px solid var(--line)' }}>
+                      {!n.read && <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'var(--red)' }} />}
+                      {n.read && <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'transparent' }} />}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate" style={{ color: n.read ? 'var(--muted)' : 'var(--text)' }}>{n.text}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{n.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-4 py-2.5 border-t" style={{ borderColor: 'var(--line)' }}>
+                  <button onClick={() => setNotifOpen(false)} className="text-xs font-medium" style={{ color: 'var(--red2)' }}>
+                    Segna tutte come lette
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* User chip */}
           {user && (
             <div className="relative">
               <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false) }}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all hover:bg-white/5"
                 style={{ border: '1px solid var(--line)' }}
               >
