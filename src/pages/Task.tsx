@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { users } from '@/data/users'
 import { loadUser } from '@/lib/auth'
-import { loadTasksFromStorage, loadEventsFromStorage, cacheTasksSnapshot } from '@/lib/storage'
+import { loadEventsFromStorage, cacheTasksSnapshot } from '@/lib/storage'
 import { fetchTasks, upsertTask, deleteTask as deleteTaskRemote, changeTaskStatus } from '@/lib/tasks-service'
 import { daysLeft, fmtShort } from '@/lib/format'
 import type { Task } from '@/data/tasks'
@@ -365,7 +365,7 @@ function TaskCard({ task, onClick, onQuickMove }: {
 
 export default function TaskPage() {
   const currentUser = loadUser()
-  const [taskList, setTaskList] = useState<Task[]>(loadTasksFromStorage)
+  const [taskList, setTaskList] = useState<Task[]>([])
   const [selected, setSelected] = useState<Task | null>(null)
   const [search, setSearch] = useState('')
   const [filterPriorita, setFilterPriorita] = useState('Tutte')
@@ -373,16 +373,14 @@ export default function TaskPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
 
-  // Carica i task da Supabase al mount.
-  // Cache localStorage rimane come snapshot iniziale e per gli altri moduli.
+  // Task: fonte di verita' Supabase. Nessun fallback mock.
+  // La snapshot in localStorage resta solo per gli altri moduli che la leggono.
   useEffect(() => {
     let cancelled = false
     fetchTasks().then(remote => {
       if (cancelled) return
-      if (remote.length > 0) {
-        setTaskList(remote)
-        cacheTasksSnapshot(remote)
-      }
+      setTaskList(remote)
+      cacheTasksSnapshot(remote)
     })
     return () => {
       cancelled = true
