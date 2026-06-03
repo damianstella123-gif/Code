@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -20,16 +20,16 @@ import {
   FileText,
 } from 'lucide-react'
 import { users } from '@/data/users'
-import { uscite } from '@/data/amministrazione'
 import { loadUser } from '@/lib/auth'
-import { loadTasksFromStorage, loadEventsFromStorage, loadPraticheFromStorage, STORAGE_KEYS } from '@/lib/storage'
 import { daysLeft, fmtShort, fmtLong, toISO, addDays } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Pratica } from '@/data/pratiche'
-
-function saveTasks(t: Task[]) { localStorage.setItem(STORAGE_KEYS.tasks, JSON.stringify(t)) }
-function saveEvents(e: Event[]) { localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(e)) }
+import type { Uscita } from '@/data/amministrazione'
+import { fetchEvents, upsertEvent } from '@/lib/events-service'
+import { fetchTasks, upsertTask, changeTaskStatus } from '@/lib/tasks-service'
+import { fetchPractices } from '@/lib/practices-service'
+import { fetchBudgets } from '@/lib/budgets-service'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,19 +84,21 @@ type CalItem = { type: 'event'; data: Event } | { type: 'task'; data: Task } | {
 
 // ─── Detail popup ─────────────────────────────────────────────────────────────
 
-function DetailPopup({ item, onClose, onTaskStateChange }: {
+function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange }: {
   item: CalItem
+  allTasks: Task[]
+  allUscite: Uscita[]
   onClose: () => void
   onTaskStateChange: (id: string, stato: Task['stato']) => void
 }) {
   if (item.type === 'event') {
     const ev = item.data as Event
     const color = eventColor(ev)
-    const evTasks = loadTasksFromStorage().filter(t => t.evento === ev.id)
+    const evTasks = allTasks.filter(t => t.evento === ev.id)
     const completati = evTasks.filter(t => t.stato === 'completato').length
     const dl = daysLeft(ev.dataInizio)
     const resp = users.find(u => u.id === ev.responsabile)
-    const spesa = uscite.filter(u => u.eventoId === ev.id).reduce((s, u) => s + u.importo, 0)
+    const spesa = allUscite.filter(u => u.eventoId === ev.id).reduce((s, u) => s + u.importo, 0)
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -844,8 +846,10 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Calendario() {
-  const [allTasks, setAllTasks] = useState<Task[]>(() => loadTasksFromStorage())
-  const [allEvents] = useState<Event[]>(() => loadEventsFromStorage())
+  const [allTasks, setAllTasks] = useState<Task[]>([])
+  const [allEvents, setAllEvents] = useState<Event[]>([])
+  const [allPratiche, setAllPratiche] = useState<Pratica[]>([])
+  const [allUscite, setAllUscite] = useState<Uscita[]>([])
   const [view, setView] = useState<ViewMode>('month')
   const [cursor, setCursor] = useState(() => {
     const t = new Date(); t.setHours(0, 0, 0, 0); return t
@@ -855,6 +859,18 @@ export default function Calendario() {
 
   const currentUser = loadUser()
   const ruolo = currentUser?.ruolo ?? 'Admin'
+
+  const refresh = useCallback(async () => {
+    const [t, e, p, u] = await Promise.all([fetchTasks(), fetchEvents(), fetchPractices(), fetchBudgets()])
+    setAllTasks(t)
+    setAllEvents(e)
+    setAllPratiche(p)
+    setAllUscite(u)
+  }, [])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
 
   // Permission-filtered visible items
   const visibleItems = useMemo((): CalItem[] => {
@@ -882,38 +898,41 @@ export default function Calendario() {
         t.assegnatario === currentUser?.id || (t.evento && myIds.includes(t.evento)))
     }
 
-    const visiblePratiche = loadPraticheFromStorage().filter(p => p.stato !== 'completata')
+    const visiblePratiche = allPratiche.filter(p => p.stato !== 'completata')
 
     return [
       ...filteredEvents.map(e => ({ type: 'event' as const, data: e })),
       ...filteredTasks.map(t => ({ type: 'task' as const, data: t })),
       ...visiblePratiche.map(p => ({ type: 'pratica' as const, data: p })),
     ]
-  }, [allTasks, allEvents, ruolo, currentUser])
+  }, [allTasks, allEvents, allPratiche, ruolo, currentUser])
 
-  function handleTaskStateChange(id: string, stato: Task['stato']) {
-    const updated = allTasks.map(t => t.id === id ? { ...t, stato } : t)
-    setAllTasks(updated)
-    saveTasks(updated)
+  async function handleTaskStateChange(id: string, stato: Task['stato']) {
+    setAllTasks(prev => prev.map(t => t.id === id ? { ...t, stato } : t))
+    await changeTaskStatus(id, stato)
+    await refresh()
   }
 
-  function handleMoveItem(id: string, type: 'event' | 'task', newDate: string) {
+  async function handleMoveItem(id: string, type: 'event' | 'task', newDate: string) {
     if (type === 'task') {
-      const updated = allTasks.map(t => t.id === id ? { ...t, scadenza: newDate } : t)
-      setAllTasks(updated)
-      saveTasks(updated)
+      const target = allTasks.find(t => t.id === id)
+      if (!target) return
+      const updated = { ...target, scadenza: newDate }
+      setAllTasks(prev => prev.map(t => t.id === id ? updated : t))
+      await upsertTask(updated)
     } else {
-      const updated = allEvents.map(e => {
-        if (e.id !== id) return e
-        const diffMs = new Date(newDate).getTime() - new Date(e.dataInizio).getTime()
-        return {
-          ...e,
-          dataInizio: newDate,
-          dataFine: new Date(new Date(e.dataFine).getTime() + diffMs).toISOString().slice(0, 10),
-        }
-      })
-      saveEvents(updated)
+      const target = allEvents.find(e => e.id === id)
+      if (!target) return
+      const diffMs = new Date(newDate).getTime() - new Date(target.dataInizio).getTime()
+      const updated: Event = {
+        ...target,
+        dataInizio: newDate,
+        dataFine: new Date(new Date(target.dataFine).getTime() + diffMs).toISOString().slice(0, 10),
+      }
+      setAllEvents(prev => prev.map(e => e.id === id ? updated : e))
+      await upsertEvent(updated)
     }
+    await refresh()
   }
 
   const weekStart = useMemo(() => startOfWeek(cursor), [cursor])
@@ -1078,6 +1097,8 @@ export default function Calendario() {
       {selectedItem && (
         <DetailPopup
           item={selectedItem}
+          allTasks={allTasks}
+          allUscite={allUscite}
           onClose={() => setSelectedItem(null)}
           onTaskStateChange={handleTaskStateChange}
         />

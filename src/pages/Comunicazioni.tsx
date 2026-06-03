@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Search,
   X,
@@ -19,23 +19,15 @@ import {
   Bell,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
-import { messaggi as initMessaggi } from '@/data/comunicazioni'
 import type { Messaggio, Priorita, TipoCanale } from '@/data/comunicazioni'
 import { users } from '@/data/users'
 import { loadEventsFromStorage, loadTasksFromStorage } from '@/lib/storage'
-
-// ─── localStorage ─────────────────────────────────────────────────────────────
-
-const SK = 'simmetria_messaggi'
-function loadMsgs(): Messaggio[] {
-  try {
-    const r = localStorage.getItem(SK)
-    return r ? JSON.parse(r) : initMessaggi
-  } catch { return initMessaggi }
-}
-function saveMsgs(msgs: Messaggio[]) {
-  localStorage.setItem(SK, JSON.stringify(msgs))
-}
+import {
+  fetchCommunications,
+  upsertCommunication,
+  updateCommunication,
+  deleteCommunication,
+} from '@/lib/communications-service'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -526,7 +518,7 @@ const SIDEBAR: { id: string; label: string; canale?: TipoCanale; icon: React.FC<
 
 export default function Comunicazioni() {
   const currentUser = loadUser()
-  const [msgs, setMsgs] = useState<Messaggio[]>(() => loadMsgs())
+  const [msgs, setMsgs] = useState<Messaggio[]>([])
   const [view, setView] = useState<string>('inbox')
   const [selected, setSelected] = useState<Messaggio | null>(null)
   const [showComposer, setShowComposer] = useState(false)
@@ -535,6 +527,15 @@ export default function Comunicazioni() {
   const [filterEvento, setFilterEvento] = useState('tutti')
   const [filterPriorita, setFilterPriorita] = useState('tutti')
   const [filterMittente, setFilterMittente] = useState('tutti')
+
+  const refresh = useCallback(async () => {
+    const list = await fetchCommunications()
+    setMsgs(list)
+  }, [])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
 
   if (!currentUser) return null
 
@@ -624,58 +625,50 @@ export default function Comunicazioni() {
   const totalUnread = visibleMsgs.filter(m => m.destinatari.includes(uid) && !m.letto.includes(uid)).length
 
   // ── Actions ─────────────────────────────────────────────────────────────────
-  function markRead(id: string) {
-    setMsgs(prev => {
-      const updated = prev.map(m =>
-        m.id === id && !m.letto.includes(uid)
-          ? { ...m, letto: [...m.letto, uid] }
-          : m
-      )
-      saveMsgs(updated)
-      return updated
-    })
+  async function markRead(id: string) {
+    const target = msgs.find(m => m.id === id)
+    if (!target || target.letto.includes(uid)) return
+    const newLetto = [...target.letto, uid]
+    setMsgs(prev => prev.map(m => m.id === id ? { ...m, letto: newLetto } : m))
+    await updateCommunication(id, { letto: newLetto })
   }
 
-  function markAllRead() {
-    setMsgs(prev => {
-      const updated = prev.map(m =>
-        (m.destinatari.includes(uid) && !m.letto.includes(uid))
-          ? { ...m, letto: [...m.letto, uid] }
-          : m
-      )
-      saveMsgs(updated)
-      return updated
-    })
+  async function markAllRead() {
+    const toMark = msgs.filter(m => m.destinatari.includes(uid) && !m.letto.includes(uid))
+    if (toMark.length === 0) return
+    setMsgs(prev => prev.map(m =>
+      (m.destinatari.includes(uid) && !m.letto.includes(uid))
+        ? { ...m, letto: [...m.letto, uid] }
+        : m
+    ))
+    await Promise.all(toMark.map(m =>
+      updateCommunication(m.id, { letto: [...m.letto, uid] })
+    ))
   }
 
-  function handleSend(data: Omit<Messaggio, 'id' | 'letto'>) {
+  async function handleSend(data: Omit<Messaggio, 'id' | 'letto'>) {
     const newMsg: Messaggio = {
       ...data,
       id: `msg_new_${Date.now()}`,
       letto: [uid],
     }
-    setMsgs(prev => {
-      const updated = [newMsg, ...prev]
-      saveMsgs(updated)
-      return updated
-    })
+    setMsgs(prev => [newMsg, ...prev])
     setShowComposer(false)
     setReplyTo(null)
     setView('sent')
+    await upsertCommunication(newMsg)
+    await refresh()
   }
 
-  function deleteMsg(id: string) {
-    setMsgs(prev => {
-      const updated = prev.filter(m => m.id !== id)
-      saveMsgs(updated)
-      return updated
-    })
+  async function deleteMsg(id: string) {
+    setMsgs(prev => prev.filter(m => m.id !== id))
     setSelected(null)
+    await deleteCommunication(id)
   }
 
   function openMsg(m: Messaggio) {
     setSelected(m)
-    markRead(m.id)
+    void markRead(m.id)
   }
 
   function handleReply(original: Messaggio) {
