@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   CheckSquare,
   Clock,
@@ -17,13 +17,10 @@ import {
 } from 'lucide-react'
 import { users } from '@/data/users'
 import { loadUser } from '@/lib/auth'
-import { loadTasksFromStorage, loadEventsFromStorage, STORAGE_KEYS } from '@/lib/storage'
+import { loadTasksFromStorage, loadEventsFromStorage, cacheTasksSnapshot } from '@/lib/storage'
+import { fetchTasks, upsertTask, deleteTask as deleteTaskRemote, changeTaskStatus } from '@/lib/tasks-service'
 import { daysLeft, fmtShort } from '@/lib/format'
 import type { Task } from '@/data/tasks'
-
-function saveTasks(list: Task[]): void {
-  localStorage.setItem(STORAGE_KEYS.tasks, JSON.stringify(list))
-}
 
 const COLUMNS: { id: Task['stato']; label: string; color: string; bg: string }[] = [
   { id: 'da_fare', label: 'Da Fare', color: 'var(--yellow)', bg: 'rgba(255, 194, 75, 0.06)' },
@@ -376,6 +373,22 @@ export default function TaskPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
 
+  // Carica i task da Supabase al mount.
+  // Cache localStorage rimane come snapshot iniziale e per gli altri moduli.
+  useEffect(() => {
+    let cancelled = false
+    fetchTasks().then(remote => {
+      if (cancelled) return
+      if (remote.length > 0) {
+        setTaskList(remote)
+        cacheTasksSnapshot(remote)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const visibleTasks = useMemo(() => {
     if (!currentUser) return []
     return getVisibleTasks(taskList, currentUser.ruolo, currentUser.id)
@@ -390,29 +403,35 @@ export default function TaskPage() {
     })
   }, [visibleTasks, search, filterPriorita, filterAssegnatario])
 
-  const moveTask = useCallback((taskId: string, to: Task['stato']) => {
+  const moveTask = useCallback(async (taskId: string, to: Task['stato']) => {
     setTaskList(prev => {
       const updated = prev.map(t => t.id === taskId ? { ...t, stato: to } : t)
-      saveTasks(updated)
+      cacheTasksSnapshot(updated)
       return updated
     })
+    await changeTaskStatus(taskId, to)
   }, [])
 
-  const saveTask = useCallback((task: Task) => {
+  const saveTask = useCallback(async (task: Task) => {
+    const saved = await upsertTask(task)
+    const finalTask = saved ?? task
     setTaskList(prev => {
-      const exists = prev.find(t => t.id === task.id)
-      const updated = exists ? prev.map(t => t.id === task.id ? task : t) : [task, ...prev]
-      saveTasks(updated)
+      const exists = prev.find(t => t.id === finalTask.id)
+      const updated = exists
+        ? prev.map(t => (t.id === finalTask.id ? finalTask : t))
+        : [finalTask, ...prev]
+      cacheTasksSnapshot(updated)
       return updated
     })
     setShowForm(false)
     setEditingTask(undefined)
   }, [])
 
-  const deleteTask = useCallback((taskId: string) => {
+  const deleteTask = useCallback(async (taskId: string) => {
+    await deleteTaskRemote(taskId)
     setTaskList(prev => {
       const updated = prev.filter(t => t.id !== taskId)
-      saveTasks(updated)
+      cacheTasksSnapshot(updated)
       return updated
     })
     setSelected(null)
