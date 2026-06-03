@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   FileText,
   Plus,
@@ -23,26 +23,13 @@ import {
   Receipt,
   ScrollText,
 } from 'lucide-react'
-import { pratiche as praticheDemo, type Pratica, type CategoriaPratica, type StatoPratica, type PrioritaPratica } from '@/data/pratiche'
+import { type Pratica, type CategoriaPratica, type StatoPratica, type PrioritaPratica } from '@/data/pratiche'
 import { events } from '@/data/events'
 import { users } from '@/data/users'
 import { loadUser } from '@/lib/auth'
 import { daysLeft, fmtShort } from '@/lib/format'
-
-const STORAGE_KEY = 'simmetria_pratiche'
-
-function loadPratiche(): Pratica[] {
-  try {
-    const r = localStorage.getItem(STORAGE_KEY)
-    return r ? JSON.parse(r) : praticheDemo
-  } catch {
-    return praticheDemo
-  }
-}
-
-function savePratiche(data: Pratica[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-}
+import { cachePraticheSnapshot } from '@/lib/storage'
+import { fetchPractices, upsertPractice, deletePractice as deletePracticeRemote } from '@/lib/practices-service'
 
 const CATEGORIE: { id: CategoriaPratica; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'contratto', label: 'Contratto', icon: Briefcase, color: 'var(--red2)' },
@@ -84,7 +71,7 @@ function priColor(pri: PrioritaPratica) {
 type View = 'list' | 'detail' | 'form'
 
 export default function Pratiche() {
-  const [allPratiche, setAllPratiche] = useState<Pratica[]>(loadPratiche)
+  const [allPratiche, setAllPratiche] = useState<Pratica[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [view, setView] = useState<View>('list')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -96,6 +83,27 @@ export default function Pratiche() {
   const [filterEvento, setFilterEvento] = useState<string | 'tutti'>('tutti')
   const [filterPriorita, setFilterPriorita] = useState<PrioritaPratica | 'tutti'>('tutti')
   const [showFilters, setShowFilters] = useState(false)
+
+  // Pratiche: fonte di verita' Supabase. Nessun fallback mock.
+  // La snapshot in localStorage resta solo per Calendario che la legge.
+  useEffect(() => {
+    let cancelled = false
+    fetchPractices().then(remote => {
+      if (cancelled) return
+      setAllPratiche(remote)
+      cachePraticheSnapshot(remote)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const refreshPractices = useCallback(async () => {
+    const remote = await fetchPractices()
+    setAllPratiche(remote)
+    cachePraticheSnapshot(remote)
+    return remote
+  }, [])
 
   const filtered = useMemo(() => {
     let list = allPratiche
@@ -143,24 +151,21 @@ export default function Pratiche() {
   }
 
   function deletePratica(id: string) {
-    const updated = allPratiche.filter(p => p.id !== id)
-    setAllPratiche(updated)
-    savePratiche(updated)
-    setView('list')
-    setSelectedId(null)
+    deletePracticeRemote(id).then(ok => {
+      if (!ok) return
+      refreshPractices()
+      setView('list')
+      setSelectedId(null)
+    })
   }
 
   function savePratica(pratica: Pratica) {
-    let updated: Pratica[]
-    if (editingId) {
-      updated = allPratiche.map(p => p.id === editingId ? pratica : p)
-    } else {
-      updated = [pratica, ...allPratiche]
-    }
-    setAllPratiche(updated)
-    savePratiche(updated)
-    setSelectedId(pratica.id)
-    setView('detail')
+    upsertPractice(pratica).then(saved => {
+      const finalPratica = saved ?? pratica
+      refreshPractices()
+      setSelectedId(finalPratica.id)
+      setView('detail')
+    })
   }
 
   if (view === 'detail' && selected) {

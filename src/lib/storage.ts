@@ -70,3 +70,11 @@ export function loadUsciteFromStorage() {
 export function loadPraticheFromStorage(): Pratica[] {
   return safeRead(STORAGE_KEYS.pratiche, praticheDemo)
 }
+
+export function cachePraticheSnapshot(list: Pratica[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.pratiche, JSON.stringify(list))
+  } catch {
+    // ignore quota errors in demo
+  }
+}
