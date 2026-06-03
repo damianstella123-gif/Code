@@ -17,13 +17,12 @@ import {
   ShieldAlert,
   CreditCard,
 } from 'lucide-react'
-import { clients } from '@/data/clients'
 import { suppliers } from '@/data/suppliers'
 import { users } from '@/data/users'
 import { messaggi } from '@/data/comunicazioni'
 import { entrate, uscite } from '@/data/amministrazione'
 import { loadUser } from '@/lib/auth'
-import { loadTasksFromStorage, loadEventsFromStorage, loadWorkflowsFromStorage, STORAGE_KEYS } from '@/lib/storage'
+import { loadTasksFromStorage, loadEventsFromStorage, loadWorkflowsFromStorage, loadClientsFromStorage, STORAGE_KEYS } from '@/lib/storage'
 import { getVisibleEvents, getVisibleTasks } from '@/lib/permissions'
 import { daysLeft, fmtShort, eventColorByStato, eventLabelByStato, taskPriColor } from '@/lib/format'
 import type { Event } from '@/data/events'
@@ -96,12 +95,14 @@ export default function Dashboard() {
   const [liveTasks, setLiveTasks] = useState<Task[]>(() => loadTasksFromStorage())
   const [liveEvents, setLiveEvents] = useState<Event[]>(() => loadEventsFromStorage())
   const [liveWFs, setLiveWFs] = useState(() => loadWorkflowsFromStorage())
+  const [liveClients, setLiveClients] = useState(() => loadClientsFromStorage())
 
   useEffect(() => {
     function onStorage(e: StorageEvent) {
       if (e.key === STORAGE_KEYS.tasks) setLiveTasks(loadTasksFromStorage())
       if (e.key === STORAGE_KEYS.events) setLiveEvents(loadEventsFromStorage())
       if (e.key === STORAGE_KEYS.workflows) setLiveWFs(loadWorkflowsFromStorage())
+      if (e.key === STORAGE_KEYS.clients) setLiveClients(loadClientsFromStorage())
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
@@ -149,7 +150,7 @@ export default function Dashboard() {
     const pagamentiSospesi = entrate.filter(e => e.stato === 'in_attesa').length
 
     // Clienti attivi
-    const clientiAttivi = clients.filter(c => c.stato === 'attivo' || c.stato === 'vip').length
+    const clientiAttivi = liveClients.filter(c => c.stato === 'attivo' || c.stato === 'vip').length
 
     // Fornitori critici (contratto scaduto o in scadenza)
     const fornitoriCritici = suppliers.filter(s =>
@@ -266,7 +267,7 @@ export default function Dashboard() {
       { id: 'budget', label: 'Budget Totale', value: `€${(kpi.budgetTotale / 1000).toFixed(0)}K`, sub: 'eventi visibili', icon: Euro, color: 'var(--green)', route: '/amministrazione' },
       { id: 'margine', label: 'Margine Stimato', value: `€${(kpi.margineStimato / 1000).toFixed(0)}K`, sub: `ent. €${(kpi.entrateTotale / 1000).toFixed(0)}K`, icon: BarChart3, color: kpi.margineStimato >= 0 ? 'var(--green)' : 'var(--red2)', route: '/amministrazione' },
       { id: 'pagamenti', label: 'Pagam. Sospesi', value: kpi.pagamentiSospesi, sub: 'da incassare', icon: CreditCard, color: kpi.pagamentiSospesi > 0 ? 'var(--yellow)' : 'var(--muted)', route: '/amministrazione' },
-      { id: 'clienti', label: 'Clienti Attivi', value: kpi.clientiAttivi, sub: `su ${clients.length} totali`, icon: Users, color: 'var(--blue)', route: '/crm' },
+      { id: 'clienti', label: 'Clienti Attivi', value: kpi.clientiAttivi, sub: `su ${liveClients.length} totali`, icon: Users, color: 'var(--blue)', route: '/crm' },
       { id: 'fornitori', label: 'Fornitori Critici', value: kpi.fornitoriCritici, sub: 'contratto critico', icon: Truck, color: kpi.fornitoriCritici > 0 ? 'var(--yellow)' : 'var(--muted)', route: '/fornitori' },
       { id: 'comunicazioni', label: 'Non Lette', value: kpi.comunicazioniNonLette, sub: 'comunicazioni', icon: MessageSquare, color: kpi.comunicazioniNonLette > 0 ? 'var(--blue)' : 'var(--muted)', route: '/comunicazioni' },
     ]
@@ -625,7 +626,7 @@ export default function Dashboard() {
           {canSeeCRM && (
             <Section title="Top clienti" icon={Users} color="var(--green)" action="CRM" onAction={() => navigate('/crm')} delay={240}>
               <div className="space-y-1.5">
-                {clients
+                {liveClients
                   .filter(c => c.stato === 'vip' || c.stato === 'attivo')
                   .sort((a, b) => b.fatturato - a.fatturato)
                   .slice(0, 4)

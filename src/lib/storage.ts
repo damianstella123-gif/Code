@@ -3,9 +3,11 @@ import { events } from '@/data/events'
 import { pratiche as praticheDemo } from '@/data/pratiche'
 import { entrate, uscite } from '@/data/amministrazione'
 import { workflowsDemo } from '@/data/workflow'
+import { clients as clientsDemo } from '@/data/clients'
 import type { Task } from '@/data/tasks'
 import type { Event } from '@/data/events'
 import type { Pratica } from '@/data/pratiche'
+import type { Client } from '@/data/clients'
 
 export const STORAGE_KEYS = {
   tasks: 'cal_tasks',
@@ -14,6 +16,7 @@ export const STORAGE_KEYS = {
   workflows: 'simmetria_workflows',
   entrate: 'simmetria_entrate',
   uscite: 'simmetria_uscite',
+  clients: 'simmetria_clients',
   settings: 'simmetria_settings',
   user: 'simmetria_user',
   flyHistory: 'fly_history',
@@ -74,6 +77,18 @@ export function loadPraticheFromStorage(): Pratica[] {
 export function cachePraticheSnapshot(list: Pratica[]): void {
   try {
     localStorage.setItem(STORAGE_KEYS.pratiche, JSON.stringify(list))
+  } catch {
+    // ignore quota errors in demo
+  }
+}
+
+export function loadClientsFromStorage(): Client[] {
+  return safeRead(STORAGE_KEYS.clients, clientsDemo)
+}
+
+export function cacheClientsSnapshot(list: Client[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.clients, JSON.stringify(list))
   } catch {
     // ignore quota errors in demo
   }

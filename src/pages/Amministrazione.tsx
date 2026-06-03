@@ -31,12 +31,11 @@ import type {
   StatoPagamento,
   TipoMovimento,
 } from '@/data/amministrazione'
-import { clients } from '@/data/clients'
 import { suppliers } from '@/data/suppliers'
 import type { Event } from '@/data/events'
 import { fetchBudgets, upsertBudget, updateBudget, deleteBudget } from '@/lib/budgets-service'
 import { fetchEvents } from '@/lib/events-service'
-import { loadEventsFromStorage, cacheEventsSnapshot } from '@/lib/storage'
+import { loadEventsFromStorage, cacheEventsSnapshot, loadClientsFromStorage } from '@/lib/storage'
 
 // ─── localStorage ────────────────────────────────────────────────────────────
 
@@ -113,7 +112,7 @@ function statoFatLabel(s: Fattura['stato']) {
 }
 
 function clientName(id: string) {
-  return clients.find(c => c.id === id)?.nome ?? id
+  return loadClientsFromStorage().find(c => c.id === id)?.nome ?? id
 }
 function supplierName(id: string) {
   return suppliers.find(s => s.id === id)?.nome ?? id
@@ -140,7 +139,7 @@ function NuovoMovimentoModal({ onClose, onSave }: NuovoMovimentoModalProps) {
   function handleSave() {
     const amt = parseFloat(importo.replace(',', '.'))
     if (!amt || amt <= 0) return
-    const defaultSoggetto = tipo === 'entrata' ? (clients[0]?.id ?? '') : (suppliers[0]?.id ?? '')
+    const defaultSoggetto = tipo === 'entrata' ? (loadClientsFromStorage()[0]?.id ?? '') : (suppliers[0]?.id ?? '')
     onSave(tipo, amt, note, eventoId === 'none' ? null : eventoId, soggettoId || defaultSoggetto)
   }
 
@@ -215,7 +214,7 @@ function NuovoMovimentoModal({ onClose, onSave }: NuovoMovimentoModalProps) {
             >
               <option value="">Seleziona…</option>
               {tipo === 'entrata'
-                ? clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)
+                ? loadClientsFromStorage().map(c => <option key={c.id} value={c.id}>{c.nome}</option>)
                 : suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)
               }
             </select>

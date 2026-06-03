@@ -26,7 +26,8 @@ import { loadUser, clearUser, getAllowedNav } from '@/lib/auth'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchPractices } from '@/lib/practices-service'
-import { cacheEventsSnapshot, cacheTasksSnapshot, cachePraticheSnapshot } from '@/lib/storage'
+import { fetchClients } from '@/lib/clients-service'
+import { cacheEventsSnapshot, cacheTasksSnapshot, cachePraticheSnapshot, cacheClientsSnapshot } from '@/lib/storage'
 
 const iconMap: Record<string, React.ElementType> = {
   '/dashboard': LayoutDashboard,
@@ -371,11 +372,12 @@ export default function Layout({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return
     let cancelled = false
-    Promise.all([fetchEvents(), fetchTasks(), fetchPractices()]).then(([ev, tk, pr]) => {
+    Promise.all([fetchEvents(), fetchTasks(), fetchPractices(), fetchClients()]).then(([ev, tk, pr, cl]) => {
       if (cancelled) return
       cacheEventsSnapshot(ev)
       cacheTasksSnapshot(tk)
       cachePraticheSnapshot(pr)
+      cacheClientsSnapshot(cl)
     })
     return () => { cancelled = true }
   }, [user])

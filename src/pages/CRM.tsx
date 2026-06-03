@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Users,
   Search,
@@ -15,11 +15,15 @@ import {
   Send,
   FileText,
   ChevronRight,
+  Plus,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
-import { clients, contatti } from '@/data/clients'
-import { events } from '@/data/events'
+import { contatti } from '@/data/clients'
 import { users } from '@/data/users'
 import type { Client, Contatto } from '@/data/clients'
+import { fetchClients, upsertClient, deleteClient } from '@/lib/clients-service'
+import { loadClientsFromStorage, cacheClientsSnapshot, loadEventsFromStorage } from '@/lib/storage'
 
 type FilterStato = 'Tutti' | 'attivo' | 'vip' | 'prospect' | 'perso'
 
@@ -132,18 +136,253 @@ function FasePipeline({ fase }: { fase: Client['faseTrattativa'] }) {
   )
 }
 
+interface ClientFormModalProps {
+  initial: Client | null
+  onClose: () => void
+  onSaved: (saved: Client) => void
+}
+
+function ClientFormModal({ initial, onClose, onSaved }: ClientFormModalProps) {
+  const isEdit = initial !== null
+  const [nome, setNome] = useState(initial?.nome ?? '')
+  const [settore, setSettore] = useState(initial?.settore ?? '')
+  const [email, setEmail] = useState(initial?.email ?? '')
+  const [telefono, setTelefono] = useState(initial?.telefono ?? '')
+  const [note, setNote] = useState(initial?.note ?? '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = async () => {
+    if (!nome.trim()) {
+      setError('Il nome del cliente è obbligatorio')
+      return
+    }
+    setError(null)
+    setSaving(true)
+    const id = initial?.id ?? `cli_${Date.now()}`
+    const payload: Client = {
+      id,
+      nome: nome.trim(),
+      settore: settore.trim(),
+      email: email.trim(),
+      telefono: telefono.trim(),
+      referente: initial?.referente ?? '',
+      avatar: initial?.avatar ?? '',
+      stato: initial?.stato ?? 'prospect',
+      nazione: initial?.nazione ?? 'Italia',
+      citta: initial?.citta ?? '',
+      source: initial?.source ?? 'contatto',
+      fatturato: initial?.fatturato ?? 0,
+      valoreStimato: initial?.valoreStimato ?? 0,
+      faseTrattativa: initial?.faseTrattativa ?? 'lead',
+      note: note.trim(),
+    }
+    const saved = await upsertClient(payload)
+    setSaving(false)
+    if (!saved) {
+      setError('Salvataggio non riuscito')
+      return
+    }
+    onSaved({ ...payload, ...saved })
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg panel p-6 animate-fade-in"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <h2 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
+              {isEdit ? 'Modifica cliente' : 'Nuovo cliente'}
+            </h2>
+            <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
+              {isEdit ? 'Aggiorna le informazioni del cliente' : 'Aggiungi un nuovo cliente al CRM'}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5">
+            <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>
+              Nome cliente *
+            </label>
+            <input
+              type="text"
+              value={nome}
+              onChange={e => setNome(e.target.value)}
+              placeholder="Es. TechnoCorp Industries"
+              className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2"
+              style={{
+                background: 'var(--panel2)',
+                border: '1px solid var(--line)',
+                color: 'var(--text)',
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>
+                Settore
+              </label>
+              <input
+                type="text"
+                value={settore}
+                onChange={e => setSettore(e.target.value)}
+                placeholder="Es. Tecnologia"
+                className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
+                style={{
+                  background: 'var(--panel2)',
+                  border: '1px solid var(--line)',
+                  color: 'var(--text)',
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>
+                Telefono
+              </label>
+              <input
+                type="text"
+                value={telefono}
+                onChange={e => setTelefono(e.target.value)}
+                placeholder="+39 ..."
+                className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
+                style={{
+                  background: 'var(--panel2)',
+                  border: '1px solid var(--line)',
+                  color: 'var(--text)',
+                }}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="cliente@azienda.com"
+              className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
+              style={{
+                background: 'var(--panel2)',
+                border: '1px solid var(--line)',
+                color: 'var(--text)',
+              }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>
+              Note
+            </label>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              rows={3}
+              placeholder="Note interne sul cliente..."
+              className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none resize-none"
+              style={{
+                background: 'var(--panel2)',
+                border: '1px solid var(--line)',
+                color: 'var(--text)',
+              }}
+            />
+          </div>
+          {error && (
+            <p className="text-xs" style={{ color: 'var(--red2)' }}>{error}</p>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:bg-white/5"
+            style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}
+          >
+            Annulla
+          </button>
+          <button
+            onClick={submit}
+            disabled={saving}
+            className="px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50"
+            style={{
+              background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)',
+              color: 'white',
+              boxShadow: 'var(--shadow-red)',
+            }}
+          >
+            {saving ? 'Salvataggio...' : isEdit ? 'Salva modifiche' : 'Crea cliente'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface ConfirmDialogProps {
+  title: string
+  message: string
+  confirmLabel?: string
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+function ConfirmDialog({ title, message, confirmLabel = 'Elimina', onConfirm, onCancel }: ConfirmDialogProps) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+      onClick={onCancel}
+    >
+      <div className="w-full max-w-sm panel p-6 animate-fade-in" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{title}</h3>
+        <p className="text-sm mt-2" style={{ color: 'var(--muted)' }}>{message}</p>
+        <div className="flex justify-end gap-2 mt-5">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/5"
+            style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}
+          >
+            Annulla
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-lg text-sm font-semibold"
+            style={{ background: 'var(--red2)', color: 'white' }}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 interface ClientDetailProps {
   client: Client
   onBack: () => void
+  onEdit: () => void
+  onDelete: () => void
 }
 
-function ClientDetail({ client, onBack }: ClientDetailProps) {
+function ClientDetail({ client, onBack, onEdit, onDelete }: ClientDetailProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'storico' | 'eventi'>('overview')
 
   const clientContatti = contatti
     .filter(c => c.clienteId === client.id)
     .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
 
+  const events = loadEventsFromStorage()
   const clientEvents = events.filter(e => e.cliente === client.id)
 
   const tabs = [
@@ -154,14 +393,33 @@ function ClientDetail({ client, onBack }: ClientDetailProps) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Back */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-sm transition-all hover:opacity-80"
-        style={{ color: 'var(--muted)' }}
-      >
-        <ArrowLeft className="w-4 h-4" /> Torna ai clienti
-      </button>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-sm transition-all hover:opacity-80"
+          style={{ color: 'var(--muted)' }}
+        >
+          <ArrowLeft className="w-4 h-4" /> Torna ai clienti
+        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onEdit}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all hover:bg-white/5"
+            style={{ color: 'var(--text)', border: '1px solid var(--line)' }}
+          >
+            <Pencil className="w-4 h-4" />
+            Modifica
+          </button>
+          <button
+            onClick={onDelete}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all hover:bg-red-500/10"
+            style={{ color: 'var(--red2)', border: '1px solid var(--line)' }}
+          >
+            <Trash2 className="w-4 h-4" />
+            Elimina
+          </button>
+        </div>
+      </div>
 
       {/* Hero */}
       <div className="panel p-6 relative overflow-hidden">
@@ -170,11 +428,20 @@ function ClientDetail({ client, onBack }: ClientDetailProps) {
           style={{ background: `linear-gradient(135deg, ${statoColor(client.stato)} 0%, transparent 60%)` }}
         />
         <div className="relative flex flex-wrap items-start gap-6">
-          <img
-            src={client.avatar}
-            alt={client.nome}
-            className="w-20 h-20 rounded-2xl object-cover flex-shrink-0"
-          />
+          {client.avatar ? (
+            <img
+              src={client.avatar}
+              alt={client.nome}
+              className="w-20 h-20 rounded-2xl object-cover flex-shrink-0"
+            />
+          ) : (
+            <div
+              className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl font-bold"
+              style={{ background: 'var(--panel2)', color: 'var(--muted)' }}
+            >
+              {client.nome.charAt(0).toUpperCase()}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <span
@@ -188,14 +455,18 @@ function ClientDetail({ client, onBack }: ClientDetailProps) {
                 {client.stato === 'vip' && <Star className="w-3 h-3 inline mr-1 -mt-0.5" />}
                 {statoLabel(client.stato)}
               </span>
-              <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>
-                {client.settore}
-              </span>
+              {client.settore && (
+                <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>
+                  {client.settore}
+                </span>
+              )}
             </div>
             <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{client.nome}</h1>
-            <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-              Ref: {client.referente}
-            </p>
+            {client.referente && (
+              <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
+                Ref: {client.referente}
+              </p>
+            )}
             <div className="mt-3">
               <FasePipeline fase={client.faseTrattativa} />
             </div>
@@ -212,7 +483,7 @@ function ClientDetail({ client, onBack }: ClientDetailProps) {
             <div className="text-center p-4 rounded-xl" style={{ background: 'var(--panel2)' }}>
               <p className="text-xs" style={{ color: 'var(--muted)' }}>Potenziale</p>
               <p className="text-lg font-bold mt-0.5" style={{ color: 'var(--blue)' }}>
-                €{(client.valoreStimato / 1000).toFixed(0)}K
+                {client.valoreStimato > 0 ? `€${(client.valoreStimato / 1000).toFixed(0)}K` : '—'}
               </p>
             </div>
           </div>
@@ -251,15 +522,17 @@ function ClientDetail({ client, onBack }: ClientDetailProps) {
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <Mail className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--blue)' }} />
-                  <span className="text-sm" style={{ color: 'var(--text)' }}>{client.email}</span>
+                  <span className="text-sm" style={{ color: 'var(--text)' }}>{client.email || '—'}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <Phone className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--green)' }} />
-                  <span className="text-sm" style={{ color: 'var(--text)' }}>{client.telefono}</span>
+                  <span className="text-sm" style={{ color: 'var(--text)' }}>{client.telefono || '—'}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <MapPin className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--red2)' }} />
-                  <span className="text-sm" style={{ color: 'var(--text)' }}>{client.citta}, {client.nazione}</span>
+                  <span className="text-sm" style={{ color: 'var(--text)' }}>
+                    {[client.citta, client.nazione].filter(Boolean).join(', ') || '—'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -289,7 +562,9 @@ function ClientDetail({ client, onBack }: ClientDetailProps) {
             {/* Note */}
             <div className="panel p-5 md:col-span-2">
               <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Note</p>
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{client.note}</p>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
+                {client.note || 'Nessuna nota disponibile.'}
+              </p>
             </div>
 
             {/* Valore commerciale */}
@@ -309,7 +584,7 @@ function ClientDetail({ client, onBack }: ClientDetailProps) {
                   </div>
                 ))}
               </div>
-              {client.fatturato > 0 && (
+              {client.fatturato > 0 && client.valoreStimato > 0 && (
                 <div>
                   <div className="flex justify-between text-xs mb-1" style={{ color: 'var(--muted)' }}>
                     <span>Fatturato vs Potenziale</span>
@@ -454,46 +729,121 @@ function ClientDetail({ client, onBack }: ClientDetailProps) {
 }
 
 export default function CRM() {
+  const [clientList, setClientList] = useState<Client[]>(() => loadClientsFromStorage())
   const [selected, setSelected] = useState<Client | null>(null)
   const [filter, setFilter] = useState<FilterStato>('Tutti')
   const [search, setSearch] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [editTarget, setEditTarget] = useState<Client | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Client | null>(null)
+
+  const refresh = useCallback(async () => {
+    const list = await fetchClients()
+    setClientList(list)
+    cacheClientsSnapshot(list)
+  }, [])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  const events = useMemo(() => loadEventsFromStorage(), [clientList])
 
   const filtered = useMemo(() => {
-    return clients.filter(c => {
+    return clientList.filter(c => {
       const matchFilter = filter === 'Tutti' || c.stato === filter
+      const q = search.trim().toLowerCase()
       const matchSearch =
-        search === '' ||
-        c.nome.toLowerCase().includes(search.toLowerCase()) ||
-        c.settore.toLowerCase().includes(search.toLowerCase()) ||
-        c.referente.toLowerCase().includes(search.toLowerCase()) ||
-        c.citta.toLowerCase().includes(search.toLowerCase())
+        q === '' ||
+        c.nome.toLowerCase().includes(q) ||
+        c.settore.toLowerCase().includes(q) ||
+        c.referente.toLowerCase().includes(q) ||
+        c.citta.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q)
       return matchFilter && matchSearch
     })
-  }, [filter, search])
+  }, [clientList, filter, search])
 
-  const totFatturato = clients.reduce((s, c) => s + c.fatturato, 0)
-  const totPotenziale = clients.reduce((s, c) => s + c.valoreStimato, 0)
-  const vipCount = clients.filter(c => c.stato === 'vip').length
-  const prospectCount = clients.filter(c => c.stato === 'prospect').length
+  const totFatturato = clientList.reduce((s, c) => s + c.fatturato, 0)
+  const totPotenziale = clientList.reduce((s, c) => s + c.valoreStimato, 0)
+  const vipCount = clientList.filter(c => c.stato === 'vip').length
+  const prospectCount = clientList.filter(c => c.stato === 'prospect').length
+
+  const handleSaved = async (saved: Client) => {
+    setShowForm(false)
+    setEditTarget(null)
+    await refresh()
+    if (selected && selected.id === saved.id) {
+      setSelected(saved)
+    }
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
+    const ok = await deleteClient(deleteTarget.id)
+    setDeleteTarget(null)
+    if (ok) {
+      if (selected && selected.id === deleteTarget.id) setSelected(null)
+      await refresh()
+    }
+  }
 
   if (selected) {
-    return <ClientDetail client={selected} onBack={() => setSelected(null)} />
+    return (
+      <>
+        <ClientDetail
+          client={selected}
+          onBack={() => setSelected(null)}
+          onEdit={() => setEditTarget(selected)}
+          onDelete={() => setDeleteTarget(selected)}
+        />
+        {(showForm || editTarget) && (
+          <ClientFormModal
+            initial={editTarget}
+            onClose={() => { setShowForm(false); setEditTarget(null) }}
+            onSaved={handleSaved}
+          />
+        )}
+        {deleteTarget && (
+          <ConfirmDialog
+            title="Eliminare il cliente?"
+            message={`Vuoi eliminare definitivamente "${deleteTarget.nome}"? Gli eventi collegati non verranno rimossi.`}
+            onConfirm={handleDeleteConfirm}
+            onCancel={() => setDeleteTarget(null)}
+          />
+        )}
+      </>
+    )
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>CRM</h1>
-        <p className="mt-1" style={{ color: 'var(--muted)' }}>
-          {filtered.length} clienti visibili
-        </p>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>CRM</h1>
+          <p className="mt-1" style={{ color: 'var(--muted)' }}>
+            {filtered.length} clienti visibili
+          </p>
+        </div>
+        <button
+          onClick={() => { setEditTarget(null); setShowForm(true) }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+          style={{
+            background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)',
+            color: 'white',
+            boxShadow: 'var(--shadow-red)',
+          }}
+        >
+          <Plus className="w-4 h-4" />
+          Nuovo cliente
+        </button>
       </div>
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Clienti Totali', value: clients.length, display: String(clients.length), color: 'var(--text)' },
+          { label: 'Clienti Totali', value: clientList.length, display: String(clientList.length), color: 'var(--text)' },
           { label: 'Fatturato Totale', value: totFatturato, display: `€${(totFatturato / 1000).toFixed(0)}K`, color: 'var(--green)' },
           { label: 'Potenziale Pipeline', value: totPotenziale, display: `€${(totPotenziale / 1000).toFixed(0)}K`, color: 'var(--blue)' },
           { label: 'VIP / Prospect', value: vipCount + prospectCount, display: `${vipCount} VIP · ${prospectCount} Prospect`, color: 'var(--yellow)' },
@@ -514,7 +864,7 @@ export default function CRM() {
           <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
           <input
             type="text"
-            placeholder="Cerca cliente, settore, referente..."
+            placeholder="Cerca cliente, settore, referente, email..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="flex-1 bg-transparent text-sm focus:outline-none"
@@ -578,11 +928,20 @@ export default function CRM() {
               >
                 <div className="flex items-start gap-4">
                   <div className="relative flex-shrink-0">
-                    <img
-                      src={client.avatar}
-                      alt={client.nome}
-                      className="w-14 h-14 rounded-xl object-cover"
-                    />
+                    {client.avatar ? (
+                      <img
+                        src={client.avatar}
+                        alt={client.nome}
+                        className="w-14 h-14 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold"
+                        style={{ background: 'var(--panel2)', color: 'var(--muted)' }}
+                      >
+                        {client.nome.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     {client.stato === 'vip' && (
                       <div
                         className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
@@ -606,13 +965,15 @@ export default function CRM() {
                           >
                             {statoLabel(client.stato)}
                           </span>
-                          <span className="text-xs" style={{ color: 'var(--muted)' }}>{client.settore}</span>
+                          {client.settore && (
+                            <span className="text-xs" style={{ color: 'var(--muted)' }}>{client.settore}</span>
+                          )}
                         </div>
                         <h3 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>
                           {client.nome}
                         </h3>
                         <p className="text-sm" style={{ color: 'var(--muted)' }}>
-                          {client.referente} · {client.citta}
+                          {[client.referente, client.citta].filter(Boolean).join(' · ') || client.email || '—'}
                         </p>
                       </div>
 
@@ -620,9 +981,11 @@ export default function CRM() {
                         <p className="text-lg font-bold" style={{ color: client.fatturato > 0 ? 'var(--green)' : 'var(--muted)' }}>
                           {client.fatturato > 0 ? `€${(client.fatturato / 1000).toFixed(0)}K` : '—'}
                         </p>
-                        <p className="text-xs" style={{ color: 'var(--blue)' }}>
-                          est. €{(client.valoreStimato / 1000).toFixed(0)}K
-                        </p>
+                        {client.valoreStimato > 0 && (
+                          <p className="text-xs" style={{ color: 'var(--blue)' }}>
+                            est. €{(client.valoreStimato / 1000).toFixed(0)}K
+                          </p>
+                        )}
                         <ChevronRight className="w-4 h-4 mt-1" style={{ color: 'var(--muted)' }} />
                       </div>
                     </div>
@@ -653,6 +1016,22 @@ export default function CRM() {
             )
           })}
         </div>
+      )}
+
+      {(showForm || editTarget) && (
+        <ClientFormModal
+          initial={editTarget}
+          onClose={() => { setShowForm(false); setEditTarget(null) }}
+          onSaved={handleSaved}
+        />
+      )}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Eliminare il cliente?"
+          message={`Vuoi eliminare definitivamente "${deleteTarget.nome}"? Gli eventi collegati non verranno rimossi.`}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
     </div>
   )

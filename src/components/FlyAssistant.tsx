@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { X, Send, Trash2, Zap, ChevronDown } from 'lucide-react'
 import { suppliers } from '@/data/suppliers'
-import { clients } from '@/data/clients'
 import { loadUser } from '@/lib/auth'
 import type { Task } from '@/data/tasks'
 import type { Event } from '@/data/events'
@@ -13,6 +12,7 @@ import {
   loadWorkflowsFromStorage,
   loadEntrateFromStorage,
   loadUsciteFromStorage,
+  loadClientsFromStorage,
 } from '@/lib/storage'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -176,6 +176,7 @@ function flyRespond(input: string): { text: string; chips?: string[] } {
 
   // Clients / CRM
   if (/client|crm|trattativa|prospect|vip/.test(q)) {
+    const clients = loadClientsFromStorage()
     const vip = clients.filter(c => c.stato === 'vip')
     const prospect = clients.filter(c => c.stato === 'prospect')
     const persi = clients.filter(c => c.stato === 'perso')

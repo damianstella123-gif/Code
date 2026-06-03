@@ -18,7 +18,7 @@ import {
   TrendingUp,
   Lock,
 } from 'lucide-react'
-import { clients } from '@/data/clients'
+import { loadClientsFromStorage } from '@/lib/storage'
 import { suppliers } from '@/data/suppliers'
 import { users } from '@/data/users'
 import { messaggi } from '@/data/comunicazioni'
@@ -136,7 +136,7 @@ function getVisibleUsers(ruolo: string) {
   return []
 }
 function getVisibleClients(ruolo: string) {
-  if (ruolo === 'Admin' || ruolo === 'Manager' || ruolo === 'Commerciale') return clients
+  if (ruolo === 'Admin' || ruolo === 'Manager' || ruolo === 'Commerciale') return loadClientsFromStorage()
   return []
 }
 function getVisibleSuppliers(ruolo: string) {

@@ -31,11 +31,10 @@ import {
 } from 'lucide-react'
 import { users } from '@/data/users'
 import { suppliers } from '@/data/suppliers'
-import { clients } from '@/data/clients'
 import { messaggi } from '@/data/comunicazioni'
 import { entrate, uscite } from '@/data/amministrazione'
 import { loadUser } from '@/lib/auth'
-import { loadTasksFromStorage, cacheEventsSnapshot } from '@/lib/storage'
+import { loadTasksFromStorage, cacheEventsSnapshot, loadClientsFromStorage } from '@/lib/storage'
 import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote } from '@/lib/events-service'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
@@ -205,7 +204,7 @@ function EventFormModal({ event, onSave, onCancel }: {
                 className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
                 style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
                 <option value="">— Nessuno —</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                {loadClientsFromStorage().map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>
             </div>
             <div>
@@ -315,7 +314,7 @@ function TabOverview({ event, progress, completedTasks, totalTasks }: {
   totalTasks: number
 }) {
   const responsabile = users.find(u => u.id === event.responsabile)
-  const cliente = clients.find(c => c.id === event.cliente)
+  const cliente = loadClientsFromStorage().find(c => c.id === event.cliente)
   const eventEntrate = entrate.filter(e => e.eventoId === event.id)
   const eventUscite = uscite.filter(u => u.eventoId === event.id)
   const totEntrate = eventEntrate.reduce((s, e) => s + e.importo, 0)
@@ -719,7 +718,7 @@ function TabBudget({ event }: { event: Event }) {
           </div>
           <div className="space-y-2">
             {eventEntrate.map(e => {
-              const c = clients.find(cl => cl.id === e.clienteId)
+              const c = loadClientsFromStorage().find(cl => cl.id === e.clienteId)
               return (
                 <div key={e.id} className="flex items-center gap-3 p-3 rounded-xl"
                   style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
@@ -1109,9 +1108,9 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange }: EventD
                   }}>
                   {statoLabel(event.stato)}
                 </span>
-                {clients.find(c => c.id === event.cliente) && (
+                {loadClientsFromStorage().find(c => c.id === event.cliente) && (
                   <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                    Cliente: <span style={{ color: 'var(--text)' }}>{clients.find(c => c.id === event.cliente)!.nome}</span>
+                    Cliente: <span style={{ color: 'var(--text)' }}>{loadClientsFromStorage().find(c => c.id === event.cliente)!.nome}</span>
                   </span>
                 )}
               </div>
@@ -1429,7 +1428,7 @@ export default function Eventi() {
       ) : (
         <div className="space-y-3">
           {filtered.map((event, i) => {
-            const cliente = clients.find(c => c.id === event.cliente)
+            const cliente = loadClientsFromStorage().find(c => c.id === event.cliente)
             const responsabile = users.find(u => u.id === event.responsabile)
             const teamMembers = users.filter(u => event.team.includes(u.id)).slice(0, 4)
             const allTasks = loadTasksFromStorage()
