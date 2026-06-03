@@ -35,7 +35,7 @@ import { clients } from '@/data/clients'
 import { messaggi } from '@/data/comunicazioni'
 import { entrate, uscite } from '@/data/amministrazione'
 import { loadUser } from '@/lib/auth'
-import { loadTasksFromStorage, loadEventsFromStorage, cacheEventsSnapshot } from '@/lib/storage'
+import { loadTasksFromStorage, cacheEventsSnapshot } from '@/lib/storage'
 import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote } from '@/lib/events-service'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
@@ -1226,7 +1226,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange }: EventD
 
 export default function Eventi() {
   const currentUser = loadUser()
-  const [eventList, setEventList] = useState<Event[]>(() => loadEventsFromStorage())
+  const [eventList, setEventList] = useState<Event[]>([])
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [search, setSearch] = useState('')
   const [filterStato, setFilterStato] = useState('Tutti')
@@ -1235,16 +1235,14 @@ export default function Eventi() {
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Carica gli eventi da Supabase al mount.
-  // Il fallback localStorage rimane per istanti iniziali / offline.
+  // Eventi: fonte di verita' Supabase. Nessun fallback mock.
+  // La snapshot in localStorage resta solo per gli altri moduli che la leggono.
   useEffect(() => {
     let cancelled = false
     fetchEvents().then(remote => {
       if (cancelled) return
-      if (remote.length > 0) {
-        setEventList(remote)
-        cacheEventsSnapshot(remote)
-      }
+      setEventList(remote)
+      cacheEventsSnapshot(remote)
     })
     return () => {
       cancelled = true
