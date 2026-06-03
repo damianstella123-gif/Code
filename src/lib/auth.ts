@@ -1,4 +1,5 @@
 import type { User } from '@/data/users'
+import type { AppRole } from './database.types'
 
 const STORAGE_KEY = 'simmetria_user'
 
@@ -57,3 +58,33 @@ export function getAllowedNav(ruolo: User['ruolo']): NavItem[] {
       return [{ name: 'Dashboard', href: '/dashboard' }]
   }
 }
+
+// ─── Mapping fra AppRole Supabase e ruoli legacy demo ────────────────────────
+// In Step 1 manteniamo l'app demo con i ruoli legacy. Quando in Step successivi
+// l'auth verra migrata a Supabase, ogni AppRole sara mappato al set di permessi
+// piu vicino fra quelli gia esistenti (Admin/Manager/Operativo/Finance/...).
+
+export function mapAppRoleToLegacy(role: AppRole): User['ruolo'] {
+  switch (role) {
+    case 'Partner':
+      return 'Admin'
+    case 'Project Manager':
+    case 'Production Manager':
+      return 'Manager'
+    case 'Event Coordinator':
+    case 'Digital Strategist':
+      return 'Commerciale'
+    case 'Amministrazione':
+      return 'Finance'
+    case 'Event Assistant':
+    case 'Junior Event Assistant':
+      return 'Operativo'
+    default:
+      return 'Operativo'
+  }
+}
+
+export function getAllowedNavForAppRole(role: AppRole): NavItem[] {
+  return getAllowedNav(mapAppRoleToLegacy(role))
+}
+
