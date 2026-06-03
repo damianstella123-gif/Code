@@ -130,7 +130,7 @@ function TaskFormModal({ task, onSave, onClose }: {
               <select value={evento} onChange={e => setEvento(e.target.value)}
                 className="input w-full py-2.5 text-sm rounded-lg">
                 <option value="">Nessuno</option>
-                {events.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
+                {loadEventsFromStorage().map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
               </select>
             </div>
           </div>
@@ -182,7 +182,7 @@ function TaskDetail({ task, onClose, onMove, onEdit, onDelete }: {
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const assignee = users.find(u => u.id === task.assegnatario)
-  const evento = task.evento ? events.find(e => e.id === task.evento) : null
+  const evento = task.evento ? loadEventsFromStorage().find(e => e.id === task.evento) : null
   const dl = daysLeft(task.scadenza)
   const isOverdue = dl < 0
 
@@ -311,7 +311,7 @@ function TaskCard({ task, onClick, onQuickMove }: {
   task: Task; onClick: () => void; onQuickMove: (to: Task['stato']) => void
 }) {
   const assignee = users.find(u => u.id === task.assegnatario)
-  const evento = task.evento ? events.find(e => e.id === task.evento) : null
+  const evento = task.evento ? loadEventsFromStorage().find(e => e.id === task.evento) : null
   const dl = daysLeft(task.scadenza)
   const isOverdue = dl < 0 && task.stato !== 'completato'
   const urgentSoon = !isOverdue && dl <= 2 && task.stato !== 'completato'
