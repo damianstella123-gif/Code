@@ -1233,6 +1233,7 @@ export default function Eventi() {
   const [showForm, setShowForm] = useState(false)
   const [editingEvent, setEditingEvent] = useState<Event | undefined>(undefined)
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   // Carica gli eventi da Supabase al mount.
   // Il fallback localStorage rimane per istanti iniziali / offline.
@@ -1250,48 +1251,58 @@ export default function Eventi() {
     }
   }, [])
 
-  const handleSave = useCallback(async (event: Event) => {
-    const saved = await upsertEvent(event)
-    const finalEvent = saved ?? event
-    setEventList(prev => {
-      const exists = prev.find(e => e.id === finalEvent.id)
-      const updated = exists
-        ? prev.map(e => (e.id === finalEvent.id ? finalEvent : e))
-        : [finalEvent, ...prev]
-      cacheEventsSnapshot(updated)
-      return updated
-    })
-    setShowForm(false)
-    setEditingEvent(undefined)
-    if (selectedEvent && selectedEvent.id === finalEvent.id) {
-      setSelectedEvent(finalEvent)
-    }
-  }, [selectedEvent])
+  useEffect(() => {
+    if (!errorMessage) return
+    const t = setTimeout(() => setErrorMessage(null), 4000)
+    return () => clearTimeout(t)
+  }, [errorMessage])
 
-  const handleDelete = useCallback(async (event: Event) => {
-    await deleteEventRemote(event.id)
-    setEventList(prev => {
-      const updated = prev.filter(e => e.id !== event.id)
-      cacheEventsSnapshot(updated)
-      return updated
-    })
-    setDeletingEvent(null)
-    setSelectedEvent(null)
+  const refreshEvents = useCallback(async () => {
+    const remote = await fetchEvents()
+    setEventList(remote)
+    cacheEventsSnapshot(remote)
+    return remote
   }, [])
 
-  const handleStatusChange = useCallback(async (event: Event, newStato: StatoEvento) => {
-    const updated = { ...event, stato: newStato }
-    const remote = await updateEventRemote(event.id, { stato: newStato })
-    const finalEvent = remote ?? updated
-    setEventList(prev => {
-      const newList = prev.map(e => (e.id === event.id ? finalEvent : e))
-      cacheEventsSnapshot(newList)
-      return newList
-    })
-    if (selectedEvent && selectedEvent.id === event.id) {
-      setSelectedEvent(finalEvent)
+  const handleSave = useCallback(async (event: Event) => {
+    const isEdit = eventList.some(e => e.id === event.id)
+    const saved = await upsertEvent(event)
+    if (!saved) {
+      setErrorMessage(isEdit ? 'Salvataggio modifica fallito. Riprova.' : 'Creazione evento fallita. Riprova.')
+      return
     }
-  }, [selectedEvent])
+    const remote = await refreshEvents()
+    setShowForm(false)
+    setEditingEvent(undefined)
+    if (selectedEvent && selectedEvent.id === saved.id) {
+      const fresh = remote.find(e => e.id === saved.id) ?? saved
+      setSelectedEvent(fresh)
+    }
+  }, [eventList, refreshEvents, selectedEvent])
+
+  const handleDelete = useCallback(async (event: Event) => {
+    const ok = await deleteEventRemote(event.id)
+    if (!ok) {
+      setErrorMessage('Eliminazione evento fallita. Riprova.')
+      return
+    }
+    await refreshEvents()
+    setDeletingEvent(null)
+    setSelectedEvent(null)
+  }, [refreshEvents])
+
+  const handleStatusChange = useCallback(async (event: Event, newStato: StatoEvento) => {
+    const remote = await updateEventRemote(event.id, { stato: newStato })
+    if (!remote) {
+      setErrorMessage('Aggiornamento stato fallito. Riprova.')
+      return
+    }
+    const refreshed = await refreshEvents()
+    if (selectedEvent && selectedEvent.id === event.id) {
+      const fresh = refreshed.find(e => e.id === event.id) ?? remote
+      setSelectedEvent(fresh)
+    }
+  }, [refreshEvents, selectedEvent])
 
   const visibleEvents = useMemo(() => {
     if (!currentUser) return []
@@ -1308,21 +1319,8 @@ export default function Eventi() {
     })
   }, [visibleEvents, search, filterStato])
 
-  if (selectedEvent) {
-    const liveEvent = eventList.find(e => e.id === selectedEvent.id) ?? selectedEvent
-    return (
-      <EventDetail
-        event={liveEvent}
-        onBack={() => setSelectedEvent(null)}
-        onEdit={(evt) => { setEditingEvent(evt); setShowForm(true) }}
-        onDelete={(evt) => setDeletingEvent(evt)}
-        onStatusChange={handleStatusChange}
-      />
-    )
-  }
-
-  return (
-    <div className="space-y-6">
+  const overlays = (
+    <>
       {showForm && (
         <EventFormModal
           event={editingEvent}
@@ -1337,6 +1335,36 @@ export default function Eventi() {
           onCancel={() => setDeletingEvent(null)}
         />
       )}
+      {errorMessage && (
+        <div
+          className="fixed top-6 right-6 z-[60] px-4 py-3 rounded-xl text-sm font-medium shadow-lg"
+          style={{ background: 'var(--panel)', border: '1px solid var(--red2)', color: 'var(--red2)' }}
+        >
+          {errorMessage}
+        </div>
+      )}
+    </>
+  )
+
+  if (selectedEvent) {
+    const liveEvent = eventList.find(e => e.id === selectedEvent.id) ?? selectedEvent
+    return (
+      <>
+        {overlays}
+        <EventDetail
+          event={liveEvent}
+          onBack={() => setSelectedEvent(null)}
+          onEdit={(evt) => { setEditingEvent(evt); setShowForm(true) }}
+          onDelete={(evt) => setDeletingEvent(evt)}
+          onStatusChange={handleStatusChange}
+        />
+      </>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {overlays}
 
       <div className="flex items-center justify-between">
         <div>
