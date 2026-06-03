@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   TrendingUp,
   AlertTriangle,
@@ -22,7 +22,6 @@ import {
 import { loadUser } from '@/lib/auth'
 import {
   entrate as initEntrate,
-  uscite as initUscite,
   fatture as initFatture,
 } from '@/data/amministrazione'
 import type {
@@ -34,12 +33,12 @@ import type {
 } from '@/data/amministrazione'
 import { clients } from '@/data/clients'
 import { suppliers } from '@/data/suppliers'
+import { fetchBudgets, upsertBudget, updateBudget, deleteBudget } from '@/lib/budgets-service'
 import { events } from '@/data/events'
 
 // ─── localStorage ────────────────────────────────────────────────────────────
 
 const SK_ENTRATE = 'simmetria_entrate'
-const SK_USCITE = 'simmetria_uscite'
 const SK_FATTURE = 'simmetria_fatture'
 
 function load<T>(key: string, fallback: T[]): T[] {
@@ -318,9 +317,27 @@ export default function Amministrazione() {
 
   const [activeTab, setActiveTab] = useState<TabId>('dashboard')
   const [entrate, setEntrate] = useState<Entrata[]>(() => load(SK_ENTRATE, initEntrate))
-  const [uscite, setUscite] = useState<Uscita[]>(() => load(SK_USCITE, initUscite))
+  const [uscite, setUscite] = useState<Uscita[]>([])
   const [fatture, setFatture] = useState<Fattura[]>(() => load(SK_FATTURE, initFatture))
   const [showNuovoMovimento, setShowNuovoMovimento] = useState(false)
+
+  // Uscite (Economico): fonte di verita' Supabase via tabella `budgets`.
+  useEffect(() => {
+    let cancelled = false
+    fetchBudgets().then(remote => {
+      if (cancelled) return
+      setUscite(remote)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function refreshUscite() {
+    const remote = await fetchBudgets()
+    setUscite(remote)
+    return remote
+  }
 
   // Filters
   const [filterEvento, setFilterEvento] = useState('tutti')
@@ -418,13 +435,11 @@ export default function Amministrazione() {
   }
 
   function segnaUscitaPagata(id: string) {
-    setUscite(prev => {
-      const updated = prev.map(u =>
-        u.id === id ? { ...u, stato: 'pagato' as StatoPagamento, dataPagamento: new Date().toISOString().slice(0, 10) } : u
-      )
-      save(SK_USCITE, updated)
-      return updated
-    })
+    const today = new Date().toISOString().slice(0, 10)
+    setUscite(prev => prev.map(u =>
+      u.id === id ? { ...u, stato: 'pagato' as StatoPagamento, dataPagamento: today } : u
+    ))
+    updateBudget(id, { stato: 'pagato', dataPagamento: today }).then(() => refreshUscite())
   }
 
   function eliminaEntrata(id: string) {
@@ -436,11 +451,8 @@ export default function Amministrazione() {
   }
 
   function eliminaUscita(id: string) {
-    setUscite(prev => {
-      const updated = prev.filter(u => u.id !== id)
-      save(SK_USCITE, updated)
-      return updated
-    })
+    setUscite(prev => prev.filter(u => u.id !== id))
+    deleteBudget(id).then(() => refreshUscite())
   }
 
   function editEntrata(id: string, importo: number, note: string) {
@@ -452,11 +464,8 @@ export default function Amministrazione() {
   }
 
   function editUscita(id: string, importo: number, note: string) {
-    setUscite(prev => {
-      const updated = prev.map(u => u.id === id ? { ...u, importo, note } : u)
-      save(SK_USCITE, updated)
-      return updated
-    })
+    setUscite(prev => prev.map(u => u.id === id ? { ...u, importo, note } : u))
+    updateBudget(id, { importo, note }).then(() => refreshUscite())
   }
 
   function generaFattura(tipo: TipoMovimento, soggettoId: string, soggetto: string, importo: number, eventoId: string | null) {
@@ -538,7 +547,8 @@ export default function Amministrazione() {
         note,
         fatturaId: null,
       }
-      setUscite(prev => { const u = [...prev, newU]; save(SK_USCITE, u); return u })
+      setUscite(prev => [...prev, newU])
+      upsertBudget(newU).then(() => refreshUscite())
     }
     setShowNuovoMovimento(false)
   }

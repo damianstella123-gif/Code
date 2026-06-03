@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   ArrowLeft,
   Phone,
@@ -28,25 +28,22 @@ import {
   Trash2,
   Save,
 } from 'lucide-react'
-import { suppliers as defaultSuppliers } from '@/data/suppliers'
 import { events } from '@/data/events'
 import { users } from '@/data/users'
 import { uscite } from '@/data/amministrazione'
 import { loadUser } from '@/lib/auth'
 import { loadTasksFromStorage } from '@/lib/storage'
+import { fetchSuppliers, upsertSupplier, deleteSupplier as deleteSupplierRemote } from '@/lib/suppliers-service'
 import type { Supplier, StatoContratto } from '@/data/suppliers'
 
 const STORAGE_KEY_FORNITORI = 'simmetria_fornitori'
 
-function loadSuppliersFromStorage(): Supplier[] {
+function cacheSuppliersToStorage(list: Supplier[]) {
   try {
-    const r = localStorage.getItem(STORAGE_KEY_FORNITORI)
-    return r ? JSON.parse(r) : defaultSuppliers
-  } catch { return defaultSuppliers }
-}
-
-function saveSuppliersToStorage(list: Supplier[]) {
-  localStorage.setItem(STORAGE_KEY_FORNITORI, JSON.stringify(list))
+    localStorage.setItem(STORAGE_KEY_FORNITORI, JSON.stringify(list))
+  } catch {
+    // ignore quota errors
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -834,7 +831,7 @@ const CONTRATTO_FILTERS: { id: string; label: string }[] = [
 
 export default function Fornitori() {
   const currentUser = loadUser()
-  const [supplierList, setSupplierList] = useState<Supplier[]>(() => loadSuppliersFromStorage())
+  const [supplierList, setSupplierList] = useState<Supplier[]>([])
   const [selected, setSelected] = useState<Supplier | null>(null)
   const [search, setSearch] = useState('')
   const [filterCategoria, setFilterCategoria] = useState('Tutte')
@@ -844,37 +841,54 @@ export default function Fornitori() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | undefined>(undefined)
   const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null)
 
-  const handleSave = useCallback((s: Supplier) => {
-    setSupplierList(prev => {
-      const exists = prev.find(x => x.id === s.id)
-      const updated = exists ? prev.map(x => x.id === s.id ? s : x) : [s, ...prev]
-      saveSuppliersToStorage(updated)
-      return updated
+  // Fornitori: fonte di verita' Supabase. Nessun fallback mock.
+  // La snapshot in localStorage resta solo per altri moduli che la leggono.
+  useEffect(() => {
+    let cancelled = false
+    fetchSuppliers().then(remote => {
+      if (cancelled) return
+      setSupplierList(remote)
+      cacheSuppliersToStorage(remote)
     })
-    setShowForm(false)
-    setEditingSupplier(undefined)
-    if (selected && selected.id === s.id) setSelected(s)
-  }, [selected])
-
-  const handleDelete = useCallback((s: Supplier) => {
-    setSupplierList(prev => {
-      const updated = prev.filter(x => x.id !== s.id)
-      saveSuppliersToStorage(updated)
-      return updated
-    })
-    setDeletingSupplier(null)
-    setSelected(null)
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  const handleSaveNotes = useCallback((s: Supplier, notes: string) => {
+  const refreshSuppliers = useCallback(async () => {
+    const remote = await fetchSuppliers()
+    setSupplierList(remote)
+    cacheSuppliersToStorage(remote)
+    return remote
+  }, [])
+
+  const handleSave = useCallback(async (s: Supplier) => {
+    const saved = await upsertSupplier(s)
+    const final = saved ?? s
+    const remote = await refreshSuppliers()
+    setShowForm(false)
+    setEditingSupplier(undefined)
+    if (selected && selected.id === final.id) {
+      const fresh = remote.find(x => x.id === final.id) ?? final
+      setSelected(fresh)
+    }
+  }, [refreshSuppliers, selected])
+
+  const handleDelete = useCallback(async (s: Supplier) => {
+    const ok = await deleteSupplierRemote(s.id)
+    if (!ok) return
+    await refreshSuppliers()
+    setDeletingSupplier(null)
+    setSelected(null)
+  }, [refreshSuppliers])
+
+  const handleSaveNotes = useCallback(async (s: Supplier, notes: string) => {
     const updated = { ...s, noteOperative: notes }
-    setSupplierList(prev => {
-      const newList = prev.map(x => x.id === s.id ? updated : x)
-      saveSuppliersToStorage(newList)
-      return newList
-    })
-    if (selected && selected.id === s.id) setSelected(updated)
-  }, [selected])
+    const saved = await upsertSupplier(updated)
+    const final = saved ?? updated
+    await refreshSuppliers()
+    if (selected && selected.id === s.id) setSelected(final)
+  }, [refreshSuppliers, selected])
 
   if (!currentUser) return null
 
