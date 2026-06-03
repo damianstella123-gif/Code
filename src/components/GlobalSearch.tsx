@@ -18,15 +18,12 @@ import {
   TrendingUp,
   Lock,
 } from 'lucide-react'
-import { events } from '@/data/events'
-import { tasks } from '@/data/tasks'
 import { clients } from '@/data/clients'
 import { suppliers } from '@/data/suppliers'
 import { users } from '@/data/users'
 import { messaggi } from '@/data/comunicazioni'
-import { workflowsDemo } from '@/data/workflow'
 import { loadUser } from '@/lib/auth'
-import { loadWorkflowsFromStorage } from '@/lib/storage'
+import { loadWorkflowsFromStorage, loadEventsFromStorage, loadTasksFromStorage } from '@/lib/storage'
 import { daysLeft } from '@/lib/format'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -120,14 +117,16 @@ function score(fields: string[], query: string): number {
 // ─── Permission filters ───────────────────────────────────────────────────────
 
 function getVisibleEvents(ruolo: string, userId: string) {
+  const events = loadEventsFromStorage()
   if (ruolo === 'Admin' || ruolo === 'Finance') return events
   if (ruolo === 'Manager' || ruolo === 'Commerciale')
     return events.filter(e => e.responsabile === userId || e.team.includes(userId))
   if (ruolo === 'Operativo')
     return events.filter(e => e.team.includes(userId))
-  return [] // Fornitore
+  return []
 }
 function getVisibleTasks(ruolo: string, userId: string) {
+  const tasks = loadTasksFromStorage()
   if (ruolo === 'Admin' || ruolo === 'Manager') return tasks
   if (ruolo === 'Finance') return tasks.filter(t => !t.evento)
   return tasks.filter(t => t.assegnatario === userId)
@@ -149,9 +148,10 @@ function getVisibleMessages(ruolo: string, userId: string) {
   return messaggi.filter(m => m.mittente === userId || m.destinatari.includes(userId))
 }
 function getVisibleWorkflows(ruolo: string, userId: string) {
-  if (ruolo === 'Admin' || ruolo === 'Finance') return workflowsDemo
+  const wfs = loadWorkflowsFromStorage()
+  if (ruolo === 'Admin' || ruolo === 'Finance') return wfs
   const myEvtIds = getVisibleEvents(ruolo, userId).map(e => e.id)
-  return workflowsDemo.filter(w => myEvtIds.includes(w.eventoId))
+  return wfs.filter(w => myEvtIds.includes(w.eventoId))
 }
 
 
@@ -202,12 +202,14 @@ function getSmartSuggestions(ruolo: string, userId: string): SearchResult[] {
     const wf = wfs.find((w: typeof wfBase) => w.id === wfBase.id) ?? wfBase
     const faseAttiva = wf.fasi.find((f: { ordine: number }) => f.ordine === wf.faseCorrenteOrdine)
     if (!faseAttiva) return
+    const allTasks = loadTasksFromStorage()
+    const allEvents = loadEventsFromStorage()
     const hasBlocker = faseAttiva.taskCriticiIds?.some((tid: string) => {
-      const t = tasks.find(x => x.id === tid)
+      const t = allTasks.find(x => x.id === tid)
       return t && t.stato !== 'completato'
     })
     if (hasBlocker) {
-      const evName = events.find(e => e.id === wf.eventoId)?.nome ?? wf.eventoId
+      const evName = allEvents.find(e => e.id === wf.eventoId)?.nome ?? wf.eventoId
       results.push({
         type: 'workflow',
         id: wf.id,
@@ -348,15 +350,17 @@ function runSearch(query: string, ruolo: string, userId: string): SearchResult[]
 
   // Workflows
   const wfs = loadWorkflowsFromStorage()
+  const searchEvents = loadEventsFromStorage()
+  const searchTasks = loadTasksFromStorage()
   getVisibleWorkflows(ruolo, userId).forEach(wfBase => {
     const wf = wfs.find((w: typeof wfBase) => w.id === wfBase.id) ?? wfBase
-    const evName = events.find(e => e.id === wf.eventoId)?.nome ?? wf.eventoId
+    const evName = searchEvents.find(e => e.id === wf.eventoId)?.nome ?? wf.eventoId
     const faseAttiva = wf.fasi.find((f: { ordine: number }) => f.ordine === wf.faseCorrenteOrdine)
     const s = score([evName, faseAttiva?.nome ?? ''], q)
     if (s > 0) {
       const pct = Math.round(wf.fasi.reduce((acc: number, f: { avanzamento: number }) => acc + f.avanzamento, 0) / wf.fasi.length)
       const blocked = faseAttiva?.taskCriticiIds?.some((tid: string) => {
-        const t = tasks.find(x => x.id === tid)
+        const t = searchTasks.find(x => x.id === tid)
         return t && t.stato !== 'completato'
       })
       results.push({

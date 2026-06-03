@@ -396,120 +396,162 @@ function getProactiveNotif(): FlyNotif | null {
   return pool[Math.floor(Math.random() * pool.length)]
 }
 
-// ─── FLY SVG Mascot (Cartoon Dog — Beige Labrador/Segugio mix) ────────────────
+// ─── FLY SVG Mascot (Premium Cartoon Dog — Full Body) ─────────────────────────
 
 function FlyMascot({ size = 56, blink = true, mood = 'happy' }: { size?: number; blink?: boolean; mood?: 'happy' | 'alert' | 'thinking' }) {
-  const s = size
-
   return (
     <svg
-      width={s}
-      height={s}
-      viewBox="0 0 56 56"
+      width={size}
+      height={size}
+      viewBox="0 0 80 80"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       style={{ display: 'block' }}
     >
-      {/* Glow backdrop */}
-      <circle cx="28" cy="30" r="22" fill="rgba(208,0,58,0.08)" />
+      {/* Subtle brand glow behind */}
+      <ellipse cx="40" cy="42" rx="28" ry="26" fill="rgba(208,0,58,0.05)" />
 
-      {/* Body — beige with white chest patch */}
-      <g className="fly-hoodie-sway" style={{ transformOrigin: '28px 44px' }}>
-        <ellipse cx="28" cy="46" rx="11" ry="9" fill="#d4a96a" />
-        {/* White chest patch */}
-        <ellipse cx="28" cy="47" rx="6" ry="7" fill="#f5ead6" />
-        {/* Collar with red tag */}
-        <path d="M21 40 Q28 42 35 40" stroke="#cc1a3a" strokeWidth="2" fill="none" strokeLinecap="round" />
-        <circle cx="28" cy="42" r="2.2" fill="#cc1a3a" />
-        <path d="M27 42 L28 44 L29 42" fill="#ffd700" />
+      {/* Tail — wagging animation */}
+      <g className="fly-hoodie-sway" style={{ transformOrigin: '52px 58px' }}>
+        <path d="M52 58 Q60 50 62 44 Q63 42 61 43 Q58 46 54 54" fill="#c99a5c" stroke="#b8884a" strokeWidth="0.5" />
       </g>
+
+      {/* Back legs */}
+      <ellipse cx="33" cy="68" rx="4.5" ry="6" fill="#c99a5c" />
+      <ellipse cx="47" cy="68" rx="4.5" ry="6" fill="#c99a5c" />
+      {/* Paws back */}
+      <ellipse cx="33" cy="73" rx="4" ry="2.5" fill="#e8d5b0" />
+      <ellipse cx="47" cy="73" rx="4" ry="2.5" fill="#e8d5b0" />
+
+      {/* Body */}
+      <ellipse cx="40" cy="56" rx="16" ry="14" fill="#d4a96a" />
+      {/* White chest patch — prominent */}
+      <ellipse cx="40" cy="55" rx="9" ry="11" fill="#f5ead6" />
+      <ellipse cx="40" cy="52" rx="6" ry="7" fill="#faf3e8" />
+
+      {/* Front legs */}
+      <rect x="32" y="60" width="5.5" height="12" rx="2.8" fill="#d4a96a" />
+      <rect x="42.5" y="60" width="5.5" height="12" rx="2.8" fill="#d4a96a" />
+      {/* Front paws */}
+      <ellipse cx="34.8" cy="72" rx="3.5" ry="2.5" fill="#f5ead6" />
+      <ellipse cx="45.3" cy="72" rx="3.5" ry="2.5" fill="#f5ead6" />
+      {/* Paw pads (tiny detail) */}
+      <circle cx="33.8" cy="72.5" r="0.7" fill="#c99a5c" />
+      <circle cx="35.8" cy="72.5" r="0.7" fill="#c99a5c" />
+      <circle cx="44.3" cy="72.5" r="0.7" fill="#c99a5c" />
+      <circle cx="46.3" cy="72.5" r="0.7" fill="#c99a5c" />
+
+      {/* Collar — brand red */}
+      <path d="M28 44 Q40 47 52 44" stroke="#cc1a3a" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+      {/* Collar tag — golden S */}
+      <circle cx="40" cy="47.5" r="3" fill="#cc1a3a" stroke="#a01030" strokeWidth="0.5" />
+      <text x="40" y="49.5" textAnchor="middle" fontSize="4" fontWeight="bold" fill="#ffd700" fontFamily="sans-serif">S</text>
 
       {/* Head */}
-      <ellipse cx="28" cy="24" rx="14" ry="13" fill="#d4a96a" />
-      {/* Muzzle lighter area */}
-      <ellipse cx="28" cy="28" rx="7" ry="6" fill="#e8c98a" />
+      <ellipse cx="40" cy="30" rx="16" ry="15" fill="#d4a96a" />
+      {/* Head highlight (3D feel) */}
+      <ellipse cx="36" cy="24" rx="8" ry="7" fill="rgba(255,255,255,0.06)" />
 
-      {/* Floppy ears — Labrador/Segugio style */}
+      {/* Floppy ears — large and expressive */}
       <g className="fly-float">
         {/* Left ear */}
-        <ellipse cx="15" cy="24" rx="5" ry="10" fill="#b8884a" transform="rotate(-10 15 24)" />
-        <ellipse cx="15.5" cy="24" rx="3" ry="7" fill="#c99a5c" transform="rotate(-10 15 24)" />
+        <ellipse cx="25" cy="28" rx="6" ry="12" fill="#b8884a" transform="rotate(-15 25 28)" />
+        <ellipse cx="25.5" cy="29" rx="3.5" ry="8" fill="#c99a5c" transform="rotate(-15 25 29)" />
         {/* Right ear */}
-        <ellipse cx="41" cy="24" rx="5" ry="10" fill="#b8884a" transform="rotate(10 41 24)" />
-        <ellipse cx="40.5" cy="24" rx="3" ry="7" fill="#c99a5c" transform="rotate(10 41 24)" />
+        <ellipse cx="55" cy="28" rx="6" ry="12" fill="#b8884a" transform="rotate(15 55 28)" />
+        <ellipse cx="54.5" cy="29" rx="3.5" ry="8" fill="#c99a5c" transform="rotate(15 55 29)" />
       </g>
 
-      {/* Eyes group */}
-      <g className={blink ? 'fly-blink' : ''} style={{ transformOrigin: '28px 22px' }}>
-        {/* Left eye */}
-        <ellipse cx="23" cy="22" rx="3.5" ry="3.8" fill="white" />
-        {/* Right eye */}
-        <ellipse cx="33" cy="22" rx="3.5" ry="3.8" fill="white" />
-        {/* Left pupil */}
-        <g className="fly-eye-look" style={{ transformOrigin: '23px 22px' }}>
-          <circle cx="23" cy="22.5" r="2.2" fill="#2c1810" />
-          <circle cx="24" cy="21.3" r="0.9" fill="white" />
-          <circle cx="22.5" cy="23.2" r="0.4" fill="rgba(208,0,58,0.5)" />
+      {/* Muzzle / snout area */}
+      <ellipse cx="40" cy="35" rx="8" ry="7" fill="#e8c98a" />
+      <ellipse cx="40" cy="36" rx="6" ry="5" fill="#f0daa0" />
+
+      {/* Eyes — large, intelligent, expressive */}
+      <g className={blink ? 'fly-blink' : ''} style={{ transformOrigin: '40px 27px' }}>
+        {/* Left eye white */}
+        <ellipse cx="34" cy="27" rx="4.5" ry="5" fill="white" />
+        <ellipse cx="34" cy="27" rx="4.5" ry="5" fill="none" stroke="rgba(139,94,60,0.2)" strokeWidth="0.5" />
+        {/* Right eye white */}
+        <ellipse cx="46" cy="27" rx="4.5" ry="5" fill="white" />
+        <ellipse cx="46" cy="27" rx="4.5" ry="5" fill="none" stroke="rgba(139,94,60,0.2)" strokeWidth="0.5" />
+        {/* Left pupil — warm brown */}
+        <g className="fly-eye-look" style={{ transformOrigin: '34px 27px' }}>
+          <circle cx="34" cy="27.5" r="2.8" fill="#3d2010" />
+          <circle cx="34" cy="27.5" r="2" fill="#5a3520" />
+          <circle cx="35.2" cy="26" r="1.1" fill="white" opacity="0.9" />
+          <circle cx="33" cy="28.5" r="0.5" fill="rgba(208,0,58,0.4)" />
         </g>
         {/* Right pupil */}
-        <g className="fly-eye-look" style={{ transformOrigin: '33px 22px' }}>
-          <circle cx="33" cy="22.5" r="2.2" fill="#2c1810" />
-          <circle cx="34" cy="21.3" r="0.9" fill="white" />
-          <circle cx="32.5" cy="23.2" r="0.4" fill="rgba(208,0,58,0.5)" />
+        <g className="fly-eye-look" style={{ transformOrigin: '46px 27px' }}>
+          <circle cx="46" cy="27.5" r="2.8" fill="#3d2010" />
+          <circle cx="46" cy="27.5" r="2" fill="#5a3520" />
+          <circle cx="47.2" cy="26" r="1.1" fill="white" opacity="0.9" />
+          <circle cx="45" cy="28.5" r="0.5" fill="rgba(208,0,58,0.4)" />
         </g>
       </g>
 
-      {/* Eyebrows — expressive based on mood */}
+      {/* Eyebrows — mood-based */}
       {mood === 'alert' ? (
         <>
-          <path d="M19.5 18 L26 19" stroke="#8b5e3c" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-          <path d="M30 19 L36.5 18" stroke="#8b5e3c" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+          <path d="M29 21 Q34 19.5 38 22" stroke="#8b5e3c" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+          <path d="M42 22 Q46 19.5 51 21" stroke="#8b5e3c" strokeWidth="1.6" fill="none" strokeLinecap="round" />
         </>
       ) : mood === 'thinking' ? (
         <>
-          <path d="M20 18.5 Q23 17 26 19" stroke="#8b5e3c" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-          <path d="M30 18 Q33 17 36 18.5" stroke="#8b5e3c" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          <path d="M30 22 Q34 20 38 22.5" stroke="#8b5e3c" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+          <path d="M42 21.5 Q46 20 50 23" stroke="#8b5e3c" strokeWidth="1.3" fill="none" strokeLinecap="round" />
         </>
       ) : (
         <>
-          <path d="M20 19 Q23 17.5 26 19" stroke="#8b5e3c" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-          <path d="M30 19 Q33 17.5 36 19" stroke="#8b5e3c" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          <path d="M30 23 Q34 21 38 23" stroke="#8b5e3c" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+          <path d="M42 23 Q46 21 50 23" stroke="#8b5e3c" strokeWidth="1.3" fill="none" strokeLinecap="round" />
         </>
       )}
 
-      {/* Nose — big black dog nose */}
-      <ellipse cx="28" cy="28" rx="3" ry="2.4" fill="#2c1810" />
-      <ellipse cx="27" cy="27.3" rx="1" ry="0.6" fill="rgba(255,255,255,0.25)" />
+      {/* Nose — prominent, rounded, glossy */}
+      <ellipse cx="40" cy="35" rx="3.5" ry="2.8" fill="#2c1810" />
+      <ellipse cx="39" cy="34" rx="1.3" ry="0.8" fill="rgba(255,255,255,0.3)" />
+      {/* Nostrils */}
+      <circle cx="38.5" cy="35.5" r="0.8" fill="#1a0e08" />
+      <circle cx="41.5" cy="35.5" r="0.8" fill="#1a0e08" />
 
       {/* Mouth */}
       {mood === 'happy' ? (
         <>
-          <path d="M28 30 L28 32" stroke="#2c1810" strokeWidth="1" strokeLinecap="round" />
-          <path d="M23 32 Q28 36 33 32" stroke="#2c1810" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-          {/* Tongue */}
-          <ellipse cx="28" cy="34" rx="2.2" ry="1.8" fill="#e85a7a" />
-          <ellipse cx="28" cy="33.5" rx="1.5" ry="1" fill="#f08090" />
+          <path d="M40 37.5 L40 39" stroke="#2c1810" strokeWidth="1" strokeLinecap="round" />
+          <path d="M33 39.5 Q40 44 47 39.5" stroke="#2c1810" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+          {/* Tongue — playful */}
+          <ellipse cx="40" cy="42" rx="3" ry="2.5" fill="#e85a7a" />
+          <ellipse cx="40" cy="41.2" rx="2" ry="1.4" fill="#f08090" />
+          <path d="M40 40.5 L40 43" stroke="rgba(200,50,80,0.3)" strokeWidth="0.5" />
+        </>
+      ) : mood === 'thinking' ? (
+        <>
+          <path d="M40 37.5 L40 38.5" stroke="#2c1810" strokeWidth="1" strokeLinecap="round" />
+          <path d="M36 39 Q40 40 44 39" stroke="#2c1810" strokeWidth="1.1" fill="none" strokeLinecap="round" />
         </>
       ) : (
         <>
-          <path d="M28 30 L28 31" stroke="#2c1810" strokeWidth="1" strokeLinecap="round" />
-          <path d="M25 32 Q28 33.5 31 32" stroke="#2c1810" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+          <path d="M40 37.5 L40 39" stroke="#2c1810" strokeWidth="1" strokeLinecap="round" />
+          <path d="M35 40 Q40 42 45 40" stroke="#2c1810" strokeWidth="1.2" fill="none" strokeLinecap="round" />
         </>
       )}
 
       {/* Whisker dots */}
-      <circle cx="20" cy="28" r="0.6" fill="#8b5e3c" />
-      <circle cx="19" cy="29.5" r="0.6" fill="#8b5e3c" />
-      <circle cx="36" cy="28" r="0.6" fill="#8b5e3c" />
-      <circle cx="37" cy="29.5" r="0.6" fill="#8b5e3c" />
+      <circle cx="30" cy="35" r="0.7" fill="#8b5e3c" />
+      <circle cx="28.5" cy="37" r="0.7" fill="#8b5e3c" />
+      <circle cx="29" cy="39" r="0.6" fill="#8b5e3c" />
+      <circle cx="50" cy="35" r="0.7" fill="#8b5e3c" />
+      <circle cx="51.5" cy="37" r="0.7" fill="#8b5e3c" />
+      <circle cx="51" cy="39" r="0.6" fill="#8b5e3c" />
 
-      {/* Tech headset — small earpiece */}
-      <path d="M13 21 Q11 21 11 24 Q11 27 13 27" stroke="rgba(208,0,58,0.7)" strokeWidth="1.5" fill="none" />
-      <circle cx="12" cy="24" r="2" fill="rgba(208,0,58,0.9)" />
-      <circle cx="12" cy="24" r="1" fill="rgba(255,255,255,0.3)" />
+      {/* Tech earpiece — brand-integrated */}
+      <rect x="19" y="25" width="4" height="6" rx="2" fill="rgba(208,0,58,0.85)" />
+      <rect x="19.8" y="26.5" width="2.4" height="3" rx="1.2" fill="rgba(255,255,255,0.2)" />
+      <circle cx="21" cy="28" r="0.8" fill="rgba(255,255,255,0.6)" className="fly-glow-pulse" />
 
-      {/* Status indicator on headset */}
-      <circle cx="12" cy="24" r="3" fill="none" stroke="rgba(208,0,58,0.3)" strokeWidth="0.5" className="fly-glow-pulse" />
+      {/* Fur tuft on top of head */}
+      <path d="M37 16 Q39 13 40 16 Q41 13 43 16" stroke="#c99a5c" strokeWidth="1.5" fill="none" strokeLinecap="round" />
     </svg>
   )
 }

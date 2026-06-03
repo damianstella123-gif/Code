@@ -22,8 +22,7 @@ import { loadUser } from '@/lib/auth'
 import { messaggi as initMessaggi } from '@/data/comunicazioni'
 import type { Messaggio, Priorita, TipoCanale } from '@/data/comunicazioni'
 import { users } from '@/data/users'
-import { events } from '@/data/events'
-import { tasks } from '@/data/tasks'
+import { loadEventsFromStorage, loadTasksFromStorage } from '@/lib/storage'
 
 // ─── localStorage ─────────────────────────────────────────────────────────────
 
@@ -90,11 +89,11 @@ function userAvatar(id: string) {
 }
 function eventName(id: string | null) {
   if (!id) return null
-  return events.find(e => e.id === id)?.nome ?? null
+  return loadEventsFromStorage().find(e => e.id === id)?.nome ?? null
 }
 function taskTitle(id: string | null) {
   if (!id) return null
-  return tasks.find(t => t.id === id)?.titolo ?? null
+  return loadTasksFromStorage().find(t => t.id === id)?.titolo ?? null
 }
 
 function Avatar({ userId, size = 8 }: { userId: string; size?: number }) {
@@ -287,7 +286,7 @@ function Composer({ currentUserId, onClose, onSend }: ComposerProps) {
                 style={inputStyle}
               >
                 <option value="none">Nessun evento</option>
-                {events.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
+                {loadEventsFromStorage().map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
               </select>
             </div>
             <div>
@@ -299,7 +298,7 @@ function Composer({ currentUserId, onClose, onSend }: ComposerProps) {
                 style={inputStyle}
               >
                 <option value="none">Nessun task</option>
-                {tasks.map(t => <option key={t.id} value={t.id}>{t.titolo}</option>)}
+                {loadTasksFromStorage().map(t => <option key={t.id} value={t.id}>{t.titolo}</option>)}
               </select>
             </div>
           </div>
@@ -551,7 +550,7 @@ export default function Comunicazioni() {
 
       if (ruolo === 'Manager') {
         const myTeamIds = [
-          ...events.filter(e => e.responsabile === uid || e.team.includes(uid)).flatMap(e => e.team),
+          ...loadEventsFromStorage().filter(e => e.responsabile === uid || e.team.includes(uid)).flatMap(e => e.team),
           uid,
         ]
         return involvedInMsg ||
@@ -568,10 +567,10 @@ export default function Comunicazioni() {
       }
 
       if (ruolo === 'Operativo') {
-        const myEventIds = events
+        const myEventIds = loadEventsFromStorage()
           .filter(e => e.responsabile === uid || e.team.includes(uid))
           .map(e => e.id)
-        const myTaskIds = tasks.filter(t => t.assegnatario === uid).map(t => t.id)
+        const myTaskIds = loadTasksFromStorage().filter(t => t.assegnatario === uid).map(t => t.id)
         return involvedInMsg ||
           (m.eventoId !== null && myEventIds.includes(m.eventoId)) ||
           (m.taskId !== null && myTaskIds.includes(m.taskId))
@@ -859,7 +858,7 @@ export default function Comunicazioni() {
                 style={{ color: filterEvento === 'tutti' ? 'var(--muted)' : 'var(--text)' }}
               >
                 <option value="tutti">Tutti gli eventi</option>
-                {events.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
+                {loadEventsFromStorage().map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
               </select>
               <ChevronDown className="w-3 h-3" style={{ color: 'var(--muted)' }} />
             </div>

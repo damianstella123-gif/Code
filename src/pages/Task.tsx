@@ -16,9 +16,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import { users } from '@/data/users'
-import { events } from '@/data/events'
 import { loadUser } from '@/lib/auth'
-import { loadTasksFromStorage, STORAGE_KEYS } from '@/lib/storage'
+import { loadTasksFromStorage, loadEventsFromStorage, STORAGE_KEYS } from '@/lib/storage'
 import { daysLeft, fmtShort } from '@/lib/format'
 import type { Task } from '@/data/tasks'
 
@@ -48,7 +47,7 @@ function getVisibleTasks(allTasks: Task[], ruolo: string, userId: string): Task[
       return allTasks
     case 'Finance':
       return allTasks.filter(t => {
-        const evt = t.evento ? events.find(e => e.id === t.evento) : null
+        const evt = t.evento ? loadEventsFromStorage().find(e => e.id === t.evento) : null
         return t.assegnatario === userId || (evt && (evt.team.includes(userId) || evt.responsabile === userId))
       })
     case 'Commerciale':

@@ -414,9 +414,9 @@ body {
 /* ─── FLY ASSISTANT ────────────────────────────────────────────────────────── */
 
 @keyframes fly-float {
-  0%, 100% { transform: translateY(0px) rotate(-1deg); }
-  33%       { transform: translateY(-8px) rotate(1deg); }
-  66%       { transform: translateY(-4px) rotate(-0.5deg); }
+  0%, 100% { transform: translateY(0px) rotate(-0.5deg); }
+  33%       { transform: translateY(-4px) rotate(0.5deg); }
+  66%       { transform: translateY(-2px) rotate(-0.3deg); }
 }
 
 @keyframes fly-blink {
@@ -462,8 +462,9 @@ body {
 }
 
 @keyframes fly-hoodie-sway {
-  0%, 100% { transform: skewX(0deg); }
-  50%      { transform: skewX(0.8deg); }
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(8deg); }
+  75%      { transform: rotate(-5deg); }
 }
 
 @keyframes fly-typing-dot {

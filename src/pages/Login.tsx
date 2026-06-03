@@ -57,18 +57,23 @@ export default function Login() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4"
+            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
             style={{
               background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)',
-              boxShadow: 'var(--shadow-red-lg)',
+              boxShadow: '0 8px 32px rgba(208,0,58,0.4), inset 0 1px 0 rgba(255,255,255,0.15)',
             }}
           >
-            <span className="text-3xl font-bold text-white">S</span>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+              <path d="M17 4H9C6.24 4 4 6.24 4 9v0c0 2.76 2.24 5 5 5h6c2.76 0 5 2.24 5 5v0c0 2.76-2.24 5-5 5H7" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
           </div>
           <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>
-            SIMMETRIA<span style={{ color: 'var(--red2)' }}> HUB</span>
+            SIMMETRIA
           </h1>
-          <p className="mt-2" style={{ color: 'var(--muted)' }}>
+          <p className="text-sm font-semibold tracking-widest mt-1" style={{ color: 'var(--red2)' }}>
+            HUB
+          </p>
+          <p className="mt-3" style={{ color: 'var(--muted)' }}>
             Accedi come utente demo
           </p>
         </div>
