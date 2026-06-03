@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 import FlyAssistant from '@/components/FlyAssistant'
 import GlobalSearch from '@/components/GlobalSearch'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -23,6 +23,10 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { loadUser, clearUser, getAllowedNav } from '@/lib/auth'
+import { fetchEvents } from '@/lib/events-service'
+import { fetchTasks } from '@/lib/tasks-service'
+import { fetchPractices } from '@/lib/practices-service'
+import { cacheEventsSnapshot, cacheTasksSnapshot, cachePraticheSnapshot } from '@/lib/storage'
 
 const iconMap: Record<string, React.ElementType> = {
   '/dashboard': LayoutDashboard,
@@ -363,6 +367,18 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const navigate = useNavigate()
   const user = loadUser()
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    Promise.all([fetchEvents(), fetchTasks(), fetchPractices()]).then(([ev, tk, pr]) => {
+      if (cancelled) return
+      cacheEventsSnapshot(ev)
+      cacheTasksSnapshot(tk)
+      cachePraticheSnapshot(pr)
+    })
+    return () => { cancelled = true }
+  }, [user])
 
   if (!user) {
     navigate('/login')

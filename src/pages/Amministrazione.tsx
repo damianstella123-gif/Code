@@ -33,8 +33,10 @@ import type {
 } from '@/data/amministrazione'
 import { clients } from '@/data/clients'
 import { suppliers } from '@/data/suppliers'
+import type { Event } from '@/data/events'
 import { fetchBudgets, upsertBudget, updateBudget, deleteBudget } from '@/lib/budgets-service'
-import { events } from '@/data/events'
+import { fetchEvents } from '@/lib/events-service'
+import { loadEventsFromStorage, cacheEventsSnapshot } from '@/lib/storage'
 
 // ─── localStorage ────────────────────────────────────────────────────────────
 
@@ -118,7 +120,7 @@ function supplierName(id: string) {
 }
 function eventName(id: string | null) {
   if (!id) return '—'
-  return events.find(e => e.id === id)?.nome ?? id
+  return loadEventsFromStorage().find(e => e.id === id)?.nome ?? id
 }
 
 // ─── Modale nuovo movimento ───────────────────────────────────────────────────
@@ -229,7 +231,7 @@ function NuovoMovimentoModal({ onClose, onSave }: NuovoMovimentoModalProps) {
               style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
             >
               <option value="none">Nessun evento</option>
-              {events.map(ev => (
+              {loadEventsFromStorage().map(ev => (
                 <option key={ev.id} value={ev.id}>{ev.nome}</option>
               ))}
             </select>
@@ -318,6 +320,7 @@ export default function Amministrazione() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard')
   const [entrate, setEntrate] = useState<Entrata[]>(() => load(SK_ENTRATE, initEntrate))
   const [uscite, setUscite] = useState<Uscita[]>([])
+  const [events, setEvents] = useState<Event[]>(() => loadEventsFromStorage())
   const [fatture, setFatture] = useState<Fattura[]>(() => load(SK_FATTURE, initFatture))
   const [showNuovoMovimento, setShowNuovoMovimento] = useState(false)
 
@@ -327,6 +330,11 @@ export default function Amministrazione() {
     fetchBudgets().then(remote => {
       if (cancelled) return
       setUscite(remote)
+    })
+    fetchEvents().then(remote => {
+      if (cancelled) return
+      setEvents(remote)
+      cacheEventsSnapshot(remote)
     })
     return () => {
       cancelled = true
