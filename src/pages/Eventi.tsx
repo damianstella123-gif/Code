@@ -27,6 +27,7 @@ import {
   Plus,
   Edit3,
   Trash2,
+  Check,
 } from 'lucide-react'
 import { users } from '@/data/users'
 import { suppliers } from '@/data/suppliers'
@@ -927,6 +928,8 @@ function TabTimeline({ event }: { event: Event }) {
 }
 
 function TabCreative({ event }: { event: Event }) {
+  const [selectedColor, setSelectedColor] = useState<string | null>(null)
+  const [selectedFont, setSelectedFont] = useState<number>(0)
   const moodColors = ['#1a1a2e', '#16213e', '#0f3460', '#e94560', '#533483', '#2c3e50', '#e8cda2', '#c4a882']
   const fontPairs = [
     { heading: 'Playfair Display', body: 'Lato', style: 'Elegante' },
@@ -963,7 +966,8 @@ function TabCreative({ event }: { event: Event }) {
         <div className="flex gap-2 flex-wrap">
           {moodColors.map((c, i) => (
             <button key={i} className="group relative w-12 h-12 rounded-xl transition-all hover:scale-110"
-              style={{ background: c, border: '2px solid var(--line)' }}>
+              onClick={() => { navigator.clipboard.writeText(c); setSelectedColor(c) }}
+              style={{ background: c, border: selectedColor === c ? '2px solid var(--red2)' : '2px solid var(--line)', boxShadow: selectedColor === c ? '0 0 12px rgba(208,0,58,0.4)' : 'none' }}>
               <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"
                 style={{ background: 'rgba(0,0,0,0.4)' }}>
                 <span className="text-white text-xs font-mono">{c}</span>
@@ -971,7 +975,9 @@ function TabCreative({ event }: { event: Event }) {
             </button>
           ))}
         </div>
-        <p className="text-xs mt-2" style={{ color: 'var(--muted)' }}>Passa sopra per copiare il codice colore</p>
+        <p className="text-xs mt-2" style={{ color: selectedColor ? 'var(--green)' : 'var(--muted)' }}>
+          {selectedColor ? `Colore ${selectedColor} copiato!` : 'Clicca per copiare il codice colore'}
+        </p>
       </div>
 
       <div className="panel p-5">
@@ -979,12 +985,14 @@ function TabCreative({ event }: { event: Event }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {fontPairs.map((fp, i) => (
             <div key={i} className="p-4 rounded-xl cursor-pointer transition-all hover:bg-white/5"
-              style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              onClick={() => setSelectedFont(i)}
+              style={{ background: 'var(--panel2)', border: selectedFont === i ? '1px solid var(--red2)' : '1px solid var(--line)', boxShadow: selectedFont === i ? '0 0 12px rgba(208,0,58,0.15)' : 'none' }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs px-2 py-0.5 rounded"
-                  style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
+                  style={{ background: selectedFont === i ? 'rgba(208,0,58,0.2)' : 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
                   {fp.style}
                 </span>
+                {selectedFont === i && <Check className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />}
               </div>
               <p className="text-lg font-bold" style={{ color: 'var(--text)', fontFamily: 'serif' }}>{fp.heading}</p>
               <p className="text-sm" style={{ color: 'var(--muted)' }}>{fp.body}</p>

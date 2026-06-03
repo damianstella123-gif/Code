@@ -934,14 +934,24 @@ export default function Calendario() {
 
   const urgentTasks = allTasks.filter(t => t.priorita === 'alta' && t.stato !== 'completato')
   const overdueItems = visibleItems.filter(item => {
-    const d = item.type === 'event' ? (item.data as Event).dataInizio : (item.data as Task).scadenza
-    const done = item.type === 'task'
-      ? (item.data as Task).stato === 'completato'
-      : (item.data as Event).stato === 'completato'
+    const d = item.type === 'event'
+      ? (item.data as Event).dataInizio
+      : item.type === 'task'
+        ? (item.data as Task).scadenza
+        : (item.data as Pratica).scadenza
+    const done = item.type === 'event'
+      ? (item.data as Event).stato === 'completato'
+      : item.type === 'task'
+        ? (item.data as Task).stato === 'completato'
+        : (item.data as Pratica).stato === 'completata'
     return new Date(d) < today && !done
   })
   const thisWeekItems = visibleItems.filter(item => {
-    const d = item.type === 'event' ? (item.data as Event).dataInizio : (item.data as Task).scadenza
+    const d = item.type === 'event'
+      ? (item.data as Event).dataInizio
+      : item.type === 'task'
+        ? (item.data as Task).scadenza
+        : (item.data as Pratica).scadenza
     const di = new Date(d)
     return di >= today && di <= addDays(today, 7)
   })
