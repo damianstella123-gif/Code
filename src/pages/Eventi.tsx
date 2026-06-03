@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   Calendar,
   MapPin,
@@ -35,7 +35,8 @@ import { clients } from '@/data/clients'
 import { messaggi } from '@/data/comunicazioni'
 import { entrate, uscite } from '@/data/amministrazione'
 import { loadUser } from '@/lib/auth'
-import { loadTasksFromStorage, loadEventsFromStorage, STORAGE_KEYS } from '@/lib/storage'
+import { loadTasksFromStorage, loadEventsFromStorage, cacheEventsSnapshot } from '@/lib/storage'
+import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote } from '@/lib/events-service'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
 
@@ -1233,45 +1234,64 @@ export default function Eventi() {
   const [editingEvent, setEditingEvent] = useState<Event | undefined>(undefined)
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null)
 
-  const saveEvents = useCallback((list: Event[]) => {
-    localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(list))
+  // Carica gli eventi da Supabase al mount.
+  // Il fallback localStorage rimane per istanti iniziali / offline.
+  useEffect(() => {
+    let cancelled = false
+    fetchEvents().then(remote => {
+      if (cancelled) return
+      if (remote.length > 0) {
+        setEventList(remote)
+        cacheEventsSnapshot(remote)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  const handleSave = useCallback((event: Event) => {
+  const handleSave = useCallback(async (event: Event) => {
+    const saved = await upsertEvent(event)
+    const finalEvent = saved ?? event
     setEventList(prev => {
-      const exists = prev.find(e => e.id === event.id)
-      const updated = exists ? prev.map(e => e.id === event.id ? event : e) : [event, ...prev]
-      saveEvents(updated)
+      const exists = prev.find(e => e.id === finalEvent.id)
+      const updated = exists
+        ? prev.map(e => (e.id === finalEvent.id ? finalEvent : e))
+        : [finalEvent, ...prev]
+      cacheEventsSnapshot(updated)
       return updated
     })
     setShowForm(false)
     setEditingEvent(undefined)
-    if (selectedEvent && selectedEvent.id === event.id) {
-      setSelectedEvent(event)
+    if (selectedEvent && selectedEvent.id === finalEvent.id) {
+      setSelectedEvent(finalEvent)
     }
-  }, [saveEvents, selectedEvent])
+  }, [selectedEvent])
 
-  const handleDelete = useCallback((event: Event) => {
+  const handleDelete = useCallback(async (event: Event) => {
+    await deleteEventRemote(event.id)
     setEventList(prev => {
       const updated = prev.filter(e => e.id !== event.id)
-      saveEvents(updated)
+      cacheEventsSnapshot(updated)
       return updated
     })
     setDeletingEvent(null)
     setSelectedEvent(null)
-  }, [saveEvents])
+  }, [])
 
-  const handleStatusChange = useCallback((event: Event, newStato: StatoEvento) => {
+  const handleStatusChange = useCallback(async (event: Event, newStato: StatoEvento) => {
     const updated = { ...event, stato: newStato }
+    const remote = await updateEventRemote(event.id, { stato: newStato })
+    const finalEvent = remote ?? updated
     setEventList(prev => {
-      const newList = prev.map(e => e.id === event.id ? updated : e)
-      saveEvents(newList)
+      const newList = prev.map(e => (e.id === event.id ? finalEvent : e))
+      cacheEventsSnapshot(newList)
       return newList
     })
     if (selectedEvent && selectedEvent.id === event.id) {
-      setSelectedEvent(updated)
+      setSelectedEvent(finalEvent)
     }
-  }, [saveEvents, selectedEvent])
+  }, [selectedEvent])
 
   const visibleEvents = useMemo(() => {
     if (!currentUser) return []

@@ -32,8 +32,19 @@ export function loadTasksFromStorage(): Task[] {
   return safeRead(STORAGE_KEYS.tasks, tasks)
 }
 
+// Snapshot sincrono degli eventi per i moduli che ancora leggono mock.
+// Step 2: la pagina Eventi e' la fonte di verita' Supabase e aggiorna
+// questa cache via `cacheEventsSnapshot()` ad ogni fetch / mutazione.
 export function loadEventsFromStorage(): Event[] {
   return safeRead(STORAGE_KEYS.events, events)
+}
+
+export function cacheEventsSnapshot(list: Event[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(list))
+  } catch {
+    // ignore quota errors in demo
+  }
 }
 
 export function loadWorkflowsFromStorage() {
