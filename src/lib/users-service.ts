@@ -4,21 +4,31 @@ import type { Profile } from './profiles'
 
 const EDGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users`
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
+async function getAuthHeaders(): Promise<HeadersInit> {
   const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Sessione scaduta, effettua nuovamente il login')
   return {
-    'Authorization': `Bearer ${session?.access_token ?? ''}`,
+    'Authorization': `Bearer ${session.access_token}`,
     'Content-Type': 'application/json',
     'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
   }
 }
 
-export async function adminListUsers(): Promise<Profile[]> {
+async function call(action: string, method: 'GET' | 'POST' = 'GET', body?: unknown): Promise<unknown> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${EDGE_URL}?action=list-users`, { headers })
+  const opts: RequestInit = { method, headers }
+  if (body) opts.body = JSON.stringify(body)
+  const res = await fetch(`${EDGE_URL}?action=${action}`, opts)
   const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? 'Errore caricamento utenti')
-  return json.users as Profile[]
+  if (!res.ok) {
+    throw new Error(json.error ?? `Errore ${res.status}`)
+  }
+  return json
+}
+
+export async function adminListUsers(): Promise<Profile[]> {
+  const data = await call('list-users') as { users: Profile[] }
+  return data.users
 }
 
 export interface CreateUserInput {
@@ -30,14 +40,7 @@ export interface CreateUserInput {
 }
 
 export async function adminCreateUser(input: CreateUserInput): Promise<void> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${EDGE_URL}?action=create-user`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(input),
-  })
-  const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? 'Errore creazione utente')
+  await call('create-user', 'POST', input)
 }
 
 export interface UpdateUserInput {
@@ -49,23 +52,9 @@ export interface UpdateUserInput {
 }
 
 export async function adminUpdateUser(input: UpdateUserInput): Promise<void> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${EDGE_URL}?action=update-user`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(input),
-  })
-  const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? 'Errore aggiornamento utente')
+  await call('update-user', 'POST', input)
 }
 
 export async function adminResetPassword(userId: string, newPassword: string): Promise<void> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${EDGE_URL}?action=reset-password`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ user_id: userId, new_password: newPassword }),
-  })
-  const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? 'Errore reset password')
+  await call('reset-password', 'POST', { user_id: userId, new_password: newPassword })
 }

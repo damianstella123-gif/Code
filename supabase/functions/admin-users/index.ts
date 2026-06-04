@@ -8,11 +8,56 @@ const corsHeaders = {
     "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-function jsonResponse(data: unknown, status = 200) {
+function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function getAdminClient() {
+  const url = Deno.env.get("SUPABASE_URL")!;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+async function verifyPartner(
+  adminClient: ReturnType<typeof createClient>,
+  req: Request
+): Promise<{ userId: string } | Response> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.replace("Bearer ", "");
+
+  if (!token) {
+    return json({ error: "Token mancante" }, 401);
+  }
+
+  const {
+    data: { user },
+    error,
+  } = await adminClient.auth.getUser(token);
+
+  if (error || !user) {
+    return json({ error: "Non autenticato: " + (error?.message ?? "utente non trovato") }, 401);
+  }
+
+  const { data: profile, error: profileError } = await adminClient
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError || !profile) {
+    return json({ error: "Profilo non trovato" }, 403);
+  }
+
+  if (profile.role !== "Partner") {
+    return json({ error: "Accesso negato: solo Partner (" + profile.role + ")" }, 403);
+  }
+
+  return { userId: user.id };
 }
 
 Deno.serve(async (req: Request) => {
@@ -21,40 +66,37 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
-    // Verify caller is authenticated and is a Partner
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const token = authHeader.replace("Bearer ", "");
-    const {
-      data: { user: caller },
-      error: authError,
-    } = await adminClient.auth.getUser(token);
-    if (authError || !caller) {
-      return jsonResponse({ error: "Non autenticato" }, 401);
-    }
-
-    const { data: callerProfile } = await adminClient
-      .from("profiles")
-      .select("role")
-      .eq("id", caller.id)
-      .maybeSingle();
-
-    if (!callerProfile || callerProfile.role !== "Partner") {
-      return jsonResponse({ error: "Accesso negato: solo Partner" }, 403);
-    }
+    const adminClient = getAdminClient();
+    const auth = await verifyPartner(adminClient, req);
+    if (auth instanceof Response) return auth;
 
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
-    if (req.method === "POST" && action === "create-user") {
-      const { email, password, first_name, last_name, role } = await req.json();
+    // ─── LIST USERS ────────────────────────────────────────────
+    if (action === "list-users") {
+      const { data, error } = await adminClient
+        .from("profiles")
+        .select(
+          "id, first_name, last_name, email, role, avatar_url, is_active, created_at, updated_at"
+        )
+        .order("created_at", { ascending: true });
+
+      if (error) return json({ error: error.message }, 500);
+      return json({ users: data });
+    }
+
+    // ─── CREATE USER ───────────────────────────────────────────
+    if (action === "create-user" && req.method === "POST") {
+      const body = await req.json();
+      const { email, password, first_name, last_name, role } = body;
+
       if (!email || !password || !first_name || !last_name || !role) {
-        return jsonResponse({ error: "Campi obbligatori mancanti" }, 400);
+        return json({ error: "Campi obbligatori: email, password, first_name, last_name, role" }, 400);
+      }
+
+      if (password.length < 6) {
+        return json({ error: "Password minima 6 caratteri" }, 400);
       }
 
       const { data: newUser, error: createError } =
@@ -66,36 +108,70 @@ Deno.serve(async (req: Request) => {
         });
 
       if (createError) {
-        return jsonResponse({ error: createError.message }, 400);
+        return json({ error: createError.message }, 400);
       }
 
-      return jsonResponse({ user: newUser.user });
+      // Ensure profile exists with correct data (trigger may have created it)
+      await adminClient.from("profiles").upsert({
+        id: newUser.user.id,
+        email,
+        first_name,
+        last_name,
+        role,
+        nome: `${first_name} ${last_name}`,
+        ruolo: role,
+        is_active: true,
+        attivo: true,
+      }, { onConflict: "id" });
+
+      return json({ user: { id: newUser.user.id, email } });
     }
 
-    if (req.method === "POST" && action === "update-user") {
-      const { user_id, first_name, last_name, role, is_active } =
-        await req.json();
+    // ─── UPDATE USER ───────────────────────────────────────────
+    if (action === "update-user" && req.method === "POST") {
+      const body = await req.json();
+      const { user_id, first_name, last_name, role, is_active } = body;
+
       if (!user_id) {
-        return jsonResponse({ error: "user_id obbligatorio" }, 400);
+        return json({ error: "user_id obbligatorio" }, 400);
       }
 
-      const updatePayload: Record<string, unknown> = {};
-      if (first_name !== undefined) updatePayload.first_name = first_name;
-      if (last_name !== undefined) updatePayload.last_name = last_name;
-      if (role !== undefined) updatePayload.role = role;
-      if (is_active !== undefined) updatePayload.is_active = is_active;
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (first_name !== undefined) {
+        patch.first_name = first_name;
+        patch.nome = `${first_name} ${last_name ?? ""}`.trim();
+      }
+      if (last_name !== undefined) {
+        patch.last_name = last_name;
+        if (!patch.nome) {
+          // fetch existing first_name
+          const { data: existing } = await adminClient
+            .from("profiles")
+            .select("first_name")
+            .eq("id", user_id)
+            .maybeSingle();
+          patch.nome = `${existing?.first_name ?? ""} ${last_name}`.trim();
+        }
+      }
+      if (role !== undefined) {
+        patch.role = role;
+        patch.ruolo = role;
+      }
+      if (is_active !== undefined) {
+        patch.is_active = is_active;
+        patch.attivo = is_active;
+      }
 
-      // Update profile
-      const { error: profileError } = await adminClient
+      const { error: updateError } = await adminClient
         .from("profiles")
-        .update(updatePayload)
+        .update(patch)
         .eq("id", user_id);
 
-      if (profileError) {
-        return jsonResponse({ error: profileError.message }, 400);
+      if (updateError) {
+        return json({ error: updateError.message }, 400);
       }
 
-      // If deactivating, also ban the user in auth; if reactivating, unban
+      // Ban/unban in auth
       if (is_active === false) {
         await adminClient.auth.admin.updateUserById(user_id, {
           ban_duration: "876000h",
@@ -106,16 +182,20 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      return jsonResponse({ success: true });
+      return json({ success: true });
     }
 
-    if (req.method === "POST" && action === "reset-password") {
-      const { user_id, new_password } = await req.json();
+    // ─── RESET PASSWORD ────────────────────────────────────────
+    if (action === "reset-password" && req.method === "POST") {
+      const body = await req.json();
+      const { user_id, new_password } = body;
+
       if (!user_id || !new_password) {
-        return jsonResponse(
-          { error: "user_id e new_password obbligatori" },
-          400
-        );
+        return json({ error: "user_id e new_password obbligatori" }, 400);
+      }
+
+      if (new_password.length < 6) {
+        return json({ error: "Password minima 6 caratteri" }, 400);
       }
 
       const { error: resetError } =
@@ -124,30 +204,15 @@ Deno.serve(async (req: Request) => {
         });
 
       if (resetError) {
-        return jsonResponse({ error: resetError.message }, 400);
+        return json({ error: resetError.message }, 400);
       }
 
-      return jsonResponse({ success: true });
+      return json({ success: true });
     }
 
-    if (req.method === "GET" && action === "list-users") {
-      const { data: profiles, error: listError } = await adminClient
-        .from("profiles")
-        .select("id, first_name, last_name, email, role, avatar_url, is_active, created_at, updated_at")
-        .order("created_at", { ascending: true });
-
-      if (listError) {
-        return jsonResponse({ error: listError.message }, 500);
-      }
-
-      return jsonResponse({ users: profiles });
-    }
-
-    return jsonResponse({ error: "Azione non valida" }, 400);
+    return json({ error: `Azione non valida: ${action}` }, 400);
   } catch (err) {
-    return jsonResponse(
-      { error: err instanceof Error ? err.message : "Errore interno" },
-      500
-    );
+    const msg = err instanceof Error ? err.message : "Errore interno";
+    return json({ error: msg }, 500);
   }
 });
