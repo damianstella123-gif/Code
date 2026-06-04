@@ -13,6 +13,7 @@ import {
   User,
   Mail,
   Camera,
+  Users,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import type { AppRole } from '@/lib/database.types'
@@ -255,138 +256,190 @@ export default function Utenti() {
     }
   }
 
+  // ─── ACCESS DENIED ────────────────────────────────────────────────────────────
+
   if (!isPartner) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(208,0,58,0.1)' }}>
-          <Shield className="w-8 h-8" style={{ color: 'var(--red2)' }} />
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-5 animate-fade-in">
+        <div
+          className="w-20 h-20 rounded-2xl flex items-center justify-center"
+          style={{ background: 'rgba(208,0,58,0.1)', border: '1px solid rgba(208,0,58,0.2)' }}
+        >
+          <Shield className="w-9 h-9" style={{ color: 'var(--red2)' }} />
         </div>
-        <h2 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Accesso negato</h2>
-        <p className="text-sm" style={{ color: 'var(--muted)' }}>
-          Solo i Partner possono gestire gli utenti.
-        </p>
+        <div className="text-center">
+          <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text)' }}>Accesso negato</h2>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>
+            Solo i Partner possono gestire gli utenti.
+          </p>
+        </div>
       </div>
     )
   }
 
+  // ─── STATS ────────────────────────────────────────────────────────────────────
+
+  const activeCount = users.filter(u => u.is_active).length
+  const inactiveCount = users.filter(u => !u.is_active).length
+
+  // ─── MAIN RENDER ──────────────────────────────────────────────────────────────
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Gestione Utenti</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-            {users.length} utenti registrati
-          </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(208,0,58,0.12)' }}>
+            <Users className="w-5 h-5" style={{ color: 'var(--red2)' }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Gestione Utenti</h1>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+              {activeCount} attivi &middot; {inactiveCount} disattivati &middot; {users.length} totali
+            </p>
+          </div>
         </div>
         <button
           onClick={() => { setShowCreate(true); setCreateForm(emptyCreateForm) }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-all"
-          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', boxShadow: 'var(--shadow-red)' }}
+          className="btn-primary flex items-center gap-2 !px-5 !py-2.5 text-sm"
         >
           <Plus className="w-4 h-4" />
           Nuovo Utente
         </button>
       </div>
 
-      {/* Feedback */}
+      {/* Feedback Toasts */}
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm animate-fade-in"
+          style={{ background: 'rgba(208,0,58,0.08)', border: '1px solid rgba(208,0,58,0.2)', color: 'var(--red2)' }}
+        >
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          {error}
+          <span className="font-medium">{error}</span>
         </div>
       )}
       {success && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'rgba(56,210,125,0.1)', color: 'var(--green)' }}>
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm animate-fade-in"
+          style={{ background: 'rgba(56,210,125,0.08)', border: '1px solid rgba(56,210,125,0.2)', color: 'var(--green)' }}
+        >
           <Check className="w-4 h-4 flex-shrink-0" />
-          {success}
+          <span className="font-medium">{success}</span>
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative" style={{ maxWidth: 360 }}>
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
-        <input
-          type="text"
-          placeholder="Cerca per nome, email o ruolo..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm outline-none"
-          style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}
-        />
+      {/* Search Bar */}
+      <div className="panel p-4 animate-fade-in" style={{ animationDelay: '50ms' }}>
+        <div className="relative" style={{ maxWidth: 400 }}>
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
+          <input
+            type="text"
+            placeholder="Cerca per nome, email o ruolo..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="input w-full !pl-10 !pr-4 !py-2.5 text-sm"
+          />
+        </div>
       </div>
 
-      {/* Users list */}
+      {/* Users Table */}
       {loading ? (
-        <div className="text-center py-12" style={{ color: 'var(--muted)' }}>Caricamento...</div>
+        <div className="panel p-12 text-center">
+          <div className="inline-flex items-center gap-3">
+            <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--red2)', borderTopColor: 'transparent' }} />
+            <span className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento utenti...</span>
+          </div>
+        </div>
       ) : (
-        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--line)' }}>
+        <div className="panel overflow-hidden animate-fade-in" style={{ animationDelay: '100ms' }}>
           <table className="w-full">
             <thead>
-              <tr style={{ background: 'var(--panel)' }}>
-                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Utente</th>
-                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider hidden md:table-cell" style={{ color: 'var(--muted)' }}>Ruolo</th>
-                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider hidden lg:table-cell" style={{ color: 'var(--muted)' }}>Stato</th>
-                <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Azioni</th>
+              <tr style={{ background: 'var(--panel2)' }}>
+                <th className="text-left px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Utente</th>
+                <th className="text-left px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: 'var(--muted)' }}>Ruolo</th>
+                <th className="text-left px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: 'var(--muted)' }}>Stato</th>
+                <th className="text-right px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Azioni</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(u => (
-                <tr key={u.id} className="transition-all hover:bg-white/[0.02]" style={{ borderTop: '1px solid var(--line)' }}>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
+              {filtered.map((u, i) => (
+                <tr
+                  key={u.id}
+                  className="group transition-all duration-200 hover:bg-white/[0.025]"
+                  style={{ borderTop: '1px solid var(--line)', animationDelay: `${i * 30}ms` }}
+                >
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3.5">
                       <div
-                        className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                        style={{ background: `linear-gradient(135deg, ${roleColor(u.role)} 0%, ${roleColor(u.role)}cc 100%)`, opacity: u.is_active ? 1 : 0.5 }}
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0 shadow-sm"
+                        style={{
+                          background: `linear-gradient(135deg, ${roleColor(u.role)} 0%, ${roleColor(u.role)}99 100%)`,
+                          opacity: u.is_active ? 1 : 0.4,
+                          boxShadow: u.is_active ? `0 4px 12px ${roleColor(u.role)}30` : 'none',
+                        }}
                       >
-                        {u.first_name.charAt(0)}{u.last_name.charAt(0)}
+                        {u.avatar_url ? (
+                          <img src={u.avatar_url} alt="" className="w-full h-full rounded-xl object-cover" />
+                        ) : (
+                          <>{u.first_name.charAt(0)}{u.last_name.charAt(0)}</>
+                        )}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: u.is_active ? 'var(--text)' : 'var(--muted)' }}>
+                        <p className="text-sm font-semibold truncate" style={{ color: u.is_active ? 'var(--text)' : 'var(--muted)' }}>
                           {u.first_name} {u.last_name}
                         </p>
-                        <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{u.email}</p>
+                        <p className="text-xs truncate mt-0.5" style={{ color: 'var(--muted)' }}>{u.email}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    <span className="text-xs px-2 py-0.5 rounded" style={{ background: `${roleColor(u.role)}20`, color: roleColor(u.role) }}>
+                  <td className="px-5 py-4 hidden md:table-cell">
+                    <span
+                      className="badge"
+                      style={{
+                        background: `${roleColor(u.role)}15`,
+                        color: roleColor(u.role),
+                        border: `1px solid ${roleColor(u.role)}30`,
+                      }}
+                    >
                       {u.role}
                     </span>
                   </td>
-                  <td className="px-4 py-3 hidden lg:table-cell">
-                    <span className="text-xs px-2 py-0.5 rounded" style={{
-                      background: u.is_active ? 'rgba(56,210,125,0.1)' : 'rgba(208,0,58,0.1)',
-                      color: u.is_active ? 'var(--green)' : 'var(--red2)',
-                    }}>
-                      {u.is_active ? 'Attivo' : 'Disattivato'}
-                    </span>
+                  <td className="px-5 py-4 hidden lg:table-cell">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ background: u.is_active ? 'var(--green)' : 'var(--red2)', boxShadow: u.is_active ? '0 0 6px var(--green)' : '0 0 6px var(--red2)' }}
+                      />
+                      <span className="text-xs font-medium" style={{ color: u.is_active ? 'var(--green)' : 'var(--red2)' }}>
+                        {u.is_active ? 'Attivo' : 'Disattivato'}
+                      </span>
+                    </div>
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
+                  <td className="px-5 py-4 text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => openEdit(u)}
-                        className="p-1.5 rounded-lg hover:bg-white/5 transition-all"
-                        title="Modifica"
+                        className="p-2 rounded-lg transition-all hover:bg-white/[0.06]"
+                        title="Modifica utente"
                       >
-                        <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                        <Edit3 className="w-4 h-4" style={{ color: 'var(--blue)' }} />
                       </button>
                       <button
                         onClick={() => { setResetUser(u); setNewPassword('') }}
-                        className="p-1.5 rounded-lg hover:bg-white/5 transition-all"
+                        className="p-2 rounded-lg transition-all hover:bg-white/[0.06]"
                         title="Reset password"
                       >
-                        <Key className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                        <Key className="w-4 h-4" style={{ color: 'var(--yellow)' }} />
                       </button>
                       {u.id !== currentUser?.id && (
                         <button
                           onClick={() => handleToggleActive(u)}
-                          className="p-1.5 rounded-lg hover:bg-white/5 transition-all"
-                          title={u.is_active ? 'Disattiva' : 'Riattiva'}
+                          className="p-2 rounded-lg transition-all hover:bg-white/[0.06]"
+                          title={u.is_active ? 'Disattiva utente' : 'Riattiva utente'}
                         >
                           {u.is_active
-                            ? <Lock className="w-3.5 h-3.5" style={{ color: 'var(--yellow)' }} />
-                            : <Unlock className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />
+                            ? <Lock className="w-4 h-4" style={{ color: 'var(--red2)' }} />
+                            : <Unlock className="w-4 h-4" style={{ color: 'var(--green)' }} />
                           }
                         </button>
                       )}
@@ -396,8 +449,13 @@ export default function Utenti() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-12 text-center text-sm" style={{ color: 'var(--muted)' }}>
-                    Nessun utente trovato
+                  <td colSpan={4} className="px-5 py-16 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'var(--panel2)' }}>
+                        <Users className="w-5 h-5" style={{ color: 'var(--muted)' }} />
+                      </div>
+                      <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun utente trovato</p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -406,177 +464,198 @@ export default function Utenti() {
         </div>
       )}
 
-      {/* Create Modal */}
+      {/* ─── Create Modal ─────────────────────────────────────────────── */}
       {showCreate && (
-        <Modal title="Nuovo Utente" onClose={() => setShowCreate(false)}>
+        <Modal title="Nuovo Utente" subtitle="Crea un nuovo account utente" onClose={() => setShowCreate(false)}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Nome" value={createForm.first_name} onChange={v => setCreateForm(p => ({ ...p, first_name: v }))} />
-              <FormField label="Cognome" value={createForm.last_name} onChange={v => setCreateForm(p => ({ ...p, last_name: v }))} />
+              <FormField label="Nome" value={createForm.first_name} onChange={v => setCreateForm(p => ({ ...p, first_name: v }))} placeholder="Mario" />
+              <FormField label="Cognome" value={createForm.last_name} onChange={v => setCreateForm(p => ({ ...p, last_name: v }))} placeholder="Rossi" />
             </div>
-            <FormField label="Email" type="email" value={createForm.email} onChange={v => setCreateForm(p => ({ ...p, email: v }))} />
-            <FormField label="Password" type="password" value={createForm.password} onChange={v => setCreateForm(p => ({ ...p, password: v }))} placeholder="Min. 6 caratteri" />
+            <FormField label="Email" type="email" value={createForm.email} onChange={v => setCreateForm(p => ({ ...p, email: v }))} placeholder="mario@simmetria.it" icon={<Mail className="w-3.5 h-3.5" />} />
+            <FormField label="Password" type="password" value={createForm.password} onChange={v => setCreateForm(p => ({ ...p, password: v }))} placeholder="Min. 6 caratteri" icon={<Key className="w-3.5 h-3.5" />} />
             <RoleSelect value={createForm.role} onChange={v => setCreateForm(p => ({ ...p, role: v }))} />
-            <button
-              onClick={handleCreate}
-              disabled={submitting}
-              className="w-full py-2.5 rounded-xl text-sm font-medium text-white"
-              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', opacity: submitting ? 0.6 : 1 }}
-            >
-              {submitting ? 'Creazione...' : 'Crea Utente'}
-            </button>
+            <div className="pt-2">
+              <button
+                onClick={handleCreate}
+                disabled={submitting}
+                className="btn-primary w-full !py-3 text-sm flex items-center justify-center gap-2"
+                style={{ opacity: submitting ? 0.6 : 1 }}
+              >
+                <Plus className="w-4 h-4" />
+                {submitting ? 'Creazione in corso...' : 'Crea Utente'}
+              </button>
+            </div>
           </div>
         </Modal>
       )}
 
-      {/* Edit Modal */}
+      {/* ─── Edit Modal ───────────────────────────────────────────────── */}
       {editingUser && (
-        <Modal title="Modifica Utente" onClose={() => setEditingUser(null)}>
-          <div className="space-y-4">
-            {/* Avatar section */}
-            <div className="flex items-center gap-4 pb-3" style={{ borderBottom: '1px solid var(--line)' }}>
+        <Modal title="Modifica Utente" subtitle={`${editingUser.first_name} ${editingUser.last_name}`} onClose={() => setEditingUser(null)}>
+          <div className="space-y-5">
+            {/* User header */}
+            <div className="flex items-center gap-4 p-4 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
               <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold text-white flex-shrink-0 relative"
-                style={{ background: `linear-gradient(135deg, ${roleColor(editForm.role)} 0%, ${roleColor(editForm.role)}cc 100%)` }}
+                className="w-14 h-14 rounded-xl flex items-center justify-center text-base font-bold text-white flex-shrink-0"
+                style={{
+                  background: `linear-gradient(135deg, ${roleColor(editForm.role)} 0%, ${roleColor(editForm.role)}99 100%)`,
+                  boxShadow: `0 4px 16px ${roleColor(editForm.role)}30`,
+                }}
               >
                 {editForm.avatar_url ? (
                   <img src={editForm.avatar_url} alt="" className="w-full h-full rounded-xl object-cover" />
                 ) : (
-                  <>{editForm.first_name.charAt(0)}{editForm.last_name.charAt(0)}</>
+                  <>{editForm.first_name.charAt(0) || '?'}{editForm.last_name.charAt(0) || '?'}</>
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
-                  {editForm.first_name} {editForm.last_name}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>
+                  {editForm.first_name || 'Nome'} {editForm.last_name || 'Cognome'}
                 </p>
-                <p className="text-xs" style={{ color: 'var(--muted)' }}>{editingUser.email}</p>
+                <p className="text-xs truncate mt-0.5" style={{ color: 'var(--muted)' }}>{editForm.email || 'email'}</p>
+                <div className="mt-1.5">
+                  <span
+                    className="badge !text-[10px]"
+                    style={{ background: `${roleColor(editForm.role)}15`, color: roleColor(editForm.role), border: `1px solid ${roleColor(editForm.role)}30` }}
+                  >
+                    {editForm.role}
+                  </span>
+                </div>
               </div>
             </div>
+
+            {/* Divider */}
+            <div className="divider" />
 
             {/* Name fields */}
             <div className="grid grid-cols-2 gap-3">
-              <FormField
-                label="Nome"
-                value={editForm.first_name}
-                onChange={v => setEditForm(p => ({ ...p, first_name: v }))}
-                icon={<User className="w-3.5 h-3.5" />}
-              />
-              <FormField
-                label="Cognome"
-                value={editForm.last_name}
-                onChange={v => setEditForm(p => ({ ...p, last_name: v }))}
-                icon={<User className="w-3.5 h-3.5" />}
-              />
+              <FormField label="Nome" value={editForm.first_name} onChange={v => setEditForm(p => ({ ...p, first_name: v }))} icon={<User className="w-3.5 h-3.5" />} />
+              <FormField label="Cognome" value={editForm.last_name} onChange={v => setEditForm(p => ({ ...p, last_name: v }))} icon={<User className="w-3.5 h-3.5" />} />
             </div>
 
             {/* Email */}
-            <FormField
-              label="Email"
-              type="email"
-              value={editForm.email}
-              onChange={v => setEditForm(p => ({ ...p, email: v }))}
-              icon={<Mail className="w-3.5 h-3.5" />}
-            />
+            <FormField label="Email" type="email" value={editForm.email} onChange={v => setEditForm(p => ({ ...p, email: v }))} icon={<Mail className="w-3.5 h-3.5" />} />
             {editForm.email !== editingUser.email && (
-              <div className="flex items-start gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(208,0,58,0.08)', color: 'var(--red2)' }}>
+              <div
+                className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-lg text-xs"
+                style={{ background: 'rgba(208,0,58,0.06)', border: '1px solid rgba(208,0,58,0.15)', color: 'var(--red2)' }}
+              >
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                <span>La modifica dell'email aggiornerà anche le credenziali di accesso (login). L'utente dovrà usare la nuova email.</span>
+                <span style={{ lineHeight: '1.5' }}>La modifica dell'email aggiornerà le credenziali di accesso. L'utente dovrà usare la nuova email per il login.</span>
               </div>
             )}
 
             {/* Role */}
             <RoleSelect value={editForm.role} onChange={v => setEditForm(p => ({ ...p, role: v }))} />
 
-            {/* Active status */}
+            {/* Active Toggle */}
             {editingUser.id !== currentUser?.id && (
-              <div className="flex items-center justify-between px-3 py-2.5 rounded-lg" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+              <div
+                className="flex items-center justify-between px-4 py-3.5 rounded-xl"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}
+              >
                 <div>
-                  <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Stato account</p>
-                  <p className="text-sm font-medium" style={{ color: editForm.is_active ? 'var(--green)' : 'var(--red2)' }}>
+                  <p className="text-xs font-medium mb-0.5" style={{ color: 'var(--muted)' }}>Stato Account</p>
+                  <p className="text-sm font-semibold" style={{ color: editForm.is_active ? 'var(--green)' : 'var(--red2)' }}>
                     {editForm.is_active ? 'Attivo' : 'Disattivato'}
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setEditForm(p => ({ ...p, is_active: !p.is_active }))}
-                  className="relative w-10 h-5 rounded-full transition-all"
-                  style={{ background: editForm.is_active ? 'var(--green)' : 'var(--line)' }}
+                  className="relative w-11 h-6 rounded-full transition-all duration-200"
+                  style={{ background: editForm.is_active ? 'var(--green)' : 'rgba(255,255,255,0.12)' }}
                 >
                   <span
-                    className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
-                    style={{ left: editForm.is_active ? '22px' : '2px' }}
+                    className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-200"
+                    style={{ left: editForm.is_active ? '24px' : '4px' }}
                   />
                 </button>
               </div>
             )}
 
             {/* Avatar URL */}
-            <FormField
-              label="URL Avatar (opzionale)"
-              value={editForm.avatar_url}
-              onChange={v => setEditForm(p => ({ ...p, avatar_url: v }))}
-              placeholder="https://..."
-              icon={<Camera className="w-3.5 h-3.5" />}
-            />
+            <FormField label="URL Avatar (opzionale)" value={editForm.avatar_url} onChange={v => setEditForm(p => ({ ...p, avatar_url: v }))} placeholder="https://..." icon={<Camera className="w-3.5 h-3.5" />} />
 
-            {/* Save button */}
-            <button
-              onClick={handleUpdate}
-              disabled={submitting}
-              className="w-full py-2.5 rounded-xl text-sm font-medium text-white transition-all"
-              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', opacity: submitting ? 0.6 : 1 }}
-            >
-              {submitting ? 'Salvataggio...' : 'Salva Modifiche'}
-            </button>
+            {/* Save */}
+            <div className="pt-1">
+              <button
+                onClick={handleUpdate}
+                disabled={submitting}
+                className="btn-primary w-full !py-3 text-sm flex items-center justify-center gap-2"
+                style={{ opacity: submitting ? 0.6 : 1 }}
+              >
+                <Check className="w-4 h-4" />
+                {submitting ? 'Salvataggio in corso...' : 'Salva Modifiche'}
+              </button>
+            </div>
           </div>
         </Modal>
       )}
 
-      {/* Reset Password Modal */}
+      {/* ─── Reset Password Modal ─────────────────────────────────────── */}
       {resetUser && (
-        <Modal title={`Reset Password: ${resetUser.first_name} ${resetUser.last_name}`} onClose={() => setResetUser(null)}>
+        <Modal title="Reset Password" subtitle={`${resetUser.first_name} ${resetUser.last_name}`} onClose={() => setResetUser(null)}>
           <div className="space-y-4">
-            <FormField label="Nuova Password" type="password" value={newPassword} onChange={setNewPassword} placeholder="Min. 6 caratteri" />
-            <button
-              onClick={handleResetPassword}
-              disabled={submitting}
-              className="w-full py-2.5 rounded-xl text-sm font-medium text-white"
-              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', opacity: submitting ? 0.6 : 1 }}
-            >
-              {submitting ? 'Reset...' : 'Reset Password'}
-            </button>
+            <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+              <div
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white"
+                style={{ background: `linear-gradient(135deg, ${roleColor(resetUser.role)} 0%, ${roleColor(resetUser.role)}99 100%)` }}
+              >
+                {resetUser.first_name.charAt(0)}{resetUser.last_name.charAt(0)}
+              </div>
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{resetUser.first_name} {resetUser.last_name}</p>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>{resetUser.email}</p>
+              </div>
+            </div>
+            <FormField label="Nuova Password" type="password" value={newPassword} onChange={setNewPassword} placeholder="Min. 6 caratteri" icon={<Key className="w-3.5 h-3.5" />} />
+            <div className="pt-1">
+              <button
+                onClick={handleResetPassword}
+                disabled={submitting}
+                className="btn-primary w-full !py-3 text-sm flex items-center justify-center gap-2"
+                style={{ opacity: submitting ? 0.6 : 1 }}
+              >
+                <Key className="w-4 h-4" />
+                {submitting ? 'Reset in corso...' : 'Reset Password'}
+              </button>
+            </div>
           </div>
         </Modal>
       )}
 
-      {/* Confirmation Dialog */}
+      {/* ─── Confirmation Dialog ──────────────────────────────────────── */}
       {confirmAction && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setConfirmAction(null)} />
           <div
-            className="relative w-full max-w-sm rounded-2xl p-6"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+            className="relative w-full max-w-sm rounded-2xl p-6 animate-fade-in"
+            style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-lg)' }}
           >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(208,0,58,0.1)' }}>
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(208,0,58,0.1)', border: '1px solid rgba(208,0,58,0.2)' }}
+              >
                 <AlertCircle className="w-5 h-5" style={{ color: 'var(--red2)' }} />
               </div>
-              <h3 className="text-base font-semibold" style={{ color: 'var(--text)' }}>Conferma</h3>
+              <h3 className="text-base font-bold" style={{ color: 'var(--text)' }}>Conferma Operazione</h3>
             </div>
-            <p className="text-sm whitespace-pre-line mb-6" style={{ color: 'var(--muted)', lineHeight: '1.6' }}>
+            <p className="text-sm whitespace-pre-line mb-6" style={{ color: 'var(--muted)', lineHeight: '1.7' }}>
               {confirmAction.message}
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmAction(null)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
-                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                className="btn-secondary flex-1 !py-2.5 text-sm text-center"
               >
                 Annulla
               </button>
               <button
                 onClick={confirmAction.onConfirm}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white transition-all"
-                style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
+                className="btn-primary flex-1 !py-2.5 text-sm"
               >
                 Conferma
               </button>
@@ -588,19 +667,33 @@ export default function Utenti() {
   )
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+// ─── COMPONENTS ────────────────────────────────────────────────────────────────
+
+function Modal({ title, subtitle, onClose, children }: {
+  title: string; subtitle?: string; onClose: () => void; children: React.ReactNode
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="relative w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto"
-        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+        className="relative w-full max-w-md rounded-2xl max-h-[90vh] overflow-y-auto animate-fade-in"
+        style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-lg)' }}
       >
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{title}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5"><X className="w-4 h-4" style={{ color: 'var(--muted)' }} /></button>
+        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4" style={{ background: 'var(--panel)', borderBottom: '1px solid var(--line)' }}>
+          <div>
+            <h3 className="text-base font-bold" style={{ color: 'var(--text)' }}>{title}</h3>
+            {subtitle && <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{subtitle}</p>}
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg transition-all hover:bg-white/[0.06]"
+          >
+            <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+          </button>
         </div>
-        {children}
+        <div className="px-6 py-5">
+          {children}
+        </div>
       </div>
     </div>
   )
@@ -611,7 +704,7 @@ function FormField({ label, value, onChange, type = 'text', placeholder, icon }:
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--muted)' }}>{label}</label>
+      <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--muted)' }}>{label}</label>
       <div className="relative">
         {icon && (
           <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted)' }}>{icon}</span>
@@ -621,8 +714,8 @@ function FormField({ label, value, onChange, type = 'text', placeholder, icon }:
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-          style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)', paddingLeft: icon ? '2.25rem' : undefined }}
+          className="input w-full text-sm"
+          style={{ paddingLeft: icon ? '2.25rem' : undefined }}
         />
       </div>
     </div>
@@ -632,12 +725,11 @@ function FormField({ label, value, onChange, type = 'text', placeholder, icon }:
 function RoleSelect({ value, onChange }: { value: AppRole; onChange: (v: AppRole) => void }) {
   return (
     <div>
-      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--muted)' }}>Ruolo</label>
+      <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--muted)' }}>Ruolo</label>
       <select
         value={value}
         onChange={e => onChange(e.target.value as AppRole)}
-        className="w-full px-3 py-2 rounded-lg text-sm outline-none appearance-none"
-        style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+        className="input w-full text-sm appearance-none cursor-pointer"
       >
         {APP_ROLES.map(r => (
           <option key={r} value={r}>{r}</option>
