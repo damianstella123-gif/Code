@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   CheckSquare,
   Clock,
@@ -365,6 +366,7 @@ function TaskCard({ task, onClick, onQuickMove }: {
 
 export default function TaskPage() {
   const currentUser = loadUser()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [taskList, setTaskList] = useState<Task[]>([])
   const [selected, setSelected] = useState<Task | null>(null)
   const [search, setSearch] = useState('')
@@ -386,6 +388,16 @@ export default function TaskPage() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    const targetId = searchParams.get('id')
+    if (!targetId || taskList.length === 0) return
+    const found = taskList.find(t => t.id === targetId)
+    if (found) {
+      setSelected(found)
+      setSearchParams({}, { replace: true })
+    }
+  }, [taskList, searchParams, setSearchParams])
 
   const visibleTasks = useMemo(() => {
     if (!currentUser) return []

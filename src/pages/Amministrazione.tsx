@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   TrendingUp,
   AlertTriangle,
@@ -316,12 +317,23 @@ export default function Amministrazione() {
 
   const isManagerOnly = currentUser.ruolo === 'Manager'
 
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    const paramTab = searchParams.get('tab')
+    if (paramTab === 'entrate' || paramTab === 'uscite' || paramTab === 'fatture') return paramTab
+    return 'dashboard'
+  })
   const [entrate, setEntrate] = useState<Entrata[]>(() => load(SK_ENTRATE, initEntrate))
   const [uscite, setUscite] = useState<Uscita[]>([])
   const [events, setEvents] = useState<Event[]>(() => loadEventsFromStorage())
   const [fatture, setFatture] = useState<Fattura[]>(() => load(SK_FATTURE, initFatture))
   const [showNuovoMovimento, setShowNuovoMovimento] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.has('tab') || searchParams.has('id')) {
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   // Uscite (Economico): fonte di verita' Supabase via tabella `budgets`.
   useEffect(() => {

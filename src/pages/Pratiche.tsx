@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   FileText,
   Plus,
@@ -71,6 +72,7 @@ function priColor(pri: PrioritaPratica) {
 type View = 'list' | 'detail' | 'form'
 
 export default function Pratiche() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [allPratiche, setAllPratiche] = useState<Pratica[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [view, setView] = useState<View>('list')
@@ -97,6 +99,17 @@ export default function Pratiche() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    const targetId = searchParams.get('id')
+    if (!targetId || allPratiche.length === 0) return
+    const found = allPratiche.find(p => p.id === targetId)
+    if (found) {
+      setSelectedId(found.id)
+      setView('detail')
+      setSearchParams({}, { replace: true })
+    }
+  }, [allPratiche, searchParams, setSearchParams])
 
   const refreshPractices = useCallback(async () => {
     const remote = await fetchPractices()

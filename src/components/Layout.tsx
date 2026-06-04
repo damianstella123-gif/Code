@@ -202,6 +202,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [notifToast, setNotifToast] = useState<string | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const user = loadUser()
 
@@ -227,10 +228,49 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
     loadNotifications()
   }, [notifOpen, loadNotifications])
 
-  const handleMarkRead = async (id: string) => {
-    await markAsRead(id)
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
-    setUnreadCount(prev => Math.max(0, prev - 1))
+  const handleNotificationClick = async (n: Notification) => {
+    if (!n.is_read) {
+      await markAsRead(n.id)
+      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x))
+      setUnreadCount(prev => Math.max(0, prev - 1))
+    }
+    setNotifOpen(false)
+
+    if (!n.related_entity_type || !n.related_entity_id) {
+      setNotifToast('Elemento collegato non disponibile')
+      setTimeout(() => setNotifToast(null), 3000)
+      return
+    }
+
+    const entityId = n.related_entity_id
+    switch (n.related_entity_type) {
+      case 'event':
+      case 'evento':
+        navigate(`/eventi?id=${entityId}`)
+        break
+      case 'task':
+        navigate(`/task?id=${entityId}`)
+        break
+      case 'practice':
+      case 'pratica':
+        navigate(`/pratiche?id=${entityId}`)
+        break
+      case 'budget':
+        navigate(`/amministrazione?tab=uscite`)
+        break
+      case 'communication':
+      case 'comunicazione':
+        navigate(`/comunicazioni?id=${entityId}`)
+        break
+      case 'supplier':
+      case 'fornitore':
+        navigate(`/fornitori?id=${entityId}`)
+        break
+      default:
+        setNotifToast('Elemento collegato non disponibile')
+        setTimeout(() => setNotifToast(null), 3000)
+        break
+    }
   }
 
   const handleMarkAllRead = async () => {
@@ -311,7 +351,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                       <button
                         key={n.id}
                         type="button"
-                        onClick={() => { if (!n.is_read) handleMarkRead(n.id) }}
+                        onClick={() => handleNotificationClick(n)}
                         className="w-full text-left px-4 py-3 flex items-start gap-3 transition-all hover:bg-white/5"
                         style={{ borderBottom: '1px solid var(--line)' }}
                       >
@@ -435,6 +475,14 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
           )}
         </div>
       </div>
+      {notifToast && (
+        <div
+          className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-4 py-2 rounded-lg text-sm animate-fade-in z-50"
+          style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--muted)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}
+        >
+          {notifToast}
+        </div>
+      )}
     </header>
   )
 }

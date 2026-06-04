@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Search,
   X,
@@ -518,6 +519,7 @@ const SIDEBAR: { id: string; label: string; canale?: TipoCanale; icon: React.FC<
 
 export default function Comunicazioni() {
   const currentUser = loadUser()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [msgs, setMsgs] = useState<Messaggio[]>([])
   const [view, setView] = useState<string>('inbox')
   const [selected, setSelected] = useState<Messaggio | null>(null)
@@ -536,6 +538,16 @@ export default function Comunicazioni() {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  useEffect(() => {
+    const targetId = searchParams.get('id')
+    if (!targetId || msgs.length === 0) return
+    const found = msgs.find(m => m.id === targetId)
+    if (found) {
+      setSelected(found)
+      setSearchParams({}, { replace: true })
+    }
+  }, [msgs, searchParams, setSearchParams])
 
   if (!currentUser) return null
 

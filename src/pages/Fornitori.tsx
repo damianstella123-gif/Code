@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Phone,
@@ -831,6 +832,7 @@ const CONTRATTO_FILTERS: { id: string; label: string }[] = [
 
 export default function Fornitori() {
   const currentUser = loadUser()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [supplierList, setSupplierList] = useState<Supplier[]>([])
   const [selected, setSelected] = useState<Supplier | null>(null)
   const [search, setSearch] = useState('')
@@ -854,6 +856,16 @@ export default function Fornitori() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    const targetId = searchParams.get('id')
+    if (!targetId || supplierList.length === 0) return
+    const found = supplierList.find(s => s.id === targetId)
+    if (found) {
+      setSelected(found)
+      setSearchParams({}, { replace: true })
+    }
+  }, [supplierList, searchParams, setSearchParams])
 
   const refreshSuppliers = useCallback(async () => {
     const remote = await fetchSuppliers()

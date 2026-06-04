@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Calendar,
   MapPin,
@@ -1225,6 +1226,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange }: EventD
 
 export default function Eventi() {
   const currentUser = loadUser()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [eventList, setEventList] = useState<Event[]>([])
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [search, setSearch] = useState('')
@@ -1247,6 +1249,16 @@ export default function Eventi() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    const targetId = searchParams.get('id')
+    if (!targetId || eventList.length === 0) return
+    const found = eventList.find(e => e.id === targetId)
+    if (found) {
+      setSelectedEvent(found)
+      setSearchParams({}, { replace: true })
+    }
+  }, [eventList, searchParams, setSearchParams])
 
   useEffect(() => {
     if (!errorMessage) return
