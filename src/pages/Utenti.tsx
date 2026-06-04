@@ -10,6 +10,9 @@ import {
   X,
   Check,
   AlertCircle,
+  User,
+  Mail,
+  Camera,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import type { AppRole } from '@/lib/database.types'
@@ -36,7 +39,7 @@ function roleColor(role: string) {
   }
 }
 
-interface UserFormData {
+interface CreateFormData {
   first_name: string
   last_name: string
   email: string
@@ -44,7 +47,16 @@ interface UserFormData {
   role: AppRole
 }
 
-const emptyForm: UserFormData = {
+interface EditFormData {
+  first_name: string
+  last_name: string
+  email: string
+  role: AppRole
+  is_active: boolean
+  avatar_url: string
+}
+
+const emptyCreateForm: CreateFormData = {
   first_name: '',
   last_name: '',
   email: '',
@@ -62,9 +74,11 @@ export default function Utenti() {
   const [showCreate, setShowCreate] = useState(false)
   const [editingUser, setEditingUser] = useState<Profile | null>(null)
   const [resetUser, setResetUser] = useState<Profile | null>(null)
-  const [formData, setFormData] = useState<UserFormData>(emptyForm)
+  const [createForm, setCreateForm] = useState<CreateFormData>(emptyCreateForm)
+  const [editForm, setEditForm] = useState<EditFormData>({ first_name: '', last_name: '', email: '', role: 'Junior Event Assistant', is_active: true, avatar_url: '' })
   const [newPassword, setNewPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null)
 
   const isPartner = currentUser?.role === 'Partner'
 
@@ -87,7 +101,7 @@ export default function Utenti() {
 
   useEffect(() => {
     if (!error && !success) return
-    const t = setTimeout(() => { setError(null); setSuccess(null) }, 4000)
+    const t = setTimeout(() => { setError(null); setSuccess(null) }, 5000)
     return () => clearTimeout(t)
   }, [error, success])
 
@@ -102,30 +116,42 @@ export default function Utenti() {
     )
   })
 
+  const openEdit = (u: Profile) => {
+    setEditingUser(u)
+    setEditForm({
+      first_name: u.first_name,
+      last_name: u.last_name,
+      email: u.email,
+      role: u.role,
+      is_active: u.is_active,
+      avatar_url: u.avatar_url ?? '',
+    })
+  }
+
   const handleCreate = async () => {
-    if (!formData.first_name || !formData.last_name || !formData.email || !formData.password) {
+    if (!createForm.first_name || !createForm.last_name || !createForm.email || !createForm.password) {
       setError('Compila tutti i campi obbligatori')
       return
     }
-    if (formData.password.length < 6) {
+    if (createForm.password.length < 6) {
       setError('La password deve avere almeno 6 caratteri')
       return
     }
     setSubmitting(true)
     try {
       await adminCreateUser({
-        email: formData.email,
-        password: formData.password,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        role: formData.role,
+        email: createForm.email,
+        password: createForm.password,
+        first_name: createForm.first_name,
+        last_name: createForm.last_name,
+        role: createForm.role,
       })
-      setSuccess(`Utente ${formData.first_name} ${formData.last_name} creato`)
+      setSuccess(`Utente ${createForm.first_name} ${createForm.last_name} creato con successo`)
       setShowCreate(false)
-      setFormData(emptyForm)
+      setCreateForm(emptyCreateForm)
       await refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Errore creazione')
+      setError(err instanceof Error ? err.message : 'Errore creazione utente')
     } finally {
       setSubmitting(false)
     }
@@ -133,35 +159,81 @@ export default function Utenti() {
 
   const handleUpdate = async () => {
     if (!editingUser) return
+    if (!editForm.first_name.trim() || !editForm.last_name.trim()) {
+      setError('Nome e cognome sono obbligatori')
+      return
+    }
+    if (!editForm.email.trim()) {
+      setError('Email obbligatoria')
+      return
+    }
+
+    const emailChanged = editForm.email !== editingUser.email
+    const changes: string[] = []
+    if (editForm.first_name !== editingUser.first_name) changes.push('nome')
+    if (editForm.last_name !== editingUser.last_name) changes.push('cognome')
+    if (emailChanged) changes.push(`email (da ${editingUser.email} a ${editForm.email})`)
+    if (editForm.role !== editingUser.role) changes.push(`ruolo (da ${editingUser.role} a ${editForm.role})`)
+    if (editForm.is_active !== editingUser.is_active) changes.push(editForm.is_active ? 'riattivazione' : 'disattivazione')
+    if ((editForm.avatar_url || '') !== (editingUser.avatar_url || '')) changes.push('avatar')
+
+    if (changes.length === 0) {
+      setEditingUser(null)
+      return
+    }
+
+    const confirmMsg = emailChanged
+      ? `Confermi le modifiche?\n\nModifiche: ${changes.join(', ')}\n\nATTENZIONE: La modifica dell'email aggiornerà anche le credenziali di accesso. L'utente dovrà usare la nuova email per il login.`
+      : `Confermi le modifiche?\n\nModifiche: ${changes.join(', ')}`
+
+    setConfirmAction({
+      message: confirmMsg,
+      onConfirm: () => executeUpdate(),
+    })
+  }
+
+  const executeUpdate = async () => {
+    if (!editingUser) return
+    setConfirmAction(null)
     setSubmitting(true)
     try {
       await adminUpdateUser({
         user_id: editingUser.id,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        role: formData.role,
+        first_name: editForm.first_name,
+        last_name: editForm.last_name,
+        email: editForm.email !== editingUser.email ? editForm.email : undefined,
+        role: editForm.role,
+        is_active: editForm.is_active,
+        avatar_url: editForm.avatar_url || null,
       })
-      setSuccess(`Utente aggiornato`)
+      setSuccess(`Utente ${editForm.first_name} ${editForm.last_name} aggiornato con successo`)
       setEditingUser(null)
       await refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Errore aggiornamento')
+      setError(err instanceof Error ? err.message : 'Errore aggiornamento utente')
     } finally {
       setSubmitting(false)
     }
   }
 
   const handleToggleActive = async (user: Profile) => {
-    try {
-      await adminUpdateUser({
-        user_id: user.id,
-        is_active: !user.is_active,
-      })
-      setSuccess(user.is_active ? 'Utente disattivato' : 'Utente riattivato')
-      await refresh()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Errore')
-    }
+    const action = user.is_active ? 'disattivare' : 'riattivare'
+    setConfirmAction({
+      message: `Confermi di voler ${action} l'utente ${user.first_name} ${user.last_name}?`,
+      onConfirm: async () => {
+        setConfirmAction(null)
+        try {
+          await adminUpdateUser({
+            user_id: user.id,
+            is_active: !user.is_active,
+          })
+          setSuccess(user.is_active ? 'Utente disattivato' : 'Utente riattivato')
+          await refresh()
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Errore')
+        }
+      },
+    })
   }
 
   const handleResetPassword = async () => {
@@ -173,11 +245,11 @@ export default function Utenti() {
     setSubmitting(true)
     try {
       await adminResetPassword(resetUser.id, newPassword)
-      setSuccess(`Password resettata per ${resetUser.first_name}`)
+      setSuccess(`Password resettata per ${resetUser.first_name} ${resetUser.last_name}`)
       setResetUser(null)
       setNewPassword('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Errore reset')
+      setError(err instanceof Error ? err.message : 'Errore reset password')
     } finally {
       setSubmitting(false)
     }
@@ -208,7 +280,7 @@ export default function Utenti() {
           </p>
         </div>
         <button
-          onClick={() => { setShowCreate(true); setFormData(emptyForm) }}
+          onClick={() => { setShowCreate(true); setCreateForm(emptyCreateForm) }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-all"
           style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', boxShadow: 'var(--shadow-red)' }}
         >
@@ -293,7 +365,7 @@ export default function Utenti() {
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        onClick={() => { setEditingUser(u); setFormData({ first_name: u.first_name, last_name: u.last_name, email: u.email, password: '', role: u.role }) }}
+                        onClick={() => openEdit(u)}
                         className="p-1.5 rounded-lg hover:bg-white/5 transition-all"
                         title="Modifica"
                       >
@@ -339,12 +411,12 @@ export default function Utenti() {
         <Modal title="Nuovo Utente" onClose={() => setShowCreate(false)}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Nome" value={formData.first_name} onChange={v => setFormData(p => ({ ...p, first_name: v }))} />
-              <FormField label="Cognome" value={formData.last_name} onChange={v => setFormData(p => ({ ...p, last_name: v }))} />
+              <FormField label="Nome" value={createForm.first_name} onChange={v => setCreateForm(p => ({ ...p, first_name: v }))} />
+              <FormField label="Cognome" value={createForm.last_name} onChange={v => setCreateForm(p => ({ ...p, last_name: v }))} />
             </div>
-            <FormField label="Email" type="email" value={formData.email} onChange={v => setFormData(p => ({ ...p, email: v }))} />
-            <FormField label="Password" type="password" value={formData.password} onChange={v => setFormData(p => ({ ...p, password: v }))} />
-            <RoleSelect value={formData.role} onChange={v => setFormData(p => ({ ...p, role: v }))} />
+            <FormField label="Email" type="email" value={createForm.email} onChange={v => setCreateForm(p => ({ ...p, email: v }))} />
+            <FormField label="Password" type="password" value={createForm.password} onChange={v => setCreateForm(p => ({ ...p, password: v }))} placeholder="Min. 6 caratteri" />
+            <RoleSelect value={createForm.role} onChange={v => setCreateForm(p => ({ ...p, role: v }))} />
             <button
               onClick={handleCreate}
               disabled={submitting}
@@ -359,17 +431,98 @@ export default function Utenti() {
 
       {/* Edit Modal */}
       {editingUser && (
-        <Modal title={`Modifica: ${editingUser.first_name} ${editingUser.last_name}`} onClose={() => setEditingUser(null)}>
+        <Modal title="Modifica Utente" onClose={() => setEditingUser(null)}>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="Nome" value={formData.first_name} onChange={v => setFormData(p => ({ ...p, first_name: v }))} />
-              <FormField label="Cognome" value={formData.last_name} onChange={v => setFormData(p => ({ ...p, last_name: v }))} />
+            {/* Avatar section */}
+            <div className="flex items-center gap-4 pb-3" style={{ borderBottom: '1px solid var(--line)' }}>
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold text-white flex-shrink-0 relative"
+                style={{ background: `linear-gradient(135deg, ${roleColor(editForm.role)} 0%, ${roleColor(editForm.role)}cc 100%)` }}
+              >
+                {editForm.avatar_url ? (
+                  <img src={editForm.avatar_url} alt="" className="w-full h-full rounded-xl object-cover" />
+                ) : (
+                  <>{editForm.first_name.charAt(0)}{editForm.last_name.charAt(0)}</>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                  {editForm.first_name} {editForm.last_name}
+                </p>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>{editingUser.email}</p>
+              </div>
             </div>
-            <RoleSelect value={formData.role} onChange={v => setFormData(p => ({ ...p, role: v }))} />
+
+            {/* Name fields */}
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                label="Nome"
+                value={editForm.first_name}
+                onChange={v => setEditForm(p => ({ ...p, first_name: v }))}
+                icon={<User className="w-3.5 h-3.5" />}
+              />
+              <FormField
+                label="Cognome"
+                value={editForm.last_name}
+                onChange={v => setEditForm(p => ({ ...p, last_name: v }))}
+                icon={<User className="w-3.5 h-3.5" />}
+              />
+            </div>
+
+            {/* Email */}
+            <FormField
+              label="Email"
+              type="email"
+              value={editForm.email}
+              onChange={v => setEditForm(p => ({ ...p, email: v }))}
+              icon={<Mail className="w-3.5 h-3.5" />}
+            />
+            {editForm.email !== editingUser.email && (
+              <div className="flex items-start gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(208,0,58,0.08)', color: 'var(--red2)' }}>
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <span>La modifica dell'email aggiornerà anche le credenziali di accesso (login). L'utente dovrà usare la nuova email.</span>
+              </div>
+            )}
+
+            {/* Role */}
+            <RoleSelect value={editForm.role} onChange={v => setEditForm(p => ({ ...p, role: v }))} />
+
+            {/* Active status */}
+            {editingUser.id !== currentUser?.id && (
+              <div className="flex items-center justify-between px-3 py-2.5 rounded-lg" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                <div>
+                  <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Stato account</p>
+                  <p className="text-sm font-medium" style={{ color: editForm.is_active ? 'var(--green)' : 'var(--red2)' }}>
+                    {editForm.is_active ? 'Attivo' : 'Disattivato'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setEditForm(p => ({ ...p, is_active: !p.is_active }))}
+                  className="relative w-10 h-5 rounded-full transition-all"
+                  style={{ background: editForm.is_active ? 'var(--green)' : 'var(--line)' }}
+                >
+                  <span
+                    className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
+                    style={{ left: editForm.is_active ? '22px' : '2px' }}
+                  />
+                </button>
+              </div>
+            )}
+
+            {/* Avatar URL */}
+            <FormField
+              label="URL Avatar (opzionale)"
+              value={editForm.avatar_url}
+              onChange={v => setEditForm(p => ({ ...p, avatar_url: v }))}
+              placeholder="https://..."
+              icon={<Camera className="w-3.5 h-3.5" />}
+            />
+
+            {/* Save button */}
             <button
               onClick={handleUpdate}
               disabled={submitting}
-              className="w-full py-2.5 rounded-xl text-sm font-medium text-white"
+              className="w-full py-2.5 rounded-xl text-sm font-medium text-white transition-all"
               style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', opacity: submitting ? 0.6 : 1 }}
             >
               {submitting ? 'Salvataggio...' : 'Salva Modifiche'}
@@ -394,6 +547,43 @@ export default function Utenti() {
           </div>
         </Modal>
       )}
+
+      {/* Confirmation Dialog */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setConfirmAction(null)} />
+          <div
+            className="relative w-full max-w-sm rounded-2xl p-6"
+            style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(208,0,58,0.1)' }}>
+                <AlertCircle className="w-5 h-5" style={{ color: 'var(--red2)' }} />
+              </div>
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text)' }}>Conferma</h3>
+            </div>
+            <p className="text-sm whitespace-pre-line mb-6" style={{ color: 'var(--muted)', lineHeight: '1.6' }}>
+              {confirmAction.message}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              >
+                Annulla
+              </button>
+              <button
+                onClick={confirmAction.onConfirm}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white transition-all"
+                style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
+              >
+                Conferma
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -403,7 +593,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="relative w-full max-w-md rounded-2xl p-6"
+        className="relative w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto"
         style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
       >
         <div className="flex items-center justify-between mb-5">
@@ -416,20 +606,25 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
-function FormField({ label, value, onChange, type = 'text', placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string
+function FormField({ label, value, onChange, type = 'text', placeholder, icon }: {
+  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; icon?: React.ReactNode
 }) {
   return (
     <div>
       <label className="block text-xs font-medium mb-1" style={{ color: 'var(--muted)' }}>{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-        style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
-      />
+      <div className="relative">
+        {icon && (
+          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted)' }}>{icon}</span>
+        )}
+        <input
+          type={type}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+          style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)', paddingLeft: icon ? '2.25rem' : undefined }}
+        />
+      </div>
     </div>
   )
 }

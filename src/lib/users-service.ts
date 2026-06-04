@@ -47,8 +47,10 @@ export interface UpdateUserInput {
   user_id: string
   first_name?: string
   last_name?: string
+  email?: string
   role?: AppRole
   is_active?: boolean
+  avatar_url?: string | null
 }
 
 export async function adminUpdateUser(input: UpdateUserInput): Promise<void> {

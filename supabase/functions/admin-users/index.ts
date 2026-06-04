@@ -130,28 +130,28 @@ Deno.serve(async (req: Request) => {
     // ─── UPDATE USER ───────────────────────────────────────────
     if (action === "update-user" && req.method === "POST") {
       const body = await req.json();
-      const { user_id, first_name, last_name, role, is_active } = body;
+      const { user_id, first_name, last_name, role, is_active, email, avatar_url } = body;
 
       if (!user_id) {
         return json({ error: "user_id obbligatorio" }, 400);
       }
 
+      // Fetch current profile for computing nome
+      const { data: currentProfile } = await adminClient
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", user_id)
+        .maybeSingle();
+
+      const finalFirstName = first_name ?? currentProfile?.first_name ?? "";
+      const finalLastName = last_name ?? currentProfile?.last_name ?? "";
+
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      if (first_name !== undefined) {
-        patch.first_name = first_name;
-        patch.nome = `${first_name} ${last_name ?? ""}`.trim();
-      }
-      if (last_name !== undefined) {
-        patch.last_name = last_name;
-        if (!patch.nome) {
-          // fetch existing first_name
-          const { data: existing } = await adminClient
-            .from("profiles")
-            .select("first_name")
-            .eq("id", user_id)
-            .maybeSingle();
-          patch.nome = `${existing?.first_name ?? ""} ${last_name}`.trim();
-        }
+
+      if (first_name !== undefined) patch.first_name = first_name;
+      if (last_name !== undefined) patch.last_name = last_name;
+      if (first_name !== undefined || last_name !== undefined) {
+        patch.nome = `${finalFirstName} ${finalLastName}`.trim();
       }
       if (role !== undefined) {
         patch.role = role;
@@ -161,7 +161,42 @@ Deno.serve(async (req: Request) => {
         patch.is_active = is_active;
         patch.attivo = is_active;
       }
+      if (avatar_url !== undefined) {
+        patch.avatar_url = avatar_url;
+      }
 
+      // Handle email change - sync profiles AND Supabase Auth
+      if (email !== undefined) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          return json({ error: "Formato email non valido" }, 400);
+        }
+
+        const { data: existingUser } = await adminClient
+          .from("profiles")
+          .select("id")
+          .eq("email", email)
+          .neq("id", user_id)
+          .maybeSingle();
+
+        if (existingUser) {
+          return json({ error: "Questa email è già in uso da un altro utente" }, 409);
+        }
+
+        // Update email in Supabase Auth (admin privilege)
+        const { error: authEmailError } = await adminClient.auth.admin.updateUserById(
+          user_id,
+          { email, email_confirm: true }
+        );
+
+        if (authEmailError) {
+          return json({ error: "Errore aggiornamento email: " + authEmailError.message }, 500);
+        }
+
+        patch.email = email;
+      }
+
+      // Apply profile update
       const { error: updateError } = await adminClient
         .from("profiles")
         .update(patch)
@@ -179,6 +214,17 @@ Deno.serve(async (req: Request) => {
       } else if (is_active === true) {
         await adminClient.auth.admin.updateUserById(user_id, {
           ban_duration: "none",
+        });
+      }
+
+      // Sync user_metadata in auth for name/role changes
+      if (first_name !== undefined || last_name !== undefined || role !== undefined) {
+        const metaUpdate: Record<string, string> = {};
+        if (first_name !== undefined) metaUpdate.first_name = first_name;
+        if (last_name !== undefined) metaUpdate.last_name = last_name;
+        if (role !== undefined) metaUpdate.role = role;
+        await adminClient.auth.admin.updateUserById(user_id, {
+          user_metadata: metaUpdate,
         });
       }
 
