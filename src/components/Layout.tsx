@@ -83,22 +83,13 @@ function Sidebar({ open, setOpen }: SidebarProps) {
         {/* Logo */}
         <div className="flex items-center justify-between h-16 px-6 border-b" style={{ borderColor: 'var(--line)' }}>
           <Link to="/dashboard" className="flex items-center gap-3 group">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden"
-              style={{
-                background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)',
-                boxShadow: '0 4px 16px rgba(208,0,58,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M17 4H9C6.24 4 4 6.24 4 9v0c0 2.76 2.24 5 5 5h6c2.76 0 5 2.24 5 5v0c0 2.76-2.24 5-5 5H7" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
-            </div>
+            <img
+              src="/simmetria-grigio_2023.png"
+              alt="Simmetria"
+              className="h-7 brightness-[1.8]"
+            />
             <div className="flex flex-col">
-              <span className="text-lg font-bold tracking-tight leading-none" style={{ color: 'var(--text)' }}>
-                SIMMETRIA
-              </span>
-              <span className="text-xs font-semibold tracking-widest leading-none mt-0.5" style={{ color: 'var(--red2)' }}>
+              <span className="text-[13px] font-bold tracking-tight leading-none" style={{ color: 'var(--red2)' }}>
                 HUB
               </span>
             </div>
