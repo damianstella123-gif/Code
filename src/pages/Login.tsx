@@ -88,16 +88,20 @@ export default function Login() {
     >
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-10">
           <img
             src="/simmetria-grigio_2023.png"
             alt="Simmetria"
-            className="h-12 mx-auto mb-5 brightness-[1.8]"
+            className="w-64 mx-auto mb-6 brightness-[1.8] drop-shadow-[0_4px_24px_rgba(208,0,58,0.15)]"
           />
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>
-            SIMMETRIA <span style={{ color: 'var(--red2)' }}>HUB</span>
-          </h1>
-          <p className="text-xs mt-1.5 tracking-wide" style={{ color: 'var(--muted)' }}>
+          <div className="flex items-center justify-center gap-2">
+            <div className="h-px flex-1 max-w-8" style={{ background: 'var(--line)' }} />
+            <span className="text-sm font-semibold tracking-[0.2em] uppercase" style={{ color: 'var(--red2)' }}>
+              HUB
+            </span>
+            <div className="h-px flex-1 max-w-8" style={{ background: 'var(--line)' }} />
+          </div>
+          <p className="text-[11px] mt-3 tracking-wide uppercase" style={{ color: 'var(--muted)' }}>
             Enterprise Event Management Platform
           </p>
         </div>

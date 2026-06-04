@@ -81,22 +81,23 @@ function Sidebar({ open, setOpen }: SidebarProps) {
         style={{ background: 'linear-gradient(180deg, var(--panel) 0%, var(--bg) 100%)' }}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-6 border-b" style={{ borderColor: 'var(--line)' }}>
-          <Link to="/dashboard" className="flex items-center gap-3 group">
+        <div className="flex items-center justify-between px-5 py-5 border-b" style={{ borderColor: 'var(--line)' }}>
+          <Link to="/dashboard" className="flex flex-col items-center w-full group">
             <img
               src="/simmetria-grigio_2023.png"
               alt="Simmetria"
-              className="h-7 brightness-[1.8]"
+              className="w-40 brightness-[1.8] drop-shadow-[0_2px_12px_rgba(208,0,58,0.1)]"
             />
-            <div className="flex flex-col">
-              <span className="text-[13px] font-bold tracking-tight leading-none" style={{ color: 'var(--red2)' }}>
-                HUB
-              </span>
-            </div>
+            <span
+              className="text-[11px] font-bold tracking-[0.25em] uppercase mt-2"
+              style={{ color: 'var(--red2)' }}
+            >
+              HUB
+            </span>
           </Link>
           <button
             onClick={() => setOpen(false)}
-            className="lg:hidden p-2 rounded-lg transition-all hover:bg-white/5"
+            className="lg:hidden p-2 rounded-lg transition-all hover:bg-white/5 absolute right-3 top-4"
           >
             <X className="w-5 h-5" style={{ color: 'var(--muted)' }} />
           </button>
