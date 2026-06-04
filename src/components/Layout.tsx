@@ -481,11 +481,8 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
 
 export default function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const navigate = useNavigate()
-  const user = loadUser()
 
   useEffect(() => {
-    if (!user) return
     let cancelled = false
     Promise.all([fetchEvents(), fetchTasks(), fetchPractices(), fetchClients()]).then(([ev, tk, pr, cl]) => {
       if (cancelled) return
@@ -495,12 +492,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       cacheClientsSnapshot(cl)
     })
     return () => { cancelled = true }
-  }, [user])
-
-  if (!user) {
-    navigate('/login')
-    return null
-  }
+  }, [])
 
   return (
     <div
