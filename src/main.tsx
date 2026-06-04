@@ -4,9 +4,6 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './styles/theme.css'
 import './index.css'
-import { logSupabaseConnectionStatus } from './lib/supabase-test'
-
-logSupabaseConnectionStatus()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

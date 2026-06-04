@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect } from 'react'
+import { ReactNode, useState, useEffect, useCallback } from 'react'
 import FlyAssistant from '@/components/FlyAssistant'
 import GlobalSearch from '@/components/GlobalSearch'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -28,6 +28,9 @@ import { fetchTasks } from '@/lib/tasks-service'
 import { fetchPractices } from '@/lib/practices-service'
 import { fetchClients } from '@/lib/clients-service'
 import { cacheEventsSnapshot, cacheTasksSnapshot, cachePraticheSnapshot, cacheClientsSnapshot } from '@/lib/storage'
+import { supabase } from '@/lib/supabase'
+import { fetchNotifications, fetchUnreadCount, markAsRead, markAllAsRead } from '@/lib/notifications-service'
+import type { Notification } from '@/lib/notifications-service'
 
 const iconMap: Record<string, React.ElementType> = {
   '/dashboard': LayoutDashboard,
@@ -182,11 +185,61 @@ function Sidebar({ open, setOpen }: SidebarProps) {
   )
 }
 
+function formatTimeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Ora'
+  if (mins < 60) return `${mins} min fa`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} ${hours === 1 ? 'ora' : 'ore'} fa`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'Ieri'
+  return `${days} giorni fa`
+}
+
 function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
   const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const user = loadUser()
+
+  const loadNotifications = useCallback(async () => {
+    if (!user) return
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const userId = session.user.id
+    const [notifs, count] = await Promise.all([
+      fetchNotifications(userId),
+      fetchUnreadCount(userId),
+    ])
+    setNotifications(notifs)
+    setUnreadCount(count)
+  }, [user])
+
+  useEffect(() => {
+    loadNotifications()
+  }, [loadNotifications])
+
+  useEffect(() => {
+    if (!notifOpen) return
+    loadNotifications()
+  }, [notifOpen, loadNotifications])
+
+  const handleMarkRead = async (id: string) => {
+    await markAsRead(id)
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+    setUnreadCount(prev => Math.max(0, prev - 1))
+  }
+
+  const handleMarkAllRead = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    await markAllAsRead(session.user.id)
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+    setUnreadCount(0)
+  }
 
   const handleLogout = () => {
     void signOutEverywhere().then(() => {
@@ -225,41 +278,61 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
               className="relative p-2 rounded-lg transition-all hover:bg-white/5"
             >
               <Bell className="w-5 h-5" style={{ color: 'var(--muted)' }} />
-              <span
-                className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full"
-                style={{ background: 'var(--red)' }}
-              />
+              {unreadCount > 0 && (
+                <span
+                  className="absolute top-1 right-1 min-w-[10px] h-[10px] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-0.5"
+                  style={{ background: 'var(--red)' }}
+                >
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
             {notifOpen && (
               <div
                 className="absolute right-0 top-full mt-2 w-80 rounded-xl overflow-hidden animate-fade-in"
                 style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
               >
-                <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--line)' }}>
+                <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>
                   <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Notifiche</p>
+                  {unreadCount > 0 && (
+                    <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(208,0,58,0.15)', color: 'var(--red2)' }}>
+                      {unreadCount}
+                    </span>
+                  )}
                 </div>
                 <div className="max-h-72 overflow-y-auto">
-                  {[
-                    { text: 'Nuovo task assegnato: Conferma venue', time: '2 min fa', read: false },
-                    { text: 'Corporate Summit passa a "in_corso"', time: '1 ora fa', read: false },
-                    { text: 'Budget evento aggiornato da Marco', time: '3 ore fa', read: true },
-                    { text: 'Fornitore TechnoStage ha risposto', time: 'Ieri', read: true },
-                  ].map((n, i) => (
-                    <div key={i} className="px-4 py-3 flex items-start gap-3 transition-all hover:bg-white/5" style={{ borderBottom: '1px solid var(--line)' }}>
-                      {!n.read && <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'var(--red)' }} />}
-                      {n.read && <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'transparent' }} />}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm truncate" style={{ color: n.read ? 'var(--muted)' : 'var(--text)' }}>{n.text}</p>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{n.time}</p>
-                      </div>
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-8 text-center">
+                      <Bell className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--muted)', opacity: 0.4 }} />
+                      <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessuna notifica</p>
                     </div>
-                  ))}
+                  ) : (
+                    notifications.map(n => (
+                      <button
+                        key={n.id}
+                        type="button"
+                        onClick={() => { if (!n.is_read) handleMarkRead(n.id) }}
+                        className="w-full text-left px-4 py-3 flex items-start gap-3 transition-all hover:bg-white/5"
+                        style={{ borderBottom: '1px solid var(--line)' }}
+                      >
+                        {!n.is_read && <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'var(--red)' }} />}
+                        {n.is_read && <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'transparent' }} />}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: n.is_read ? 'var(--muted)' : 'var(--text)' }}>{n.title}</p>
+                          <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--muted)' }}>{n.message}</p>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--muted)', opacity: 0.7 }}>{formatTimeAgo(n.created_at)}</p>
+                        </div>
+                      </button>
+                    ))
+                  )}
                 </div>
-                <div className="px-4 py-2.5 border-t" style={{ borderColor: 'var(--line)' }}>
-                  <button onClick={() => setNotifOpen(false)} className="text-xs font-medium" style={{ color: 'var(--red2)' }}>
-                    Segna tutte come lette
-                  </button>
-                </div>
+                {notifications.length > 0 && (
+                  <div className="px-4 py-2.5 border-t" style={{ borderColor: 'var(--line)' }}>
+                    <button onClick={handleMarkAllRead} className="text-xs font-medium" style={{ color: 'var(--red2)' }}>
+                      Segna tutte come lette
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
