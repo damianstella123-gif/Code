@@ -83,33 +83,29 @@ export default function Login() {
     <div
       className="min-h-screen flex items-center justify-center px-4"
       style={{
-        background: 'linear-gradient(135deg, var(--bg) 0%, rgba(208, 0, 58, 0.05) 50%, var(--bg) 100%)',
+        background: 'linear-gradient(135deg, var(--bg) 0%, rgba(208, 0, 58, 0.04) 50%, var(--bg) 100%)',
       }}
     >
-      <div className="w-full max-w-sm">
-        {/* Logo */}
+      <div className="w-full max-w-md">
+        {/* Branding */}
         <div className="text-center mb-10">
           <img
             src="/simmetria-grigio_2023.png"
             alt="Simmetria"
-            className="w-64 mx-auto mb-6 brightness-[1.8] drop-shadow-[0_4px_24px_rgba(208,0,58,0.15)]"
+            className="w-72 mx-auto mb-7 brightness-[1.8] drop-shadow-[0_4px_24px_rgba(208,0,58,0.12)]"
           />
-          <div className="flex items-center justify-center gap-2">
-            <div className="h-px flex-1 max-w-8" style={{ background: 'var(--line)' }} />
-            <span className="text-sm font-semibold tracking-[0.2em] uppercase" style={{ color: 'var(--red2)' }}>
-              HUB
-            </span>
-            <div className="h-px flex-1 max-w-8" style={{ background: 'var(--line)' }} />
-          </div>
-          <p className="text-[11px] mt-3 tracking-wide uppercase" style={{ color: 'var(--muted)' }}>
-            Enterprise Event Management Platform
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>
+            SIMMETRIA <span style={{ color: 'var(--red2)' }}>HUB</span>
+          </h1>
+          <p className="text-sm mt-3 leading-relaxed max-w-xs mx-auto" style={{ color: 'var(--muted)' }}>
+            Centralizza eventi, pratiche, team e operativit&agrave; in un unico hub aziendale.
           </p>
         </div>
 
         {/* Login form */}
         <form
           onSubmit={handleSubmit}
-          className="p-6 space-y-5 rounded-2xl"
+          className="p-6 space-y-5 rounded-2xl max-w-sm mx-auto"
           style={{
             background: 'var(--panel)',
             border: '1px solid var(--line)',
