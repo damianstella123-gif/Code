@@ -467,6 +467,61 @@ body {
   75%      { transform: rotate(-5deg); }
 }
 
+@keyframes fly-tail-wag {
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(12deg); }
+  75%      { transform: rotate(-8deg); }
+}
+
+@keyframes fly-tail-wag-fast {
+  0%, 100% { transform: rotate(0deg); }
+  15%      { transform: rotate(18deg); }
+  35%      { transform: rotate(-14deg); }
+  55%      { transform: rotate(16deg); }
+  75%      { transform: rotate(-10deg); }
+}
+
+@keyframes fly-ears-perk {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-2px) rotate(-2deg); }
+}
+
+@keyframes fly-ears-idle {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(1px); }
+}
+
+@keyframes fly-body-breathe {
+  0%, 100% { transform: scaleY(1) translateY(0); }
+  50%      { transform: scaleY(1.008) translateY(-0.5px); }
+}
+
+@keyframes fly-body-think {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25%      { transform: translateX(-1px) rotate(-0.5deg); }
+  75%      { transform: translateX(1px) rotate(0.5deg); }
+}
+
+@keyframes fly-eyes-attentive {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-0.5px); }
+}
+
+@keyframes fly-sparkle {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50%      { opacity: 0.3; transform: scale(1.5); }
+}
+
+@keyframes fly-think-dots {
+  0%, 100% { opacity: 0.5; transform: translateY(0); }
+  50%      { opacity: 0.8; transform: translateY(-2px); }
+}
+
+@keyframes fly-glow-pulse-sm {
+  0%, 100% { opacity: 0.7; }
+  50%      { opacity: 0.3; }
+}
+
 @keyframes fly-typing-dot {
   0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
   40%           { transform: translateY(-4px); opacity: 1; }
@@ -482,6 +537,16 @@ body {
 .fly-notif-out     { animation: fly-notif-out 0.25s ease-in forwards; }
 .fly-badge-pop     { animation: fly-badge-pop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
 .fly-hoodie-sway   { animation: fly-hoodie-sway 3.2s ease-in-out infinite; }
+.fly-tail-wag      { animation: fly-tail-wag 1.8s ease-in-out infinite; }
+.fly-tail-wag-fast { animation: fly-tail-wag-fast 0.6s ease-in-out infinite; }
+.fly-ears-perk     { animation: fly-ears-perk 2s ease-in-out infinite; }
+.fly-ears-idle     { animation: fly-ears-idle 3s ease-in-out infinite; }
+.fly-body-breathe  { animation: fly-body-breathe 4s ease-in-out infinite; }
+.fly-body-think    { animation: fly-body-think 1.5s ease-in-out infinite; }
+.fly-eyes-attentive { animation: fly-eyes-attentive 1.8s ease-in-out infinite; }
+.fly-sparkle       { animation: fly-sparkle 1.2s ease-in-out infinite; }
+.fly-think-dots    { animation: fly-think-dots 1.5s ease-in-out infinite; }
+.fly-glow-pulse-sm { animation: fly-glow-pulse-sm 2s ease-in-out infinite; }
 
 .fly-typing-dot:nth-child(1) { animation: fly-typing-dot 1.2s ease-in-out infinite 0s; }
 .fly-typing-dot:nth-child(2) { animation: fly-typing-dot 1.2s ease-in-out infinite 0.2s; }
