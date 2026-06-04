@@ -68,6 +68,7 @@ function statoLabel(stato: string) {
 function getVisibleEvents(ruolo: string, userId: string, eventList: Event[]): Event[] {
   switch (ruolo) {
     case 'Admin':
+    case 'Partner':
     case 'Finance':
     case 'Commerciale':
       return eventList

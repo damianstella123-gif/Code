@@ -877,6 +877,7 @@ export default function Calendario() {
     let filteredEvents = allEvents
     let filteredTasks = allTasks
 
+    if (ruolo !== 'Admin' && ruolo !== 'Partner') {
     if (ruolo === 'Operativo') {
       filteredTasks = allTasks.filter(t => t.assegnatario === currentUser?.id)
       filteredEvents = []
@@ -896,6 +897,7 @@ export default function Calendario() {
       const myIds = filteredEvents.map(e => e.id)
       filteredTasks = allTasks.filter(t =>
         t.assegnatario === currentUser?.id || (t.evento && myIds.includes(t.evento)))
+    }
     }
 
     const visiblePratiche = allPratiche.filter(p => p.stato !== 'completata')

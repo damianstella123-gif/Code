@@ -114,7 +114,7 @@ export default function Dashboard() {
   const myEvents = useMemo(() => getVisibleEvents(ruolo, userId, liveEvents), [ruolo, userId, liveEvents])
   const myTasks = useMemo(() => getVisibleTasks(ruolo, userId, liveTasks), [ruolo, userId, liveTasks])
   const myMessages = useMemo(() =>
-    ruolo === 'Admin'
+    ruolo === 'Admin' || ruolo === 'Partner'
       ? messaggi
       : messaggi.filter(m => m.mittente === userId || m.destinatari.includes(userId))
   , [ruolo, userId])
@@ -273,7 +273,7 @@ export default function Dashboard() {
     ]
     // Show relevant KPIs per role
     const visible: string[] = (() => {
-      if (ruolo === 'Admin') return ['eventi', 'task', 'urgenti', 'workflow', 'budget', 'margine', 'pagamenti', 'clienti']
+      if (ruolo === 'Admin' || ruolo === 'Partner') return ['eventi', 'task', 'urgenti', 'workflow', 'budget', 'margine', 'pagamenti', 'clienti']
       if (ruolo === 'Manager') return ['eventi', 'task', 'urgenti', 'workflow']
       if (ruolo === 'Operativo') return ['task', 'urgenti', 'comunicazioni']
       if (ruolo === 'Finance') return ['budget', 'margine', 'pagamenti', 'fornitori']
@@ -313,9 +313,9 @@ export default function Dashboard() {
     return cells
   }, [today, liveEvents, liveTasks])
 
-  const canSeeAdmin = ['Admin', 'Finance'].includes(ruolo)
-  const canSeeCRM = ['Admin', 'Commerciale', 'Manager'].includes(ruolo)
-  const canSeeWF = ['Admin', 'Manager', 'Finance'].includes(ruolo)
+  const canSeeAdmin = ['Admin', 'Partner', 'Finance'].includes(ruolo)
+  const canSeeCRM = ['Admin', 'Partner', 'Commerciale', 'Manager'].includes(ruolo)
+  const canSeeWF = ['Admin', 'Partner', 'Manager', 'Finance'].includes(ruolo)
 
   return (
     <div className="space-y-5">

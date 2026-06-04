@@ -20,7 +20,7 @@ import {
   Trash2,
   Edit3,
 } from 'lucide-react'
-import { loadUser } from '@/lib/auth'
+import { loadUser, isPartnerUser } from '@/lib/auth'
 import {
   entrate as initEntrate,
   fatture as initFatture,
@@ -298,7 +298,7 @@ export default function Amministrazione() {
   const currentUser = loadUser()
 
   // Permission gate
-  if (!currentUser || ['Operativo', 'Commerciale', 'Fornitore'].includes(currentUser.ruolo)) {
+  if (!currentUser || (!isPartnerUser(currentUser) && ['Operativo', 'Commerciale', 'Fornitore'].includes(currentUser.ruolo))) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div

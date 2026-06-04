@@ -70,6 +70,11 @@ export function clearUser(): void {
   localStorage.removeItem(STORAGE_KEY)
 }
 
+export function isPartnerUser(user: AuthUser | null): boolean {
+  if (!user) return false
+  return user.role === 'Partner' || user.ruolo === 'Admin'
+}
+
 export type NavItem = {
   name: string
   href: string

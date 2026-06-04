@@ -41,6 +41,7 @@ function prioritaColor(p: string) {
 function getVisibleTasks(allTasks: Task[], ruolo: string, userId: string): Task[] {
   switch (ruolo) {
     case 'Admin':
+    case 'Partner':
     case 'Manager':
       return allTasks
     case 'Finance':

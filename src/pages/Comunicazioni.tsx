@@ -559,7 +559,7 @@ export default function Comunicazioni() {
     return msgs.filter(m => {
       const involvedInMsg = m.mittente === uid || m.destinatari.includes(uid)
 
-      if (ruolo === 'Admin') return true
+      if (ruolo === 'Admin' || ruolo === 'Partner') return true
 
       if (ruolo === 'Manager') {
         const myTeamIds = [
@@ -691,7 +691,7 @@ export default function Comunicazioni() {
   // Sidebar views allowed by role
   const allowedViews = useMemo(() => {
     const all = SIDEBAR.map(s => s.id)
-    if (ruolo === 'Admin') return all
+    if (ruolo === 'Admin' || ruolo === 'Partner') return all
     if (ruolo === 'Manager') return ['inbox', 'sent', 'evento', 'interno']
     if (ruolo === 'Finance') return ['inbox', 'sent', 'amministrativo', 'interno']
     if (ruolo === 'Commerciale') return ['inbox', 'sent', 'crm', 'interno']

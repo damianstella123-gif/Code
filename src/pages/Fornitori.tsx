@@ -905,11 +905,11 @@ export default function Fornitori() {
   if (!currentUser) return null
 
   const ruolo = currentUser.ruolo
-  const showFinance = ruolo === 'Admin' || ruolo === 'Finance'
+  const showFinance = ruolo === 'Admin' || ruolo === 'Partner' || ruolo === 'Finance'
 
   // Determine which supplier IDs this user can see
   const allowedIds = useMemo((): string[] | 'all' => {
-    if (ruolo === 'Admin' || ruolo === 'Manager') return 'all'
+    if (ruolo === 'Admin' || ruolo === 'Partner' || ruolo === 'Manager') return 'all'
     if (ruolo === 'Finance') return 'all'
     if (ruolo === 'Fornitore') {
       return supplierList.filter(s => s.referente === currentUser.nome || s.stato === 'attivo').map(s => s.id).slice(0, 1)
@@ -1023,7 +1023,7 @@ export default function Fornitori() {
       </div>
 
       {/* Alerts */}
-      {(inScadenza > 0 || scaduti > 0) && (ruolo === 'Admin' || ruolo === 'Manager' || ruolo === 'Finance') && (
+      {(inScadenza > 0 || scaduti > 0) && (ruolo === 'Admin' || ruolo === 'Partner' || ruolo === 'Manager' || ruolo === 'Finance') && (
         <div className="space-y-2">
           {inScadenza > 0 && (
             <div className="flex items-center gap-3 p-3.5 rounded-xl" style={{ background: 'rgba(255,194,75,0.08)', border: '1px solid rgba(255,194,75,0.25)' }}>
@@ -1045,7 +1045,7 @@ export default function Fornitori() {
       )}
 
       {/* KPIs */}
-      {(ruolo === 'Admin' || ruolo === 'Manager' || ruolo === 'Finance') && (
+      {(ruolo === 'Admin' || ruolo === 'Partner' || ruolo === 'Manager' || ruolo === 'Finance') && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: 'Fornitori attivi', value: baseList.filter(s => s.stato === 'attivo').length, color: 'var(--green)' },

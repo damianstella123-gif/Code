@@ -838,7 +838,7 @@ export default function Workflow() {
   const visibleWfs = useMemo(() => {
     if (!currentUser) return workflows
     const ruolo = currentUser.ruolo
-    if (ruolo === 'Admin' || ruolo === 'Finance') return workflows
+    if (ruolo === 'Admin' || ruolo === 'Partner' || ruolo === 'Finance') return workflows
     if (ruolo === 'Manager' || ruolo === 'Operativo') {
       const myEventIds = getEvents()
         .filter(e => e.responsabile === currentUser.id || e.team.includes(currentUser.id))
