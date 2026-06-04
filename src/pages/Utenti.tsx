@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Plus,
   Search,
-  Shield,
   Lock,
   Unlock,
   Key,
@@ -14,6 +13,7 @@ import {
   Mail,
   Camera,
   Users,
+  Filter,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import type { AppRole } from '@/lib/database.types'
@@ -25,6 +25,8 @@ import {
   adminUpdateUser,
   adminResetPassword,
 } from '@/lib/users-service'
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 function roleColor(role: string) {
   switch (role) {
@@ -39,6 +41,16 @@ function roleColor(role: string) {
     default: return 'var(--muted)'
   }
 }
+
+type FilterStato = 'Tutti' | 'attivo' | 'disattivato'
+
+const STATO_FILTERS: { id: FilterStato; label: string }[] = [
+  { id: 'Tutti', label: 'Tutti' },
+  { id: 'attivo', label: 'Attivi' },
+  { id: 'disattivato', label: 'Disattivati' },
+]
+
+// ─── FORM TYPES ───────────────────────────────────────────────────────────────
 
 interface CreateFormData {
   first_name: string
@@ -65,6 +77,8 @@ const emptyCreateForm: CreateFormData = {
   role: 'Junior Event Assistant',
 }
 
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+
 export default function Utenti() {
   const currentUser = loadUser()
   const [users, setUsers] = useState<Profile[]>([])
@@ -72,6 +86,8 @@ export default function Utenti() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [filterRole, setFilterRole] = useState<'Tutti' | AppRole>('Tutti')
+  const [filterStato, setFilterStato] = useState<FilterStato>('Tutti')
   const [showCreate, setShowCreate] = useState(false)
   const [editingUser, setEditingUser] = useState<Profile | null>(null)
   const [resetUser, setResetUser] = useState<Profile | null>(null)
@@ -96,9 +112,8 @@ export default function Utenti() {
   }, [])
 
   useEffect(() => {
-    if (isPartner) refresh()
-    else setLoading(false)
-  }, [isPartner, refresh])
+    refresh()
+  }, [refresh])
 
   useEffect(() => {
     if (!error && !success) return
@@ -107,6 +122,9 @@ export default function Utenti() {
   }, [error, success])
 
   const filtered = users.filter(u => {
+    if (filterRole !== 'Tutti' && u.role !== filterRole) return false
+    if (filterStato === 'attivo' && !u.is_active) return false
+    if (filterStato === 'disattivato' && u.is_active) return false
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -256,33 +274,12 @@ export default function Utenti() {
     }
   }
 
-  // ─── ACCESS DENIED ────────────────────────────────────────────────────────────
-
-  if (!isPartner) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-5 animate-fade-in">
-        <div
-          className="w-20 h-20 rounded-2xl flex items-center justify-center"
-          style={{ background: 'rgba(208,0,58,0.1)', border: '1px solid rgba(208,0,58,0.2)' }}
-        >
-          <Shield className="w-9 h-9" style={{ color: 'var(--red2)' }} />
-        </div>
-        <div className="text-center">
-          <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text)' }}>Accesso negato</h2>
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>
-            Solo i Partner possono gestire gli utenti.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  // ─── STATS ────────────────────────────────────────────────────────────────────
+  // ─── STATS ──────────────────────────────────────────────────────────────────
 
   const activeCount = users.filter(u => u.is_active).length
   const inactiveCount = users.filter(u => !u.is_active).length
 
-  // ─── MAIN RENDER ──────────────────────────────────────────────────────────────
+  // ─── RENDER ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
@@ -293,180 +290,130 @@ export default function Utenti() {
             <Users className="w-5 h-5" style={{ color: 'var(--red2)' }} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Gestione Utenti</h1>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Team</h1>
             <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
               {activeCount} attivi &middot; {inactiveCount} disattivati &middot; {users.length} totali
             </p>
           </div>
         </div>
-        <button
-          onClick={() => { setShowCreate(true); setCreateForm(emptyCreateForm) }}
-          className="btn-primary flex items-center gap-2 !px-5 !py-2.5 text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Nuovo Utente
-        </button>
+        {isPartner && (
+          <button
+            onClick={() => { setShowCreate(true); setCreateForm(emptyCreateForm) }}
+            className="btn-primary flex items-center gap-2 !px-5 !py-2.5 text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Nuovo Utente
+          </button>
+        )}
       </div>
 
-      {/* Feedback Toasts */}
+      {/* Feedback */}
       {error && (
-        <div
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm animate-fade-in"
-          style={{ background: 'rgba(208,0,58,0.08)', border: '1px solid rgba(208,0,58,0.2)', color: 'var(--red2)' }}
-        >
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm animate-fade-in" style={{ background: 'rgba(208,0,58,0.08)', border: '1px solid rgba(208,0,58,0.2)', color: 'var(--red2)' }}>
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span className="font-medium">{error}</span>
         </div>
       )}
       {success && (
-        <div
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm animate-fade-in"
-          style={{ background: 'rgba(56,210,125,0.08)', border: '1px solid rgba(56,210,125,0.2)', color: 'var(--green)' }}
-        >
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm animate-fade-in" style={{ background: 'rgba(56,210,125,0.08)', border: '1px solid rgba(56,210,125,0.2)', color: 'var(--green)' }}>
           <Check className="w-4 h-4 flex-shrink-0" />
           <span className="font-medium">{success}</span>
         </div>
       )}
 
-      {/* Search Bar */}
+      {/* Filters bar */}
       <div className="panel p-4 animate-fade-in" style={{ animationDelay: '50ms' }}>
-        <div className="relative" style={{ maxWidth: 400 }}>
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
-          <input
-            type="text"
-            placeholder="Cerca per nome, email o ruolo..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="input w-full !pl-10 !pr-4 !py-2.5 text-sm"
-          />
+        <div className="flex flex-col lg:flex-row items-start lg:items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 w-full lg:max-w-xs">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
+            <input
+              type="text"
+              placeholder="Cerca nel team..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="input w-full !pl-10 !py-2.5 text-sm"
+            />
+          </div>
+
+          {/* Role filter */}
+          <div className="flex items-center gap-2">
+            <Filter className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+            <select
+              value={filterRole}
+              onChange={e => setFilterRole(e.target.value as 'Tutti' | AppRole)}
+              className="input !py-2 !px-3 text-xs appearance-none cursor-pointer"
+            >
+              <option value="Tutti">Tutti i ruoli</option>
+              {APP_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+
+          {/* Status filter pills */}
+          <div className="flex items-center gap-1.5">
+            {STATO_FILTERS.map(f => (
+              <button
+                key={f.id}
+                onClick={() => setFilterStato(f.id)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  background: filterStato === f.id ? 'rgba(208,0,58,0.12)' : 'transparent',
+                  color: filterStato === f.id ? 'var(--red2)' : 'var(--muted)',
+                  border: `1px solid ${filterStato === f.id ? 'rgba(208,0,58,0.25)' : 'var(--line)'}`,
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Users Table */}
+      {/* User Cards Grid */}
       {loading ? (
-        <div className="panel p-12 text-center">
-          <div className="inline-flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--red2)', borderTopColor: 'transparent' }} />
-            <span className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento utenti...</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="panel p-5" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl skeleton" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-32 rounded skeleton" />
+                  <div className="h-3 w-24 rounded skeleton" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="panel p-16 text-center animate-fade-in">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: 'var(--panel2)' }}>
+              <Users className="w-6 h-6" style={{ color: 'var(--muted)' }} />
+            </div>
+            <p className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Nessun utente trovato</p>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Prova a modificare i filtri di ricerca</p>
           </div>
         </div>
       ) : (
-        <div className="panel overflow-hidden animate-fade-in" style={{ animationDelay: '100ms' }}>
-          <table className="w-full">
-            <thead>
-              <tr style={{ background: 'var(--panel2)' }}>
-                <th className="text-left px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Utente</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: 'var(--muted)' }}>Ruolo</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: 'var(--muted)' }}>Stato</th>
-                <th className="text-right px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Azioni</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((u, i) => (
-                <tr
-                  key={u.id}
-                  className="group transition-all duration-200 hover:bg-white/[0.025]"
-                  style={{ borderTop: '1px solid var(--line)', animationDelay: `${i * 30}ms` }}
-                >
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3.5">
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0 shadow-sm"
-                        style={{
-                          background: `linear-gradient(135deg, ${roleColor(u.role)} 0%, ${roleColor(u.role)}99 100%)`,
-                          opacity: u.is_active ? 1 : 0.4,
-                          boxShadow: u.is_active ? `0 4px 12px ${roleColor(u.role)}30` : 'none',
-                        }}
-                      >
-                        {u.avatar_url ? (
-                          <img src={u.avatar_url} alt="" className="w-full h-full rounded-xl object-cover" />
-                        ) : (
-                          <>{u.first_name.charAt(0)}{u.last_name.charAt(0)}</>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold truncate" style={{ color: u.is_active ? 'var(--text)' : 'var(--muted)' }}>
-                          {u.first_name} {u.last_name}
-                        </p>
-                        <p className="text-xs truncate mt-0.5" style={{ color: 'var(--muted)' }}>{u.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4 hidden md:table-cell">
-                    <span
-                      className="badge"
-                      style={{
-                        background: `${roleColor(u.role)}15`,
-                        color: roleColor(u.role),
-                        border: `1px solid ${roleColor(u.role)}30`,
-                      }}
-                    >
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 hidden lg:table-cell">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ background: u.is_active ? 'var(--green)' : 'var(--red2)', boxShadow: u.is_active ? '0 0 6px var(--green)' : '0 0 6px var(--red2)' }}
-                      />
-                      <span className="text-xs font-medium" style={{ color: u.is_active ? 'var(--green)' : 'var(--red2)' }}>
-                        {u.is_active ? 'Attivo' : 'Disattivato'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => openEdit(u)}
-                        className="p-2 rounded-lg transition-all hover:bg-white/[0.06]"
-                        title="Modifica utente"
-                      >
-                        <Edit3 className="w-4 h-4" style={{ color: 'var(--blue)' }} />
-                      </button>
-                      <button
-                        onClick={() => { setResetUser(u); setNewPassword('') }}
-                        className="p-2 rounded-lg transition-all hover:bg-white/[0.06]"
-                        title="Reset password"
-                      >
-                        <Key className="w-4 h-4" style={{ color: 'var(--yellow)' }} />
-                      </button>
-                      {u.id !== currentUser?.id && (
-                        <button
-                          onClick={() => handleToggleActive(u)}
-                          className="p-2 rounded-lg transition-all hover:bg-white/[0.06]"
-                          title={u.is_active ? 'Disattiva utente' : 'Riattiva utente'}
-                        >
-                          {u.is_active
-                            ? <Lock className="w-4 h-4" style={{ color: 'var(--red2)' }} />
-                            : <Unlock className="w-4 h-4" style={{ color: 'var(--green)' }} />
-                          }
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-5 py-16 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'var(--panel2)' }}>
-                        <Users className="w-5 h-5" style={{ color: 'var(--muted)' }} />
-                      </div>
-                      <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun utente trovato</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map((u, i) => (
+            <UserCard
+              key={u.id}
+              user={u}
+              isPartner={isPartner}
+              isSelf={u.id === currentUser?.id}
+              delay={i * 40}
+              onEdit={() => openEdit(u)}
+              onToggleActive={() => handleToggleActive(u)}
+              onResetPassword={() => { setResetUser(u); setNewPassword('') }}
+            />
+          ))}
         </div>
       )}
 
-      {/* ─── Create Modal ─────────────────────────────────────────────── */}
+      {/* ─── Create Modal ─────────────────────────────────────────── */}
       {showCreate && (
-        <Modal title="Nuovo Utente" subtitle="Crea un nuovo account utente" onClose={() => setShowCreate(false)}>
+        <Modal title="Nuovo Utente" subtitle="Crea un nuovo account" onClose={() => setShowCreate(false)}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Nome" value={createForm.first_name} onChange={v => setCreateForm(p => ({ ...p, first_name: v }))} placeholder="Mario" />
@@ -476,12 +423,7 @@ export default function Utenti() {
             <FormField label="Password" type="password" value={createForm.password} onChange={v => setCreateForm(p => ({ ...p, password: v }))} placeholder="Min. 6 caratteri" icon={<Key className="w-3.5 h-3.5" />} />
             <RoleSelect value={createForm.role} onChange={v => setCreateForm(p => ({ ...p, role: v }))} />
             <div className="pt-2">
-              <button
-                onClick={handleCreate}
-                disabled={submitting}
-                className="btn-primary w-full !py-3 text-sm flex items-center justify-center gap-2"
-                style={{ opacity: submitting ? 0.6 : 1 }}
-              >
+              <button onClick={handleCreate} disabled={submitting} className="btn-primary w-full !py-3 text-sm flex items-center justify-center gap-2" style={{ opacity: submitting ? 0.6 : 1 }}>
                 <Plus className="w-4 h-4" />
                 {submitting ? 'Creazione in corso...' : 'Crea Utente'}
               </button>
@@ -490,73 +432,51 @@ export default function Utenti() {
         </Modal>
       )}
 
-      {/* ─── Edit Modal ───────────────────────────────────────────────── */}
+      {/* ─── Edit Modal ───────────────────────────────────────────── */}
       {editingUser && (
         <Modal title="Modifica Utente" subtitle={`${editingUser.first_name} ${editingUser.last_name}`} onClose={() => setEditingUser(null)}>
           <div className="space-y-5">
-            {/* User header */}
+            {/* User preview card */}
             <div className="flex items-center gap-4 p-4 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
               <div
                 className="w-14 h-14 rounded-xl flex items-center justify-center text-base font-bold text-white flex-shrink-0"
-                style={{
-                  background: `linear-gradient(135deg, ${roleColor(editForm.role)} 0%, ${roleColor(editForm.role)}99 100%)`,
-                  boxShadow: `0 4px 16px ${roleColor(editForm.role)}30`,
-                }}
+                style={{ background: `linear-gradient(135deg, ${roleColor(editForm.role)} 0%, ${roleColor(editForm.role)}88 100%)`, boxShadow: `0 4px 16px ${roleColor(editForm.role)}25` }}
               >
-                {editForm.avatar_url ? (
-                  <img src={editForm.avatar_url} alt="" className="w-full h-full rounded-xl object-cover" />
-                ) : (
-                  <>{editForm.first_name.charAt(0) || '?'}{editForm.last_name.charAt(0) || '?'}</>
-                )}
+                {editForm.avatar_url
+                  ? <img src={editForm.avatar_url} alt="" className="w-full h-full rounded-xl object-cover" />
+                  : <>{editForm.first_name.charAt(0) || '?'}{editForm.last_name.charAt(0) || '?'}</>
+                }
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>
-                  {editForm.first_name || 'Nome'} {editForm.last_name || 'Cognome'}
-                </p>
+                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{editForm.first_name || 'Nome'} {editForm.last_name || 'Cognome'}</p>
                 <p className="text-xs truncate mt-0.5" style={{ color: 'var(--muted)' }}>{editForm.email || 'email'}</p>
-                <div className="mt-1.5">
-                  <span
-                    className="badge !text-[10px]"
-                    style={{ background: `${roleColor(editForm.role)}15`, color: roleColor(editForm.role), border: `1px solid ${roleColor(editForm.role)}30` }}
-                  >
-                    {editForm.role}
-                  </span>
-                </div>
+                <span className="inline-block mt-1.5 badge !text-[10px]" style={{ background: `${roleColor(editForm.role)}15`, color: roleColor(editForm.role), border: `1px solid ${roleColor(editForm.role)}30` }}>
+                  {editForm.role}
+                </span>
               </div>
             </div>
 
-            {/* Divider */}
             <div className="divider" />
 
-            {/* Name fields */}
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Nome" value={editForm.first_name} onChange={v => setEditForm(p => ({ ...p, first_name: v }))} icon={<User className="w-3.5 h-3.5" />} />
               <FormField label="Cognome" value={editForm.last_name} onChange={v => setEditForm(p => ({ ...p, last_name: v }))} icon={<User className="w-3.5 h-3.5" />} />
             </div>
 
-            {/* Email */}
             <FormField label="Email" type="email" value={editForm.email} onChange={v => setEditForm(p => ({ ...p, email: v }))} icon={<Mail className="w-3.5 h-3.5" />} />
             {editForm.email !== editingUser.email && (
-              <div
-                className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-lg text-xs"
-                style={{ background: 'rgba(208,0,58,0.06)', border: '1px solid rgba(208,0,58,0.15)', color: 'var(--red2)' }}
-              >
+              <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-lg text-xs" style={{ background: 'rgba(208,0,58,0.06)', border: '1px solid rgba(208,0,58,0.15)', color: 'var(--red2)' }}>
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                 <span style={{ lineHeight: '1.5' }}>La modifica dell'email aggiornerà le credenziali di accesso. L'utente dovrà usare la nuova email per il login.</span>
               </div>
             )}
 
-            {/* Role */}
             <RoleSelect value={editForm.role} onChange={v => setEditForm(p => ({ ...p, role: v }))} />
 
-            {/* Active Toggle */}
             {editingUser.id !== currentUser?.id && (
-              <div
-                className="flex items-center justify-between px-4 py-3.5 rounded-xl"
-                style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}
-              >
+              <div className="flex items-center justify-between px-4 py-3.5 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
                 <div>
-                  <p className="text-xs font-medium mb-0.5" style={{ color: 'var(--muted)' }}>Stato Account</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--muted)' }}>Stato Account</p>
                   <p className="text-sm font-semibold" style={{ color: editForm.is_active ? 'var(--green)' : 'var(--red2)' }}>
                     {editForm.is_active ? 'Attivo' : 'Disattivato'}
                   </p>
@@ -567,25 +487,15 @@ export default function Utenti() {
                   className="relative w-11 h-6 rounded-full transition-all duration-200"
                   style={{ background: editForm.is_active ? 'var(--green)' : 'rgba(255,255,255,0.12)' }}
                 >
-                  <span
-                    className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-200"
-                    style={{ left: editForm.is_active ? '24px' : '4px' }}
-                  />
+                  <span className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-200" style={{ left: editForm.is_active ? '24px' : '4px' }} />
                 </button>
               </div>
             )}
 
-            {/* Avatar URL */}
             <FormField label="URL Avatar (opzionale)" value={editForm.avatar_url} onChange={v => setEditForm(p => ({ ...p, avatar_url: v }))} placeholder="https://..." icon={<Camera className="w-3.5 h-3.5" />} />
 
-            {/* Save */}
             <div className="pt-1">
-              <button
-                onClick={handleUpdate}
-                disabled={submitting}
-                className="btn-primary w-full !py-3 text-sm flex items-center justify-center gap-2"
-                style={{ opacity: submitting ? 0.6 : 1 }}
-              >
+              <button onClick={handleUpdate} disabled={submitting} className="btn-primary w-full !py-3 text-sm flex items-center justify-center gap-2" style={{ opacity: submitting ? 0.6 : 1 }}>
                 <Check className="w-4 h-4" />
                 {submitting ? 'Salvataggio in corso...' : 'Salva Modifiche'}
               </button>
@@ -594,15 +504,12 @@ export default function Utenti() {
         </Modal>
       )}
 
-      {/* ─── Reset Password Modal ─────────────────────────────────────── */}
+      {/* ─── Reset Password Modal ─────────────────────────────────── */}
       {resetUser && (
         <Modal title="Reset Password" subtitle={`${resetUser.first_name} ${resetUser.last_name}`} onClose={() => setResetUser(null)}>
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
-              <div
-                className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white"
-                style={{ background: `linear-gradient(135deg, ${roleColor(resetUser.role)} 0%, ${roleColor(resetUser.role)}99 100%)` }}
-              >
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{ background: `linear-gradient(135deg, ${roleColor(resetUser.role)} 0%, ${roleColor(resetUser.role)}88 100%)` }}>
                 {resetUser.first_name.charAt(0)}{resetUser.last_name.charAt(0)}
               </div>
               <div>
@@ -612,12 +519,7 @@ export default function Utenti() {
             </div>
             <FormField label="Nuova Password" type="password" value={newPassword} onChange={setNewPassword} placeholder="Min. 6 caratteri" icon={<Key className="w-3.5 h-3.5" />} />
             <div className="pt-1">
-              <button
-                onClick={handleResetPassword}
-                disabled={submitting}
-                className="btn-primary w-full !py-3 text-sm flex items-center justify-center gap-2"
-                style={{ opacity: submitting ? 0.6 : 1 }}
-              >
+              <button onClick={handleResetPassword} disabled={submitting} className="btn-primary w-full !py-3 text-sm flex items-center justify-center gap-2" style={{ opacity: submitting ? 0.6 : 1 }}>
                 <Key className="w-4 h-4" />
                 {submitting ? 'Reset in corso...' : 'Reset Password'}
               </button>
@@ -626,19 +528,13 @@ export default function Utenti() {
         </Modal>
       )}
 
-      {/* ─── Confirmation Dialog ──────────────────────────────────────── */}
+      {/* ─── Confirmation Dialog ──────────────────────────────────── */}
       {confirmAction && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setConfirmAction(null)} />
-          <div
-            className="relative w-full max-w-sm rounded-2xl p-6 animate-fade-in"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-lg)' }}
-          >
+          <div className="relative w-full max-w-sm rounded-2xl p-6 animate-fade-in" style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-lg)' }}>
             <div className="flex items-center gap-3 mb-4">
-              <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(208,0,58,0.1)', border: '1px solid rgba(208,0,58,0.2)' }}
-              >
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(208,0,58,0.1)', border: '1px solid rgba(208,0,58,0.2)' }}>
                 <AlertCircle className="w-5 h-5" style={{ color: 'var(--red2)' }} />
               </div>
               <h3 className="text-base font-bold" style={{ color: 'var(--text)' }}>Conferma Operazione</h3>
@@ -647,16 +543,10 @@ export default function Utenti() {
               {confirmAction.message}
             </p>
             <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmAction(null)}
-                className="btn-secondary flex-1 !py-2.5 text-sm text-center"
-              >
+              <button onClick={() => setConfirmAction(null)} className="btn-secondary flex-1 !py-2.5 text-sm text-center">
                 Annulla
               </button>
-              <button
-                onClick={confirmAction.onConfirm}
-                className="btn-primary flex-1 !py-2.5 text-sm"
-              >
+              <button onClick={confirmAction.onConfirm} className="btn-primary flex-1 !py-2.5 text-sm">
                 Conferma
               </button>
             </div>
@@ -667,7 +557,103 @@ export default function Utenti() {
   )
 }
 
-// ─── COMPONENTS ────────────────────────────────────────────────────────────────
+// ─── USER CARD COMPONENT ──────────────────────────────────────────────────────
+
+function UserCard({ user, isPartner, isSelf, delay, onEdit, onToggleActive, onResetPassword }: {
+  user: Profile
+  isPartner: boolean
+  isSelf: boolean
+  delay: number
+  onEdit: () => void
+  onToggleActive: () => void
+  onResetPassword: () => void
+}) {
+  const color = roleColor(user.role)
+
+  return (
+    <div
+      className="panel p-5 hover-card animate-fade-in relative group"
+      style={{ animationDelay: `${delay}ms`, opacity: user.is_active ? 1 : 0.7 }}
+    >
+      {/* Status indicator */}
+      <div className="absolute top-4 right-4">
+        <span
+          className="w-2.5 h-2.5 rounded-full block"
+          style={{ background: user.is_active ? 'var(--green)' : 'var(--red2)', boxShadow: `0 0 8px ${user.is_active ? 'var(--green)' : 'var(--red2)'}60` }}
+        />
+      </div>
+
+      {/* Avatar + Info */}
+      <div className="flex items-start gap-4">
+        <div
+          className="w-12 h-12 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+          style={{
+            background: `linear-gradient(135deg, ${color} 0%, ${color}88 100%)`,
+            boxShadow: `0 4px 12px ${color}25`,
+          }}
+        >
+          {user.avatar_url ? (
+            <img src={user.avatar_url} alt="" className="w-full h-full rounded-xl object-cover" />
+          ) : (
+            <>{user.first_name.charAt(0)}{user.last_name.charAt(0)}</>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>
+            {user.first_name} {user.last_name}
+          </h3>
+          <p className="text-xs truncate mt-0.5" style={{ color: 'var(--muted)' }}>
+            {user.email}
+          </p>
+        </div>
+      </div>
+
+      {/* Role badge + status */}
+      <div className="flex items-center gap-2 mt-4">
+        <span
+          className="badge"
+          style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}
+        >
+          {user.role}
+        </span>
+        <span
+          className="text-[10px] font-medium px-2 py-0.5 rounded"
+          style={{
+            background: user.is_active ? 'rgba(56,210,125,0.1)' : 'rgba(208,0,58,0.1)',
+            color: user.is_active ? 'var(--green)' : 'var(--red2)',
+          }}
+        >
+          {user.is_active ? 'Attivo' : 'Disattivato'}
+        </span>
+      </div>
+
+      {/* Partner-only actions */}
+      {isPartner && (
+        <div
+          className="flex items-center gap-1 mt-4 pt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          style={{ borderTop: '1px solid var(--line)' }}
+        >
+          <button onClick={onEdit} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/[0.06]" style={{ color: 'var(--blue)' }}>
+            <Edit3 className="w-3.5 h-3.5" />
+            Modifica
+          </button>
+          <button onClick={onResetPassword} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/[0.06]" style={{ color: 'var(--yellow)' }}>
+            <Key className="w-3.5 h-3.5" />
+            Password
+          </button>
+          {!isSelf && (
+            <button onClick={onToggleActive} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/[0.06] ml-auto" style={{ color: user.is_active ? 'var(--red2)' : 'var(--green)' }}>
+              {user.is_active ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+              {user.is_active ? 'Disattiva' : 'Riattiva'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
 
 function Modal({ title, subtitle, onClose, children }: {
   title: string; subtitle?: string; onClose: () => void; children: React.ReactNode
@@ -675,25 +661,17 @@ function Modal({ title, subtitle, onClose, children }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className="relative w-full max-w-md rounded-2xl max-h-[90vh] overflow-y-auto animate-fade-in"
-        style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-lg)' }}
-      >
+      <div className="relative w-full max-w-md rounded-2xl max-h-[90vh] overflow-y-auto animate-fade-in" style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-lg)' }}>
         <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4" style={{ background: 'var(--panel)', borderBottom: '1px solid var(--line)' }}>
           <div>
             <h3 className="text-base font-bold" style={{ color: 'var(--text)' }}>{title}</h3>
             {subtitle && <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{subtitle}</p>}
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg transition-all hover:bg-white/[0.06]"
-          >
+          <button onClick={onClose} className="p-2 rounded-lg transition-all hover:bg-white/[0.06]">
             <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
           </button>
         </div>
-        <div className="px-6 py-5">
-          {children}
-        </div>
+        <div className="px-6 py-5">{children}</div>
       </div>
     </div>
   )
@@ -706,9 +684,7 @@ function FormField({ label, value, onChange, type = 'text', placeholder, icon }:
     <div>
       <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--muted)' }}>{label}</label>
       <div className="relative">
-        {icon && (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted)' }}>{icon}</span>
-        )}
+        {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted)' }}>{icon}</span>}
         <input
           type={type}
           value={value}
@@ -731,9 +707,7 @@ function RoleSelect({ value, onChange }: { value: AppRole; onChange: (v: AppRole
         onChange={e => onChange(e.target.value as AppRole)}
         className="input w-full text-sm appearance-none cursor-pointer"
       >
-        {APP_ROLES.map(r => (
-          <option key={r} value={r}>{r}</option>
-        ))}
+        {APP_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
       </select>
     </div>
   )
