@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, LogIn, Shield, Briefcase, Wrench, DollarSign, TrendingUp, Truck } from 'lucide-react'
 import { users } from '@/data/users'
-import { saveUser } from '@/lib/auth'
+import { saveUser, mapLegacyToAppRole, mapAppRoleToLegacy } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
+import { fetchProfile } from '@/lib/profiles'
 import type { User } from '@/data/users'
 
 const ruoloIcon: Record<string, React.ElementType> = {
@@ -36,11 +38,73 @@ export default function Login() {
   const navigate = useNavigate()
   const [selected, setSelected] = useState<User | null>(null)
   const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleLogin = () => {
-    if (!selected) return
-    saveUser(selected)
-    navigate('/dashboard')
+  const handleLogin = async () => {
+    if (!selected || loading) return
+    setError(null)
+    setLoading(true)
+    try {
+      const password = 'simmetria-demo-2026'
+      let signInRes = await supabase.auth.signInWithPassword({
+        email: selected.email,
+        password,
+      })
+
+      if (signInRes.error) {
+        const signupRes = await supabase.auth.signUp({
+          email: selected.email,
+          password,
+          options: {
+            data: {
+              nome: selected.nome,
+              ruolo: mapLegacyToAppRole(selected.ruolo),
+              reparto: selected.reparto,
+            },
+          },
+        })
+        if (signupRes.error) {
+          setError(signupRes.error.message)
+          setLoading(false)
+          return
+        }
+        signInRes = await supabase.auth.signInWithPassword({
+          email: selected.email,
+          password,
+        })
+        if (signInRes.error) {
+          setError(signInRes.error.message)
+          setLoading(false)
+          return
+        }
+      }
+
+      const authUser = signInRes.data.user
+      let mergedUser: User = selected
+      if (authUser) {
+        const profile = await fetchProfile(authUser.id)
+        if (profile) {
+          mergedUser = {
+            ...selected,
+            id: profile.id,
+            nome: profile.nome ?? selected.nome,
+            email: profile.email ?? selected.email,
+            ruolo: mapAppRoleToLegacy(profile.ruolo),
+            reparto: profile.reparto || selected.reparto,
+          }
+        } else {
+          mergedUser = { ...selected, id: authUser.id }
+        }
+      }
+
+      saveUser(mergedUser)
+      navigate('/dashboard')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore durante il login')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const RuoloIconComp = selected ? (ruoloIcon[selected.ruolo] ?? Briefcase) : null
@@ -217,7 +281,7 @@ export default function Login() {
           <button
             type="button"
             onClick={handleLogin}
-            disabled={!selected}
+            disabled={!selected || loading}
             className="w-full py-3 text-white font-medium rounded-xl flex items-center justify-center gap-2 transition-all"
             style={{
               background: selected
@@ -225,13 +289,19 @@ export default function Login() {
                 : 'var(--panel2)',
               boxShadow: selected ? 'var(--shadow-red)' : 'none',
               color: selected ? 'white' : 'var(--muted)',
-              cursor: selected ? 'pointer' : 'not-allowed',
-              opacity: selected ? 1 : 0.5,
+              cursor: selected && !loading ? 'pointer' : 'not-allowed',
+              opacity: selected && !loading ? 1 : 0.5,
             }}
           >
             <LogIn className="w-4 h-4" />
-            Accedi come {selected?.nome.split(' ')[0] ?? '...'}
+            {loading ? 'Accesso in corso...' : `Accedi come ${selected?.nome.split(' ')[0] ?? '...'}`}
           </button>
+
+          {error && (
+            <p className="text-center text-xs" style={{ color: 'var(--red2)' }}>
+              {error}
+            </p>
+          )}
         </div>
 
         <p className="text-center text-xs mt-6" style={{ color: 'var(--muted)' }}>

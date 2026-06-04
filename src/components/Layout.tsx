@@ -22,7 +22,7 @@ import {
   FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { loadUser, clearUser, getAllowedNav } from '@/lib/auth'
+import { loadUser, getAllowedNav, signOutEverywhere } from '@/lib/auth'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchPractices } from '@/lib/practices-service'
@@ -56,8 +56,9 @@ function Sidebar({ open, setOpen }: SidebarProps) {
   const navItems = user ? getAllowedNav(user.ruolo) : getAllowedNav('Operativo')
 
   const handleLogout = () => {
-    clearUser()
-    navigate('/login')
+    void signOutEverywhere().then(() => {
+      navigate('/login')
+    })
   }
 
   return (
@@ -188,8 +189,9 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
   const user = loadUser()
 
   const handleLogout = () => {
-    clearUser()
-    navigate('/login')
+    void signOutEverywhere().then(() => {
+      navigate('/login')
+    })
   }
 
   return (
@@ -328,7 +330,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                     <button
                       onClick={() => {
                         setUserMenuOpen(false)
-                        navigate('/login')
+                        void signOutEverywhere().then(() => navigate('/login'))
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all hover:bg-white/5"
                       style={{ color: 'var(--muted)' }}

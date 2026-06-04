@@ -1,7 +1,17 @@
 import type { User } from '@/data/users'
 import type { AppRole } from './database.types'
+import { supabase } from './supabase'
 
 const STORAGE_KEY = 'simmetria_user'
+
+export async function signOutEverywhere(): Promise<void> {
+  try {
+    await supabase.auth.signOut()
+  } catch (e) {
+    console.error('signOutEverywhere supabase error:', e)
+  }
+  clearUser()
+}
 
 export function saveUser(user: User): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
@@ -63,6 +73,25 @@ export function getAllowedNav(ruolo: User['ruolo']): NavItem[] {
 // In Step 1 manteniamo l'app demo con i ruoli legacy. Quando in Step successivi
 // l'auth verra migrata a Supabase, ogni AppRole sara mappato al set di permessi
 // piu vicino fra quelli gia esistenti (Admin/Manager/Operativo/Finance/...).
+
+export function mapLegacyToAppRole(ruolo: User['ruolo']): AppRole {
+  switch (ruolo) {
+    case 'Admin':
+      return 'Partner'
+    case 'Manager':
+      return 'Project Manager'
+    case 'Commerciale':
+      return 'Event Coordinator'
+    case 'Finance':
+      return 'Amministrazione'
+    case 'Operativo':
+      return 'Event Assistant'
+    case 'Fornitore':
+      return 'Junior Event Assistant'
+    default:
+      return 'Junior Event Assistant'
+  }
+}
 
 export function mapAppRoleToLegacy(role: AppRole): User['ruolo'] {
   switch (role) {

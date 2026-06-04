@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
@@ -13,11 +14,34 @@ import Utenti from './pages/Utenti'
 import Pratiche from './pages/Pratiche'
 import Impostazioni from './pages/Impostazioni'
 import Login from './pages/Login'
-import { loadUser } from './lib/auth'
+import { loadUser, clearUser } from './lib/auth'
+import { supabase } from './lib/supabase'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
+  const [checking, setChecking] = useState(true)
+  const [hasSession, setHasSession] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return
+      setHasSession(!!data.session)
+      if (!data.session) clearUser()
+      setChecking(false)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setHasSession(!!session)
+      if (!session) clearUser()
+    })
+    return () => {
+      cancelled = true
+      sub.subscription.unsubscribe()
+    }
+  }, [])
+
+  if (checking) return null
   const user = loadUser()
-  if (!user) return <Navigate to="/login" replace />
+  if (!hasSession || !user) return <Navigate to="/login" replace />
   return <>{children}</>
 }
 
