@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Eventi from './pages/Eventi'
@@ -12,22 +13,79 @@ import Workflow from './pages/Workflow'
 import Utenti from './pages/Utenti'
 import Pratiche from './pages/Pratiche'
 import Impostazioni from './pages/Impostazioni'
+import Login from './pages/Login'
+import { loadUser, saveUser, clearUser } from './lib/auth'
+import { supabase } from './lib/supabase'
+import { fetchProfile } from './lib/profiles'
+
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const [checking, setChecking] = useState(true)
+  const [authenticated, setAuthenticated] = useState(false)
+
+  useEffect(() => {
+    const check = async () => {
+      const stored = loadUser()
+      if (stored) {
+        setAuthenticated(true)
+        setChecking(false)
+        return
+      }
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id)
+        if (profile && profile.is_active) {
+          saveUser({
+            id: profile.id,
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            email: profile.email,
+            role: profile.role,
+            avatar_url: profile.avatar_url,
+            is_active: profile.is_active,
+          })
+          setAuthenticated(true)
+        } else {
+          clearUser()
+          await supabase.auth.signOut()
+        }
+      }
+      setChecking(false)
+    }
+    check()
+  }, [])
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</div>
+      </div>
+    )
+  }
+
+  if (!authenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <>{children}</>
+}
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-      <Route path="/eventi" element={<Layout><Eventi /></Layout>} />
-      <Route path="/crm" element={<Layout><CRM /></Layout>} />
-      <Route path="/task" element={<Layout><Task /></Layout>} />
-      <Route path="/calendario" element={<Layout><Calendario /></Layout>} />
-      <Route path="/fornitori" element={<Layout><Fornitori /></Layout>} />
-      <Route path="/amministrazione" element={<Layout><Amministrazione /></Layout>} />
-      <Route path="/comunicazioni" element={<Layout><Comunicazioni /></Layout>} />
-      <Route path="/workflow" element={<Layout><Workflow /></Layout>} />
-      <Route path="/pratiche" element={<Layout><Pratiche /></Layout>} />
-      <Route path="/utenti" element={<Layout><Utenti /></Layout>} />
-      <Route path="/impostazioni" element={<Layout><Impostazioni /></Layout>} />
+      <Route path="/login" element={<Login />} />
+
+      <Route path="/dashboard" element={<AuthGuard><Layout><Dashboard /></Layout></AuthGuard>} />
+      <Route path="/eventi" element={<AuthGuard><Layout><Eventi /></Layout></AuthGuard>} />
+      <Route path="/crm" element={<AuthGuard><Layout><CRM /></Layout></AuthGuard>} />
+      <Route path="/task" element={<AuthGuard><Layout><Task /></Layout></AuthGuard>} />
+      <Route path="/calendario" element={<AuthGuard><Layout><Calendario /></Layout></AuthGuard>} />
+      <Route path="/fornitori" element={<AuthGuard><Layout><Fornitori /></Layout></AuthGuard>} />
+      <Route path="/amministrazione" element={<AuthGuard><Layout><Amministrazione /></Layout></AuthGuard>} />
+      <Route path="/comunicazioni" element={<AuthGuard><Layout><Comunicazioni /></Layout></AuthGuard>} />
+      <Route path="/workflow" element={<AuthGuard><Layout><Workflow /></Layout></AuthGuard>} />
+      <Route path="/pratiche" element={<AuthGuard><Layout><Pratiche /></Layout></AuthGuard>} />
+      <Route path="/utenti" element={<AuthGuard><Layout><Utenti /></Layout></AuthGuard>} />
+      <Route path="/impostazioni" element={<AuthGuard><Layout><Impostazioni /></Layout></AuthGuard>} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

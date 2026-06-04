@@ -1,3 +1,4 @@
+import { supabase } from './supabase'
 import type { AppRole } from './database.types'
 
 export interface AuthUser {
@@ -12,29 +13,39 @@ export interface AuthUser {
   ruolo: string
 }
 
-const DEFAULT_USER: AuthUser = {
-  id: 'partner-default',
-  first_name: 'Simmetria',
-  last_name: 'Partner',
-  email: 'partner@simmetria.it',
-  role: 'Partner',
-  avatar_url: null,
-  is_active: true,
-  nome: 'Simmetria Partner',
-  ruolo: 'Admin',
+const STORAGE_KEY = 'simmetria_user'
+
+export function loadUser(): AuthUser | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as AuthUser
+  } catch {
+    return null
+  }
 }
 
-export function loadUser(): AuthUser {
-  return DEFAULT_USER
+export function saveUser(input: Omit<AuthUser, 'nome' | 'ruolo'>): void {
+  const user: AuthUser = {
+    ...input,
+    nome: `${input.first_name} ${input.last_name}`.trim(),
+    ruolo: 'Admin',
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
+}
+
+export function clearUser(): void {
+  localStorage.removeItem(STORAGE_KEY)
+}
+
+export async function signOutEverywhere(): Promise<void> {
+  clearUser()
+  await supabase.auth.signOut()
 }
 
 export function isPartnerUser(_user: AuthUser | null): boolean {
   return true
 }
-
-export function saveUser(_user: Omit<AuthUser, 'nome' | 'ruolo'>): void {}
-export function clearUser(): void {}
-export async function signOutEverywhere(): Promise<void> {}
 
 export type NavItem = {
   name: string
