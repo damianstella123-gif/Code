@@ -397,7 +397,7 @@ function getProactiveNotif(): FlyNotif | null {
   return pool[Math.floor(Math.random() * pool.length)]
 }
 
-// ─── FLY SVG Mascot (Premium Cartoon Dog — Full Body) ─────────────────────────
+// ─── FLY SVG Mascot (Simmetria Hub Official Mascot) ──────────────────────────
 
 type FlyState = 'idle' | 'listening' | 'processing' | 'suggesting' | 'success' | 'error'
 
@@ -416,249 +416,231 @@ function FlyMascot({ size = 56, state = 'idle' }: { size?: number; state?: FlySt
       style={{ display: 'block' }}
       className={bodyClass}
     >
-      {/* Subtle ground shadow */}
-      <ellipse cx="50" cy="93" rx="22" ry="4" fill="rgba(0,0,0,0.25)" />
+      {/* Ground shadow */}
+      <ellipse cx="50" cy="95" rx="20" ry="3.5" fill="rgba(0,0,0,0.3)" />
 
-      {/* Tail */}
-      <g className={tailClass} style={{ transformOrigin: '68px 62px' }}>
-        <path
-          d="M65 62 Q74 52 78 46 Q80 42 78 44 Q74 49 72 54 Q70 58 67 61"
-          fill="#c9975a"
-          stroke="#b5854a"
-          strokeWidth="0.8"
-        />
-        <path d="M77 46 Q79 43 77 45" fill="#e0c090" />
+      {/* Tail - fluffy, upright, golden */}
+      <g className={tailClass} style={{ transformOrigin: '70px 58px' }}>
+        <path d="M67 60 Q76 48 79 40 Q80 37 78 39 Q75 44 73 50 Q71 55 68 59" fill="#d4a050" />
+        <path d="M69 58 Q76 48 78 42" stroke="#e8c070" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        <path d="M70 56 Q74 50 76 45" stroke="#f0d890" strokeWidth="0.8" fill="none" opacity="0.5" />
       </g>
 
       {/* Back legs */}
-      <rect x="34" y="72" width="8" height="16" rx="4" fill="#c9975a" />
-      <rect x="56" y="72" width="8" height="16" rx="4" fill="#c9975a" />
-      {/* Back paws */}
-      <ellipse cx="38" cy="88" rx="5.5" ry="3.5" fill="#f0e0c4" />
-      <ellipse cx="60" cy="88" rx="5.5" ry="3.5" fill="#f0e0c4" />
-      {/* Paw pads */}
-      <circle cx="36.5" cy="89" r="1" fill="#c9975a" />
-      <circle cx="38.5" cy="89.5" r="0.8" fill="#c9975a" />
-      <circle cx="39.8" cy="89" r="1" fill="#c9975a" />
-      <circle cx="58.5" cy="89" r="1" fill="#c9975a" />
-      <circle cx="60.5" cy="89.5" r="0.8" fill="#c9975a" />
-      <circle cx="61.8" cy="89" r="1" fill="#c9975a" />
+      <rect x="33" y="72" width="9" height="18" rx="4.5" fill="#c89848" />
+      <rect x="57" y="72" width="9" height="18" rx="4.5" fill="#c89848" />
+      {/* Back paws - white/cream */}
+      <ellipse cx="37.5" cy="90" rx="5.5" ry="3.8" fill="#f8f0e0" />
+      <ellipse cx="61.5" cy="90" rx="5.5" ry="3.8" fill="#f8f0e0" />
 
-      {/* Body */}
-      <ellipse cx="50" cy="66" rx="20" ry="17" fill="#d4a86a" />
-      {/* Body shading */}
-      <ellipse cx="54" cy="62" rx="12" ry="10" fill="rgba(220,180,120,0.3)" />
+      {/* Body - golden/beige */}
+      <ellipse cx="50" cy="66" rx="21" ry="18" fill="#d4a050" />
+      {/* Body highlight */}
+      <ellipse cx="46" cy="60" rx="12" ry="10" fill="rgba(230,190,100,0.2)" />
 
-      {/* White chest patch - distinctive marking */}
-      <ellipse cx="50" cy="65" rx="11" ry="14" fill="#f5ead6" />
-      <ellipse cx="50" cy="62" rx="7" ry="9" fill="#faf4eb" />
-      {/* Chest fur detail */}
-      <path d="M47 56 Q50 54 53 56" stroke="rgba(200,170,120,0.3)" strokeWidth="0.6" fill="none" />
-      <path d="M46 59 Q50 57 54 59" stroke="rgba(200,170,120,0.2)" strokeWidth="0.5" fill="none" />
+      {/* Chest - lighter cream/white */}
+      <ellipse cx="50" cy="66" rx="12" ry="15" fill="#f5e8cc" />
+      <ellipse cx="50" cy="63" rx="8" ry="10" fill="#faf2e4" />
 
-      {/* Front legs - slightly different poses per state */}
-      <rect x="38" y="73" width="7.5" height="16" rx="3.8" fill="#d4a86a" />
-      <rect x="53" y="73" width="7.5" height="16" rx="3.8" fill="#d4a86a" />
-      {/* Front paws */}
-      <ellipse cx="41.8" cy="89" rx="5" ry="3.2" fill="#f5ead6" />
-      <ellipse cx="56.8" cy="89" rx="5" ry="3.2" fill="#f5ead6" />
-      {/* Front paw pads detail */}
-      <circle cx="40.5" cy="89.5" r="0.9" fill="#c9975a" />
-      <circle cx="42" cy="90" r="0.7" fill="#c9975a" />
-      <circle cx="43.5" cy="89.5" r="0.9" fill="#c9975a" />
-      <circle cx="55.5" cy="89.5" r="0.9" fill="#c9975a" />
-      <circle cx="57" cy="90" r="0.7" fill="#c9975a" />
-      <circle cx="58.5" cy="89.5" r="0.9" fill="#c9975a" />
+      {/* Tech Harness - dark with red accents (key feature from reference) */}
+      <path d="M34 54 Q50 60 66 54" stroke="#1a1a2e" strokeWidth="4" fill="none" strokeLinecap="round" />
+      <path d="M34 54 L36 70 Q50 74 64 70 L66 54" fill="rgba(20,20,40,0.85)" stroke="#2a2a44" strokeWidth="0.8" />
+      {/* Harness side straps */}
+      <path d="M36 56 L34 54" stroke="#1a1a2e" strokeWidth="3" strokeLinecap="round" />
+      <path d="M64 56 L66 54" stroke="#1a1a2e" strokeWidth="3" strokeLinecap="round" />
+      {/* Harness red LED strips */}
+      <path d="M38 58 L38 66" stroke="#cc1a3a" strokeWidth="1.2" strokeLinecap="round" opacity="0.8" className="fly-glow-pulse-sm" />
+      <path d="M62 58 L62 66" stroke="#cc1a3a" strokeWidth="1.2" strokeLinecap="round" opacity="0.8" className="fly-glow-pulse-sm" />
+      {/* Harness buckle detail */}
+      <rect x="47" y="54" width="6" height="3" rx="1.5" fill="#2a2a44" stroke="#cc1a3a" strokeWidth="0.5" />
+      <circle cx="50" cy="55.5" r="0.8" fill="#cc1a3a" className="fly-glow-pulse-sm" />
+      {/* Harness chest plate texture */}
+      <path d="M42 62 L44 68" stroke="rgba(200,200,220,0.1)" strokeWidth="0.5" />
+      <path d="M56 62 L58 68" stroke="rgba(200,200,220,0.1)" strokeWidth="0.5" />
 
-      {/* Collar - Simmetria brand red */}
-      <path d="M33 52 Q50 56 67 52" stroke="#cc1a3a" strokeWidth="3.2" fill="none" strokeLinecap="round" />
-      <path d="M33 52 Q50 56 67 52" stroke="rgba(255,255,255,0.1)" strokeWidth="1" fill="none" strokeLinecap="round" />
-      {/* Collar tag - golden S for Simmetria */}
-      <circle cx="50" cy="57" r="4" fill="#cc1a3a" stroke="#8a0020" strokeWidth="0.6" />
-      <circle cx="50" cy="57" r="3" fill="#d4183e" />
-      <text x="50" y="59.5" textAnchor="middle" fontSize="5.5" fontWeight="bold" fill="#ffd700" fontFamily="sans-serif">S</text>
-      {/* Tag shine */}
-      <ellipse cx="48.5" cy="55.5" rx="1.2" ry="0.8" fill="rgba(255,255,255,0.25)" />
+      {/* Front legs - golden */}
+      <rect x="37" y="74" width="8.5" height="17" rx="4.2" fill="#d4a050" />
+      <rect x="53.5" y="74" width="8.5" height="17" rx="4.2" fill="#d4a050" />
+      {/* Front paws - white/cream */}
+      <ellipse cx="41.2" cy="91" rx="5.5" ry="3.5" fill="#f8f0e0" />
+      <ellipse cx="57.8" cy="91" rx="5.5" ry="3.5" fill="#f8f0e0" />
 
-      {/* Head */}
-      <ellipse cx="50" cy="34" rx="20" ry="19" fill="#d4a86a" />
-      {/* Head 3D highlight */}
-      <ellipse cx="44" cy="27" rx="10" ry="9" fill="rgba(240,210,160,0.15)" />
+      {/* Collar with "S" tag */}
+      <path d="M34 49 Q50 53 66 49" stroke="#2a2a3a" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+      <path d="M34 49 Q50 53 66 49" stroke="#3a3a50" strokeWidth="2" fill="none" strokeLinecap="round" />
+      {/* Collar red accent line */}
+      <path d="M36 49.5 Q50 53 64 49.5" stroke="#cc1a3a" strokeWidth="0.8" fill="none" opacity="0.6" />
+      {/* S Medallion */}
+      <circle cx="50" cy="54" r="4.5" fill="#cc1a3a" stroke="#8a0020" strokeWidth="0.8" />
+      <circle cx="50" cy="54" r="3.5" fill="#e01a3a" />
+      <text x="50" y="56.8" textAnchor="middle" fontSize="5.5" fontWeight="bold" fill="#ffd700" fontFamily="sans-serif">S</text>
+      <ellipse cx="48.5" cy="52.5" rx="1.5" ry="0.8" fill="rgba(255,255,255,0.2)" />
 
-      {/* Floppy ears */}
+      {/* Head - rounder, matching reference */}
+      <ellipse cx="50" cy="32" rx="21" ry="20" fill="#d4a050" />
+      {/* Forehead highlight */}
+      <ellipse cx="45" cy="25" rx="10" ry="8" fill="rgba(220,180,80,0.15)" />
+      {/* Cheek fur - lighter sides */}
+      <ellipse cx="34" cy="36" rx="5" ry="6" fill="rgba(240,220,170,0.2)" />
+      <ellipse cx="66" cy="36" rx="5" ry="6" fill="rgba(240,220,170,0.2)" />
+
+      {/* Ears - floppy, brown/caramel top (matching reference closely) */}
       <g className={earClass}>
-        {/* Left ear - outer */}
-        <ellipse cx="30" cy="30" rx="8" ry="15" fill="#b5854a" transform="rotate(-12 30 30)" />
-        {/* Left ear - inner */}
-        <ellipse cx="31" cy="32" rx="4.5" ry="10" fill="#c9975a" transform="rotate(-12 31 32)" />
-        <ellipse cx="31.5" cy="33" rx="2.5" ry="6" fill="rgba(220,170,120,0.5)" transform="rotate(-12 31.5 33)" />
-        {/* Right ear - outer */}
-        <ellipse cx="70" cy="30" rx="8" ry="15" fill="#b5854a" transform="rotate(12 70 30)" />
-        {/* Right ear - inner */}
-        <ellipse cx="69" cy="32" rx="4.5" ry="10" fill="#c9975a" transform="rotate(12 69 32)" />
-        <ellipse cx="68.5" cy="33" rx="2.5" ry="6" fill="rgba(220,170,120,0.5)" transform="rotate(12 68.5 33)" />
+        {/* Left ear */}
+        <ellipse cx="29" cy="30" rx="9" ry="14" fill="#b07830" transform="rotate(-10 29 30)" />
+        <ellipse cx="30" cy="32" rx="5.5" ry="10" fill="#c89040" transform="rotate(-10 30 32)" />
+        <ellipse cx="30.5" cy="33" rx="3" ry="6" fill="rgba(200,160,80,0.3)" transform="rotate(-10 30.5 33)" />
+        {/* Right ear */}
+        <ellipse cx="71" cy="30" rx="9" ry="14" fill="#b07830" transform="rotate(10 71 30)" />
+        <ellipse cx="70" cy="32" rx="5.5" ry="10" fill="#c89040" transform="rotate(10 70 32)" />
+        <ellipse cx="69.5" cy="33" rx="3" ry="6" fill="rgba(200,160,80,0.3)" transform="rotate(10 69.5 33)" />
       </g>
 
-      {/* Muzzle */}
-      <ellipse cx="50" cy="40" rx="10" ry="9" fill="#e8c98a" />
-      <ellipse cx="50" cy="42" rx="7.5" ry="6.5" fill="#f2dca0" />
+      {/* Muzzle area - cream colored, prominent */}
+      <ellipse cx="50" cy="39" rx="11" ry="10" fill="#e8c878" />
+      <ellipse cx="50" cy="41" rx="8.5" ry="7.5" fill="#f2dda0" />
+      {/* Muzzle highlight */}
+      <ellipse cx="48" cy="38" rx="4" ry="3" fill="rgba(255,245,220,0.15)" />
 
-      {/* Eyes - large, expressive, state-dependent */}
-      <g className={state === 'idle' || state === 'suggesting' ? 'fly-blink' : ''} style={{ transformOrigin: '50px 31px' }}>
-        {/* Left eye */}
-        <ellipse cx="41" cy="31" rx="5.5" ry="6" fill="white" />
-        <ellipse cx="41" cy="31" rx="5.5" ry="6" stroke="rgba(139,94,60,0.15)" strokeWidth="0.5" fill="none" />
-        {/* Right eye */}
-        <ellipse cx="59" cy="31" rx="5.5" ry="6" fill="white" />
-        <ellipse cx="59" cy="31" rx="5.5" ry="6" stroke="rgba(139,94,60,0.15)" strokeWidth="0.5" fill="none" />
+      {/* Eyes - large, warm brown, expressive (key character feature) */}
+      <g className={state === 'idle' || state === 'suggesting' ? 'fly-blink' : ''} style={{ transformOrigin: '50px 30px' }}>
+        {/* Left eye socket slight shadow */}
+        <ellipse cx="40" cy="30" rx="7" ry="7.5" fill="rgba(160,100,40,0.08)" />
+        <ellipse cx="60" cy="30" rx="7" ry="7.5" fill="rgba(160,100,40,0.08)" />
+        {/* Left eye white */}
+        <ellipse cx="40" cy="30" rx="6" ry="6.5" fill="white" />
+        <ellipse cx="40" cy="30" rx="6" ry="6.5" stroke="rgba(139,94,60,0.12)" strokeWidth="0.4" fill="none" />
+        {/* Right eye white */}
+        <ellipse cx="60" cy="30" rx="6" ry="6.5" fill="white" />
+        <ellipse cx="60" cy="30" rx="6" ry="6.5" stroke="rgba(139,94,60,0.12)" strokeWidth="0.4" fill="none" />
 
-        {/* Pupils - with state-based look direction */}
+        {/* Iris + pupil with look direction */}
         <g className={state === 'listening' ? 'fly-eyes-attentive' : state === 'processing' ? '' : 'fly-eye-look'}>
-          {/* Left pupil */}
-          <circle cx="42" cy="31.5" r="3.5" fill="#2a1508" />
-          <circle cx="42" cy="31.5" r="2.5" fill="#4a2815" />
-          {/* Left eye highlight */}
-          <circle cx="43.5" cy="29.5" r="1.5" fill="white" opacity="0.9" />
-          <circle cx="40.5" cy="33" r="0.7" fill="white" opacity="0.5" />
-          {/* Brand red reflection */}
-          <circle cx="40.5" cy="32.5" r="0.6" fill="rgba(208,0,58,0.35)" />
+          {/* Left iris - warm chocolate brown */}
+          <circle cx="41" cy="30.5" r="4.2" fill="#5c3310" />
+          <circle cx="41" cy="30.5" r="3.2" fill="#7a4820" />
+          <circle cx="41" cy="31" r="2" fill="#2a1508" />
+          {/* Left eye highlights */}
+          <circle cx="43" cy="28.5" r="1.8" fill="white" opacity="0.9" />
+          <circle cx="39.5" cy="32" r="0.9" fill="white" opacity="0.4" />
 
-          {/* Right pupil */}
-          <circle cx="58" cy="31.5" r="3.5" fill="#2a1508" />
-          <circle cx="58" cy="31.5" r="2.5" fill="#4a2815" />
-          {/* Right eye highlight */}
-          <circle cx="59.5" cy="29.5" r="1.5" fill="white" opacity="0.9" />
-          <circle cx="56.5" cy="33" r="0.7" fill="white" opacity="0.5" />
-          {/* Brand red reflection */}
-          <circle cx="56.5" cy="32.5" r="0.6" fill="rgba(208,0,58,0.35)" />
+          {/* Right iris */}
+          <circle cx="59" cy="30.5" r="4.2" fill="#5c3310" />
+          <circle cx="59" cy="30.5" r="3.2" fill="#7a4820" />
+          <circle cx="59" cy="31" r="2" fill="#2a1508" />
+          {/* Right eye highlights */}
+          <circle cx="61" cy="28.5" r="1.8" fill="white" opacity="0.9" />
+          <circle cx="57.5" cy="32" r="0.9" fill="white" opacity="0.4" />
         </g>
 
-        {/* Processing state - half-closed eyes */}
+        {/* Processing state - squinted */}
         {state === 'processing' && (
           <>
-            <rect x="35.5" y="30" width="11" height="4" rx="2" fill="#d4a86a" opacity="0.7" />
-            <rect x="53.5" y="30" width="11" height="4" rx="2" fill="#d4a86a" opacity="0.7" />
-          </>
-        )}
-
-        {/* Error state - worried eyes wider */}
-        {state === 'error' && (
-          <>
-            <ellipse cx="41" cy="29" rx="1.5" ry="2" fill="rgba(255,255,255,0.3)" />
-            <ellipse cx="59" cy="29" rx="1.5" ry="2" fill="rgba(255,255,255,0.3)" />
+            <rect x="34" y="29" width="12" height="5" rx="2.5" fill="#d4a050" opacity="0.6" />
+            <rect x="54" y="29" width="12" height="5" rx="2.5" fill="#d4a050" opacity="0.6" />
           </>
         )}
       </g>
 
-      {/* Eyebrows - state-dependent */}
+      {/* Eyebrows - subtle, expressive */}
       {state === 'error' ? (
         <>
-          <path d="M35 23 Q39 21 44 24" stroke="#8b5e3c" strokeWidth="1.8" fill="none" strokeLinecap="round" />
-          <path d="M56 24 Q61 21 65 23" stroke="#8b5e3c" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+          <path d="M34 21 Q38 19 44 22" stroke="#9a6830" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+          <path d="M56 22 Q62 19 66 21" stroke="#9a6830" strokeWidth="1.8" fill="none" strokeLinecap="round" />
         </>
       ) : state === 'processing' ? (
         <>
-          <path d="M36 24 Q40 22 44 25" stroke="#8b5e3c" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-          <path d="M56 24 Q60 22 64 25" stroke="#8b5e3c" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+          <path d="M35 23 Q39 21 44 24" stroke="#9a6830" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+          <path d="M56 23 Q61 21 65 24" stroke="#9a6830" strokeWidth="1.4" fill="none" strokeLinecap="round" />
         </>
       ) : state === 'listening' ? (
         <>
-          <path d="M36 23 Q40 20 44 23" stroke="#8b5e3c" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-          <path d="M56 23 Q60 20 64 23" stroke="#8b5e3c" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          <path d="M35 22 Q40 19 44 22" stroke="#9a6830" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          <path d="M56 22 Q60 19 65 22" stroke="#9a6830" strokeWidth="1.5" fill="none" strokeLinecap="round" />
         </>
       ) : state === 'success' ? (
         <>
-          <path d="M36 25 Q40 23 44 25" stroke="#8b5e3c" strokeWidth="1.3" fill="none" strokeLinecap="round" />
-          <path d="M56 25 Q60 23 64 25" stroke="#8b5e3c" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+          <path d="M35 24 Q40 22 44 24" stroke="#9a6830" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+          <path d="M56 24 Q60 22 65 24" stroke="#9a6830" strokeWidth="1.3" fill="none" strokeLinecap="round" />
         </>
       ) : (
         <>
-          <path d="M36 25 Q40 23 44 25.5" stroke="#8b5e3c" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-          <path d="M56 25.5 Q60 23 64 25" stroke="#8b5e3c" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+          <path d="M35 24 Q40 22 44 24.5" stroke="#9a6830" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+          <path d="M56 24.5 Q60 22 65 24" stroke="#9a6830" strokeWidth="1.3" fill="none" strokeLinecap="round" />
         </>
       )}
 
-      {/* Nose */}
-      <ellipse cx="50" cy="40" rx="4.5" ry="3.5" fill="#1e100a" />
-      <ellipse cx="48.5" cy="38.8" rx="1.8" ry="1" fill="rgba(255,255,255,0.25)" />
+      {/* Nose - prominent, shiny black */}
+      <ellipse cx="50" cy="40" rx="5" ry="3.8" fill="#1a0e08" />
+      <ellipse cx="48" cy="38.5" rx="2.2" ry="1.2" fill="rgba(255,255,255,0.2)" />
       {/* Nostrils */}
-      <ellipse cx="48" cy="40.5" rx="1.2" ry="0.9" fill="#0e0604" />
-      <ellipse cx="52" cy="40.5" rx="1.2" ry="0.9" fill="#0e0604" />
+      <ellipse cx="47.5" cy="40.5" rx="1.5" ry="1" fill="#0a0404" />
+      <ellipse cx="52.5" cy="40.5" rx="1.5" ry="1" fill="#0a0404" />
 
       {/* Mouth - state dependent */}
       {state === 'success' ? (
         <>
-          <path d="M50 43 L50 44.5" stroke="#1e100a" strokeWidth="1.2" strokeLinecap="round" />
-          <path d="M40 46 Q50 53 60 46" stroke="#1e100a" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-          {/* Big happy tongue */}
-          <ellipse cx="50" cy="50" rx="4.5" ry="3.5" fill="#e8506e" />
-          <ellipse cx="50" cy="49" rx="3" ry="2" fill="#f08098" />
-          <path d="M50 48 L50 52" stroke="rgba(180,40,60,0.25)" strokeWidth="0.6" />
+          <path d="M50 43.5 L50 45" stroke="#1a0e08" strokeWidth="1.2" strokeLinecap="round" />
+          <path d="M39 47 Q50 55 61 47" stroke="#1a0e08" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          <ellipse cx="50" cy="51" rx="5" ry="4" fill="#e04868" />
+          <ellipse cx="50" cy="50" rx="3.5" ry="2.5" fill="#f07088" />
+          <path d="M50 49 L50 53" stroke="rgba(160,30,50,0.2)" strokeWidth="0.6" />
         </>
       ) : state === 'error' ? (
         <>
-          <path d="M50 43 L50 44" stroke="#1e100a" strokeWidth="1.1" strokeLinecap="round" />
-          <path d="M43 47 Q50 44 57 47" stroke="#1e100a" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+          <path d="M50 43.5 L50 44.5" stroke="#1a0e08" strokeWidth="1.1" strokeLinecap="round" />
+          <path d="M43 48 Q50 45 57 48" stroke="#1a0e08" strokeWidth="1.3" fill="none" strokeLinecap="round" />
         </>
       ) : state === 'processing' ? (
         <>
-          <path d="M50 43 L50 44" stroke="#1e100a" strokeWidth="1" strokeLinecap="round" />
-          <path d="M45 45.5 Q50 46.5 55 45.5" stroke="#1e100a" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          <path d="M50 43.5 L50 44.5" stroke="#1a0e08" strokeWidth="1" strokeLinecap="round" />
+          <path d="M45 46 Q50 47 55 46" stroke="#1a0e08" strokeWidth="1.2" fill="none" strokeLinecap="round" />
         </>
       ) : state === 'listening' ? (
         <>
-          <path d="M50 43 L50 44.5" stroke="#1e100a" strokeWidth="1.1" strokeLinecap="round" />
-          <ellipse cx="50" cy="47" rx="3" ry="2.5" fill="#1e100a" opacity="0.8" />
-          <ellipse cx="50" cy="47.5" rx="2" ry="1.5" fill="#e8506e" />
+          <path d="M50 43.5 L50 45" stroke="#1a0e08" strokeWidth="1.1" strokeLinecap="round" />
+          <ellipse cx="50" cy="47.5" rx="3.5" ry="3" fill="#1a0e08" opacity="0.8" />
+          <ellipse cx="50" cy="48" rx="2.5" ry="2" fill="#e04868" />
         </>
       ) : (
         <>
-          <path d="M50 43 L50 45" stroke="#1e100a" strokeWidth="1.1" strokeLinecap="round" />
-          <path d="M42 46.5 Q50 51 58 46.5" stroke="#1e100a" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-          {/* Playful tongue */}
-          <ellipse cx="50" cy="49.5" rx="3.5" ry="2.8" fill="#e8506e" />
-          <ellipse cx="50" cy="48.8" rx="2.2" ry="1.6" fill="#f08098" />
-          <path d="M50 48 L50 51" stroke="rgba(180,40,60,0.2)" strokeWidth="0.5" />
+          <path d="M50 43.5 L50 45.5" stroke="#1a0e08" strokeWidth="1.1" strokeLinecap="round" />
+          <path d="M41 47 Q50 53 59 47" stroke="#1a0e08" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+          <ellipse cx="50" cy="50.5" rx="4" ry="3.2" fill="#e04868" />
+          <ellipse cx="50" cy="49.8" rx="2.5" ry="2" fill="#f07088" />
+          <path d="M50 49 L50 52" stroke="rgba(160,30,50,0.2)" strokeWidth="0.5" />
         </>
       )}
 
       {/* Whisker dots */}
-      <circle cx="35" cy="40" r="0.9" fill="#8b5e3c" opacity="0.7" />
-      <circle cx="33" cy="42.5" r="0.9" fill="#8b5e3c" opacity="0.6" />
-      <circle cx="34" cy="45" r="0.8" fill="#8b5e3c" opacity="0.5" />
-      <circle cx="65" cy="40" r="0.9" fill="#8b5e3c" opacity="0.7" />
-      <circle cx="67" cy="42.5" r="0.9" fill="#8b5e3c" opacity="0.6" />
-      <circle cx="66" cy="45" r="0.8" fill="#8b5e3c" opacity="0.5" />
+      <circle cx="34" cy="41" r="0.8" fill="#9a6830" opacity="0.5" />
+      <circle cx="32" cy="43.5" r="0.8" fill="#9a6830" opacity="0.4" />
+      <circle cx="33" cy="46" r="0.7" fill="#9a6830" opacity="0.3" />
+      <circle cx="66" cy="41" r="0.8" fill="#9a6830" opacity="0.5" />
+      <circle cx="68" cy="43.5" r="0.8" fill="#9a6830" opacity="0.4" />
+      <circle cx="67" cy="46" r="0.7" fill="#9a6830" opacity="0.3" />
 
-      {/* Tech earpiece - Simmetria brand */}
-      <rect x="21" cy="28" y="28" width="5" height="8" rx="2.5" fill="rgba(208,0,58,0.9)" />
-      <rect x="22" y="30" width="3" height="4" rx="1.5" fill="rgba(255,255,255,0.15)" />
-      <circle cx="23.5" cy="32" r="1.1" fill="rgba(255,255,255,0.7)" className="fly-glow-pulse-sm" />
-      {/* Antenna line */}
-      <path d="M23 28 Q22 24 24 21" stroke="rgba(208,0,58,0.6)" strokeWidth="0.8" fill="none" strokeLinecap="round" />
-      <circle cx="24" cy="21" r="1.2" fill="rgba(208,0,58,0.8)" className="fly-glow-pulse-sm" />
-
-      {/* Fur tuft on head */}
-      <path d="M45 16 Q47 12 49 16 Q51 12 53 16 Q55 13 56 16" stroke="#c9975a" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+      {/* Forehead fur line detail */}
+      <path d="M44 15 Q46 11 48 15 Q50 11 52 15 Q54 12 55 15" stroke="#c89040" strokeWidth="1.5" fill="none" strokeLinecap="round" />
 
       {/* State indicator particles */}
       {state === 'success' && (
         <g className="fly-sparkle">
-          <circle cx="72" cy="20" r="1.5" fill="var(--green)" opacity="0.8" />
-          <circle cx="28" cy="18" r="1.2" fill="var(--green)" opacity="0.6" />
-          <circle cx="76" cy="35" r="1" fill="var(--green)" opacity="0.7" />
+          <circle cx="75" cy="18" r="2" fill="#38d27d" opacity="0.8" />
+          <circle cx="25" cy="16" r="1.5" fill="#38d27d" opacity="0.6" />
+          <circle cx="78" cy="32" r="1.2" fill="#38d27d" opacity="0.7" />
         </g>
       )}
       {state === 'error' && (
-        <g className="fly-shake-particles">
-          <text x="73" y="22" fontSize="8" fill="var(--red2)" opacity="0.7">!</text>
+        <g className="fly-sparkle">
+          <text x="76" y="22" fontSize="9" fill="#ff315f" opacity="0.8" fontWeight="bold">!</text>
         </g>
       )}
       {state === 'processing' && (
         <g className="fly-think-dots">
-          <circle cx="72" cy="22" r="2" fill="var(--muted)" opacity="0.5" />
-          <circle cx="78" cy="18" r="1.5" fill="var(--muted)" opacity="0.4" />
-          <circle cx="82" cy="14" r="1" fill="var(--muted)" opacity="0.3" />
+          <circle cx="74" cy="20" r="2.2" fill="#9ba3aa" opacity="0.5" />
+          <circle cx="80" cy="15" r="1.7" fill="#9ba3aa" opacity="0.4" />
+          <circle cx="84" cy="10" r="1.2" fill="#9ba3aa" opacity="0.3" />
         </g>
       )}
     </svg>
