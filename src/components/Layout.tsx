@@ -22,7 +22,7 @@ import {
   FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { loadUser, getAllowedNav, signOutEverywhere } from '@/lib/auth'
+import { loadUser, getAllowedNavForRole, signOutEverywhere } from '@/lib/auth'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchPractices } from '@/lib/practices-service'
@@ -56,7 +56,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const user = loadUser()
-  const navItems = user ? getAllowedNav(user.ruolo) : getAllowedNav('Operativo')
+  const navItems = user ? getAllowedNavForRole(user.role) : []
 
   const handleLogout = () => {
     void signOutEverywhere().then(() => {
@@ -147,17 +147,18 @@ function Sidebar({ open, setOpen }: SidebarProps) {
         <div className="p-4 border-t" style={{ borderColor: 'var(--line)' }}>
           {user ? (
             <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
-              <img
-                src={user.avatar}
-                alt={user.nome}
-                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-              />
+              <div
+                className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-sm font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
+              >
+                {user.first_name.charAt(0)}{user.last_name.charAt(0)}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
-                  {user.nome}
+                  {user.first_name} {user.last_name}
                 </p>
                 <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
-                  {user.ruolo} · {user.reparto}
+                  {user.role}
                 </p>
               </div>
               <button
@@ -385,17 +386,18 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                 className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all hover:bg-white/5"
                 style={{ border: '1px solid var(--line)' }}
               >
-                <img
-                  src={user.avatar}
-                  alt={user.nome}
-                  className="w-7 h-7 rounded-lg object-cover"
-                />
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
+                  style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
+                >
+                  {user.first_name.charAt(0)}{user.last_name.charAt(0)}
+                </div>
                 <div className="hidden sm:block text-left">
                   <p className="text-xs font-medium leading-none" style={{ color: 'var(--text)' }}>
-                    {user.nome.split(' ')[0]}
+                    {user.first_name}
                   </p>
                   <p className="text-xs leading-none mt-0.5" style={{ color: 'var(--muted)' }}>
-                    {user.ruolo}
+                    {user.role}
                   </p>
                 </div>
                 <ChevronDown
@@ -415,14 +417,15 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                 >
                   <div className="p-4 border-b" style={{ borderColor: 'var(--line)' }}>
                     <div className="flex items-center gap-3">
-                      <img
-                        src={user.avatar}
-                        alt={user.nome}
-                        className="w-12 h-12 rounded-xl object-cover"
-                      />
+                      <div
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold text-white"
+                        style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
+                      >
+                        {user.first_name.charAt(0)}{user.last_name.charAt(0)}
+                      </div>
                       <div>
                         <p className="font-semibold" style={{ color: 'var(--text)' }}>
-                          {user.nome}
+                          {user.first_name} {user.last_name}
                         </p>
                         <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
                           {user.email}
@@ -434,23 +437,12 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                             color: 'var(--red2)',
                           }}
                         >
-                          {user.ruolo} · {user.reparto}
+                          {user.role}
                         </span>
                       </div>
                     </div>
                   </div>
                   <div className="p-2">
-                    <button
-                      onClick={() => {
-                        setUserMenuOpen(false)
-                        void signOutEverywhere().then(() => navigate('/login'))
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all hover:bg-white/5"
-                      style={{ color: 'var(--muted)' }}
-                    >
-                      <Users className="w-4 h-4" />
-                      Cambia utente
-                    </button>
                     <button
                       onClick={handleLogout}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all hover:bg-red-500/10"
