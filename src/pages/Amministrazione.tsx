@@ -19,6 +19,7 @@ import {
   X,
   Trash2,
   Edit3,
+  Upload,
 } from 'lucide-react'
 import { loadUser, isPartnerUser } from '@/lib/auth'
 import type {
@@ -34,6 +35,12 @@ import { fetchBudgets, upsertBudget, updateBudget, deleteBudget } from '@/lib/bu
 import { fetchEvents } from '@/lib/events-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchClients } from '@/lib/clients-service'
+import {
+  fetchInvoices, upsertInvoice, deleteInvoice,
+  fetchAdminDocuments, upsertAdminDocument, deleteAdminDocument, uploadAdminFile,
+  INVOICE_STATUSES, ADMIN_DOC_TYPES,
+  type Invoice, type AdminDocument,
+} from '@/lib/invoices-service'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -294,7 +301,7 @@ function StatoBadge({ stato }: { stato: StatoPagamento }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-type TabId = 'dashboard' | 'entrate' | 'uscite' | 'fatture'
+type TabId = 'dashboard' | 'entrate' | 'uscite' | 'fatture' | 'invoices' | 'documenti'
 
 export default function Amministrazione() {
   const currentUser = loadUser()
@@ -322,7 +329,7 @@ export default function Amministrazione() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     const paramTab = searchParams.get('tab')
-    if (paramTab === 'entrate' || paramTab === 'uscite' || paramTab === 'fatture') return paramTab
+    if (paramTab === 'entrate' || paramTab === 'uscite' || paramTab === 'fatture' || paramTab === 'invoices' || paramTab === 'documenti') return paramTab
     return 'dashboard'
   })
   const [entrate, setEntrate] = useState<Entrata[]>(() => loadLocal(SK_ENTRATE))
@@ -332,6 +339,12 @@ export default function Amministrazione() {
   const [clients, setClients] = useState<{ id: string; nome: string }[]>([])
   const [fatture, setFatture] = useState<Fattura[]>(() => loadLocal(SK_FATTURE))
   const [showNuovoMovimento, setShowNuovoMovimento] = useState(false)
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [adminDocs, setAdminDocs] = useState<AdminDocument[]>([])
+  const [showInvoiceForm, setShowInvoiceForm] = useState(false)
+  const [showDocForm, setShowDocForm] = useState(false)
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
+  const [editingDoc, setEditingDoc] = useState<AdminDocument | null>(null)
 
   useEffect(() => {
     if (searchParams.has('tab') || searchParams.has('id')) {
@@ -341,12 +354,14 @@ export default function Amministrazione() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([fetchBudgets(), fetchEvents(), fetchSuppliers(), fetchClients()]).then(([bg, ev, sp, cl]) => {
+    Promise.all([fetchBudgets(), fetchEvents(), fetchSuppliers(), fetchClients(), fetchInvoices(), fetchAdminDocuments()]).then(([bg, ev, sp, cl, inv, docs]) => {
       if (cancelled) return
       setUscite(bg)
       setEvents(ev)
       setSuppliers(sp)
       setClients(cl.map(c => ({ id: c.id, nome: c.nome })))
+      setInvoices(inv)
+      setAdminDocs(docs)
       _clients = cl.map(c => ({ id: c.id, nome: c.nome }))
       _suppliers = sp
       _events = ev
@@ -626,6 +641,8 @@ export default function Amministrazione() {
     { id: 'entrate', label: `Entrate (${filteredEntrate.length})` },
     { id: 'uscite', label: `Uscite (${filteredUscite.length})` },
     { id: 'fatture', label: `Fatture (${filteredFatture.length})` },
+    { id: 'invoices', label: `Fatture DB (${invoices.length})` },
+    { id: 'documenti', label: `Documenti (${adminDocs.length})` },
   ]
 
   return (
@@ -1253,6 +1270,417 @@ export default function Amministrazione() {
           events={events}
         />
       )}
+
+      {/* ─── TAB: INVOICES (Supabase) ─────────────────────────────────────────── */}
+      {activeTab === 'invoices' && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="flex justify-between items-center">
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>
+              Fatture gestite su Supabase. Per collegamento futuro con Fatture in Cloud.
+            </p>
+            <button onClick={() => { setEditingInvoice(null); setShowInvoiceForm(true) }}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
+              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+              <Plus className="w-3.5 h-3.5" /> Nuova Fattura
+            </button>
+          </div>
+          {invoices.length === 0 ? (
+            <div className="text-center py-10 panel rounded-2xl">
+              <Receipt className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--muted)' }} />
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessuna fattura registrata</p>
+            </div>
+          ) : (
+            <div className="panel rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" style={{ color: 'var(--text)' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                      <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'var(--muted)' }}>Numero</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'var(--muted)' }}>Tipo</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'var(--muted)' }}>Soggetto</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium" style={{ color: 'var(--muted)' }}>Importo</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'var(--muted)' }}>Stato</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'var(--muted)' }}>Scadenza</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium" style={{ color: 'var(--muted)' }}>Azioni</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices.map(inv => {
+                      const subject = inv.type === 'emessa'
+                        ? (clients.find(c => c.id === inv.client_id)?.nome ?? '-')
+                        : (suppliers.find(s => s.id === inv.supplier_id)?.nome ?? '-')
+                      const st = INVOICE_STATUSES.find(s => s.id === inv.status)
+                      return (
+                        <tr key={inv.id} style={{ borderBottom: '1px solid var(--line)' }} className="hover:bg-white/[0.02]">
+                          <td className="px-4 py-3 font-medium">{inv.number || '-'}</td>
+                          <td className="px-4 py-3 text-xs capitalize">{inv.type}</td>
+                          <td className="px-4 py-3 text-xs">{subject}</td>
+                          <td className="px-4 py-3 text-right font-medium">{formatEur(inv.amount)}</td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: `${st?.color ?? '#9ba3aa'}20`, color: st?.color ?? '#9ba3aa' }}>
+                              {st?.label ?? inv.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs">{inv.due_date ? formatDate(inv.due_date) : '-'}</td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {inv.external_url && (
+                                <a href={inv.external_url} target="_blank" rel="noopener noreferrer"
+                                  className="p-1.5 rounded-lg hover:bg-white/10" title="Apri in Fatture in Cloud">
+                                  <FileText className="w-3.5 h-3.5" style={{ color: 'var(--blue)' }} />
+                                </a>
+                              )}
+                              <button onClick={() => { setEditingInvoice(inv); setShowInvoiceForm(true) }}
+                                className="p-1.5 rounded-lg hover:bg-white/10">
+                                <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                              </button>
+                              <button onClick={async () => { await deleteInvoice(inv.id); setInvoices(prev => prev.filter(i => i.id !== inv.id)) }}
+                                className="p-1.5 rounded-lg hover:bg-white/10">
+                                <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── TAB: DOCUMENTI ────────────────────────────────────────────────────── */}
+      {activeTab === 'documenti' && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="flex justify-between items-center">
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>
+              Documenti amministrativi: contratti, ricevute, note di credito, F24.
+            </p>
+            <button onClick={() => { setEditingDoc(null); setShowDocForm(true) }}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
+              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+              <Plus className="w-3.5 h-3.5" /> Nuovo Documento
+            </button>
+          </div>
+          {adminDocs.length === 0 ? (
+            <div className="text-center py-10 panel rounded-2xl">
+              <FileText className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--muted)' }} />
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun documento amministrativo</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {adminDocs.map(doc => {
+                const typeLabel = ADMIN_DOC_TYPES.find(t => t.id === doc.type)?.label ?? doc.type
+                return (
+                  <div key={doc.id} className="panel p-4 rounded-xl space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium" style={{ color: 'var(--text)' }}>{doc.title}</h4>
+                        <p className="text-xs" style={{ color: 'var(--muted)' }}>{typeLabel}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <button onClick={() => { setEditingDoc(doc); setShowDocForm(true) }} className="p-1 rounded hover:bg-white/10">
+                          <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                        </button>
+                        <button onClick={async () => { await deleteAdminDocument(doc.id); setAdminDocs(prev => prev.filter(d => d.id !== doc.id)) }}
+                          className="p-1 rounded hover:bg-white/10">
+                          <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                        </button>
+                      </div>
+                    </div>
+                    {doc.notes && <p className="text-xs" style={{ color: 'var(--muted)' }}>{doc.notes}</p>}
+                    {doc.file_url && (
+                      <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
+                        className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--blue)' }}>
+                        <Download className="w-3 h-3" /> Scarica file
+                      </a>
+                    )}
+                    <p className="text-xs" style={{ color: 'var(--muted)' }}>{formatDate(doc.created_at)}</p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Invoice Form Modal */}
+      {showInvoiceForm && (
+        <InvoiceFormModal
+          invoice={editingInvoice}
+          events={events}
+          clients={clients}
+          suppliers={suppliers}
+          onClose={() => setShowInvoiceForm(false)}
+          onSave={async (data) => {
+            const result = await upsertInvoice(data)
+            if (result) {
+              if (editingInvoice) {
+                setInvoices(prev => prev.map(i => i.id === result.id ? result : i))
+              } else {
+                setInvoices(prev => [result, ...prev])
+              }
+            }
+            setShowInvoiceForm(false)
+          }}
+        />
+      )}
+
+      {/* Document Form Modal */}
+      {showDocForm && (
+        <DocFormModal
+          doc={editingDoc}
+          events={events}
+          clients={clients}
+          suppliers={suppliers}
+          onClose={() => setShowDocForm(false)}
+          onSave={async (data) => {
+            const result = await upsertAdminDocument(data)
+            if (result) {
+              if (editingDoc) {
+                setAdminDocs(prev => prev.map(d => d.id === result.id ? result : d))
+              } else {
+                setAdminDocs(prev => [result, ...prev])
+              }
+            }
+            setShowDocForm(false)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function InvoiceFormModal({ invoice, events, clients, suppliers, onClose, onSave }: {
+  invoice: Invoice | null
+  events: Event[]
+  clients: { id: string; nome: string }[]
+  suppliers: Supplier[]
+  onClose: () => void
+  onSave: (data: Partial<Invoice> & { type: string }) => void
+}) {
+  const [type, setType] = useState<'emessa' | 'ricevuta'>(invoice?.type ?? 'emessa')
+  const [number, setNumber] = useState(invoice?.number ?? '')
+  const [amount, setAmount] = useState(invoice?.amount?.toString() ?? '')
+  const [vatAmount, setVatAmount] = useState(invoice?.vat_amount?.toString() ?? '0')
+  const [status, setStatus] = useState(invoice?.status ?? 'bozza')
+  const [dueDate, setDueDate] = useState(invoice?.due_date ?? '')
+  const [eventId, setEventId] = useState(invoice?.event_id ?? '')
+  const [clientId, setClientId] = useState(invoice?.client_id ?? '')
+  const [supplierId, setSupplierId] = useState(invoice?.supplier_id ?? '')
+  const [externalUrl, setExternalUrl] = useState(invoice?.external_url ?? '')
+  const [ficId, setFicId] = useState(invoice?.fatture_in_cloud_id ?? '')
+  const [notes, setNotes] = useState(invoice?.notes ?? '')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-lg rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{invoice ? 'Modifica Fattura' : 'Nuova Fattura'}</h3>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10">
+            <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+          </button>
+        </div>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Tipo</label>
+              <select value={type} onChange={e => setType(e.target.value as 'emessa' | 'ricevuta')}
+                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <option value="emessa">Emessa (attiva)</option>
+                <option value="ricevuta">Ricevuta (passiva)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Numero</label>
+              <input value={number} onChange={e => setNumber(e.target.value)} placeholder="FT-2026-001"
+                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Importo</label>
+              <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>IVA</label>
+              <input type="number" value={vatAmount} onChange={e => setVatAmount(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Stato</label>
+              <select value={status} onChange={e => setStatus(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                {INVOICE_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Evento</label>
+              <select value={eventId} onChange={e => setEventId(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <option value="">Nessuno</option>
+                {events.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>{type === 'emessa' ? 'Cliente' : 'Fornitore'}</label>
+              {type === 'emessa' ? (
+                <select value={clientId} onChange={e => setClientId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                  <option value="">Seleziona</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              ) : (
+                <select value={supplierId} onChange={e => setSupplierId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                  <option value="">Seleziona</option>
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                </select>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Scadenza</label>
+              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>ID Fatture in Cloud</label>
+              <input value={ficId} onChange={e => setFicId(e.target.value)} placeholder="Opzionale"
+                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Link esterno (Fatture in Cloud)</label>
+            <input value={externalUrl} onChange={e => setExternalUrl(e.target.value)} placeholder="https://..."
+              className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          </div>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Note" rows={2}
+            className="w-full px-3 py-2 rounded-xl text-sm resize-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+        </div>
+        <button onClick={() => onSave({
+          ...(invoice?.id ? { id: invoice.id } : {}),
+          type, number, amount: Number(amount) || 0, vat_amount: Number(vatAmount) || 0,
+          status, due_date: dueDate || null,
+          event_id: eventId || null, client_id: clientId || null, supplier_id: supplierId || null,
+          fatture_in_cloud_id: ficId || null, external_url: externalUrl || null, notes,
+        })} disabled={!number && !amount}
+          className="w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-40"
+          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+          {invoice ? 'Salva Modifiche' : 'Crea Fattura'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function DocFormModal({ doc, events, clients, suppliers, onClose, onSave }: {
+  doc: AdminDocument | null
+  events: Event[]
+  clients: { id: string; nome: string }[]
+  suppliers: Supplier[]
+  onClose: () => void
+  onSave: (data: Partial<AdminDocument> & { title: string }) => void
+}) {
+  const [title, setTitle] = useState(doc?.title ?? '')
+  const [type, setType] = useState(doc?.type ?? 'altro')
+  const [eventId, setEventId] = useState(doc?.event_id ?? '')
+  const [clientId, setClientId] = useState(doc?.client_id ?? '')
+  const [supplierId, setSupplierId] = useState(doc?.supplier_id ?? '')
+  const [notes, setNotes] = useState(doc?.notes ?? '')
+  const [fileUrl, setFileUrl] = useState(doc?.file_url ?? '')
+  const [uploading, setUploading] = useState(false)
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const id = doc?.id ?? crypto.randomUUID()
+    const url = await uploadAdminFile(file, id)
+    if (url) setFileUrl(url)
+    setUploading(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-md rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{doc ? 'Modifica Documento' : 'Nuovo Documento'}</h3>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10">
+            <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+          </button>
+        </div>
+        <div className="space-y-3">
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Titolo documento"
+            className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Tipo</label>
+              <select value={type} onChange={e => setType(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                {ADMIN_DOC_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Evento</label>
+              <select value={eventId} onChange={e => setEventId(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <option value="">Nessuno</option>
+                {events.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Cliente</label>
+              <select value={clientId} onChange={e => setClientId(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <option value="">Nessuno</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Fornitore</label>
+              <select value={supplierId} onChange={e => setSupplierId(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <option value="">Nessuno</option>
+                {suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+              </select>
+            </div>
+          </div>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Note" rows={2}
+            className="w-full px-3 py-2 rounded-xl text-sm resize-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm cursor-pointer"
+              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+              <Upload className="w-4 h-4" />
+              {uploading ? 'Caricamento...' : 'Carica file'}
+              <input type="file" className="hidden" onChange={handleFileUpload} />
+            </label>
+            {fileUrl && <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs" style={{ color: 'var(--blue)' }}>File caricato</a>}
+          </div>
+        </div>
+        <button onClick={() => onSave({
+          ...(doc?.id ? { id: doc.id } : {}),
+          title, type,
+          event_id: eventId || null, client_id: clientId || null, supplier_id: supplierId || null,
+          file_url: fileUrl || null, notes,
+        })} disabled={!title.trim()}
+          className="w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-40"
+          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+          {doc ? 'Salva Modifiche' : 'Crea Documento'}
+        </button>
+      </div>
     </div>
   )
 }

@@ -13,6 +13,9 @@ import Workflow from './pages/Workflow'
 import Utenti from './pages/Utenti'
 import Pratiche from './pages/Pratiche'
 import Impostazioni from './pages/Impostazioni'
+import CreativeStudio from './pages/CreativeStudio'
+import SocialStudio from './pages/SocialStudio'
+import Presentazioni from './pages/Presentazioni'
 import Login from './pages/Login'
 import { loadUser, saveUser, clearUser } from './lib/auth'
 import { supabase } from './lib/supabase'
@@ -84,6 +87,9 @@ export default function App() {
       <Route path="/comunicazioni" element={<AuthGuard><Layout><Comunicazioni /></Layout></AuthGuard>} />
       <Route path="/workflow" element={<AuthGuard><Layout><Workflow /></Layout></AuthGuard>} />
       <Route path="/pratiche" element={<AuthGuard><Layout><Pratiche /></Layout></AuthGuard>} />
+      <Route path="/creative-studio" element={<AuthGuard><Layout><CreativeStudio /></Layout></AuthGuard>} />
+      <Route path="/social-studio" element={<AuthGuard><Layout><SocialStudio /></Layout></AuthGuard>} />
+      <Route path="/presentazioni" element={<AuthGuard><Layout><Presentazioni /></Layout></AuthGuard>} />
       <Route path="/utenti" element={<AuthGuard><Layout><Utenti /></Layout></AuthGuard>} />
       <Route path="/impostazioni" element={<AuthGuard><Layout><Impostazioni /></Layout></AuthGuard>} />
 

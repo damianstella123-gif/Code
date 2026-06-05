@@ -28,6 +28,9 @@ import {
   Edit3,
   Trash2,
   Check,
+  Package,
+  Download as DownloadIcon,
+  Plus as PlusIcon,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { loadTasksFromStorage, cacheEventsSnapshot, loadClientsFromStorage } from '@/lib/storage'
@@ -35,6 +38,7 @@ import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent
 import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchBudgets } from '@/lib/budgets-service'
 import { fetchCommunications } from '@/lib/communications-service'
+import { fetchPackagesByEvent, upsertClientPackage, updateClientPackage, deleteClientPackage, type ClientPackage } from '@/lib/packages-service'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
@@ -44,7 +48,7 @@ import type { Uscita } from '@/data/amministrazione'
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 type StatoEvento = Event['stato']
 
-type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'timeline' | 'creative'
+type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'timeline' | 'creative' | 'pacchetto'
 
 function statoColor(stato: string) {
   switch (stato) {
@@ -906,6 +910,136 @@ function TabCreative({ event }: { event: Event }) {
   )
 }
 
+function TabPacchetto({ event }: { event: Event }) {
+  const [packages, setPackages] = useState<ClientPackage[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchPackagesByEvent(event.id).then(p => { setPackages(p); setLoading(false) })
+  }, [event.id])
+
+  async function handleCreate() {
+    const result = await upsertClientPackage({
+      event_id: event.id,
+      client_id: event.cliente,
+      status: 'bozza',
+    })
+    if (result) setPackages(prev => [result, ...prev])
+  }
+
+  async function handleStatusChange(pkg: ClientPackage, status: string) {
+    const patch: Partial<ClientPackage> = { status }
+    if (status === 'inviato') patch.sent_at = new Date().toISOString()
+    const result = await updateClientPackage(pkg.id, patch)
+    if (result) setPackages(prev => prev.map(p => p.id === result.id ? result : p))
+  }
+
+  async function handleDelete(id: string) {
+    await deleteClientPackage(id)
+    setPackages(prev => prev.filter(p => p.id !== id))
+  }
+
+  if (loading) return <div className="text-center py-8" style={{ color: 'var(--muted)' }}>Caricamento...</div>
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold" style={{ color: 'var(--text)' }}>Pacchetto Cliente</h3>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Raccoglie presentazione, budget e documenti per il cliente.
+          </p>
+        </div>
+        <button onClick={handleCreate}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
+          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+          <PlusIcon className="w-3.5 h-3.5" /> Nuovo Pacchetto
+        </button>
+      </div>
+
+      {packages.length === 0 ? (
+        <div className="text-center py-8 panel rounded-xl">
+          <Package className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--muted)' }} />
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Nessun pacchetto creato per questo evento.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {packages.map(pkg => {
+            const statusColors: Record<string, string> = {
+              bozza: '#9ba3aa', in_preparazione: '#4db4ff', pronto: '#38d27d', inviato: '#22c55e', archiviato: '#6b7280',
+            }
+            const statusLabels: Record<string, string> = {
+              bozza: 'Bozza', in_preparazione: 'In Preparazione', pronto: 'Pronto', inviato: 'Inviato', archiviato: 'Archiviato',
+            }
+            const color = statusColors[pkg.status] ?? '#9ba3aa'
+            return (
+              <div key={pkg.id} className="panel p-4 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs px-2 py-1 rounded-full font-medium"
+                    style={{ background: `${color}20`, color }}>
+                    {statusLabels[pkg.status] ?? pkg.status}
+                  </span>
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                    {new Date(pkg.created_at).toLocaleDateString('it-IT')}
+                  </span>
+                </div>
+
+                {/* File links */}
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: 'PPTX', url: pkg.pptx_url },
+                    { label: 'PDF Presentazione', url: pkg.pdf_presentation_url },
+                    { label: 'XLSX Budget', url: pkg.xlsx_url },
+                    { label: 'PDF Budget', url: pkg.pdf_budget_url },
+                  ].map(f => (
+                    <div key={f.label} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+                      style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                      <DownloadIcon className="w-3 h-3" style={{ color: f.url ? 'var(--blue)' : 'var(--muted)' }} />
+                      {f.url ? (
+                        <a href={f.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)' }}>{f.label}</a>
+                      ) : (
+                        <span style={{ color: 'var(--muted)' }}>{f.label} (non generato)</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
+                  <select value={pkg.status} onChange={e => handleStatusChange(pkg, e.target.value)}
+                    className="flex-1 px-2 py-1.5 rounded-lg text-xs"
+                    style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                    <option value="bozza">Bozza</option>
+                    <option value="in_preparazione">In Preparazione</option>
+                    <option value="pronto">Pronto</option>
+                    <option value="inviato">Inviato</option>
+                    <option value="archiviato">Archiviato</option>
+                  </select>
+                  <button onClick={() => handleDelete(pkg.id)} className="p-1.5 rounded-lg hover:bg-white/10">
+                    <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                  </button>
+                </div>
+
+                {pkg.sent_at && (
+                  <p className="text-xs" style={{ color: 'var(--green)' }}>
+                    Inviato il {new Date(pkg.sent_at).toLocaleDateString('it-IT')}
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Info */}
+      <div className="p-3 rounded-xl text-xs" style={{ background: 'rgba(77,180,255,0.06)', border: '1px solid rgba(77,180,255,0.2)', color: 'var(--muted)' }}>
+        La generazione automatica di PPTX/XLSX richiede Edge Function.
+        Al momento puoi caricare i file manualmente o usare l'export dal modulo Budget/Presentazioni.
+      </div>
+    </div>
+  )
+}
+
 // ─── EventDetail ──────────────────────────────────────────────────────────────
 
 interface EventDetailProps {
@@ -947,6 +1081,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
     { id: 'comunicazioni', label: `Comunicazioni${eventMsg.length > 0 ? ` (${eventMsg.length})` : ''}` },
     { id: 'timeline', label: 'Timeline' },
     { id: 'creative', label: 'Creative Studio' },
+    { id: 'pacchetto', label: 'Pacchetto' },
   ]
 
   return (
@@ -1095,6 +1230,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'timeline' && <TabTimeline event={event} />}
         {activeTab === 'creative' && <TabCreative event={event} />}
+        {activeTab === 'pacchetto' && <TabPacchetto event={event} />}
       </div>
     </div>
   )

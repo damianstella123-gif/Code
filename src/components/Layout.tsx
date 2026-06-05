@@ -20,6 +20,9 @@ import {
   ChevronDown,
   SlidersHorizontal,
   FileText,
+  Palette,
+  Share2,
+  Presentation,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { loadUser, getAllowedNavForRole, signOutEverywhere } from '@/lib/auth'
@@ -40,6 +43,9 @@ const iconMap: Record<string, React.ElementType> = {
   '/calendario': CalendarDays,
   '/fornitori': Truck,
   '/amministrazione': Settings,
+  '/creative-studio': Palette,
+  '/social-studio': Share2,
+  '/presentazioni': Presentation,
   '/comunicazioni': MessageSquare,
   '/workflow': GitBranch,
   '/pratiche': FileText,
