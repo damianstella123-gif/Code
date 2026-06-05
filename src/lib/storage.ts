@@ -1,13 +1,9 @@
-import { tasks } from '@/data/tasks'
-import { events } from '@/data/events'
-import { pratiche as praticheDemo } from '@/data/pratiche'
-import { entrate, uscite } from '@/data/amministrazione'
-import { workflowsDemo } from '@/data/workflow'
-import { clients as clientsDemo } from '@/data/clients'
 import type { Task } from '@/data/tasks'
 import type { Event } from '@/data/events'
 import type { Pratica } from '@/data/pratiche'
 import type { Client } from '@/data/clients'
+import type { EventoWorkflow } from '@/data/workflow'
+import type { Entrata, Uscita } from '@/data/amministrazione'
 
 export const STORAGE_KEYS = {
   tasks: 'cal_tasks',
@@ -32,64 +28,53 @@ function safeRead<T>(key: string, fallback: T): T {
 }
 
 export function loadTasksFromStorage(): Task[] {
-  return safeRead(STORAGE_KEYS.tasks, tasks)
+  return safeRead(STORAGE_KEYS.tasks, [])
 }
 
 export function cacheTasksSnapshot(list: Task[]): void {
   try {
     localStorage.setItem(STORAGE_KEYS.tasks, JSON.stringify(list))
-  } catch {
-    // ignore quota errors in demo
-  }
+  } catch { /* ignore */ }
 }
 
-// Snapshot sincrono degli eventi per i moduli che ancora leggono mock.
-// Step 2: la pagina Eventi e' la fonte di verita' Supabase e aggiorna
-// questa cache via `cacheEventsSnapshot()` ad ogni fetch / mutazione.
 export function loadEventsFromStorage(): Event[] {
-  return safeRead(STORAGE_KEYS.events, events)
+  return safeRead(STORAGE_KEYS.events, [])
 }
 
 export function cacheEventsSnapshot(list: Event[]): void {
   try {
     localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(list))
-  } catch {
-    // ignore quota errors in demo
-  }
+  } catch { /* ignore */ }
 }
 
-export function loadWorkflowsFromStorage() {
-  return safeRead(STORAGE_KEYS.workflows, workflowsDemo)
+export function loadWorkflowsFromStorage(): EventoWorkflow[] {
+  return safeRead(STORAGE_KEYS.workflows, [])
 }
 
-export function loadEntrateFromStorage() {
-  return safeRead(STORAGE_KEYS.entrate, entrate)
+export function loadEntrateFromStorage(): Entrata[] {
+  return safeRead(STORAGE_KEYS.entrate, [])
 }
 
-export function loadUsciteFromStorage() {
-  return safeRead(STORAGE_KEYS.uscite, uscite)
+export function loadUsciteFromStorage(): Uscita[] {
+  return safeRead(STORAGE_KEYS.uscite, [])
 }
 
 export function loadPraticheFromStorage(): Pratica[] {
-  return safeRead(STORAGE_KEYS.pratiche, praticheDemo)
+  return safeRead(STORAGE_KEYS.pratiche, [])
 }
 
 export function cachePraticheSnapshot(list: Pratica[]): void {
   try {
     localStorage.setItem(STORAGE_KEYS.pratiche, JSON.stringify(list))
-  } catch {
-    // ignore quota errors in demo
-  }
+  } catch { /* ignore */ }
 }
 
 export function loadClientsFromStorage(): Client[] {
-  return safeRead(STORAGE_KEYS.clients, clientsDemo)
+  return safeRead(STORAGE_KEYS.clients, [])
 }
 
 export function cacheClientsSnapshot(list: Client[]): void {
   try {
     localStorage.setItem(STORAGE_KEYS.clients, JSON.stringify(list))
-  } catch {
-    // ignore quota errors in demo
-  }
+  } catch { /* ignore */ }
 }

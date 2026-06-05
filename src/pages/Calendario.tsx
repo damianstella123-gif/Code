@@ -18,8 +18,8 @@ import {
   Tag,
   Zap,
   FileText,
+  Plus,
 } from 'lucide-react'
-import { users } from '@/data/users'
 import { loadUser } from '@/lib/auth'
 import { daysLeft, fmtShort, fmtLong, toISO, addDays } from '@/lib/format'
 import type { Event } from '@/data/events'
@@ -28,7 +28,7 @@ import type { Pratica } from '@/data/pratiche'
 import type { Uscita } from '@/data/amministrazione'
 import { fetchEvents, upsertEvent } from '@/lib/events-service'
 import { fetchTasks, upsertTask, changeTaskStatus } from '@/lib/tasks-service'
-import { fetchPractices } from '@/lib/practices-service'
+import { fetchPractices, upsertPractice } from '@/lib/practices-service'
 import { fetchBudgets } from '@/lib/budgets-service'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,8 +74,6 @@ function statoTaskLabel(s: string) {
 function prioritaLabel(p: string) {
   return { alta: 'Alta', media: 'Media', bassa: 'Bassa' }[p] ?? p
 }
-function userName(id: string) { return users.find(u => u.id === id)?.nome ?? id }
-function userAvatar(id: string) { return users.find(u => u.id === id)?.avatar }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -97,7 +95,6 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange }: 
     const evTasks = allTasks.filter(t => t.evento === ev.id)
     const completati = evTasks.filter(t => t.stato === 'completato').length
     const dl = daysLeft(ev.dataInizio)
-    const resp = users.find(u => u.id === ev.responsabile)
     const spesa = allUscite.filter(u => u.eventoId === ev.id).reduce((s, u) => s + u.importo, 0)
 
     return (
@@ -138,7 +135,7 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange }: 
             {[
               { icon: Clock, label: `${fmtLong(ev.dataInizio)} → ${fmtLong(ev.dataFine)}` },
               { icon: MapPin, label: ev.location },
-              { icon: User, label: resp?.nome ?? '—' },
+              { icon: User, label: ev.responsabile || '—' },
               { icon: Euro, label: `Budget €${ev.budget.toLocaleString('it-IT')}${spesa > 0 ? ` · Speso €${spesa.toLocaleString('it-IT')}` : ''}` },
             ].map((r, i) => (
               <div key={i} className="flex items-center gap-3">
@@ -154,20 +151,6 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange }: 
                 <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
                   <div className="h-full rounded-full transition-all"
                     style={{ width: `${(completati / evTasks.length) * 100}%`, background: color }} />
-                </div>
-              </div>
-            )}
-            {ev.team.length > 0 && (
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-xs" style={{ color: 'var(--muted)' }}>Team:</span>
-                <div className="flex -space-x-1">
-                  {ev.team.slice(0, 6).map(uid => {
-                    const av = userAvatar(uid)
-                    return av ? (
-                      <img key={uid} src={av} alt="" className="w-6 h-6 rounded-full border-2 object-cover"
-                        style={{ borderColor: 'var(--panel)' }} />
-                    ) : null
-                  })}
                 </div>
               </div>
             )}
@@ -241,7 +224,6 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange }: 
   const t = item.data as Task
   const color = taskColor(t)
   const dl = daysLeft(t.scadenza)
-  const assegnatario = users.find(u => u.id === t.assegnatario)
   const STATES: Task['stato'][] = ['da_fare', 'in_corso', 'completato']
 
   return (
@@ -291,13 +273,6 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange }: 
               Scadenza: {fmtLong(t.scadenza)}
             </span>
           </div>
-          {assegnatario && (
-            <div className="flex items-center gap-3">
-              <img src={assegnatario.avatar} alt="" className="w-6 h-6 rounded-lg object-cover" />
-              <span className="text-sm" style={{ color: 'var(--text)' }}>{assegnatario.nome}</span>
-              <span className="text-xs" style={{ color: 'var(--muted)' }}>{assegnatario.ruolo}</span>
-            </div>
-          )}
           <div>
             <p className="text-xs uppercase tracking-wide mb-2" style={{ color: 'var(--muted)' }}>Cambia stato rapido</p>
             <div className="grid grid-cols-3 gap-2">
@@ -631,7 +606,7 @@ function DayView({ day, items, onItemClick }: {
               const sub = item.type === 'event'
                 ? (item.data as Event).location
                 : item.type === 'task'
-                  ? `Assegnato a ${userName((item.data as Task).assegnatario)}`
+                  ? `Assegnato a ${(item.data as Task).assegnatario}`
                   : (item.data as Pratica).controparte
               const urgent = item.type === 'task' && (item.data as Task).priorita === 'alta' && (item.data as Task).stato !== 'completato'
               const id = item.type === 'event'
@@ -843,6 +818,191 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
   )
 }
 
+// ─── Quick Create Modal ───────────────────────────────────────────────────────
+
+type CreateType = 'event' | 'task' | 'pratica'
+
+function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
+  defaultDate: string
+  events: Event[]
+  onClose: () => void
+  onCreate: (type: CreateType, data: Event | Task | Pratica) => void
+}) {
+  const [type, setType] = useState<CreateType>('task')
+  const [titolo, setTitolo] = useState('')
+  const [desc, setDesc] = useState('')
+  const [dataInizio, setDataInizio] = useState(defaultDate)
+  const [dataFine, setDataFine] = useState(defaultDate)
+  const [eventoId, setEventoId] = useState('')
+  const [priorita, setPriorita] = useState<'alta' | 'media' | 'bassa'>('media')
+  const [location, setLocation] = useState('')
+
+  function handleSubmit() {
+    if (!titolo.trim()) return
+    const id = `${type.slice(0, 3)}_${Date.now()}`
+    if (type === 'event') {
+      const ev: Event = {
+        id,
+        nome: titolo,
+        descrizione: desc,
+        cliente: '',
+        dataInizio,
+        dataFine: dataFine || dataInizio,
+        location,
+        budget: 0,
+        stato: 'pianificazione',
+        partecipanti: 0,
+        responsabile: '',
+        team: [],
+      }
+      onCreate('event', ev)
+    } else if (type === 'task') {
+      const t: Task = {
+        id,
+        titolo,
+        descrizione: desc,
+        assegnatario: '',
+        evento: eventoId || null,
+        priorita,
+        stato: 'da_fare',
+        scadenza: dataInizio,
+        creatoIl: new Date().toISOString().slice(0, 10),
+      }
+      onCreate('task', t)
+    } else {
+      const p: Pratica = {
+        id,
+        titolo,
+        descrizione: desc,
+        eventoId: eventoId || null,
+        responsabileId: '',
+        categoria: 'documento',
+        stato: 'da_aprire',
+        priorita,
+        creatoIl: new Date().toISOString().slice(0, 10),
+        scadenza: dataInizio,
+        note: '',
+        importo: null,
+        controparte: '',
+      }
+      onCreate('pratica', p)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-md rounded-2xl p-6 space-y-4"
+        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Nuova attivita</h3>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10">
+            <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+          </button>
+        </div>
+
+        {/* Type selector */}
+        <div className="flex gap-2">
+          {([
+            { id: 'task' as CreateType, label: 'Task', icon: CheckSquare },
+            { id: 'event' as CreateType, label: 'Evento', icon: Calendar },
+            { id: 'pratica' as CreateType, label: 'Pratica', icon: FileText },
+          ]).map(t => (
+            <button key={t.id} onClick={() => setType(t.id)}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+              style={{
+                background: type === t.id ? 'var(--red)' : 'transparent',
+                color: type === t.id ? 'white' : 'var(--muted)',
+                border: type === t.id ? 'none' : '1px solid var(--line)',
+              }}>
+              <t.icon className="w-3.5 h-3.5" />
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Fields */}
+        <div className="space-y-3">
+          <input
+            value={titolo} onChange={e => setTitolo(e.target.value)}
+            placeholder={type === 'event' ? 'Nome evento' : 'Titolo'}
+            className="w-full px-3 py-2.5 rounded-xl text-sm"
+            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+          />
+          <textarea
+            value={desc} onChange={e => setDesc(e.target.value)}
+            placeholder="Descrizione (opzionale)"
+            rows={2}
+            className="w-full px-3 py-2.5 rounded-xl text-sm resize-none"
+            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>
+                {type === 'event' ? 'Data inizio' : 'Scadenza'}
+              </label>
+              <input type="date" value={dataInizio} onChange={e => setDataInizio(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              />
+            </div>
+            {type === 'event' && (
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Data fine</label>
+                <input type="date" value={dataFine} onChange={e => setDataFine(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl text-sm"
+                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                />
+              </div>
+            )}
+            {type !== 'event' && (
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Priorita</label>
+                <select value={priorita} onChange={e => setPriorita(e.target.value as 'alta' | 'media' | 'bassa')}
+                  className="w-full px-3 py-2 rounded-xl text-sm"
+                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                  <option value="alta">Alta</option>
+                  <option value="media">Media</option>
+                  <option value="bassa">Bassa</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {type === 'event' && (
+            <input value={location} onChange={e => setLocation(e.target.value)}
+              placeholder="Location"
+              className="w-full px-3 py-2.5 rounded-xl text-sm"
+              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+            />
+          )}
+
+          {(type === 'task' || type === 'pratica') && events.length > 0 && (
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Evento collegato</label>
+              <select value={eventoId} onChange={e => setEventoId(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <option value="">Nessuno</option>
+                {events.map(ev => (
+                  <option key={ev.id} value={ev.id}>{ev.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        <button onClick={handleSubmit} disabled={!titolo.trim()}
+          className="w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
+          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+          Crea {type === 'event' ? 'Evento' : type === 'task' ? 'Task' : 'Pratica'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Calendario() {
@@ -855,6 +1015,7 @@ export default function Calendario() {
     const t = new Date(); t.setHours(0, 0, 0, 0); return t
   })
   const [selectedItem, setSelectedItem] = useState<CalItem | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
   const today = useMemo(() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t }, [])
 
   const currentUser = loadUser()
@@ -934,6 +1095,14 @@ export default function Calendario() {
       setAllEvents(prev => prev.map(e => e.id === id ? updated : e))
       await upsertEvent(updated)
     }
+    await refresh()
+  }
+
+  async function handleCreate(type: CreateType, data: Event | Task | Pratica) {
+    if (type === 'event') await upsertEvent(data as Event)
+    else if (type === 'task') await upsertTask(data as Task)
+    else await upsertPractice(data as Pratica)
+    setShowCreate(false)
     await refresh()
   }
 
@@ -1103,6 +1272,24 @@ export default function Calendario() {
           allUscite={allUscite}
           onClose={() => setSelectedItem(null)}
           onTaskStateChange={handleTaskStateChange}
+        />
+      )}
+
+      {/* FAB create button */}
+      <button
+        onClick={() => setShowCreate(true)}
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110 z-40"
+        style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
+        <Plus className="w-6 h-6 text-white" />
+      </button>
+
+      {/* Quick create modal */}
+      {showCreate && (
+        <QuickCreateModal
+          defaultDate={toISO(cursor)}
+          events={allEvents}
+          onClose={() => setShowCreate(false)}
+          onCreate={handleCreate}
         />
       )}
     </div>

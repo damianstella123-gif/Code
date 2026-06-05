@@ -9,26 +9,27 @@ import {
   AlertTriangle,
   ArrowRight,
   Zap,
-  GitBranch,
   MessageSquare,
   Truck,
   Bell,
   BarChart3,
-  ShieldAlert,
   CreditCard,
 } from 'lucide-react'
-import { suppliers } from '@/data/suppliers'
-import { users } from '@/data/users'
-import { messaggi } from '@/data/comunicazioni'
-import { entrate, uscite } from '@/data/amministrazione'
 import { loadUser } from '@/lib/auth'
-import { loadTasksFromStorage, loadEventsFromStorage, loadWorkflowsFromStorage, loadClientsFromStorage, STORAGE_KEYS } from '@/lib/storage'
 import { getVisibleEvents, getVisibleTasks } from '@/lib/permissions'
 import { daysLeft, fmtShort, eventColorByStato, eventLabelByStato, taskPriColor } from '@/lib/format'
+import { fetchEvents } from '@/lib/events-service'
+import { fetchTasks } from '@/lib/tasks-service'
+import { fetchClients } from '@/lib/clients-service'
+import { fetchSuppliers } from '@/lib/suppliers-service'
+import { fetchBudgets } from '@/lib/budgets-service'
+import { fetchCommunications } from '@/lib/communications-service'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
-
-function userAvatar(id: string) { return users.find(u => u.id === id)?.avatar }
+import type { Supplier } from '@/data/suppliers'
+import type { Client } from '@/data/clients'
+import type { Uscita } from '@/data/amministrazione'
+import type { Messaggio } from '@/data/comunicazioni'
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
@@ -92,20 +93,33 @@ export default function Dashboard() {
   const ruolo = currentUser?.ruolo ?? 'Admin'
   const userId = currentUser?.id ?? ''
 
-  const [liveTasks, setLiveTasks] = useState<Task[]>(() => loadTasksFromStorage())
-  const [liveEvents, setLiveEvents] = useState<Event[]>(() => loadEventsFromStorage())
-  const [liveWFs, setLiveWFs] = useState(() => loadWorkflowsFromStorage())
-  const [liveClients, setLiveClients] = useState(() => loadClientsFromStorage())
+  const [liveTasks, setLiveTasks] = useState<Task[]>([])
+  const [liveEvents, setLiveEvents] = useState<Event[]>([])
+  const [liveClients, setLiveClients] = useState<Client[]>([])
+  const [liveSuppliers, setLiveSuppliers] = useState<Supplier[]>([])
+  const [liveBudgets, setLiveBudgets] = useState<Uscita[]>([])
+  const [liveCommunications, setLiveCommunications] = useState<Messaggio[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    function onStorage(e: StorageEvent) {
-      if (e.key === STORAGE_KEYS.tasks) setLiveTasks(loadTasksFromStorage())
-      if (e.key === STORAGE_KEYS.events) setLiveEvents(loadEventsFromStorage())
-      if (e.key === STORAGE_KEYS.workflows) setLiveWFs(loadWorkflowsFromStorage())
-      if (e.key === STORAGE_KEYS.clients) setLiveClients(loadClientsFromStorage())
+    async function load() {
+      const [ev, tk, cl, sp, bg, cm] = await Promise.all([
+        fetchEvents(),
+        fetchTasks(),
+        fetchClients(),
+        fetchSuppliers(),
+        fetchBudgets(),
+        fetchCommunications(),
+      ])
+      setLiveEvents(ev)
+      setLiveTasks(tk)
+      setLiveClients(cl)
+      setLiveSuppliers(sp)
+      setLiveBudgets(bg)
+      setLiveCommunications(cm)
+      setLoading(false)
     }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    load()
   }, [])
 
   const today = new Date()
@@ -113,11 +127,6 @@ export default function Dashboard() {
 
   const myEvents = useMemo(() => getVisibleEvents(ruolo, userId, liveEvents), [ruolo, userId, liveEvents])
   const myTasks = useMemo(() => getVisibleTasks(ruolo, userId, liveTasks), [ruolo, userId, liveTasks])
-  const myMessages = useMemo(() =>
-    ruolo === 'Admin' || ruolo === 'Partner'
-      ? messaggi
-      : messaggi.filter(m => m.mittente === userId || m.destinatari.includes(userId))
-  , [ruolo, userId])
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
 
@@ -128,47 +137,35 @@ export default function Dashboard() {
     const taskCompletati = myTasks.filter(t => t.stato === 'completato').length
     const completionRate = myTasks.length > 0 ? Math.round((taskCompletati / myTasks.length) * 100) : 0
 
-    // Workflow bloccati (fase attiva con task critici aperti)
-    const wfBloccati = liveWFs.filter((wf: typeof liveWFs[0]) => {
-      const faseAttiva = wf.fasi.find((f: { ordine: number }) => f.ordine === wf.faseCorrenteOrdine)
-      if (!faseAttiva) return false
-      return faseAttiva.taskCriticiIds?.some((tid: string) => {
-        const t = liveTasks.find((x: Task) => x.id === tid)
-        return t && t.stato !== 'completato'
-      })
-    }).length
-
     // Budget totale eventi visibili
     const budgetTotale = myEvents.reduce((s, e) => s + e.budget, 0)
-    // Entrate totali
-    const entrateTotale = entrate.reduce((s, e) => s + e.importo, 0)
-    // Uscite totali
-    const usciteTotale = uscite.reduce((s, u) => s + u.importo, 0)
-    const margineStimato = entrateTotale - usciteTotale
+    // Uscite totali da Supabase
+    const usciteTotale = liveBudgets.reduce((s, u) => s + (u.importo ?? 0), 0)
+    const margineStimato = budgetTotale - usciteTotale
 
     // Pagamenti sospesi
-    const pagamentiSospesi = entrate.filter(e => e.stato === 'in_attesa').length
+    const pagamentiSospesi = liveBudgets.filter(b => b.stato === 'in_attesa').length
 
     // Clienti attivi
     const clientiAttivi = liveClients.filter(c => c.stato === 'attivo' || c.stato === 'vip').length
 
     // Fornitori critici (contratto scaduto o in scadenza)
-    const fornitoriCritici = suppliers.filter(s =>
+    const fornitoriCritici = liveSuppliers.filter(s =>
       s.statoContratto === 'scaduto' || s.statoContratto === 'in_scadenza'
     ).length
 
     // Comunicazioni non lette dall'utente corrente
-    const comunicazioniNonLette = myMessages.filter(m =>
+    const comunicazioniNonLette = liveCommunications.filter(m =>
       !m.letto.includes(userId) && m.destinatari.includes(userId)
     ).length
 
     return {
-      eventiAttivi, taskAperti, taskUrgentiN, wfBloccati,
+      eventiAttivi, taskAperti, taskUrgentiN,
       budgetTotale, margineStimato, pagamentiSospesi,
       clientiAttivi, fornitoriCritici, comunicazioniNonLette,
-      completionRate, entrateTotale,
+      completionRate, usciteTotale,
     }
-  }, [myEvents, myTasks, myMessages, liveWFs, liveTasks, userId])
+  }, [myEvents, myTasks, liveBudgets, liveClients, liveSuppliers, liveCommunications, userId])
 
   // ── Sections data ─────────────────────────────────────────────────────────
 
@@ -200,49 +197,29 @@ export default function Dashboard() {
   }, [myEvents, myTasks])
 
   const comunicazioniRecenti = useMemo(() =>
-    [...myMessages]
+    [...liveCommunications]
       .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
       .slice(0, 4)
-  , [myMessages])
-
-  const workflowInRitardo = useMemo(() => {
-    return liveWFs
-      .map((wf: typeof liveWFs[0]) => {
-        const faseAttiva = wf.fasi.find((f: { ordine: number }) => f.ordine === wf.faseCorrenteOrdine)
-        if (!faseAttiva) return null
-        const isBlocked = faseAttiva.taskCriticiIds?.some((tid: string) => {
-          const t = liveTasks.find((x: Task) => x.id === tid)
-          return t && t.stato !== 'completato'
-        })
-        if (!isBlocked) return null
-        const pct = Math.round(wf.fasi.reduce((a: number, f: { avanzamento: number }) => a + f.avanzamento, 0) / wf.fasi.length)
-        const ev = liveEvents.find((e: Event) => e.id === wf.eventoId)
-        return { id: wf.id, evName: ev?.nome ?? wf.eventoId, fase: faseAttiva.nome, pct }
-      })
-      .filter(Boolean)
-      .slice(0, 3)
-  }, [liveWFs, liveTasks, liveEvents])
+  , [liveCommunications])
 
   const alertAmministrativi = useMemo(() => {
     const alerts: { label: string; sub: string; level: 'critical' | 'warning'; route: string }[] = []
-    const scaduti = entrate.filter(e => e.stato === 'scaduto')
+    const scaduti = liveBudgets.filter(b => b.stato === 'scaduto')
     if (scaduti.length > 0)
-      alerts.push({ label: `${scaduti.length} pagament${scaduti.length > 1 ? 'i scaduti' : 'o scaduto'}`, sub: `Totale: €${scaduti.reduce((s, e) => s + e.importo, 0).toLocaleString('it-IT')}`, level: 'critical', route: '/amministrazione' })
-    const inAttesa = entrate.filter(e => e.stato === 'in_attesa')
+      alerts.push({ label: `${scaduti.length} pagament${scaduti.length > 1 ? 'i scaduti' : 'o scaduto'}`, sub: `Totale: €${scaduti.reduce((s, e) => s + (e.importo ?? 0), 0).toLocaleString('it-IT')}`, level: 'critical', route: '/amministrazione' })
+    const inAttesa = liveBudgets.filter(b => b.stato === 'in_attesa')
     if (inAttesa.length > 0)
-      alerts.push({ label: `${inAttesa.length} pagament${inAttesa.length > 1 ? 'i in attesa' : 'o in attesa'}`, sub: `Totale: €${inAttesa.reduce((s, e) => s + e.importo, 0).toLocaleString('it-IT')}`, level: 'warning', route: '/amministrazione' })
-    const fornitoriProblema = suppliers.filter(s => s.statoContratto === 'scaduto' || s.statoContratto === 'in_scadenza')
+      alerts.push({ label: `${inAttesa.length} pagament${inAttesa.length > 1 ? 'i in attesa' : 'o in attesa'}`, sub: `Totale: €${inAttesa.reduce((s, e) => s + (e.importo ?? 0), 0).toLocaleString('it-IT')}`, level: 'warning', route: '/amministrazione' })
+    const fornitoriProblema = liveSuppliers.filter(s => s.statoContratto === 'scaduto' || s.statoContratto === 'in_scadenza')
     if (fornitoriProblema.length > 0)
       alerts.push({ label: `${fornitoriProblema.length} fornitor${fornitoriProblema.length > 1 ? 'i con contratto critico' : 'e con contratto critico'}`, sub: fornitoriProblema.slice(0, 2).map(f => f.nome).join(', '), level: 'warning', route: '/fornitori' })
     return alerts.slice(0, 4)
-  }, [])
+  }, [liveBudgets, liveSuppliers])
 
   // ── Fly suggestions ───────────────────────────────────────────────────────
 
   const flySuggestions = useMemo(() => {
     const tips: { text: string; chip: string; color: string; route: string }[] = []
-    if (kpi.wfBloccati > 0)
-      tips.push({ text: `${kpi.wfBloccati} workflow bloccato da task critici aperti.`, chip: 'Vai ai Workflow', color: 'var(--red2)', route: '/workflow' })
     if (kpi.taskUrgentiN > 0)
       tips.push({ text: `${kpi.taskUrgentiN} task urgenti senza completamento — rischio scadenza.`, chip: 'Vedi Task', color: 'var(--red2)', route: '/task' })
     if (kpi.fornitoriCritici > 0)
@@ -250,7 +227,7 @@ export default function Dashboard() {
     if (kpi.comunicazioniNonLette > 0)
       tips.push({ text: `Hai ${kpi.comunicazioniNonLette} comunicazioni non lette.`, chip: 'Comunicazioni', color: 'var(--blue)', route: '/comunicazioni' })
     if (kpi.pagamentiSospesi > 0)
-      tips.push({ text: `${kpi.pagamentiSospesi} pagamenti in attesa di incasso.`, chip: 'Amministrazione', color: 'var(--yellow)', route: '/amministrazione' })
+      tips.push({ text: `${kpi.pagamentiSospesi} pagamenti in attesa.`, chip: 'Amministrazione', color: 'var(--yellow)', route: '/amministrazione' })
     if (tips.length === 0)
       tips.push({ text: 'Tutto sotto controllo! Nessuna urgenza operativa rilevata. Ottimo lavoro.', chip: 'Dashboard', color: 'var(--green)', route: '/dashboard' })
     return tips.slice(0, 3)
@@ -263,26 +240,24 @@ export default function Dashboard() {
       { id: 'eventi', label: 'Eventi Attivi', value: kpi.eventiAttivi, sub: `su ${myEvents.length} totali`, icon: Calendar, color: 'var(--red2)', route: '/eventi' },
       { id: 'task', label: 'Task Aperti', value: kpi.taskAperti, sub: `${kpi.taskUrgentiN} urgenti`, icon: CheckSquare, color: 'var(--blue)', route: '/task' },
       { id: 'urgenti', label: 'Task Urgenti', value: kpi.taskUrgentiN, sub: 'priorità alta', icon: Zap, color: kpi.taskUrgentiN > 0 ? 'var(--red2)' : 'var(--green)', route: '/task' },
-      { id: 'workflow', label: 'WF Bloccati', value: kpi.wfBloccati, sub: 'task critici aperti', icon: GitBranch, color: kpi.wfBloccati > 0 ? 'var(--red2)' : 'var(--muted)', route: '/workflow' },
       { id: 'budget', label: 'Budget Totale', value: `€${(kpi.budgetTotale / 1000).toFixed(0)}K`, sub: 'eventi visibili', icon: Euro, color: 'var(--green)', route: '/amministrazione' },
-      { id: 'margine', label: 'Margine Stimato', value: `€${(kpi.margineStimato / 1000).toFixed(0)}K`, sub: `ent. €${(kpi.entrateTotale / 1000).toFixed(0)}K`, icon: BarChart3, color: kpi.margineStimato >= 0 ? 'var(--green)' : 'var(--red2)', route: '/amministrazione' },
-      { id: 'pagamenti', label: 'Pagam. Sospesi', value: kpi.pagamentiSospesi, sub: 'da incassare', icon: CreditCard, color: kpi.pagamentiSospesi > 0 ? 'var(--yellow)' : 'var(--muted)', route: '/amministrazione' },
+      { id: 'margine', label: 'Margine Stimato', value: `€${(kpi.margineStimato / 1000).toFixed(0)}K`, sub: `usc. €${(kpi.usciteTotale / 1000).toFixed(0)}K`, icon: BarChart3, color: kpi.margineStimato >= 0 ? 'var(--green)' : 'var(--red2)', route: '/amministrazione' },
+      { id: 'pagamenti', label: 'Pagam. Sospesi', value: kpi.pagamentiSospesi, sub: 'in attesa', icon: CreditCard, color: kpi.pagamentiSospesi > 0 ? 'var(--yellow)' : 'var(--muted)', route: '/amministrazione' },
       { id: 'clienti', label: 'Clienti Attivi', value: kpi.clientiAttivi, sub: `su ${liveClients.length} totali`, icon: Users, color: 'var(--blue)', route: '/crm' },
       { id: 'fornitori', label: 'Fornitori Critici', value: kpi.fornitoriCritici, sub: 'contratto critico', icon: Truck, color: kpi.fornitoriCritici > 0 ? 'var(--yellow)' : 'var(--muted)', route: '/fornitori' },
       { id: 'comunicazioni', label: 'Non Lette', value: kpi.comunicazioniNonLette, sub: 'comunicazioni', icon: MessageSquare, color: kpi.comunicazioniNonLette > 0 ? 'var(--blue)' : 'var(--muted)', route: '/comunicazioni' },
     ]
-    // Show relevant KPIs per role
     const visible: string[] = (() => {
-      if (ruolo === 'Admin' || ruolo === 'Partner') return ['eventi', 'task', 'urgenti', 'workflow', 'budget', 'margine', 'pagamenti', 'clienti']
-      if (ruolo === 'Manager') return ['eventi', 'task', 'urgenti', 'workflow']
+      if (ruolo === 'Admin' || ruolo === 'Partner') return ['eventi', 'task', 'urgenti', 'budget', 'margine', 'pagamenti', 'clienti']
+      if (ruolo === 'Manager') return ['eventi', 'task', 'urgenti']
       if (ruolo === 'Operativo') return ['task', 'urgenti', 'comunicazioni']
       if (ruolo === 'Finance') return ['budget', 'margine', 'pagamenti', 'fornitori']
       if (ruolo === 'Commerciale') return ['clienti', 'eventi', 'comunicazioni', 'task']
       if (ruolo === 'Fornitore') return ['task', 'urgenti']
-      return ['eventi', 'task', 'urgenti', 'workflow']
+      return ['eventi', 'task', 'urgenti']
     })()
     return all.filter(k => visible.includes(k.id))
-  }, [kpi, myEvents.length, ruolo])
+  }, [kpi, myEvents.length, liveClients.length, ruolo])
 
   // ── Mini calendar ─────────────────────────────────────────────────────────
 
@@ -315,7 +290,17 @@ export default function Dashboard() {
 
   const canSeeAdmin = ['Admin', 'Partner', 'Finance'].includes(ruolo)
   const canSeeCRM = ['Admin', 'Partner', 'Commerciale', 'Manager'].includes(ruolo)
-  const canSeeWF = ['Admin', 'Partner', 'Manager', 'Finance'].includes(ruolo)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin mx-auto" style={{ borderColor: 'var(--red2)', borderTopColor: 'transparent' }} />
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento dati...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -400,12 +385,9 @@ export default function Dashboard() {
                           <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
                             €{(ev.budget / 1000).toFixed(0)}K
                           </p>
-                          <div className="flex -space-x-1 justify-end mt-1">
-                            {ev.team.slice(0, 3).map(uid => {
-                              const av = userAvatar(uid)
-                              return av ? <img key={uid} src={av} alt="" className="w-5 h-5 rounded-full border object-cover" style={{ borderColor: 'var(--panel2)' }} /> : null
-                            })}
-                          </div>
+                          {ev.team.length > 0 && (
+                            <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{ev.team.length} persone</p>
+                          )}
                         </div>
                       </button>
                     )
@@ -424,7 +406,6 @@ export default function Dashboard() {
                   {urgentTasks.map(t => {
                     const dl = daysLeft(t.scadenza)
                     const overdue = dl < 0
-                    const assignee = users.find(u => u.id === t.assegnatario)
                     const color = taskPriColor(t.priorita, t.stato)
                     return (
                       <button key={t.id}
@@ -434,10 +415,7 @@ export default function Dashboard() {
                         <div className="w-1.5 h-10 rounded-full flex-shrink-0" style={{ background: color }} />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{t.titolo}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {assignee && <img src={assignee.avatar} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />}
-                            <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{assignee?.nome ?? '—'}</p>
-                          </div>
+                          <p className="text-xs truncate mt-0.5" style={{ color: 'var(--muted)' }}>{t.assegnatario || '—'}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
                           <div className="flex items-center gap-1.5">
@@ -456,35 +434,6 @@ export default function Dashboard() {
               )
             }
           </Section>
-
-          {/* Workflow in ritardo (Admin/Manager/Finance) */}
-          {canSeeWF && workflowInRitardo.length > 0 && (
-            <Section title="Workflow bloccati" icon={GitBranch} color="var(--red2)" action="Workflow" onAction={() => navigate('/workflow')} delay={200}>
-              <div className="space-y-2">
-                {workflowInRitardo.map((wf: { id: string; evName: string; fase: string; pct: number } | null) => {
-                  if (!wf) return null
-                  return (
-                    <button key={wf.id}
-                      onClick={() => navigate('/workflow')}
-                      className="w-full flex items-center gap-3 p-3.5 rounded-xl text-left transition-all hover:bg-white/5"
-                      style={{ background: 'var(--panel2)', border: '1px solid rgba(255,49,95,0.15)' }}>
-                      <ShieldAlert className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--red2)' }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{wf.evName}</p>
-                        <p className="text-xs" style={{ color: 'var(--muted)' }}>Bloccato in: {wf.fase}</p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--line)' }}>
-                          <div className="h-full rounded-full" style={{ width: `${wf.pct}%`, background: 'var(--red2)' }} />
-                        </div>
-                        <span className="text-xs" style={{ color: 'var(--muted)' }}>{wf.pct}%</span>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </Section>
-          )}
 
           {/* Alert amministrativi (Admin/Finance) */}
           {canSeeAdmin && alertAmministrativi.length > 0 && (
@@ -595,22 +544,21 @@ export default function Dashboard() {
               : (
                 <div className="space-y-1.5">
                   {comunicazioniRecenti.map(m => {
-                    const sender = users.find(u => u.id === m.mittente)
                     const unread = !m.letto.includes(userId) && m.destinatari.includes(userId)
                     return (
                       <button key={m.id}
                         onClick={() => navigate('/comunicazioni')}
                         className="w-full flex items-center gap-2.5 p-2.5 rounded-lg text-left transition-all hover:bg-white/5"
                         style={{ background: 'var(--panel2)', border: unread ? '1px solid rgba(77,180,255,0.2)' : '1px solid transparent' }}>
-                        {sender?.avatar
-                          ? <img src={sender.avatar} alt="" className="w-6 h-6 rounded-lg object-cover flex-shrink-0" />
-                          : <div className="w-6 h-6 rounded-lg flex-shrink-0" style={{ background: 'var(--panel)' }} />
-                        }
+                        <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                          style={{ background: 'rgba(77,180,255,0.1)', color: 'var(--blue)' }}>
+                          {m.mittente.charAt(0).toUpperCase()}
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs truncate" style={{ color: unread ? 'var(--text)' : 'var(--muted)', fontWeight: unread ? 600 : 400 }}>
                             {m.oggetto}
                           </p>
-                          <p className="text-xs" style={{ color: 'var(--muted)' }}>{sender?.nome?.split(' ')[0]}</p>
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>{m.mittente}</p>
                         </div>
                         {unread && <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: 'var(--blue)' }} />}
                         {m.priorita === 'alta' && <Zap className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--red2)' }} />}
@@ -690,16 +638,11 @@ export default function Dashboard() {
               <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>task</p>
             </div>
             <div className="panel p-4 animate-fade-in" style={{ animationDelay: '360ms' }}>
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>Team attivo</p>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>Fornitori</p>
               <p className="text-xl font-bold mt-0.5" style={{ color: 'var(--blue)' }}>
-                {users.filter(u => u.stato === 'attivo').length}<span className="text-sm font-normal" style={{ color: 'var(--muted)' }}>/{users.length}</span>
+                {liveSuppliers.filter(s => s.stato === 'attivo').length}<span className="text-sm font-normal" style={{ color: 'var(--muted)' }}>/{liveSuppliers.length}</span>
               </p>
-              <div className="flex -space-x-1.5 mt-2">
-                {users.filter(u => u.stato === 'attivo').slice(0, 5).map(u => (
-                  <img key={u.id} src={u.avatar} alt="" className="w-6 h-6 rounded-full border-2 object-cover"
-                    style={{ borderColor: 'var(--panel)' }} />
-                ))}
-              </div>
+              <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>attivi</p>
             </div>
           </div>
         </div>

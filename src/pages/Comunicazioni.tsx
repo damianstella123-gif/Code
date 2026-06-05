@@ -21,7 +21,6 @@ import {
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import type { Messaggio, Priorita, TipoCanale } from '@/data/comunicazioni'
-import { users } from '@/data/users'
 import { loadEventsFromStorage, loadTasksFromStorage } from '@/lib/storage'
 import {
   fetchCommunications,
@@ -74,12 +73,6 @@ function canaleLabel(c: TipoCanale) {
   }
 }
 
-function userName(id: string) {
-  return users.find(u => u.id === id)?.nome ?? id
-}
-function userAvatar(id: string) {
-  return users.find(u => u.id === id)?.avatar
-}
 function eventName(id: string | null) {
   if (!id) return null
   return loadEventsFromStorage().find(e => e.id === id)?.nome ?? null
@@ -87,23 +80,6 @@ function eventName(id: string | null) {
 function taskTitle(id: string | null) {
   if (!id) return null
   return loadTasksFromStorage().find(t => t.id === id)?.titolo ?? null
-}
-
-function Avatar({ userId, size = 8 }: { userId: string; size?: number }) {
-  const av = userAvatar(userId)
-  const nm = userName(userId)
-  const s = `w-${size} h-${size}`
-  if (av) return (
-    <img src={av} alt={nm} className={`${s} rounded-lg object-cover flex-shrink-0`} />
-  )
-  return (
-    <div
-      className={`${s} rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0`}
-      style={{ background: 'var(--panel2)', color: 'var(--text)' }}
-    >
-      {nm.split(' ').map(n => n[0]).join('').slice(0, 2)}
-    </div>
-  )
 }
 
 // ─── Composer ────────────────────────────────────────────────────────────────
@@ -123,12 +99,6 @@ function Composer({ currentUserId, onClose, onSend }: ComposerProps) {
   const [priorita, setPriorita] = useState<Priorita>('media')
   const [canale, setCanale] = useState<TipoCanale>('interno')
   const [destInput, setDestInput] = useState('')
-
-  const filteredUsers = users.filter(
-    u => u.id !== currentUserId &&
-      !destinatari.includes(u.id) &&
-      (destInput === '' || u.nome.toLowerCase().includes(destInput.toLowerCase()))
-  )
 
   function addDest(id: string) { setDestinatari(p => [...p, id]); setDestInput('') }
   function removeDest(id: string) { setDestinatari(p => p.filter(d => d !== id)) }
@@ -185,8 +155,7 @@ function Composer({ currentUserId, onClose, onSend }: ComposerProps) {
                   className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
                   style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}
                 >
-                  <img src={userAvatar(id)} alt="" className="w-4 h-4 rounded object-cover" />
-                  {userName(id)}
+                  {id}
                   <button onClick={() => removeDest(id)} className="hover:opacity-70 ml-0.5">
                     <X className="w-3 h-3" style={{ color: 'var(--muted)' }} />
                   </button>
@@ -196,32 +165,17 @@ function Composer({ currentUserId, onClose, onSend }: ComposerProps) {
             <div className="relative">
               <input
                 type="text"
-                placeholder="Cerca utente..."
+                placeholder="Inserisci ID destinatario..."
                 value={destInput}
                 onChange={e => setDestInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && destInput.trim()) {
+                    addDest(destInput.trim())
+                  }
+                }}
                 className="w-full px-3 py-2.5 rounded-xl text-sm focus:outline-none"
                 style={inputStyle}
               />
-              {destInput && filteredUsers.length > 0 && (
-                <div
-                  className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden z-10"
-                  style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}
-                >
-                  {filteredUsers.slice(0, 5).map(u => (
-                    <button
-                      key={u.id}
-                      onClick={() => addDest(u.id)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-white/5 transition-all"
-                    >
-                      <img src={u.avatar} alt="" className="w-7 h-7 rounded-lg object-cover" />
-                      <div className="text-left">
-                        <p style={{ color: 'var(--text)' }}>{u.nome}</p>
-                        <p className="text-xs" style={{ color: 'var(--muted)' }}>{u.ruolo} · {u.reparto}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 
@@ -363,16 +317,18 @@ function MessageThread({ msg, currentUserId, onBack, onReply, onMarkRead, onDele
       <div className="panel p-6 space-y-5">
         {/* Header */}
         <div className="flex items-start gap-4">
-          <Avatar userId={msg.mittente} size={10} />
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--panel2)', color: 'var(--text)' }}>
+            {msg.mittente.slice(0, 2).toUpperCase()}
+          </div>
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold" style={{ color: 'var(--text)' }}>{msg.oggetto}</h2>
                 <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>
-                  Da: <span style={{ color: 'var(--text)' }}>{userName(msg.mittente)}</span>
+                  Da: <span style={{ color: 'var(--text)' }}>{msg.mittente}</span>
                   {' · '}
                   A: <span style={{ color: 'var(--text)' }}>
-                    {msg.destinatari.map(d => userName(d)).join(', ')}
+                    {msg.destinatari.join(', ')}
                   </span>
                 </p>
               </div>
@@ -472,8 +428,10 @@ function MessageThread({ msg, currentUserId, onBack, onReply, onMarkRead, onDele
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs"
                   style={{ background: 'var(--panel2)', border: `1px solid ${read ? 'rgba(56,210,125,0.2)' : 'var(--line)'}` }}
                 >
-                  <img src={userAvatar(id)} alt="" className="w-5 h-5 rounded object-cover" />
-                  <span style={{ color: 'var(--text)' }}>{userName(id)}</span>
+                  <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-xs font-bold" style={{ background: 'var(--line)', color: 'var(--text)' }}>
+                    {id.slice(0, 1).toUpperCase()}
+                  </div>
+                  <span style={{ color: 'var(--text)' }}>{id}</span>
                   {read
                     ? <CheckCheck className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />
                     : <Circle className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />}
@@ -614,7 +572,7 @@ export default function Comunicazioni() {
       const matchSearch = search === '' ||
         m.oggetto.toLowerCase().includes(search.toLowerCase()) ||
         m.corpo.toLowerCase().includes(search.toLowerCase()) ||
-        userName(m.mittente).toLowerCase().includes(search.toLowerCase())
+        m.mittente.toLowerCase().includes(search.toLowerCase())
       const matchEvento = filterEvento === 'tutti' || m.eventoId === filterEvento
       const matchPriorita = filterPriorita === 'tutti' || m.priorita === filterPriorita
       const matchMittente = filterMittente === 'tutti' || m.mittente === filterMittente
@@ -891,7 +849,6 @@ export default function Comunicazioni() {
                 style={{ color: filterMittente === 'tutti' ? 'var(--muted)' : 'var(--text)' }}
               >
                 <option value="tutti">Tutti i mittenti</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
               </select>
               <ChevronDown className="w-3 h-3" style={{ color: 'var(--muted)' }} />
             </div>
@@ -934,7 +891,9 @@ export default function Comunicazioni() {
                   >
                     <div className="p-4 flex items-start gap-3">
                       {/* Avatar */}
-                      <Avatar userId={m.mittente} size={9} />
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold" style={{ background: 'var(--panel2)', color: 'var(--text)' }}>
+                        {m.mittente.slice(0, 2).toUpperCase()}
+                      </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
@@ -945,8 +904,8 @@ export default function Comunicazioni() {
                                 style={{ color: unread ? 'var(--text)' : 'var(--muted)' }}
                               >
                                 {isFromMe
-                                  ? `A: ${m.destinatari.slice(0, 2).map(d => userName(d)).join(', ')}${m.destinatari.length > 2 ? ` +${m.destinatari.length - 2}` : ''}`
-                                  : userName(m.mittente)}
+                                  ? `A: ${m.destinatari.slice(0, 2).join(', ')}${m.destinatari.length > 2 ? ` +${m.destinatari.length - 2}` : ''}`
+                                  : m.mittente}
                               </span>
                               {unread && (
                                 <span

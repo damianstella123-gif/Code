@@ -29,13 +29,14 @@ import {
   Trash2,
   Save,
 } from 'lucide-react'
-import { events } from '@/data/events'
-import { users } from '@/data/users'
-import { uscite } from '@/data/amministrazione'
 import { loadUser } from '@/lib/auth'
 import { loadTasksFromStorage } from '@/lib/storage'
 import { fetchSuppliers, upsertSupplier, deleteSupplier as deleteSupplierRemote } from '@/lib/suppliers-service'
+import { fetchEvents } from '@/lib/events-service'
+import { fetchBudgets } from '@/lib/budgets-service'
 import type { Supplier, StatoContratto } from '@/data/suppliers'
+import type { Event } from '@/data/events'
+import type { Uscita } from '@/data/amministrazione'
 
 const STORAGE_KEY_FORNITORI = 'simmetria_fornitori'
 
@@ -115,8 +116,8 @@ function RatingStars({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'l
 
 // ─── Supplier Form Modal ──────────────────────────────────────────────────────
 
-function SupplierFormModal({ supplier, onSave, onCancel }: {
-  supplier?: Supplier; onSave: (s: Supplier) => void; onCancel: () => void
+function SupplierFormModal({ supplier, events, onSave, onCancel }: {
+  supplier?: Supplier; events: Event[]; onSave: (s: Supplier) => void; onCancel: () => void
 }) {
   const [nome, setNome] = useState(supplier?.nome ?? '')
   const [email, setEmail] = useState(supplier?.email ?? '')
@@ -382,6 +383,8 @@ function DeleteConfirm({ name, onConfirm, onCancel }: {
 
 interface DetailProps {
   supplier: Supplier
+  events: Event[]
+  budgets: Uscita[]
   onBack: () => void
   showFinance: boolean
   onEdit: (s: Supplier) => void
@@ -389,14 +392,14 @@ interface DetailProps {
   onSaveNotes: (s: Supplier, notes: string) => void
 }
 
-function SupplierDetail({ supplier, onBack, showFinance, onEdit, onDelete, onSaveNotes }: DetailProps) {
+function SupplierDetail({ supplier, events, budgets, onBack, showFinance, onEdit, onDelete, onSaveNotes }: DetailProps) {
   const [tab, setTab] = useState<'overview' | 'eventi' | 'documenti' | 'recensioni'>('overview')
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesText, setNotesText] = useState(supplier.noteOperative)
 
   const linkedEvents = events.filter(e => supplier.eventiId.includes(e.id))
   const totalSpeso = showFinance
-    ? uscite.filter(u => u.fornitoreId === supplier.id).reduce((s, u) => s + u.importo, 0)
+    ? budgets.filter(u => u.fornitoreId === supplier.id).reduce((s, u) => s + u.importo, 0)
     : 0
   const ContrattoIcon = contrattoIcon(supplier.statoContratto)
   const days = daysToExpiry(supplier.scadenzaContratto)
@@ -704,7 +707,7 @@ function SupplierDetail({ supplier, onBack, showFinance, onEdit, onDelete, onSav
             const allTasks = loadTasksFromStorage()
             const evTasks = allTasks.filter(t => t.evento === ev.id)
             const spesaEvento = showFinance
-              ? uscite.filter(u => u.fornitoreId === supplier.id && u.eventoId === ev.id).reduce((s, u) => s + u.importo, 0)
+              ? budgets.filter(u => u.fornitoreId === supplier.id && u.eventoId === ev.id).reduce((s, u) => s + u.importo, 0)
               : 0
             return (
               <div key={ev.id} className="panel p-5 flex items-start gap-4">
@@ -787,19 +790,14 @@ function SupplierDetail({ supplier, onBack, showFinance, onEdit, onDelete, onSav
               <p>Nessuna recensione</p>
             </div>
           ) : supplier.recensioni.map(rec => {
-            const autore = users.find(u => u.id === rec.autoreId)
             const evRec = events.find(e => e.id === rec.eventoId)
             return (
               <div key={rec.id} className="panel p-5">
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex items-center gap-3">
-                    {autore ? (
-                      <img src={autore.avatar} alt={autore.nome} className="w-9 h-9 rounded-lg object-cover" />
-                    ) : (
-                      <div className="w-9 h-9 rounded-lg" style={{ background: 'var(--panel2)' }} />
-                    )}
+                    <div className="w-9 h-9 rounded-lg" style={{ background: 'var(--panel2)' }} />
                     <div>
-                      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{autore?.nome ?? 'Team'}</p>
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{rec.autoreId}</p>
                       {evRec && <p className="text-xs" style={{ color: 'var(--muted)' }}>{evRec.nome}</p>}
                     </div>
                   </div>
@@ -834,6 +832,8 @@ export default function Fornitori() {
   const currentUser = loadUser()
   const [searchParams, setSearchParams] = useSearchParams()
   const [supplierList, setSupplierList] = useState<Supplier[]>([])
+  const [eventsList, setEventsList] = useState<Event[]>([])
+  const [budgetsList, setBudgetsList] = useState<Uscita[]>([])
   const [selected, setSelected] = useState<Supplier | null>(null)
   const [search, setSearch] = useState('')
   const [filterCategoria, setFilterCategoria] = useState('Tutte')
@@ -843,14 +843,19 @@ export default function Fornitori() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | undefined>(undefined)
   const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null)
 
-  // Fornitori: fonte di verita' Supabase. Nessun fallback mock.
-  // La snapshot in localStorage resta solo per altri moduli che la leggono.
+  // Fornitori, Eventi, Budgets: fonte di verita' Supabase. Nessun fallback mock.
   useEffect(() => {
     let cancelled = false
-    fetchSuppliers().then(remote => {
+    Promise.all([
+      fetchSuppliers(),
+      fetchEvents(),
+      fetchBudgets(),
+    ]).then(([remote, remoteEvents, remoteBudgets]) => {
       if (cancelled) return
       setSupplierList(remote)
       cacheSuppliersToStorage(remote)
+      setEventsList(remoteEvents)
+      setBudgetsList(remoteBudgets)
     })
     return () => {
       cancelled = true
@@ -915,7 +920,7 @@ export default function Fornitori() {
       return supplierList.filter(s => s.referente === currentUser.nome || s.stato === 'attivo').map(s => s.id).slice(0, 1)
     }
     if (ruolo === 'Operativo') {
-      const myEventIds = events
+      const myEventIds = eventsList
         .filter(e => e.team.includes(currentUser.id) || e.responsabile === currentUser.id)
         .map(e => e.id)
       return supplierList.filter(s => s.eventiId.some(eid => myEventIds.includes(eid))).map(s => s.id)
@@ -924,7 +929,7 @@ export default function Fornitori() {
       return supplierList.filter(s => s.stato === 'attivo').map(s => s.id)
     }
     return 'all'
-  }, [ruolo, currentUser, supplierList])
+  }, [ruolo, currentUser, supplierList, eventsList])
 
   const baseList = useMemo(() =>
     allowedIds === 'all' ? supplierList : supplierList.filter(s => allowedIds.includes(s.id)),
@@ -958,6 +963,7 @@ export default function Fornitori() {
         {showForm && (
           <SupplierFormModal
             supplier={editingSupplier}
+            events={eventsList}
             onSave={handleSave}
             onCancel={() => { setShowForm(false); setEditingSupplier(undefined) }}
           />
@@ -971,6 +977,8 @@ export default function Fornitori() {
         )}
         <SupplierDetail
           supplier={liveSupplier}
+          events={eventsList}
+          budgets={budgetsList}
           onBack={() => setSelected(null)}
           showFinance={showFinance}
           onEdit={(s) => { setEditingSupplier(s); setShowForm(true) }}
@@ -986,6 +994,7 @@ export default function Fornitori() {
       {showForm && (
         <SupplierFormModal
           supplier={editingSupplier}
+          events={eventsList}
           onSave={handleSave}
           onCancel={() => { setShowForm(false); setEditingSupplier(undefined) }}
         />

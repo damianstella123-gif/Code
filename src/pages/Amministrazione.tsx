@@ -21,10 +21,6 @@ import {
   Edit3,
 } from 'lucide-react'
 import { loadUser, isPartnerUser } from '@/lib/auth'
-import {
-  entrate as initEntrate,
-  fatture as initFatture,
-} from '@/data/amministrazione'
 import type {
   Entrata,
   Uscita,
@@ -32,28 +28,27 @@ import type {
   StatoPagamento,
   TipoMovimento,
 } from '@/data/amministrazione'
-import { suppliers } from '@/data/suppliers'
+import type { Supplier } from '@/data/suppliers'
 import type { Event } from '@/data/events'
 import { fetchBudgets, upsertBudget, updateBudget, deleteBudget } from '@/lib/budgets-service'
 import { fetchEvents } from '@/lib/events-service'
-import { loadEventsFromStorage, cacheEventsSnapshot, loadClientsFromStorage } from '@/lib/storage'
+import { fetchSuppliers } from '@/lib/suppliers-service'
+import { fetchClients } from '@/lib/clients-service'
 
-// ─── localStorage ────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const SK_ENTRATE = 'simmetria_entrate'
 const SK_FATTURE = 'simmetria_fatture'
 
-function load<T>(key: string, fallback: T[]): T[] {
+function loadLocal<T>(key: string): T[] {
   try {
     const r = localStorage.getItem(key)
-    return r ? JSON.parse(r) : fallback
-  } catch { return fallback }
+    return r ? JSON.parse(r) : []
+  } catch { return [] }
 }
-function save(key: string, data: unknown) {
+function saveLocal(key: string, data: unknown) {
   localStorage.setItem(key, JSON.stringify(data))
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatEur(n: number) {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -112,15 +107,19 @@ function statoFatLabel(s: Fattura['stato']) {
   }
 }
 
+let _clients: { id: string; nome: string }[] = []
+let _suppliers: Supplier[] = []
+let _events: Event[] = []
+
 function clientName(id: string) {
-  return loadClientsFromStorage().find(c => c.id === id)?.nome ?? id
+  return _clients.find(c => c.id === id)?.nome ?? id
 }
 function supplierName(id: string) {
-  return suppliers.find(s => s.id === id)?.nome ?? id
+  return _suppliers.find(s => s.id === id)?.nome ?? id
 }
 function eventName(id: string | null) {
   if (!id) return '—'
-  return loadEventsFromStorage().find(e => e.id === id)?.nome ?? id
+  return _events.find(e => e.id === id)?.nome ?? id
 }
 
 // ─── Modale nuovo movimento ───────────────────────────────────────────────────
@@ -128,9 +127,12 @@ function eventName(id: string | null) {
 interface NuovoMovimentoModalProps {
   onClose: () => void
   onSave: (tipo: TipoMovimento, importo: number, note: string, eventoId: string | null, soggettoId: string) => void
+  clients: { id: string; nome: string }[]
+  suppliers: Supplier[]
+  events: Event[]
 }
 
-function NuovoMovimentoModal({ onClose, onSave }: NuovoMovimentoModalProps) {
+function NuovoMovimentoModal({ onClose, onSave, clients, suppliers, events }: NuovoMovimentoModalProps) {
   const [tipo, setTipo] = useState<TipoMovimento>('entrata')
   const [importo, setImporto] = useState('')
   const [note, setNote] = useState('')
@@ -140,7 +142,7 @@ function NuovoMovimentoModal({ onClose, onSave }: NuovoMovimentoModalProps) {
   function handleSave() {
     const amt = parseFloat(importo.replace(',', '.'))
     if (!amt || amt <= 0) return
-    const defaultSoggetto = tipo === 'entrata' ? (loadClientsFromStorage()[0]?.id ?? '') : (suppliers[0]?.id ?? '')
+    const defaultSoggetto = tipo === 'entrata' ? (clients[0]?.id ?? '') : (suppliers[0]?.id ?? '')
     onSave(tipo, amt, note, eventoId === 'none' ? null : eventoId, soggettoId || defaultSoggetto)
   }
 
@@ -215,7 +217,7 @@ function NuovoMovimentoModal({ onClose, onSave }: NuovoMovimentoModalProps) {
             >
               <option value="">Seleziona…</option>
               {tipo === 'entrata'
-                ? loadClientsFromStorage().map(c => <option key={c.id} value={c.id}>{c.nome}</option>)
+                ? clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)
                 : suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)
               }
             </select>
@@ -231,7 +233,7 @@ function NuovoMovimentoModal({ onClose, onSave }: NuovoMovimentoModalProps) {
               style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
             >
               <option value="none">Nessun evento</option>
-              {loadEventsFromStorage().map(ev => (
+              {events.map(ev => (
                 <option key={ev.id} value={ev.id}>{ev.nome}</option>
               ))}
             </select>
@@ -323,10 +325,12 @@ export default function Amministrazione() {
     if (paramTab === 'entrate' || paramTab === 'uscite' || paramTab === 'fatture') return paramTab
     return 'dashboard'
   })
-  const [entrate, setEntrate] = useState<Entrata[]>(() => load(SK_ENTRATE, initEntrate))
+  const [entrate, setEntrate] = useState<Entrata[]>(() => loadLocal(SK_ENTRATE))
   const [uscite, setUscite] = useState<Uscita[]>([])
-  const [events, setEvents] = useState<Event[]>(() => loadEventsFromStorage())
-  const [fatture, setFatture] = useState<Fattura[]>(() => load(SK_FATTURE, initFatture))
+  const [events, setEvents] = useState<Event[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [clients, setClients] = useState<{ id: string; nome: string }[]>([])
+  const [fatture, setFatture] = useState<Fattura[]>(() => loadLocal(SK_FATTURE))
   const [showNuovoMovimento, setShowNuovoMovimento] = useState(false)
 
   useEffect(() => {
@@ -335,21 +339,19 @@ export default function Amministrazione() {
     }
   }, [searchParams, setSearchParams])
 
-  // Uscite (Economico): fonte di verita' Supabase via tabella `budgets`.
   useEffect(() => {
     let cancelled = false
-    fetchBudgets().then(remote => {
+    Promise.all([fetchBudgets(), fetchEvents(), fetchSuppliers(), fetchClients()]).then(([bg, ev, sp, cl]) => {
       if (cancelled) return
-      setUscite(remote)
+      setUscite(bg)
+      setEvents(ev)
+      setSuppliers(sp)
+      setClients(cl.map(c => ({ id: c.id, nome: c.nome })))
+      _clients = cl.map(c => ({ id: c.id, nome: c.nome }))
+      _suppliers = sp
+      _events = ev
     })
-    fetchEvents().then(remote => {
-      if (cancelled) return
-      setEvents(remote)
-      cacheEventsSnapshot(remote)
-    })
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [])
 
   async function refreshUscite() {
@@ -448,7 +450,7 @@ export default function Amministrazione() {
       const updated = prev.map(e =>
         e.id === id ? { ...e, stato: 'pagato' as StatoPagamento, dataPagamento: new Date().toISOString().slice(0, 10) } : e
       )
-      save(SK_ENTRATE, updated)
+      saveLocal(SK_ENTRATE, updated)
       return updated
     })
   }
@@ -464,7 +466,7 @@ export default function Amministrazione() {
   function eliminaEntrata(id: string) {
     setEntrate(prev => {
       const updated = prev.filter(e => e.id !== id)
-      save(SK_ENTRATE, updated)
+      saveLocal(SK_ENTRATE, updated)
       return updated
     })
   }
@@ -477,7 +479,7 @@ export default function Amministrazione() {
   function editEntrata(id: string, importo: number, note: string) {
     setEntrate(prev => {
       const updated = prev.map(e => e.id === id ? { ...e, importo, note } : e)
-      save(SK_ENTRATE, updated)
+      saveLocal(SK_ENTRATE, updated)
       return updated
     })
   }
@@ -506,35 +508,72 @@ export default function Amministrazione() {
     }
     setFatture(prev => {
       const updated = [...prev, newFat]
-      save(SK_FATTURE, updated)
+      saveLocal(SK_FATTURE, updated)
       return updated
     })
     alert(`Fattura ${num} creata in bozza.`)
   }
 
-  function esportaRiepilogo() {
-    const lines = [
-      'SIMMETRIA HUB — Riepilogo Amministrativo',
-      `Data: ${new Date().toLocaleDateString('it-IT')}`,
-      '',
-      `Budget eventi: ${formatEur(budgetEvents)}`,
-      `Totale entrate: ${formatEur(totEntrate)}`,
-      `Totale uscite: ${formatEur(totUscite)}`,
-      `Margine stimato: ${formatEur(margine)} (${marginePerc}%)`,
-      `Pagamenti in sospeso: ${formatEur(totInAttesa)}`,
-      `Incassi scaduti: ${formatEur(totScaduto)}`,
-      '',
-      'ENTRATE',
-      ...visibleEntrate.map(e => `  ${clientName(e.clienteId)} | ${eventName(e.eventoId)} | ${formatEur(e.importo)} | ${statoPagLabel(e.stato)}`),
-      '',
-      'USCITE',
-      ...visibleUscite.map(u => `  ${supplierName(u.fornitoreId)} | ${eventName(u.eventoId)} | ${formatEur(u.importo)} | ${statoPagLabel(u.stato)}`),
-    ]
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `simmetria_riepilogo_${new Date().toISOString().slice(0, 10)}.txt`
-    a.click()
+  async function esportaXLSX() {
+    const XLSX = await import('xlsx')
+    const usciteRows = visibleUscite.map(u => ({
+      'Fornitore': supplierName(u.fornitoreId),
+      'Evento': eventName(u.eventoId),
+      'Categoria': u.categoria,
+      'Quantita': u.quantity,
+      'Prezzo Unitario': u.unitPrice ?? '',
+      'Importo': u.importo,
+      'Stato': statoPagLabel(u.stato),
+      'Scadenza': u.scadenza,
+      'Data Pagamento': u.dataPagamento ?? '',
+      'Note': u.note,
+    }))
+    const entrateRows = visibleEntrate.map(e => ({
+      'Cliente': clientName(e.clienteId),
+      'Evento': eventName(e.eventoId),
+      'Importo': e.importo,
+      'Stato': statoPagLabel(e.stato),
+      'Data Prevista': e.dataPrevista,
+      'Data Pagamento': e.dataPagamento ?? '',
+      'Metodo': e.metodoPagamento,
+      'Note': e.note,
+    }))
+    const wb = XLSX.utils.book_new()
+    const wsU = XLSX.utils.json_to_sheet(usciteRows)
+    const wsE = XLSX.utils.json_to_sheet(entrateRows)
+    XLSX.utils.book_append_sheet(wb, wsU, 'Uscite')
+    XLSX.utils.book_append_sheet(wb, wsE, 'Entrate')
+    XLSX.writeFile(wb, `simmetria_budget_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
+  async function esportaPDF() {
+    const jsPDFModule = await import('jspdf')
+    const autoTable = (await import('jspdf-autotable')).default
+    const doc = new jsPDFModule.default()
+    doc.setFontSize(16)
+    doc.text('SIMMETRIA HUB - Riepilogo Budget', 14, 20)
+    doc.setFontSize(10)
+    doc.text(`Data: ${new Date().toLocaleDateString('it-IT')}`, 14, 28)
+    doc.text(`Budget eventi: ${formatEur(budgetEvents)}  |  Entrate: ${formatEur(totEntrate)}  |  Uscite: ${formatEur(totUscite)}  |  Margine: ${formatEur(margine)} (${marginePerc}%)`, 14, 34)
+
+    autoTable(doc, {
+      startY: 42,
+      head: [['Fornitore', 'Evento', 'Categoria', 'Qta', 'P.Unit.', 'Importo', 'Stato', 'Scadenza']],
+      body: visibleUscite.map(u => [
+        supplierName(u.fornitoreId),
+        eventName(u.eventoId),
+        u.categoria,
+        String(u.quantity),
+        u.unitPrice != null ? formatEur(u.unitPrice) : '-',
+        formatEur(u.importo),
+        statoPagLabel(u.stato),
+        u.scadenza,
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [220, 30, 60] },
+    })
+
+    doc.save(`simmetria_budget_${new Date().toISOString().slice(0, 10)}.pdf`)
   }
 
   function handleNuovoMovimento(tipo: TipoMovimento, importo: number, note: string, eventoId: string | null, soggettoId: string) {
@@ -552,7 +591,7 @@ export default function Amministrazione() {
         note,
         fatturaId: null,
       }
-      setEntrate(prev => { const u = [...prev, newE]; save(SK_ENTRATE, u); return u })
+      setEntrate(prev => { const u = [...prev, newE]; saveLocal(SK_ENTRATE, u); return u })
     } else {
       const newU: Uscita = {
         id: `usc_new_${Date.now()}`,
@@ -560,6 +599,8 @@ export default function Amministrazione() {
         eventoId,
         categoria: 'Altro',
         importo,
+        quantity: 1,
+        unitPrice: null,
         stato: 'in_attesa',
         scadenza: today,
         dataPagamento: null,
@@ -611,11 +652,18 @@ export default function Amministrazione() {
             <Plus className="w-4 h-4" /> Movimento
           </button>
           <button
-            onClick={esportaRiepilogo}
+            onClick={esportaXLSX}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
             style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}
           >
-            <Download className="w-4 h-4" /> Esporta
+            <Download className="w-4 h-4" /> XLSX
+          </button>
+          <button
+            onClick={esportaPDF}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
+            style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}
+          >
+            <FileText className="w-4 h-4" /> PDF
           </button>
         </div>
       </div>
@@ -1200,6 +1248,9 @@ export default function Amministrazione() {
         <NuovoMovimentoModal
           onClose={() => setShowNuovoMovimento(false)}
           onSave={handleNuovoMovimento}
+          clients={clients}
+          suppliers={suppliers}
+          events={events}
         />
       )}
     </div>

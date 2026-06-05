@@ -25,12 +25,12 @@ import {
   ScrollText,
 } from 'lucide-react'
 import { type Pratica, type CategoriaPratica, type StatoPratica, type PrioritaPratica } from '@/data/pratiche'
-import { events } from '@/data/events'
-import { users } from '@/data/users'
+import type { Event } from '@/data/events'
 import { loadUser } from '@/lib/auth'
 import { daysLeft, fmtShort } from '@/lib/format'
 import { cachePraticheSnapshot } from '@/lib/storage'
 import { fetchPractices, upsertPractice, deletePractice as deletePracticeRemote } from '@/lib/practices-service'
+import { fetchEvents } from '@/lib/events-service'
 
 const CATEGORIE: { id: CategoriaPratica; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'contratto', label: 'Contratto', icon: Briefcase, color: 'var(--red2)' },
@@ -77,6 +77,7 @@ export default function Pratiche() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [view, setView] = useState<View>('list')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [allEvents, setAllEvents] = useState<Event[]>([])
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -94,6 +95,18 @@ export default function Pratiche() {
       if (cancelled) return
       setAllPratiche(remote)
       cachePraticheSnapshot(remote)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Load events from Supabase
+  useEffect(() => {
+    let cancelled = false
+    fetchEvents().then(events => {
+      if (cancelled) return
+      setAllEvents(events)
     })
     return () => {
       cancelled = true
@@ -182,12 +195,12 @@ export default function Pratiche() {
   }
 
   if (view === 'detail' && selected) {
-    return <DetailView pratica={selected} onBack={() => setView('list')} onEdit={() => openEdit(selected.id)} onDelete={() => deletePratica(selected.id)} />
+    return <DetailView pratica={selected} onBack={() => setView('list')} onEdit={() => openEdit(selected.id)} onDelete={() => deletePratica(selected.id)} allEvents={allEvents} />
   }
 
   if (view === 'form') {
     const editing = editingId ? allPratiche.find(p => p.id === editingId) : undefined
-    return <FormView pratica={editing} onSave={savePratica} onCancel={() => { setView(selectedId ? 'detail' : 'list') }} />
+    return <FormView pratica={editing} onSave={savePratica} onCancel={() => { setView(selectedId ? 'detail' : 'list') }} allEvents={allEvents} />
   }
 
   return (
@@ -267,7 +280,7 @@ export default function Pratiche() {
             <select value={filterEvento} onChange={e => setFilterEvento(e.target.value)}
               className="input w-full py-2 text-sm rounded-lg">
               <option value="tutti">Tutti</option>
-              {events.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
+              {allEvents.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
               <option value="none">Senza evento</option>
             </select>
           </div>
@@ -301,8 +314,7 @@ export default function Pratiche() {
             const dl = daysLeft(p.scadenza)
             const overdue = p.stato !== 'completata' && dl < 0
             const CatIcon = catIcon(p.categoria)
-            const evento = p.eventoId ? events.find(e => e.id === p.eventoId) : null
-            const resp = users.find(u => u.id === p.responsabileId)
+            const evento = p.eventoId ? allEvents.find(e => e.id === p.eventoId) : null
             return (
               <button key={p.id}
                 onClick={() => openDetail(p.id)}
@@ -334,7 +346,7 @@ export default function Pratiche() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  {resp && <img src={resp.avatar} alt="" className="w-6 h-6 rounded-lg object-cover hidden sm:block" />}
+                  {p.responsabileId && <span className="text-xs px-2 py-0.5 rounded font-medium hidden sm:block" style={{ background: 'rgba(77,180,255,0.15)', color: 'var(--blue)' }}>{p.responsabileId}</span>}
                   <span className="text-xs px-2 py-0.5 rounded"
                     style={{ background: `${statoColor(p.stato)}15`, color: statoColor(p.stato), border: `1px solid ${statoColor(p.stato)}25` }}>
                     {statoLabel(p.stato)}
@@ -380,12 +392,11 @@ function KpiMini({ label, value, icon: Icon, color, pulse }: {
 
 // ─── Detail View ──────────────────────────────────────────────────────────────
 
-function DetailView({ pratica, onBack, onEdit, onDelete }: {
-  pratica: Pratica; onBack: () => void; onEdit: () => void; onDelete: () => void
+function DetailView({ pratica, onBack, onEdit, onDelete, allEvents }: {
+  pratica: Pratica; onBack: () => void; onEdit: () => void; onDelete: () => void; allEvents: Event[]
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const evento = pratica.eventoId ? events.find(e => e.id === pratica.eventoId) : null
-  const resp = users.find(u => u.id === pratica.responsabileId)
+  const evento = pratica.eventoId ? allEvents.find(e => e.id === pratica.eventoId) : null
   const dl = daysLeft(pratica.scadenza)
   const overdue = pratica.stato !== 'completata' && dl < 0
   const CatIcon = catIcon(pratica.categoria)
@@ -460,7 +471,7 @@ function DetailView({ pratica, onBack, onEdit, onDelete }: {
         {pratica.importo && (
           <InfoCard icon={Euro} label="Importo" value={`€${pratica.importo.toLocaleString('it-IT')}`} color="var(--green)" />
         )}
-        <InfoCard icon={User} label="Responsabile" value={resp?.nome ?? '—'} color="var(--blue)" avatar={resp?.avatar} />
+        <InfoCard icon={User} label="Responsabile" value={pratica.responsabileId ?? '—'} color="var(--blue)" />
         <InfoCard icon={Briefcase} label="Controparte" value={pratica.controparte} color="var(--text)" />
         {evento && (
           <InfoCard icon={Calendar} label="Evento" value={evento.nome} color="var(--red2)" />
@@ -501,8 +512,8 @@ function InfoCard({ icon: Icon, label, value, color, avatar }: {
 
 // ─── Form View ────────────────────────────────────────────────────────────────
 
-function FormView({ pratica, onSave, onCancel }: {
-  pratica?: Pratica; onSave: (p: Pratica) => void; onCancel: () => void
+function FormView({ pratica, onSave, onCancel, allEvents }: {
+  pratica?: Pratica; onSave: (p: Pratica) => void; onCancel: () => void; allEvents: Event[]
 }) {
   const [titolo, setTitolo] = useState(pratica?.titolo ?? '')
   const [descrizione, setDescrizione] = useState(pratica?.descrizione ?? '')
@@ -612,14 +623,19 @@ function FormView({ pratica, onSave, onCancel }: {
             <select value={eventoId} onChange={e => setEventoId(e.target.value)}
               className="input w-full py-2.5 text-sm rounded-lg">
               <option value="">Nessuno</option>
-              {events.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
+              {allEvents.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
             </select>
           </div>
           <div>
             <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Responsabile</label>
             <select value={responsabileId} onChange={e => setResponsabileId(e.target.value)}
               className="input w-full py-2.5 text-sm rounded-lg">
-              {users.filter(u => u.ruolo !== 'Fornitore').map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+              <option value="">Seleziona responsabile</option>
+              <option value="Admin">Admin</option>
+              <option value="Manager">Manager</option>
+              <option value="Finance">Finance</option>
+              <option value="Commerciale">Commerciale</option>
+              <option value="Operativo">Operativo</option>
             </select>
           </div>
           <div>

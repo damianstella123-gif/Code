@@ -20,7 +20,6 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   FileText,
-  Star,
   Zap,
   ImageIcon,
   Type,
@@ -30,15 +29,17 @@ import {
   Trash2,
   Check,
 } from 'lucide-react'
-import { users } from '@/data/users'
-import { suppliers } from '@/data/suppliers'
-import { messaggi } from '@/data/comunicazioni'
-import { entrate, uscite } from '@/data/amministrazione'
 import { loadUser } from '@/lib/auth'
 import { loadTasksFromStorage, cacheEventsSnapshot, loadClientsFromStorage } from '@/lib/storage'
 import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote } from '@/lib/events-service'
+import { fetchSuppliers } from '@/lib/suppliers-service'
+import { fetchBudgets } from '@/lib/budgets-service'
+import { fetchCommunications } from '@/lib/communications-service'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
+import type { Supplier } from '@/data/suppliers'
+import type { Messaggio } from '@/data/comunicazioni'
+import type { Uscita } from '@/data/amministrazione'
 
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 type StatoEvento = Event['stato']
@@ -96,8 +97,15 @@ function getTimeline(event: Event) {
 
 // ─── Event Form Modal ─────────────────────────────────────────────────────────
 
-function EventFormModal({ event, onSave, onCancel }: {
+interface InternalUser {
+  id: string
+  nome: string
+  avatar: string
+}
+
+function EventFormModal({ event, internalUsers, onSave, onCancel }: {
   event?: Event
+  internalUsers: InternalUser[]
   onSave: (e: Event) => void
   onCancel: () => void
 }) {
@@ -136,8 +144,6 @@ function EventFormModal({ event, onSave, onCancel }: {
   const toggleTeamMember = (id: string) => {
     setTeamIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
-
-  const internalUsers = users.filter(u => u.ruolo !== 'Fornitore')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
@@ -309,37 +315,23 @@ function DeleteConfirm({ eventName, onConfirm, onCancel }: {
 
 // ─── Tab content components ───────────────────────────────────────────────────
 
-function TabOverview({ event, progress, completedTasks, totalTasks }: {
+function TabOverview({ event, progress, completedTasks, totalTasks, budgets }: {
   event: Event
   progress: number
   completedTasks: number
   totalTasks: number
+  budgets: Uscita[]
 }) {
-  const responsabile = users.find(u => u.id === event.responsabile)
-  const cliente = loadClientsFromStorage().find(c => c.id === event.cliente)
-  const eventEntrate = entrate.filter(e => e.eventoId === event.id)
-  const eventUscite = uscite.filter(u => u.eventoId === event.id)
-  const totEntrate = eventEntrate.reduce((s, e) => s + e.importo, 0)
+  const eventUscite = budgets.filter(u => u.eventoId === event.id)
   const totUscite = eventUscite.reduce((s, u) => s + u.importo, 0)
   const speso = totUscite > 0 ? totUscite : Math.round(event.budget * 0.62)
   const residuo = event.budget - speso
   const usoPct = event.budget > 0 ? Math.round((speso / event.budget) * 100) : 0
 
+  const cliente = loadClientsFromStorage().find(c => c.id === event.cliente)
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {responsabile && (
-        <div className="panel p-5">
-          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Responsabile</p>
-          <div className="flex items-center gap-3">
-            <img src={responsabile.avatar} alt={responsabile.nome} className="w-12 h-12 rounded-xl object-cover" />
-            <div>
-              <p className="font-semibold" style={{ color: 'var(--text)' }}>{responsabile.nome}</p>
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>{responsabile.ruolo} · {responsabile.reparto}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {cliente && (
         <div className="panel p-5">
           <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Cliente</p>
@@ -406,7 +398,7 @@ function TabOverview({ event, progress, completedTasks, totalTasks }: {
               <span className="text-sm" style={{ color: 'var(--muted)' }}>Entrate previste</span>
             </div>
             <span className="font-semibold text-sm" style={{ color: 'var(--green)' }}>
-              €{totEntrate > 0 ? totEntrate.toLocaleString('it-IT') : event.budget.toLocaleString('it-IT')}
+              €{event.budget.toLocaleString('it-IT')}
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -465,7 +457,6 @@ function TabTask({ event }: { event: Event }) {
       ) : (
         <div className="space-y-2">
           {filtered.map(task => {
-            const assignee = users.find(u => u.id === task.assegnatario)
             const dl = daysLeft(task.scadenza)
             const isOverdue = dl < 0
             const priColor = task.priorita === 'alta' ? 'var(--red2)' : task.priorita === 'media' ? 'var(--yellow)' : 'var(--muted)'
@@ -478,10 +469,6 @@ function TabTask({ event }: { event: Event }) {
                   <p className="font-medium text-sm" style={{ color: 'var(--text)' }}>{task.titolo}</p>
                   <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--muted)' }}>{task.descrizione}</p>
                 </div>
-                {assignee && (
-                  <img src={assignee.avatar} alt={assignee.nome}
-                    className="w-8 h-8 rounded-lg object-cover flex-shrink-0" title={assignee.nome} />
-                )}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className="text-xs px-2 py-1 rounded" style={{ background: statoBg, color: sColor }}>
                     {task.stato === 'da_fare' ? 'Da fare' : task.stato === 'in_corso' ? 'In corso' : 'Fatto'}
@@ -501,94 +488,18 @@ function TabTask({ event }: { event: Event }) {
   )
 }
 
-function TabTeam({ event }: { event: Event }) {
-  const allTasks = loadTasksFromStorage()
-  const eventTasks = allTasks.filter(t => t.evento === event.id)
-  const eventTeam = users.filter(u => event.team.includes(u.id))
-  const responsabile = users.find(u => u.id === event.responsabile)
-
+function TabTeam({ event: _event }: { event: Event }) {
   return (
     <div className="space-y-4">
-      {responsabile && !event.team.includes(responsabile.id) && (
-        <div className="panel p-5 flex items-center gap-4"
-          style={{ border: '1px solid rgba(208,0,58,0.2)', background: 'rgba(208,0,58,0.03)' }}>
-          <div className="relative">
-            <img src={responsabile.avatar} alt={responsabile.nome} className="w-12 h-12 rounded-xl object-cover" />
-            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
-              style={{ background: 'var(--red2)' }}>
-              <Star className="w-3 h-3 text-white" />
-            </div>
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <p className="font-semibold" style={{ color: 'var(--text)' }}>{responsabile.nome}</p>
-              <span className="text-xs px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.25)' }}>
-                Responsabile
-              </span>
-            </div>
-            <p className="text-sm" style={{ color: 'var(--muted)' }}>{responsabile.ruolo} · {responsabile.reparto}</p>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {eventTeam.map(member => {
-          const memberTasks = eventTasks.filter(t => t.assegnatario === member.id)
-          const isResp = member.id === event.responsabile
-          const completati = memberTasks.filter(t => t.stato === 'completato').length
-          const pct = memberTasks.length > 0 ? Math.round((completati / memberTasks.length) * 100) : 0
-
-          return (
-            <div key={member.id} className="panel p-5">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <img src={member.avatar} alt={member.nome} className="w-12 h-12 rounded-xl object-cover" />
-                  {isResp && (
-                    <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
-                      style={{ background: 'var(--red2)' }}>
-                      <Star className="w-3 h-3 text-white" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{member.nome}</p>
-                  <p className="text-xs" style={{ color: 'var(--muted)' }}>{member.ruolo}</p>
-                </div>
-              </div>
-              <div className="mt-3 pt-3 space-y-2" style={{ borderTop: '1px solid var(--line)' }}>
-                <div className="grid grid-cols-2 gap-2 text-center">
-                  <div className="p-2 rounded-lg" style={{ background: 'var(--panel2)' }}>
-                    <p className="text-xs" style={{ color: 'var(--muted)' }}>Task</p>
-                    <p className="font-bold text-sm" style={{ color: 'var(--text)' }}>{memberTasks.length}</p>
-                  </div>
-                  <div className="p-2 rounded-lg" style={{ background: 'var(--panel2)' }}>
-                    <p className="text-xs" style={{ color: 'var(--muted)' }}>Completati</p>
-                    <p className="font-bold text-sm" style={{ color: 'var(--green)' }}>{completati}</p>
-                  </div>
-                </div>
-                {memberTasks.length > 0 && (
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span style={{ color: 'var(--muted)' }}>Progresso</span>
-                      <span style={{ color: 'var(--text)' }}>{pct}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--line)' }}>
-                      <div className="h-full rounded-full transition-all"
-                        style={{ width: `${pct}%`, background: pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--blue)' : 'var(--red2)' }} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        })}
+      <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
+        <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+        <p>Gestione team disponibile dal profilo utente</p>
       </div>
     </div>
   )
 }
 
-function TabFornitori({ event }: { event: Event }) {
+function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const eventSuppliers = suppliers.filter(s => s.eventiId.includes(event.id))
 
   if (eventSuppliers.length === 0) {
@@ -598,7 +509,7 @@ function TabFornitori({ event }: { event: Event }) {
   return <TabFornitoriList suppliers={eventSuppliers} />
 }
 
-function TabFornitoriList({ suppliers: list }: { suppliers: typeof suppliers }) {
+function TabFornitoriList({ suppliers: list }: { suppliers: Supplier[] }) {
   return (
     <div className="space-y-3">
       {list.length === 0 ? (
@@ -653,12 +564,10 @@ function TabFornitoriList({ suppliers: list }: { suppliers: typeof suppliers }) 
   )
 }
 
-function TabBudget({ event }: { event: Event }) {
-  const eventEntrate = entrate.filter(e => e.eventoId === event.id)
-  const eventUscite = uscite.filter(u => u.eventoId === event.id)
-  const totEntrate = eventEntrate.reduce((s, e) => s + e.importo, 0)
+function TabBudget({ event, budgets, suppliers }: { event: Event; budgets: Uscita[]; suppliers: Supplier[] }) {
+  const eventUscite = budgets.filter(u => u.eventoId === event.id)
   const totUscite = eventUscite.reduce((s, u) => s + u.importo, 0)
-  const margine = (totEntrate || event.budget) - totUscite
+  const margine = event.budget - totUscite
   const usoPct = event.budget > 0 ? Math.min(Math.round((totUscite / event.budget) * 100), 100) : 0
 
   const sColor = (s: string) => {
@@ -684,7 +593,7 @@ function TabBudget({ event }: { event: Event }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Budget Totale', value: event.budget, color: 'var(--text)' },
-          { label: 'Entrate Prev.', value: totEntrate || event.budget, color: 'var(--green)' },
+          { label: 'Entrate Prev.', value: event.budget, color: 'var(--green)' },
           { label: 'Uscite', value: totUscite, color: 'var(--yellow)' },
           { label: 'Margine', value: margine, color: margine >= 0 ? 'var(--green)' : 'var(--red2)' },
         ].map(k => (
@@ -711,38 +620,6 @@ function TabBudget({ event }: { event: Event }) {
           <span>€{event.budget.toLocaleString('it-IT')}</span>
         </div>
       </div>
-
-      {eventEntrate.length > 0 && (
-        <div className="panel p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <ArrowDownLeft className="w-4 h-4" style={{ color: 'var(--green)' }} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Entrate ({eventEntrate.length})</h3>
-          </div>
-          <div className="space-y-2">
-            {eventEntrate.map(e => {
-              const c = loadClientsFromStorage().find(cl => cl.id === e.clienteId)
-              return (
-                <div key={e.id} className="flex items-center gap-3 p-3 rounded-xl"
-                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{e.note}</p>
-                    <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                      {c?.nome ?? '—'} · Prev. {fmtShort(e.dataPrevista)}
-                    </p>
-                  </div>
-                  <span className="text-xs px-2 py-1 rounded flex-shrink-0"
-                    style={{ background: statoBg(e.stato), color: sColor(e.stato) }}>
-                    {statoLbl(e.stato)}
-                  </span>
-                  <span className="font-semibold text-sm flex-shrink-0" style={{ color: 'var(--green)' }}>
-                    €{e.importo.toLocaleString('it-IT')}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       {eventUscite.length > 0 && (
         <div className="panel p-5">
@@ -776,7 +653,7 @@ function TabBudget({ event }: { event: Event }) {
         </div>
       )}
 
-      {eventEntrate.length === 0 && eventUscite.length === 0 && (
+      {eventUscite.length === 0 && (
         <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <Euro className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p>Nessuna voce finanziaria registrata per questo evento</p>
@@ -787,10 +664,10 @@ function TabBudget({ event }: { event: Event }) {
   )
 }
 
-function TabComunicazioni({ event }: { event: Event }) {
+function TabComunicazioni({ event, comunicazioni }: { event: Event; comunicazioni: Messaggio[] }) {
   const currentUser = loadUser()
   const userId = currentUser?.id ?? ''
-  const evtMsg = messaggi.filter(m => m.eventoId === event.id)
+  const evtMsg = comunicazioni.filter(m => m.eventoId === event.id)
 
   return (
     <div className="space-y-3">
@@ -800,23 +677,19 @@ function TabComunicazioni({ event }: { event: Event }) {
           <p>Nessuna comunicazione per questo evento</p>
         </div>
       ) : evtMsg.map(msg => {
-        const sender = users.find(u => u.id === msg.mittente)
         const unread = !msg.letto.includes(userId) && msg.destinatari.includes(userId)
         const priColor = msg.priorita === 'alta' ? 'var(--red2)' : msg.priorita === 'media' ? 'var(--yellow)' : 'var(--muted)'
         return (
           <div key={msg.id} className="panel p-5"
             style={{ border: unread ? '1px solid rgba(77,180,255,0.3)' : '1px solid var(--line)' }}>
             <div className="flex items-start gap-3">
-              {sender?.avatar
-                ? <img src={sender.avatar} alt={sender.nome} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
-                : <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: 'var(--panel2)' }} />
-              }
+              <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: 'var(--panel2)' }} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{msg.oggetto}</p>
                     <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                      Da: {sender?.nome ?? '—'} · {new Date(msg.data).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      Da: {msg.mittente} · {new Date(msg.data).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -1041,14 +914,18 @@ interface EventDetailProps {
   onEdit: (event: Event) => void
   onDelete: (event: Event) => void
   onStatusChange: (event: Event, newStato: StatoEvento) => void
+  budgets: Uscita[]
+  suppliers: Supplier[]
+  comunicazioni: Messaggio[]
+  internalUsers: InternalUser[]
 }
 
-function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange }: EventDetailProps) {
+function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni }: EventDetailProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
 
   const allTasks = loadTasksFromStorage()
   const eventTasks = allTasks.filter(t => t.evento === event.id)
-  const eventMsg = messaggi.filter(m => m.eventoId === event.id)
+  const eventMsg = comunicazioni.filter(m => m.eventoId === event.id)
   const eventSuppliers = suppliers.filter(s => s.eventiId.includes(event.id))
 
   const completedTasks = eventTasks.filter(t => t.stato === 'completato').length
@@ -1209,13 +1086,13 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange }: EventD
       {/* Tab Content */}
       <div key={activeTab} className="animate-fade-in">
         {activeTab === 'overview' && (
-          <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} />
+          <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} />
         )}
         {activeTab === 'task' && <TabTask event={event} />}
         {activeTab === 'team' && <TabTeam event={event} />}
-        {activeTab === 'fornitori' && <TabFornitori event={event} />}
-        {activeTab === 'budget' && <TabBudget event={event} />}
-        {activeTab === 'comunicazioni' && <TabComunicazioni event={event} />}
+        {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} />}
+        {activeTab === 'budget' && <TabBudget event={event} budgets={budgets} suppliers={suppliers} />}
+        {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'timeline' && <TabTimeline event={event} />}
         {activeTab === 'creative' && <TabCreative event={event} />}
       </div>
@@ -1236,9 +1113,12 @@ export default function Eventi() {
   const [editingEvent, setEditingEvent] = useState<Event | undefined>(undefined)
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [budgets, setBudgets] = useState<Uscita[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [comunicazioni, setComunicazioni] = useState<Messaggio[]>([])
+  const [internalUsers, setInternalUsers] = useState<InternalUser[]>([])
 
-  // Eventi: fonte di verita' Supabase. Nessun fallback mock.
-  // La snapshot in localStorage resta solo per gli altri moduli che la leggono.
+  // Load events
   useEffect(() => {
     let cancelled = false
     fetchEvents().then(remote => {
@@ -1249,6 +1129,36 @@ export default function Eventi() {
     return () => {
       cancelled = true
     }
+  }, [])
+
+  // Load budgets, suppliers, communications
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      fetchBudgets(),
+      fetchSuppliers(),
+      fetchCommunications(),
+    ]).then(([budgetsData, suppliersData, comunicazioniData]) => {
+      if (cancelled) return
+      setBudgets(budgetsData)
+      setSuppliers(suppliersData)
+      setComunicazioni(comunicazioniData)
+    }).catch(err => {
+      console.error('Error loading data:', err)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Mock internal users for team/responsabile fields
+  useEffect(() => {
+    setInternalUsers([
+      { id: 'user_1', nome: 'Marco Rossi', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Marco' },
+      { id: 'user_2', nome: 'Laura Bianchi', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Laura' },
+      { id: 'user_3', nome: 'Giovanni Verdi', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Giovanni' },
+      { id: 'user_4', nome: 'Maria Gialli', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Maria' },
+    ])
   }, [])
 
   useEffect(() => {
@@ -1334,6 +1244,7 @@ export default function Eventi() {
       {showForm && (
         <EventFormModal
           event={editingEvent}
+          internalUsers={internalUsers}
           onSave={handleSave}
           onCancel={() => { setShowForm(false); setEditingEvent(undefined) }}
         />
@@ -1367,6 +1278,10 @@ export default function Eventi() {
           onEdit={(evt) => { setEditingEvent(evt); setShowForm(true) }}
           onDelete={(evt) => setDeletingEvent(evt)}
           onStatusChange={handleStatusChange}
+          budgets={budgets}
+          suppliers={suppliers}
+          comunicazioni={comunicazioni}
+          internalUsers={internalUsers}
         />
       </>
     )
@@ -1442,8 +1357,8 @@ export default function Eventi() {
         <div className="space-y-3">
           {filtered.map((event, i) => {
             const cliente = loadClientsFromStorage().find(c => c.id === event.cliente)
-            const responsabile = users.find(u => u.id === event.responsabile)
-            const teamMembers = users.filter(u => event.team.includes(u.id)).slice(0, 4)
+            const responsabile = internalUsers.find(u => u.id === event.responsabile)
+            const teamMembers = internalUsers.filter(u => event.team.includes(u.id)).slice(0, 4)
             const allTasks = loadTasksFromStorage()
             const eventTaskList = allTasks.filter(t => t.evento === event.id)
             const completedCount = eventTaskList.filter(t => t.stato === 'completato').length

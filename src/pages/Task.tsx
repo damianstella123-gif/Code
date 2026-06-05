@@ -16,12 +16,13 @@ import {
   Edit3,
   Trash2,
 } from 'lucide-react'
-import { users } from '@/data/users'
 import { loadUser } from '@/lib/auth'
 import { loadEventsFromStorage, cacheTasksSnapshot } from '@/lib/storage'
 import { fetchTasks, upsertTask, deleteTask as deleteTaskRemote, changeTaskStatus } from '@/lib/tasks-service'
+import { fetchAllProfiles } from '@/lib/profiles'
 import { daysLeft, fmtShort } from '@/lib/format'
 import type { Task } from '@/data/tasks'
+import type { Profile } from '@/lib/profiles'
 
 const COLUMNS: { id: Task['stato']; label: string; color: string; bg: string }[] = [
   { id: 'da_fare', label: 'Da Fare', color: 'var(--yellow)', bg: 'rgba(255, 194, 75, 0.06)' },
@@ -61,8 +62,8 @@ function getVisibleTasks(allTasks: Task[], ruolo: string, userId: string): Task[
 
 // ─── Task Form Modal ──────────────────────────────────────────────────────────
 
-function TaskFormModal({ task, onSave, onClose }: {
-  task?: Task; onSave: (t: Task) => void; onClose: () => void
+function TaskFormModal({ task, onSave, onClose, users }: {
+  task?: Task; onSave: (t: Task) => void; onClose: () => void; users: Profile[]
 }) {
   const [titolo, setTitolo] = useState(task?.titolo ?? '')
   const [descrizione, setDescrizione] = useState(task?.descrizione ?? '')
@@ -119,8 +120,8 @@ function TaskFormModal({ task, onSave, onClose }: {
               <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Assegnatario</label>
               <select value={assegnatario} onChange={e => setAssegnatario(e.target.value)}
                 className="input w-full py-2.5 text-sm rounded-lg">
-                {users.filter(u => u.ruolo !== 'Fornitore').map(u => (
-                  <option key={u.id} value={u.id}>{u.nome}</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.first_name + ' ' + u.last_name}>{u.first_name} {u.last_name}</option>
                 ))}
               </select>
             </div>
@@ -180,7 +181,6 @@ function TaskDetail({ task, onClose, onMove, onEdit, onDelete }: {
   onEdit: () => void; onDelete: () => void
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const assignee = users.find(u => u.id === task.assegnatario)
   const evento = task.evento ? loadEventsFromStorage().find(e => e.id === task.evento) : null
   const dl = daysLeft(task.scadenza)
   const isOverdue = dl < 0
@@ -238,11 +238,8 @@ function TaskDetail({ task, onClose, onMove, onEdit, onDelete }: {
             </div>
             <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
               <p className="text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>Assegnatario</p>
-              {assignee ? (
-                <div className="flex items-center gap-2">
-                  <img src={assignee.avatar} alt={assignee.nome} className="w-5 h-5 rounded object-cover" />
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{assignee.nome}</span>
-                </div>
+              {task.assegnatario ? (
+                <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{task.assegnatario}</span>
               ) : <span className="text-sm" style={{ color: 'var(--muted)' }}>—</span>}
             </div>
           </div>
@@ -309,7 +306,6 @@ function TaskDetail({ task, onClose, onMove, onEdit, onDelete }: {
 function TaskCard({ task, onClick, onQuickMove }: {
   task: Task; onClick: () => void; onQuickMove: (to: Task['stato']) => void
 }) {
-  const assignee = users.find(u => u.id === task.assegnatario)
   const evento = task.evento ? loadEventsFromStorage().find(e => e.id === task.evento) : null
   const dl = daysLeft(task.scadenza)
   const isOverdue = dl < 0 && task.stato !== 'completato'
@@ -350,8 +346,10 @@ function TaskCard({ task, onClick, onQuickMove }: {
               <ChevronRight className="w-3.5 h-3.5" style={{ color: nextCol.color }} />
             </button>
           )}
-          {assignee ? (
-            <img src={assignee.avatar} alt={assignee.nome} className="w-6 h-6 rounded-md object-cover" title={assignee.nome} />
+          {task.assegnatario ? (
+            <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-semibold" style={{ background: 'var(--panel2)', color: 'var(--text)' }} title={task.assegnatario}>
+              {task.assegnatario.charAt(0).toUpperCase()}
+            </div>
           ) : (
             <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: 'var(--panel2)' }}>
               <User className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
@@ -375,6 +373,7 @@ export default function TaskPage() {
   const [filterAssegnatario, setFilterAssegnatario] = useState('Tutti')
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
+  const [allUsers, setAllUsers] = useState<Profile[]>([])
 
   // Task: fonte di verita' Supabase. Nessun fallback mock.
   // La snapshot in localStorage resta solo per gli altri moduli che la leggono.
@@ -384,6 +383,18 @@ export default function TaskPage() {
       if (cancelled) return
       setTaskList(remote)
       cacheTasksSnapshot(remote)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Load users from Supabase
+  useEffect(() => {
+    let cancelled = false
+    fetchAllProfiles().then(profiles => {
+      if (cancelled) return
+      setAllUsers(profiles)
     })
     return () => {
       cancelled = true
@@ -451,8 +462,8 @@ export default function TaskPage() {
   const columns = COLUMNS.map(col => ({ ...col, tasks: filtered.filter(t => t.stato === col.id) }))
   const overdueCount = visibleTasks.filter(t => daysLeft(t.scadenza) < 0 && t.stato !== 'completato').length
   const teamMembers = useMemo(() => {
-    const ids = [...new Set(visibleTasks.map(t => t.assegnatario))]
-    return users.filter(u => ids.includes(u.id))
+    const names = [...new Set(visibleTasks.map(t => t.assegnatario).filter(Boolean))]
+    return names
   }, [visibleTasks])
 
   const selectedCurrent = selected ? (taskList.find(t => t.id === selected.id) ?? selected) : null
@@ -515,7 +526,7 @@ export default function TaskPage() {
           className="px-3 py-2.5 rounded-xl text-sm focus:outline-none cursor-pointer"
           style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
           <option value="Tutti">Tutti i membri</option>
-          {teamMembers.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+          {teamMembers.map(name => <option key={name} value={name}>{name}</option>)}
         </select>
       </div>
 
@@ -557,7 +568,7 @@ export default function TaskPage() {
       )}
 
       {showForm && (
-        <TaskFormModal task={editingTask} onSave={saveTask} onClose={() => { setShowForm(false); setEditingTask(undefined) }} />
+        <TaskFormModal task={editingTask} onSave={saveTask} onClose={() => { setShowForm(false); setEditingTask(undefined) }} users={allUsers} />
       )}
     </div>
   )

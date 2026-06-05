@@ -20,10 +20,9 @@ import {
   Trash2,
 } from 'lucide-react'
 import { contatti } from '@/data/clients'
-import { users } from '@/data/users'
 import type { Client, Contatto } from '@/data/clients'
 import { fetchClients, upsertClient, deleteClient } from '@/lib/clients-service'
-import { loadClientsFromStorage, cacheClientsSnapshot, loadEventsFromStorage } from '@/lib/storage'
+import { fetchEvents } from '@/lib/events-service'
 
 type FilterStato = 'Tutti' | 'attivo' | 'vip' | 'prospect' | 'perso'
 
@@ -373,16 +372,16 @@ interface ClientDetailProps {
   onBack: () => void
   onEdit: () => void
   onDelete: () => void
+  events: import('@/data/events').Event[]
 }
 
-function ClientDetail({ client, onBack, onEdit, onDelete }: ClientDetailProps) {
+function ClientDetail({ client, onBack, onEdit, onDelete, events }: ClientDetailProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'storico' | 'eventi'>('overview')
 
   const clientContatti = contatti
     .filter(c => c.clienteId === client.id)
     .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
 
-  const events = loadEventsFromStorage()
   const clientEvents = events.filter(e => e.cliente === client.id)
 
   const tabs = [
@@ -623,7 +622,7 @@ function ClientDetail({ client, onBack, onEdit, onDelete }: ClientDetailProps) {
                     {clientContatti.map((cnt, i) => {
                       const Icon = contattoIcon(cnt.tipo)
                       const color = contattoColor(cnt.tipo)
-                      const autore = users.find(u => u.id === cnt.autore)
+                      const autore = { nome: cnt.autore || '—' }
                       return (
                         <div key={cnt.id} className="flex gap-5 relative animate-fade-in" style={{ animationDelay: `${i * 50}ms` }}>
                           <div
@@ -650,7 +649,9 @@ function ClientDetail({ client, onBack, onEdit, onDelete }: ClientDetailProps) {
                             </div>
                             {autore && (
                               <div className="flex items-center gap-2 mt-2">
-                                <img src={autore.avatar} alt={autore.nome} className="w-5 h-5 rounded object-cover" />
+                                <div className="w-5 h-5 rounded flex items-center justify-center text-xs font-bold" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>
+                                  {autore.nome.charAt(0).toUpperCase()}
+                                </div>
                                 <span className="text-xs" style={{ color: 'var(--muted)' }}>{autore.nome}</span>
                               </div>
                             )}
@@ -729,25 +730,24 @@ function ClientDetail({ client, onBack, onEdit, onDelete }: ClientDetailProps) {
 }
 
 export default function CRM() {
-  const [clientList, setClientList] = useState<Client[]>(() => loadClientsFromStorage())
+  const [clientList, setClientList] = useState<Client[]>([])
   const [selected, setSelected] = useState<Client | null>(null)
   const [filter, setFilter] = useState<FilterStato>('Tutti')
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState<Client | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Client | null>(null)
+  const [events, setEvents] = useState<import('@/data/events').Event[]>([])
 
   const refresh = useCallback(async () => {
-    const list = await fetchClients()
+    const [list, evs] = await Promise.all([fetchClients(), fetchEvents()])
     setClientList(list)
-    cacheClientsSnapshot(list)
+    setEvents(evs)
   }, [])
 
   useEffect(() => {
     refresh()
   }, [refresh])
-
-  const events = useMemo(() => loadEventsFromStorage(), [clientList])
 
   const filtered = useMemo(() => {
     return clientList.filter(c => {
@@ -796,6 +796,7 @@ export default function CRM() {
           onBack={() => setSelected(null)}
           onEdit={() => setEditTarget(selected)}
           onDelete={() => setDeleteTarget(selected)}
+          events={events}
         />
         {(showForm || editTarget) && (
           <ClientFormModal

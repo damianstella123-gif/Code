@@ -12,6 +12,8 @@ interface BudgetRow {
   category: string
   estimated_cost: number | string
   actual_cost: number | string
+  quantity: number | string
+  unit_price: number | string | null
   status: StatoPagamento
   supplier_id: string | null
   due_date: string
@@ -35,6 +37,8 @@ function rowToUscita(r: BudgetRow): Uscita {
     eventoId: r.event_id,
     categoria: r.category ?? '',
     importo: num(r.actual_cost) || num(r.estimated_cost),
+    quantity: num(r.quantity) || 1,
+    unitPrice: r.unit_price !== null && r.unit_price !== undefined ? num(r.unit_price) : null,
     stato: r.status,
     scadenza: r.due_date,
     dataPagamento: r.payment_date,
@@ -52,6 +56,8 @@ function uscitaToRow(u: Uscita): Omit<BudgetRow, 'created_at' | 'updated_at'> {
     category: u.categoria ?? '',
     estimated_cost: u.importo ?? 0,
     actual_cost: u.importo ?? 0,
+    quantity: u.quantity ?? 1,
+    unit_price: u.unitPrice,
     status: u.stato,
     supplier_id: u.fornitoreId && u.fornitoreId.length > 0 ? u.fornitoreId : null,
     due_date: u.scadenza,
@@ -96,6 +102,8 @@ export async function updateBudget(id: string, patch: Partial<Uscita>): Promise<
     dbPatch.estimated_cost = patch.importo
     dbPatch.actual_cost = patch.importo
   }
+  if (patch.quantity !== undefined) dbPatch.quantity = patch.quantity
+  if (patch.unitPrice !== undefined) dbPatch.unit_price = patch.unitPrice
   if (patch.stato !== undefined) dbPatch.status = patch.stato
   if (patch.scadenza !== undefined) dbPatch.due_date = patch.scadenza
   if (patch.dataPagamento !== undefined) dbPatch.payment_date = patch.dataPagamento
