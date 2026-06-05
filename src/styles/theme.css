@@ -551,3 +551,105 @@ body {
 .fly-typing-dot:nth-child(1) { animation: fly-typing-dot 1.2s ease-in-out infinite 0s; }
 .fly-typing-dot:nth-child(2) { animation: fly-typing-dot 1.2s ease-in-out infinite 0.2s; }
 .fly-typing-dot:nth-child(3) { animation: fly-typing-dot 1.2s ease-in-out infinite 0.4s; }
+
+/* ─── FLY IMAGE-BASED ANIMATIONS ────────────────────────────────────────────── */
+
+@keyframes fly-img-breathe {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50%      { transform: scale(1.02) translateY(-1px); }
+}
+
+@keyframes fly-img-bounce {
+  0%, 100% { transform: scale(1) translateY(0); }
+  25%      { transform: scale(1.05) translateY(-2px); }
+  50%      { transform: scale(0.98) translateY(1px); }
+  75%      { transform: scale(1.03) translateY(-1px); }
+}
+
+@keyframes fly-img-pulse-listen {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(208,0,58,0.4); }
+  50%      { transform: scale(1.03); box-shadow: 0 0 0 6px rgba(208,0,58,0); }
+}
+
+@keyframes fly-img-spin-think {
+  0%   { transform: rotate(0deg) scale(1); }
+  25%  { transform: rotate(-2deg) scale(0.97); }
+  50%  { transform: rotate(0deg) scale(1); }
+  75%  { transform: rotate(2deg) scale(0.97); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes fly-img-celebrate {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  20%      { transform: scale(1.1) rotate(-3deg); }
+  40%      { transform: scale(1.05) rotate(3deg); }
+  60%      { transform: scale(1.08) rotate(-2deg); }
+  80%      { transform: scale(1.03) rotate(1deg); }
+}
+
+@keyframes fly-img-shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-2px); }
+  40%      { transform: translateX(2px); }
+  60%      { transform: translateX(-1.5px); }
+  80%      { transform: translateX(1.5px); }
+}
+
+@keyframes fly-img-ring-pulse {
+  0%   { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.fly-img-container {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.fly-img-idle {
+  animation: fly-img-breathe 3.5s ease-in-out infinite;
+}
+
+.fly-img-listening {
+  animation: fly-img-pulse-listen 2s ease-in-out infinite;
+}
+
+.fly-img-processing {
+  animation: fly-img-spin-think 2s ease-in-out infinite;
+}
+
+.fly-img-success {
+  animation: fly-img-celebrate 1.2s ease-in-out;
+}
+
+.fly-img-error {
+  animation: fly-img-shake 0.5s ease-in-out;
+}
+
+.fly-img-processing-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent, rgba(208,0,58,0.3), transparent);
+  animation: fly-img-spin-overlay 1.5s linear infinite;
+}
+
+@keyframes fly-img-spin-overlay {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.fly-img-success-ring,
+.fly-img-error-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: fly-img-ring-pulse 1s ease-out forwards;
+}
+
+.fly-img-success-ring {
+  border: 2px solid #38d27d;
+}
+
+.fly-img-error-ring {
+  border: 2px solid #ff315f;
+}
