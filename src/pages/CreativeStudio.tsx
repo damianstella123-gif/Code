@@ -10,6 +10,7 @@ import {
 } from '@/lib/creative-service'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchClients } from '@/lib/clients-service'
+import { fetchAllProfiles, type Profile } from '@/lib/profiles'
 import type { Event } from '@/data/events'
 
 interface Client { id: string; nome: string }
@@ -32,6 +33,7 @@ export default function CreativeStudio() {
   const [projects, setProjects] = useState<CreativeProject[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [clients, setClients] = useState<Client[]>([])
+  const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<CreativeProject | null>(null)
@@ -39,10 +41,11 @@ export default function CreativeStudio() {
   const [filterStatus, setFilterStatus] = useState('')
 
   const refresh = useCallback(async () => {
-    const [p, e, c] = await Promise.all([fetchCreativeProjects(), fetchEvents(), fetchClients()])
+    const [p, e, c, pr] = await Promise.all([fetchCreativeProjects(), fetchEvents(), fetchClients(), fetchAllProfiles()])
     setProjects(p)
     setEvents(e)
     setClients(c as Client[])
+    setProfiles(pr)
     setLoading(false)
   }, [])
 
@@ -151,7 +154,7 @@ export default function CreativeStudio() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(p => (
-            <ProjectCard key={p.id} project={p} events={events} clients={clients}
+            <ProjectCard key={p.id} project={p} events={events} clients={clients} profiles={profiles}
               onEdit={handleEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} />
           ))}
         </div>
@@ -163,6 +166,7 @@ export default function CreativeStudio() {
           project={editing}
           events={events}
           clients={clients}
+          profiles={profiles}
           onClose={() => setShowForm(false)}
           onSave={async (data) => {
             await upsertCreativeProject(data)
@@ -175,16 +179,18 @@ export default function CreativeStudio() {
   )
 }
 
-function ProjectCard({ project, events, clients, onEdit, onDelete, onStatusChange }: {
+function ProjectCard({ project, events, clients, profiles, onEdit, onDelete, onStatusChange }: {
   project: CreativeProject
   events: Event[]
   clients: Client[]
+  profiles: Profile[]
   onEdit: (p: CreativeProject) => void
   onDelete: (id: string) => void
   onStatusChange: (id: string, status: string) => void
 }) {
   const event = events.find(e => e.id === project.event_id)
   const client = clients.find(c => c.id === project.client_id)
+  const responsible = profiles.find(p => p.id === project.responsible_id)
 
   return (
     <div className="panel p-4 rounded-2xl space-y-3 hover:shadow-lg transition-all">
@@ -208,6 +214,11 @@ function ProjectCard({ project, events, clients, onEdit, onDelete, onStatusChang
         {client && (
           <div className="flex items-center gap-1.5">
             <User className="w-3 h-3" /> {client.nome}
+          </div>
+        )}
+        {responsible && (
+          <div className="flex items-center gap-1.5">
+            <User className="w-3 h-3" style={{ color: 'var(--blue)' }} /> {responsible.first_name} {responsible.last_name}
           </div>
         )}
         {project.due_date && (
@@ -245,10 +256,11 @@ function ProjectCard({ project, events, clients, onEdit, onDelete, onStatusChang
   )
 }
 
-function ProjectForm({ project, events, clients, onClose, onSave }: {
+function ProjectForm({ project, events, clients, profiles, onClose, onSave }: {
   project: CreativeProject | null
   events: Event[]
   clients: Client[]
+  profiles: Profile[]
   onClose: () => void
   onSave: (data: Partial<CreativeProject> & { title: string }) => void
 }) {
@@ -256,6 +268,7 @@ function ProjectForm({ project, events, clients, onClose, onSave }: {
   const [type, setType] = useState(project?.type ?? 'presentazione')
   const [eventId, setEventId] = useState(project?.event_id ?? '')
   const [clientId, setClientId] = useState(project?.client_id ?? '')
+  const [responsibleId, setResponsibleId] = useState(project?.responsible_id ?? '')
   const [status, setStatus] = useState(project?.status ?? 'bozza')
   const [dueDate, setDueDate] = useState(project?.due_date ?? '')
   const [notes, setNotes] = useState(project?.notes ?? '')
@@ -281,6 +294,7 @@ function ProjectForm({ project, events, clients, onClose, onSave }: {
       type,
       event_id: eventId || null,
       client_id: clientId || null,
+      responsible_id: responsibleId || null,
       status,
       due_date: dueDate || null,
       notes,
@@ -364,6 +378,16 @@ function ProjectForm({ project, events, clients, onClose, onSave }: {
                 className="w-full px-3 py-2 rounded-xl text-sm"
                 style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
             </div>
+          </div>
+
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Responsabile</label>
+            <select value={responsibleId} onChange={e => setResponsibleId(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+              <option value="">Nessuno</option>
+              {profiles.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
+            </select>
           </div>
 
           <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Note"

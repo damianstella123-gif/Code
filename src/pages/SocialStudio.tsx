@@ -1,15 +1,16 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  Plus, X, Trash2, Edit3, Filter, Calendar, Tag,
-  Instagram, Linkedin, Facebook, Mail, Clock, Eye, CheckCircle, Send,
+  Plus, X, Trash2, Edit3, Filter, Calendar, Tag, Upload,
+  Instagram, Linkedin, Facebook, Mail, Clock, Eye, CheckCircle, Send, User,
 } from 'lucide-react'
 import {
   fetchSocialContents, upsertSocialContent, updateSocialContent, deleteSocialContent,
-  SOCIAL_CHANNELS, SOCIAL_STATUSES, type SocialContent,
+  uploadSocialAsset, SOCIAL_CHANNELS, SOCIAL_STATUSES, type SocialContent,
 } from '@/lib/social-service'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchClients } from '@/lib/clients-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
+import { fetchAllProfiles, type Profile } from '@/lib/profiles'
 import type { Event } from '@/data/events'
 
 interface Client { id: string; nome: string }
@@ -42,6 +43,7 @@ export default function SocialStudio() {
   const [events, setEvents] = useState<Event[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [creativeProjects, setCreativeProjects] = useState<CreativeProject[]>([])
+  const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<SocialContent | null>(null)
@@ -49,13 +51,14 @@ export default function SocialStudio() {
   const [filterStatus, setFilterStatus] = useState('')
 
   const refresh = useCallback(async () => {
-    const [sc, ev, cl, cp] = await Promise.all([
-      fetchSocialContents(), fetchEvents(), fetchClients(), fetchCreativeProjects(),
+    const [sc, ev, cl, cp, pr] = await Promise.all([
+      fetchSocialContents(), fetchEvents(), fetchClients(), fetchCreativeProjects(), fetchAllProfiles(),
     ])
     setContents(sc)
     setEvents(ev)
     setClients(cl as Client[])
     setCreativeProjects(cp)
+    setProfiles(pr)
     setLoading(false)
   }, [])
 
@@ -155,6 +158,7 @@ export default function SocialStudio() {
           {filtered.map(c => {
             const Icon = channelIcon(c.channel)
             const event = events.find(e => e.id === c.event_id)
+            const responsible = profiles.find(p => p.id === c.responsible_id)
             return (
               <div key={c.id} className="panel p-4 rounded-2xl space-y-3 hover:shadow-lg transition-all">
                 <div className="flex items-start justify-between gap-2">
@@ -180,6 +184,7 @@ export default function SocialStudio() {
                 <div className="space-y-1 text-xs" style={{ color: 'var(--muted)' }}>
                   {event && <div className="flex items-center gap-1.5"><Calendar className="w-3 h-3" /> {event.nome}</div>}
                   {c.publish_date && <div className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {formatDate(c.publish_date)}</div>}
+                  {responsible && <div className="flex items-center gap-1.5"><User className="w-3 h-3" style={{ color: 'var(--blue)' }} /> {responsible.first_name} {responsible.last_name}</div>}
                 </div>
 
                 <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
@@ -208,6 +213,7 @@ export default function SocialStudio() {
           events={events}
           clients={clients}
           creativeProjects={creativeProjects}
+          profiles={profiles}
           onClose={() => setShowForm(false)}
           onSave={async (data) => {
             await upsertSocialContent(data)
@@ -220,11 +226,12 @@ export default function SocialStudio() {
   )
 }
 
-function SocialForm({ content, events, clients, creativeProjects, onClose, onSave }: {
+function SocialForm({ content, events, clients, creativeProjects, profiles, onClose, onSave }: {
   content: SocialContent | null
   events: Event[]
   clients: Client[]
   creativeProjects: CreativeProject[]
+  profiles: Profile[]
   onClose: () => void
   onSave: (data: Partial<SocialContent> & { title: string }) => void
 }) {
@@ -233,10 +240,23 @@ function SocialForm({ content, events, clients, creativeProjects, onClose, onSav
   const [eventId, setEventId] = useState(content?.event_id ?? '')
   const [clientId, setClientId] = useState(content?.client_id ?? '')
   const [creativeId, setCreativeId] = useState(content?.creative_project_id ?? '')
+  const [responsibleId, setResponsibleId] = useState(content?.responsible_id ?? '')
   const [copy, setCopy] = useState(content?.copy ?? '')
   const [publishDate, setPublishDate] = useState(content?.publish_date ?? '')
   const [status, setStatus] = useState(content?.status ?? 'idea')
   const [notes, setNotes] = useState(content?.notes ?? '')
+  const [uploading, setUploading] = useState(false)
+  const [assetUrl, setAssetUrl] = useState(content?.asset_url ?? '')
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const id = content?.id ?? crypto.randomUUID()
+    const url = await uploadSocialAsset(file, id)
+    if (url) setAssetUrl(url)
+    setUploading(false)
+  }
 
   function handleSubmit() {
     if (!title.trim()) return
@@ -247,10 +267,12 @@ function SocialForm({ content, events, clients, creativeProjects, onClose, onSav
       event_id: eventId || null,
       client_id: clientId || null,
       creative_project_id: creativeId || null,
+      responsible_id: responsibleId || null,
       copy,
       publish_date: publishDate || null,
       status,
       notes,
+      asset_url: assetUrl || null,
     })
   }
 
@@ -342,6 +364,32 @@ function SocialForm({ content, events, clients, creativeProjects, onClose, onSav
           <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Note interne"
             rows={2} className="w-full px-3 py-2.5 rounded-xl text-sm resize-none"
             style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Responsabile</label>
+            <select value={responsibleId} onChange={e => setResponsibleId(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+              <option value="">Nessuno</option>
+              {profiles.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Asset (immagine/video)</label>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm cursor-pointer"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <Upload className="w-4 h-4" />
+                {uploading ? 'Caricamento...' : 'Carica asset'}
+                <input type="file" className="hidden" accept="image/*,video/*" onChange={handleFileUpload} />
+              </label>
+              {assetUrl && (
+                <a href={assetUrl} target="_blank" rel="noopener noreferrer"
+                  className="text-xs" style={{ color: 'var(--blue)' }}>Asset caricato</a>
+              )}
+            </div>
+          </div>
         </div>
 
         <button onClick={handleSubmit} disabled={!title.trim()}

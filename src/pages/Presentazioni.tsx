@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Plus, X, Upload, FileText, Download, AlertTriangle, Trash2,
+  Plus, X, Upload, FileText, Download, AlertTriangle, Trash2, User,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { fetchEvents } from '@/lib/events-service'
@@ -8,6 +8,7 @@ import { fetchClients } from '@/lib/clients-service'
 import { fetchBudgets } from '@/lib/budgets-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
+import { fetchAllProfiles, type Profile } from '@/lib/profiles'
 import type { Event } from '@/data/events'
 import type { Uscita } from '@/data/amministrazione'
 import type { Task } from '@/data/tasks'
@@ -29,6 +30,7 @@ interface PresentationVersion {
   status: 'bozza' | 'generazione_richiesta' | 'pronto' | 'errore'
   notes: string
   file_url: string | null
+  responsible_id: string | null
   created_at: string
 }
 
@@ -42,6 +44,7 @@ export default function Presentazioni() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [budgets, setBudgets] = useState<Uscita[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
+  const [profiles, setProfiles] = useState<Profile[]>([])
   const [templates, setTemplates] = useState<PresentationTemplate[]>([])
   const [versions, setVersions] = useState<PresentationVersion[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,14 +52,15 @@ export default function Presentazioni() {
   const [uploading, setUploading] = useState(false)
 
   const refresh = useCallback(async () => {
-    const [ev, cl, sp, bg, tk] = await Promise.all([
-      fetchEvents(), fetchClients(), fetchSuppliers(), fetchBudgets(), fetchTasks(),
+    const [ev, cl, sp, bg, tk, pr] = await Promise.all([
+      fetchEvents(), fetchClients(), fetchSuppliers(), fetchBudgets(), fetchTasks(), fetchAllProfiles(),
     ])
     setEvents(ev)
     setClients(cl as Client[])
     setSuppliers(sp as Supplier[])
     setBudgets(bg)
     setTasks(tk)
+    setProfiles(pr)
     await loadTemplates()
     await loadVersions()
     setLoading(false)
@@ -111,6 +115,11 @@ export default function Presentazioni() {
   async function handleDeleteVersion(id: string) {
     await supabase.from('presentation_versions').delete().eq('id', id)
     setVersions(prev => prev.filter(v => v.id !== id))
+  }
+
+  async function handleStatusChange(id: string, status: string) {
+    await supabase.from('presentation_versions').update({ status }).eq('id', id)
+    setVersions(prev => prev.map(v => v.id === id ? { ...v, status: status as PresentationVersion['status'] } : v))
   }
 
   return (
@@ -203,6 +212,7 @@ export default function Presentazioni() {
             {versions.map(v => {
               const event = events.find(e => e.id === v.event_id)
               const client = clients.find(c => c.id === v.client_id)
+              const responsible = profiles.find(p => p.id === v.responsible_id)
               const statusStyles: Record<string, { bg: string; color: string; label: string }> = {
                 bozza: { bg: '#9ba3aa20', color: '#9ba3aa', label: 'Bozza' },
                 generazione_richiesta: { bg: '#ffc24b20', color: '#ffc24b', label: 'In Generazione' },
@@ -223,10 +233,20 @@ export default function Presentazioni() {
                       Template: {v.template_name} | {formatDate(v.created_at)}
                     </p>
                     {v.notes && <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{v.notes}</p>}
+                    {responsible && (
+                      <p className="text-xs mt-0.5 flex items-center gap-1" style={{ color: 'var(--blue)' }}>
+                        <User className="w-3 h-3" /> {responsible.first_name} {responsible.last_name}
+                      </p>
+                    )}
                   </div>
-                  <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background: st.bg, color: st.color }}>
-                    {st.label}
-                  </span>
+                  <select value={v.status} onChange={e => handleStatusChange(v.id, e.target.value)}
+                    className="text-xs px-2 py-1 rounded-lg"
+                    style={{ background: st.bg, color: st.color, border: 'none' }}>
+                    <option value="bozza">Bozza</option>
+                    <option value="generazione_richiesta">In Generazione</option>
+                    <option value="pronto">Pronto</option>
+                    <option value="errore">Errore</option>
+                  </select>
                   {v.file_url && (
                     <a href={v.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-white/10">
                       <Download className="w-4 h-4" style={{ color: 'var(--blue)' }} />
@@ -252,6 +272,7 @@ export default function Presentazioni() {
           budgets={budgets}
           tasks={tasks}
           templates={templates}
+          profiles={profiles}
           onClose={() => setShowNewPresentation(false)}
           onCreate={handleCreateVersion}
         />
@@ -260,19 +281,21 @@ export default function Presentazioni() {
   )
 }
 
-function NewPresentationModal({ events, clients, suppliers, budgets, tasks, templates, onClose, onCreate }: {
+function NewPresentationModal({ events, clients, suppliers, budgets, tasks, templates, profiles, onClose, onCreate }: {
   events: Event[]
   clients: Client[]
   suppliers: Supplier[]
   budgets: Uscita[]
   tasks: Task[]
   templates: PresentationTemplate[]
+  profiles: Profile[]
   onClose: () => void
   onCreate: (data: Omit<PresentationVersion, 'id' | 'created_at'>) => void
 }) {
   const [eventId, setEventId] = useState(events[0]?.id ?? '')
   const [clientId, setClientId] = useState('')
   const [templateName, setTemplateName] = useState(templates[0]?.name ?? '')
+  const [responsibleId, setResponsibleId] = useState('')
   const [notes, setNotes] = useState('')
 
   const selectedEvent = events.find(e => e.id === eventId)
@@ -293,6 +316,7 @@ function NewPresentationModal({ events, clients, suppliers, budgets, tasks, temp
       status: templates.length > 0 ? 'generazione_richiesta' : 'bozza',
       notes,
       file_url: null,
+      responsible_id: responsibleId || null,
     })
   }
 
@@ -374,6 +398,16 @@ function NewPresentationModal({ events, clients, suppliers, budgets, tasks, temp
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Note aggiuntive per la presentazione"
           rows={2} className="w-full px-3 py-2.5 rounded-xl text-sm resize-none"
           style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+
+        <div>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Responsabile</label>
+          <select value={responsibleId} onChange={e => setResponsibleId(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl text-sm"
+            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+            <option value="">Nessuno</option>
+            {profiles.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
+          </select>
+        </div>
 
         <button onClick={handleSubmit} disabled={!eventId}
           className="w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
