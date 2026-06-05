@@ -30,6 +30,8 @@ import { fetchEvents, upsertEvent } from '@/lib/events-service'
 import { fetchTasks, upsertTask, changeTaskStatus } from '@/lib/tasks-service'
 import { fetchPractices, upsertPractice } from '@/lib/practices-service'
 import { fetchBudgets } from '@/lib/budgets-service'
+import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
+import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -68,6 +70,18 @@ function praticaColor(p: Pratica): string {
   if (p.priorita === 'media') return '#ffc24b'
   return '#9ba3aa'
 }
+function creativeColor(c: CreativeProject): string {
+  if (c.status === 'completato') return '#38d27d'
+  if (c.status === 'in_lavorazione') return '#a855f7'
+  if (c.status === 'in_revisione') return '#ffc24b'
+  return '#e879a0'
+}
+function socialColor(s: SocialContent): string {
+  if (s.status === 'pubblicato') return '#38d27d'
+  if (s.status === 'approvato') return '#4db4ff'
+  if (s.status === 'in_lavorazione') return '#ffc24b'
+  return '#f97316'
+}
 function statoTaskLabel(s: string) {
   return { da_fare: 'Da fare', in_corso: 'In corso', completato: 'Completato' }[s] ?? s
 }
@@ -78,7 +92,12 @@ function prioritaLabel(p: string) {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ViewMode = 'month' | 'week' | 'day' | 'agenda'
-type CalItem = { type: 'event'; data: Event } | { type: 'task'; data: Task } | { type: 'pratica'; data: Pratica }
+type CalItem =
+  | { type: 'event'; data: Event }
+  | { type: 'task'; data: Task }
+  | { type: 'pratica'; data: Pratica }
+  | { type: 'creative'; data: CreativeProject }
+  | { type: 'social'; data: SocialContent }
 
 // ─── Detail popup ─────────────────────────────────────────────────────────────
 
@@ -220,6 +239,118 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange }: 
     )
   }
 
+  // Creative detail
+  if (item.type === 'creative') {
+    const c = item.data as CreativeProject
+    const color = creativeColor(c)
+    const dl = c.due_date ? daysLeft(c.due_date) : null
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+        onClick={onClose}>
+        <div className="w-full max-w-md rounded-2xl overflow-hidden animate-fade-in"
+          style={{ background: 'var(--panel)', border: `1px solid ${color}30`, boxShadow: `0 24px 80px rgba(0,0,0,0.7), 0 0 40px ${color}15` }}
+          onClick={e => e.stopPropagation()}>
+          <div className="p-5"
+            style={{ background: `linear-gradient(135deg, ${color}12 0%, transparent 70%)`, borderBottom: '1px solid var(--line)' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} />
+                  <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Creative</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded capitalize" style={{ background: `${color}18`, color }}>{c.type}</span>
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{c.title}</h3>
+                {c.notes && <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>{c.notes}</p>}
+              </div>
+              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0">
+                <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span className="text-xs px-2.5 py-1 rounded-full font-semibold capitalize"
+                style={{ background: `${color}18`, color, border: `1px solid ${color}30` }}>
+                {c.status.replace(/_/g, ' ')}
+              </span>
+              {dl !== null && dl < 0 && c.status !== 'completato' && (
+                <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(255,49,95,0.1)', color: 'var(--red2)' }}>
+                  <AlertTriangle className="w-3 h-3 inline mr-1 -mt-0.5" />{Math.abs(dl)}g scaduto
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="p-5 space-y-3">
+            {c.due_date && (
+              <div className="flex items-center gap-3">
+                <Clock className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                <span className="text-sm" style={{ color: 'var(--text)' }}>Deadline: {fmtLong(c.due_date)}</span>
+              </div>
+            )}
+            {c.output_format && (
+              <div className="flex items-center gap-3">
+                <FileText className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                <span className="text-sm" style={{ color: 'var(--text)' }}>Formato: {c.output_format}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Social detail
+  if (item.type === 'social') {
+    const s = item.data as SocialContent
+    const color = socialColor(s)
+    const dl = s.publish_date ? daysLeft(s.publish_date) : null
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+        onClick={onClose}>
+        <div className="w-full max-w-md rounded-2xl overflow-hidden animate-fade-in"
+          style={{ background: 'var(--panel)', border: `1px solid ${color}30`, boxShadow: `0 24px 80px rgba(0,0,0,0.7), 0 0 40px ${color}15` }}
+          onClick={e => e.stopPropagation()}>
+          <div className="p-5"
+            style={{ background: `linear-gradient(135deg, ${color}12 0%, transparent 70%)`, borderBottom: '1px solid var(--line)' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <Zap className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} />
+                  <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Social</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded capitalize" style={{ background: `${color}18`, color }}>{s.channel.replace(/_/g, ' ')}</span>
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{s.title}</h3>
+                {s.copy && <p className="text-sm mt-0.5 line-clamp-2" style={{ color: 'var(--muted)' }}>{s.copy}</p>}
+              </div>
+              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0">
+                <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span className="text-xs px-2.5 py-1 rounded-full font-semibold capitalize"
+                style={{ background: `${color}18`, color, border: `1px solid ${color}30` }}>
+                {s.status.replace(/_/g, ' ')}
+              </span>
+              {dl !== null && dl < 0 && s.status !== 'pubblicato' && (
+                <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(255,49,95,0.1)', color: 'var(--red2)' }}>
+                  <AlertTriangle className="w-3 h-3 inline mr-1 -mt-0.5" />{Math.abs(dl)}g scaduto
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="p-5 space-y-3">
+            {s.publish_date && (
+              <div className="flex items-center gap-3">
+                <Clock className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                <span className="text-sm" style={{ color: 'var(--text)' }}>Pubblicazione: {fmtLong(s.publish_date)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Task detail
   const t = item.data as Task
   const color = taskColor(t)
@@ -315,23 +446,39 @@ function CalPill({ item, onClick, onDragStart }: {
     ? eventColor(item.data as Event)
     : item.type === 'task'
       ? taskColor(item.data as Task)
-      : praticaColor(item.data as Pratica)
+      : item.type === 'creative'
+        ? creativeColor(item.data as CreativeProject)
+        : item.type === 'social'
+          ? socialColor(item.data as SocialContent)
+          : praticaColor(item.data as Pratica)
   const label = item.type === 'event'
     ? (item.data as Event).nome
     : item.type === 'task'
       ? (item.data as Task).titolo
-      : (item.data as Pratica).titolo
+      : item.type === 'creative'
+        ? (item.data as CreativeProject).title
+        : item.type === 'social'
+          ? (item.data as SocialContent).title
+          : (item.data as Pratica).titolo
   const urgent = item.type === 'task' && (item.data as Task).priorita === 'alta' && (item.data as Task).stato !== 'completato'
   const dl = item.type === 'event'
     ? daysLeft((item.data as Event).dataInizio)
     : item.type === 'task'
       ? daysLeft((item.data as Task).scadenza)
-      : daysLeft((item.data as Pratica).scadenza)
+      : item.type === 'creative'
+        ? daysLeft((item.data as CreativeProject).due_date!)
+        : item.type === 'social'
+          ? daysLeft((item.data as SocialContent).publish_date!)
+          : daysLeft((item.data as Pratica).scadenza)
   const isDone = item.type === 'event'
     ? (item.data as Event).stato === 'completato'
     : item.type === 'task'
       ? (item.data as Task).stato === 'completato'
-      : (item.data as Pratica).stato === 'completata'
+      : item.type === 'creative'
+        ? (item.data as CreativeProject).status === 'completato'
+        : item.type === 'social'
+          ? (item.data as SocialContent).status === 'pubblicato'
+          : (item.data as Pratica).stato === 'completata'
   const isOverdue = dl < 0 && !isDone
 
   return (
@@ -377,6 +524,14 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
       }
       if (item.type === 'pratica') {
         return sameDay(day, new Date((item.data as Pratica).scadenza))
+      }
+      if (item.type === 'creative') {
+        const c = item.data as CreativeProject
+        return c.due_date ? sameDay(day, new Date(c.due_date)) : false
+      }
+      if (item.type === 'social') {
+        const s = item.data as SocialContent
+        return s.publish_date ? sameDay(day, new Date(s.publish_date)) : false
       }
       return sameDay(day, new Date((item.data as Task).scadenza))
     })
@@ -424,7 +579,7 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
               </div>
               <div className="px-1 pb-1 space-y-0.5 mt-0.5">
                 {dayItems.slice(0, 3).map(item => {
-                  const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : (item.data as Pratica).id
+                  const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : item.type === 'creative' ? (item.data as CreativeProject).id : item.type === 'social' ? (item.data as SocialContent).id : (item.data as Pratica).id
                   return (
                     <CalPill key={id} item={item}
                       onClick={() => onItemClick(item)}
@@ -465,6 +620,14 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
       }
       if (item.type === 'pratica') {
         return sameDay(day, new Date((item.data as Pratica).scadenza))
+      }
+      if (item.type === 'creative') {
+        const c = item.data as CreativeProject
+        return c.due_date ? sameDay(day, new Date(c.due_date)) : false
+      }
+      if (item.type === 'social') {
+        const s = item.data as SocialContent
+        return s.publish_date ? sameDay(day, new Date(s.publish_date)) : false
       }
       return sameDay(day, new Date((item.data as Task).scadenza))
     })
@@ -543,6 +706,14 @@ function DayView({ day, items, onItemClick }: {
     if (item.type === 'pratica') {
       return sameDay(day, new Date((item.data as Pratica).scadenza))
     }
+    if (item.type === 'creative') {
+      const c = item.data as CreativeProject
+      return c.due_date ? sameDay(day, new Date(c.due_date)) : false
+    }
+    if (item.type === 'social') {
+      const s = item.data as SocialContent
+      return s.publish_date ? sameDay(day, new Date(s.publish_date)) : false
+    }
     return sameDay(day, new Date((item.data as Task).scadenza))
   })
 
@@ -558,11 +729,15 @@ function DayView({ day, items, onItemClick }: {
   const evItems = dayItems.filter(i => i.type === 'event')
   const taskItems = dayItems.filter(i => i.type === 'task')
   const praticaItems = dayItems.filter(i => i.type === 'pratica')
+  const creativeItems = dayItems.filter(i => i.type === 'creative')
+  const socialItems = dayItems.filter(i => i.type === 'social')
   const blocks = [
     { label: 'Mattina', range: '08:00 – 12:00', emoji: '🌅', items: evItems.slice(0, Math.ceil(evItems.length / 2)) },
     { label: 'Pomeriggio', range: '13:00 – 18:00', emoji: '☀️', items: evItems.slice(Math.ceil(evItems.length / 2)) },
     { label: 'Scadenze task', range: 'Task del giorno', emoji: '📋', items: taskItems },
     { label: 'Pratiche', range: 'Scadenze pratiche', emoji: '📄', items: praticaItems },
+    { label: 'Creatività', range: 'Deadline materiali', emoji: '🎨', items: creativeItems },
+    { label: 'Social', range: 'Pubblicazioni', emoji: '📱', items: socialItems },
   ].filter(b => b.items.length > 0)
 
   return (
@@ -653,11 +828,15 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
   function getItemDate(item: CalItem): string {
     if (item.type === 'event') return (item.data as Event).dataInizio
     if (item.type === 'pratica') return (item.data as Pratica).scadenza
+    if (item.type === 'creative') return (item.data as CreativeProject).due_date!
+    if (item.type === 'social') return (item.data as SocialContent).publish_date!
     return (item.data as Task).scadenza
   }
   function isItemDone(item: CalItem): boolean {
     if (item.type === 'event') return (item.data as Event).stato === 'completato'
     if (item.type === 'pratica') return (item.data as Pratica).stato === 'completata'
+    if (item.type === 'creative') return (item.data as CreativeProject).status === 'completato'
+    if (item.type === 'social') return (item.data as SocialContent).status === 'pubblicato'
     return (item.data as Task).stato === 'completato'
   }
 
@@ -1010,6 +1189,8 @@ export default function Calendario() {
   const [allEvents, setAllEvents] = useState<Event[]>([])
   const [allPratiche, setAllPratiche] = useState<Pratica[]>([])
   const [allUscite, setAllUscite] = useState<Uscita[]>([])
+  const [allCreative, setAllCreative] = useState<CreativeProject[]>([])
+  const [allSocial, setAllSocial] = useState<SocialContent[]>([])
   const [view, setView] = useState<ViewMode>('month')
   const [cursor, setCursor] = useState(() => {
     const t = new Date(); t.setHours(0, 0, 0, 0); return t
@@ -1022,11 +1203,13 @@ export default function Calendario() {
   const ruolo = currentUser?.ruolo ?? 'Admin'
 
   const refresh = useCallback(async () => {
-    const [t, e, p, u] = await Promise.all([fetchTasks(), fetchEvents(), fetchPractices(), fetchBudgets()])
+    const [t, e, p, u, cr, so] = await Promise.all([fetchTasks(), fetchEvents(), fetchPractices(), fetchBudgets(), fetchCreativeProjects(), fetchSocialContents()])
     setAllTasks(t)
     setAllEvents(e)
     setAllPratiche(p)
     setAllUscite(u)
+    setAllCreative(cr)
+    setAllSocial(so)
   }, [])
 
   useEffect(() => {
@@ -1062,13 +1245,17 @@ export default function Calendario() {
     }
 
     const visiblePratiche = allPratiche.filter(p => p.stato !== 'completata')
+    const visibleCreative = allCreative.filter(c => c.due_date && c.status !== 'completato')
+    const visibleSocial = allSocial.filter(s => s.publish_date && s.status !== 'pubblicato')
 
     return [
       ...filteredEvents.map(e => ({ type: 'event' as const, data: e })),
       ...filteredTasks.map(t => ({ type: 'task' as const, data: t })),
       ...visiblePratiche.map(p => ({ type: 'pratica' as const, data: p })),
+      ...visibleCreative.map(c => ({ type: 'creative' as const, data: c })),
+      ...visibleSocial.map(s => ({ type: 'social' as const, data: s })),
     ]
-  }, [allTasks, allEvents, allPratiche, ruolo, currentUser])
+  }, [allTasks, allEvents, allPratiche, allCreative, allSocial, ruolo, currentUser])
 
   async function handleTaskStateChange(id: string, stato: Task['stato']) {
     setAllTasks(prev => prev.map(t => t.id === id ? { ...t, stato } : t))

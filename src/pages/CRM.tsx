@@ -18,11 +18,16 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Palette,
+  Zap,
 } from 'lucide-react'
 import { contatti } from '@/data/clients'
 import type { Client, Contatto } from '@/data/clients'
 import { fetchClients, upsertClient, deleteClient } from '@/lib/clients-service'
 import { fetchEvents } from '@/lib/events-service'
+import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
+import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
+import { supabase } from '@/lib/supabase'
 
 type FilterStato = 'Tutti' | 'attivo' | 'vip' | 'prospect' | 'perso'
 
@@ -376,7 +381,22 @@ interface ClientDetailProps {
 }
 
 function ClientDetail({ client, onBack, onEdit, onDelete, events }: ClientDetailProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'storico' | 'eventi'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'storico' | 'eventi' | 'materiali'>('overview')
+  const [clientCreative, setClientCreative] = useState<CreativeProject[]>([])
+  const [clientSocial, setClientSocial] = useState<SocialContent[]>([])
+  const [clientPresentations, setClientPresentations] = useState<{ id: string; template_name: string; status: string; created_at: string }[]>([])
+
+  useEffect(() => {
+    fetchCreativeProjects().then(all => {
+      setClientCreative(all.filter(p => p.client_id === client.id))
+    })
+    fetchSocialContents().then(all => {
+      setClientSocial(all.filter(c => c.client_id === client.id))
+    })
+    supabase.from('presentation_versions').select('*').eq('client_id', client.id).order('created_at', { ascending: false }).then(({ data }) => {
+      if (data) setClientPresentations(data)
+    })
+  }, [client.id])
 
   const clientContatti = contatti
     .filter(c => c.clienteId === client.id)
@@ -388,6 +408,7 @@ function ClientDetail({ client, onBack, onEdit, onDelete, events }: ClientDetail
     { id: 'overview' as const, label: 'Panoramica' },
     { id: 'storico' as const, label: `Storico (${clientContatti.length})` },
     { id: 'eventi' as const, label: `Eventi (${clientEvents.length})` },
+    { id: 'materiali' as const, label: `Materiali (${clientCreative.length + clientSocial.length + clientPresentations.length})` },
   ]
 
   return (
@@ -721,6 +742,86 @@ function ClientDetail({ client, onBack, onEdit, onDelete, events }: ClientDetail
                   </div>
                 )
               })
+            )}
+          </div>
+        )}
+
+        {activeTab === 'materiali' && (
+          <div className="space-y-6">
+            {clientCreative.length > 0 && (
+              <div>
+                <h4 className="text-xs uppercase tracking-wide mb-3 flex items-center gap-2" style={{ color: 'var(--muted)' }}>
+                  <Palette className="w-3.5 h-3.5" /> Materiali Creativi ({clientCreative.length})
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {clientCreative.map(p => (
+                    <div key={p.id} className="panel p-4" style={{ border: '1px solid var(--line)' }}>
+                      <p className="font-medium text-sm truncate" style={{ color: 'var(--text)' }}>{p.title}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs capitalize" style={{ color: 'var(--muted)' }}>{p.type.replace(/_/g, ' ')}</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded capitalize"
+                          style={{ background: p.status === 'completato' ? 'rgba(56,210,125,0.15)' : 'rgba(155,163,170,0.15)', color: p.status === 'completato' ? 'var(--green)' : 'var(--muted)' }}>
+                          {p.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {clientSocial.length > 0 && (
+              <div>
+                <h4 className="text-xs uppercase tracking-wide mb-3 flex items-center gap-2" style={{ color: 'var(--muted)' }}>
+                  <Zap className="w-3.5 h-3.5" /> Contenuti Social ({clientSocial.length})
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {clientSocial.map(c => (
+                    <div key={c.id} className="panel p-4" style={{ border: '1px solid var(--line)' }}>
+                      <p className="font-medium text-sm truncate" style={{ color: 'var(--text)' }}>{c.title}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs capitalize" style={{ color: 'var(--muted)' }}>{c.channel.replace(/_/g, ' ')}</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded capitalize"
+                          style={{ background: c.status === 'pubblicato' ? 'rgba(56,210,125,0.15)' : 'rgba(155,163,170,0.15)', color: c.status === 'pubblicato' ? 'var(--green)' : 'var(--muted)' }}>
+                          {c.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {clientPresentations.length > 0 && (
+              <div>
+                <h4 className="text-xs uppercase tracking-wide mb-3 flex items-center gap-2" style={{ color: 'var(--muted)' }}>
+                  <FileText className="w-3.5 h-3.5" /> Presentazioni ({clientPresentations.length})
+                </h4>
+                <div className="space-y-2">
+                  {clientPresentations.map(v => (
+                    <div key={v.id} className="panel p-4 flex items-center gap-3" style={{ border: '1px solid var(--line)' }}>
+                      <FileText className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--blue)' }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm" style={{ color: 'var(--text)' }}>{v.template_name}</p>
+                        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                          {new Date(v.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <span className="text-xs px-2 py-0.5 rounded capitalize"
+                        style={{ background: v.status === 'pronto' ? 'rgba(56,210,125,0.15)' : 'rgba(155,163,170,0.15)', color: v.status === 'pronto' ? 'var(--green)' : 'var(--muted)' }}>
+                        {v.status === 'generazione_richiesta' ? 'in generazione' : v.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {clientCreative.length === 0 && clientSocial.length === 0 && clientPresentations.length === 0 && (
+              <div className="panel p-8 text-center">
+                <Palette className="w-8 h-8 mx-auto mb-2 opacity-30" style={{ color: 'var(--muted)' }} />
+                <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun materiale collegato a questo cliente</p>
+              </div>
             )}
           </div>
         )}

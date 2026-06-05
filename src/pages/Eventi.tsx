@@ -21,13 +21,9 @@ import {
   ArrowUpRight,
   FileText,
   Zap,
-  ImageIcon,
-  Type,
-  LayoutTemplate,
   Plus,
   Edit3,
   Trash2,
-  Check,
   Package,
   Download as DownloadIcon,
   Plus as PlusIcon,
@@ -39,6 +35,9 @@ import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchBudgets } from '@/lib/budgets-service'
 import { fetchCommunications } from '@/lib/communications-service'
 import { fetchPackagesByEvent, upsertClientPackage, updateClientPackage, deleteClientPackage, type ClientPackage } from '@/lib/packages-service'
+import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
+import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
+import { supabase } from '@/lib/supabase'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
@@ -48,7 +47,7 @@ import type { Uscita } from '@/data/amministrazione'
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 type StatoEvento = Event['stato']
 
-type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'timeline' | 'creative' | 'pacchetto'
+type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'timeline' | 'creative' | 'social' | 'presentazioni' | 'pacchetto'
 
 function statoColor(stato: string) {
   switch (stato) {
@@ -807,21 +806,25 @@ function TabTimeline({ event }: { event: Event }) {
 }
 
 function TabCreative({ event }: { event: Event }) {
-  const [selectedColor, setSelectedColor] = useState<string | null>(null)
-  const [selectedFont, setSelectedFont] = useState<number>(0)
-  const moodColors = ['#1a1a2e', '#16213e', '#0f3460', '#e94560', '#533483', '#2c3e50', '#e8cda2', '#c4a882']
-  const fontPairs = [
-    { heading: 'Playfair Display', body: 'Lato', style: 'Elegante' },
-    { heading: 'Montserrat', body: 'Open Sans', style: 'Moderno' },
-    { heading: 'Cormorant Garamond', body: 'Raleway', style: 'Sofisticato' },
-    { heading: 'Oswald', body: 'Roboto', style: 'Corporate' },
-  ]
-  const templates = [
-    { nome: 'Invito Formale', icon: LayoutTemplate, desc: 'Carta premium, bordi dorati' },
-    { nome: 'Digital Banner', icon: ImageIcon, desc: '1920x1080, social ready' },
-    { nome: 'Badge Partecipante', icon: Type, desc: 'Stampa recto-verso' },
-    { nome: 'Programma Evento', icon: FileText, desc: 'A4 bifold, 4 pagine' },
-  ]
+  const [projects, setProjects] = useState<CreativeProject[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchCreativeProjects().then(all => {
+      setProjects(all.filter(p => p.event_id === event.id))
+      setLoading(false)
+    })
+  }, [event.id])
+
+  const statusColor = (s: string) => {
+    switch (s) {
+      case 'completato': return 'var(--green)'
+      case 'in_lavorazione': return '#a855f7'
+      case 'in_revisione': return 'var(--yellow)'
+      case 'approvato': return 'var(--blue)'
+      default: return 'var(--muted)'
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -829,83 +832,230 @@ function TabCreative({ event }: { event: Event }) {
         style={{ border: '1px solid rgba(208,0,58,0.15)', background: 'linear-gradient(135deg, rgba(208,0,58,0.03) 0%, var(--panel) 70%)' }}>
         <div className="flex items-center gap-2 mb-1">
           <Palette className="w-4 h-4" style={{ color: 'var(--red2)' }} />
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Creative Studio</h3>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Materiali Creativi</h3>
           <span className="text-xs px-2 py-0.5 rounded-full ml-auto"
-            style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.25)' }}>
-            Beta
+            style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)' }}>
+            {projects.length} {projects.length === 1 ? 'progetto' : 'progetti'}
           </span>
         </div>
         <p className="text-xs" style={{ color: 'var(--muted)' }}>
-          Identità visiva, materiali comunicativi e branding per "{event.nome}"
+          Materiali creativi collegati a "{event.nome}"
         </p>
       </div>
 
-      <div className="panel p-5">
-        <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Mood Board</p>
-        <div className="flex gap-2 flex-wrap">
-          {moodColors.map((c, i) => (
-            <button key={i} className="group relative w-12 h-12 rounded-xl transition-all hover:scale-110"
-              onClick={() => { navigator.clipboard.writeText(c); setSelectedColor(c) }}
-              style={{ background: c, border: selectedColor === c ? '2px solid var(--red2)' : '2px solid var(--line)', boxShadow: selectedColor === c ? '0 0 12px rgba(208,0,58,0.4)' : 'none' }}>
-              <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"
-                style={{ background: 'rgba(0,0,0,0.4)' }}>
-                <span className="text-white text-xs font-mono">{c}</span>
-              </div>
-            </button>
-          ))}
+      {loading ? (
+        <div className="panel p-8 text-center">
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>
         </div>
-        <p className="text-xs mt-2" style={{ color: selectedColor ? 'var(--green)' : 'var(--muted)' }}>
-          {selectedColor ? `Colore ${selectedColor} copiato!` : 'Clicca per copiare il codice colore'}
-        </p>
-      </div>
-
-      <div className="panel p-5">
-        <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Coppie Tipografiche</p>
+      ) : projects.length === 0 ? (
+        <div className="panel p-8 text-center">
+          <Palette className="w-8 h-8 mx-auto mb-2 opacity-30" style={{ color: 'var(--muted)' }} />
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun materiale creativo collegato</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Crea progetti dal Creative Studio e collegali a questo evento</p>
+        </div>
+      ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {fontPairs.map((fp, i) => (
-            <div key={i} className="p-4 rounded-xl cursor-pointer transition-all hover:bg-white/5"
-              onClick={() => setSelectedFont(i)}
-              style={{ background: 'var(--panel2)', border: selectedFont === i ? '1px solid var(--red2)' : '1px solid var(--line)', boxShadow: selectedFont === i ? '0 0 12px rgba(208,0,58,0.15)' : 'none' }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs px-2 py-0.5 rounded"
-                  style={{ background: selectedFont === i ? 'rgba(208,0,58,0.2)' : 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
-                  {fp.style}
+          {projects.map(p => (
+            <div key={p.id} className="panel p-4 transition-all hover:bg-white/5"
+              style={{ border: '1px solid var(--line)' }}>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate" style={{ color: 'var(--text)' }}>{p.title}</p>
+                  <p className="text-xs capitalize" style={{ color: 'var(--muted)' }}>{p.type.replace(/_/g, ' ')}</p>
+                </div>
+                <span className="text-xs px-2 py-0.5 rounded-full capitalize flex-shrink-0"
+                  style={{ background: `${statusColor(p.status)}18`, color: statusColor(p.status), border: `1px solid ${statusColor(p.status)}30` }}>
+                  {p.status.replace(/_/g, ' ')}
                 </span>
-                {selectedFont === i && <Check className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />}
               </div>
-              <p className="text-lg font-bold" style={{ color: 'var(--text)', fontFamily: 'serif' }}>{fp.heading}</p>
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>{fp.body}</p>
+              {p.due_date && (
+                <div className="flex items-center gap-1.5 mt-2">
+                  <Clock className="w-3 h-3" style={{ color: 'var(--muted)' }} />
+                  <span className="text-xs" style={{ color: daysLeft(p.due_date) < 0 ? 'var(--red2)' : 'var(--muted)' }}>
+                    {fmtShort(p.due_date)}
+                  </span>
+                </div>
+              )}
+              {p.output_format && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <FileText className="w-3 h-3" style={{ color: 'var(--muted)' }} />
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>{p.output_format}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+function TabSocial({ event }: { event: Event }) {
+  const [contents, setContents] = useState<SocialContent[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchSocialContents().then(all => {
+      setContents(all.filter(c => c.event_id === event.id))
+      setLoading(false)
+    })
+  }, [event.id])
+
+  const statusColor = (s: string) => {
+    switch (s) {
+      case 'pubblicato': return 'var(--green)'
+      case 'approvato': return 'var(--blue)'
+      case 'in_lavorazione': return 'var(--yellow)'
+      default: return 'var(--muted)'
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="panel p-5"
+        style={{ border: '1px solid rgba(249,115,22,0.15)', background: 'linear-gradient(135deg, rgba(249,115,22,0.03) 0%, var(--panel) 70%)' }}>
+        <div className="flex items-center gap-2 mb-1">
+          <Zap className="w-4 h-4" style={{ color: '#f97316' }} />
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Contenuti Social</h3>
+          <span className="text-xs px-2 py-0.5 rounded-full ml-auto"
+            style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316' }}>
+            {contents.length} {contents.length === 1 ? 'contenuto' : 'contenuti'}
+          </span>
+        </div>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+          Contenuti social collegati a "{event.nome}"
+        </p>
       </div>
 
-      <div className="panel p-5">
-        <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Template Kit</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {templates.map((t, i) => {
-            const Icon = t.icon
-            return (
-              <button key={i} className="flex items-center gap-4 p-4 rounded-xl text-left transition-all hover:bg-white/5"
-                onClick={() => alert(`Download "${t.nome}" avviato (demo)`)}
-                style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'rgba(208,0,58,0.1)' }}>
-                  <Icon className="w-5 h-5" style={{ color: 'var(--red2)' }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm" style={{ color: 'var(--text)' }}>{t.nome}</p>
-                  <p className="text-xs" style={{ color: 'var(--muted)' }}>{t.desc}</p>
-                </div>
-                <span className="text-xs px-2 py-1 rounded flex-shrink-0"
-                  style={{ background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>
-                  Scarica
-                </span>
-              </button>
-            )
-          })}
+      {loading ? (
+        <div className="panel p-8 text-center">
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>
         </div>
+      ) : contents.length === 0 ? (
+        <div className="panel p-8 text-center">
+          <Zap className="w-8 h-8 mx-auto mb-2 opacity-30" style={{ color: 'var(--muted)' }} />
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun contenuto social collegato</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Crea contenuti dal Social Studio e collegali a questo evento</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {contents.map(c => (
+            <div key={c.id} className="panel p-4 transition-all hover:bg-white/5"
+              style={{ border: '1px solid var(--line)' }}>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate" style={{ color: 'var(--text)' }}>{c.title}</p>
+                  <p className="text-xs capitalize" style={{ color: 'var(--muted)' }}>{c.channel.replace(/_/g, ' ')}</p>
+                </div>
+                <span className="text-xs px-2 py-0.5 rounded-full capitalize flex-shrink-0"
+                  style={{ background: `${statusColor(c.status)}18`, color: statusColor(c.status), border: `1px solid ${statusColor(c.status)}30` }}>
+                  {c.status.replace(/_/g, ' ')}
+                </span>
+              </div>
+              {c.publish_date && (
+                <div className="flex items-center gap-1.5 mt-2">
+                  <Clock className="w-3 h-3" style={{ color: 'var(--muted)' }} />
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                    {fmtShort(c.publish_date)}
+                  </span>
+                </div>
+              )}
+              {c.copy && (
+                <p className="text-xs mt-2 line-clamp-2" style={{ color: 'var(--muted)' }}>{c.copy}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TabPresentazioni({ event }: { event: Event }) {
+  const [versions, setVersions] = useState<{ id: string; template_name: string; status: string; notes: string; file_url: string | null; created_at: string }[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase
+      .from('presentation_versions')
+      .select('*')
+      .eq('event_id', event.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data) setVersions(data)
+        setLoading(false)
+      })
+  }, [event.id])
+
+  const statusColor = (s: string) => {
+    switch (s) {
+      case 'pronto': return 'var(--green)'
+      case 'generazione_richiesta': return 'var(--blue)'
+      case 'errore': return 'var(--red2)'
+      default: return 'var(--muted)'
+    }
+  }
+  const statusLabel = (s: string) => {
+    switch (s) {
+      case 'bozza': return 'Bozza'
+      case 'generazione_richiesta': return 'In Generazione'
+      case 'pronto': return 'Pronto'
+      case 'errore': return 'Errore'
+      default: return s
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="panel p-5"
+        style={{ border: '1px solid rgba(77,180,255,0.15)', background: 'linear-gradient(135deg, rgba(77,180,255,0.03) 0%, var(--panel) 70%)' }}>
+        <div className="flex items-center gap-2 mb-1">
+          <FileText className="w-4 h-4" style={{ color: 'var(--blue)' }} />
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Presentazioni</h3>
+          <span className="text-xs px-2 py-0.5 rounded-full ml-auto"
+            style={{ background: 'rgba(77,180,255,0.12)', color: 'var(--blue)' }}>
+            {versions.length} {versions.length === 1 ? 'versione' : 'versioni'}
+          </span>
+        </div>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+          Presentazioni generate per "{event.nome}"
+        </p>
       </div>
+
+      {loading ? (
+        <div className="panel p-8 text-center">
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>
+        </div>
+      ) : versions.length === 0 ? (
+        <div className="panel p-8 text-center">
+          <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" style={{ color: 'var(--muted)' }} />
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessuna presentazione per questo evento</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Crea presentazioni dal modulo Presentazioni e collegale a questo evento</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {versions.map(v => (
+            <div key={v.id} className="panel p-4 flex items-center gap-4 transition-all hover:bg-white/5"
+              style={{ border: '1px solid var(--line)' }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(77,180,255,0.1)' }}>
+                <FileText className="w-5 h-5" style={{ color: 'var(--blue)' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm" style={{ color: 'var(--text)' }}>{v.template_name}</p>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                  {new Date(v.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </p>
+                {v.notes && <p className="text-xs mt-1 truncate" style={{ color: 'var(--muted)' }}>{v.notes}</p>}
+              </div>
+              <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
+                style={{ background: `${statusColor(v.status)}18`, color: statusColor(v.status), border: `1px solid ${statusColor(v.status)}30` }}>
+                {statusLabel(v.status)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1081,6 +1231,8 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
     { id: 'comunicazioni', label: `Comunicazioni${eventMsg.length > 0 ? ` (${eventMsg.length})` : ''}` },
     { id: 'timeline', label: 'Timeline' },
     { id: 'creative', label: 'Creative Studio' },
+    { id: 'social', label: 'Social' },
+    { id: 'presentazioni', label: 'Presentazioni' },
     { id: 'pacchetto', label: 'Pacchetto' },
   ]
 
@@ -1230,6 +1382,8 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'timeline' && <TabTimeline event={event} />}
         {activeTab === 'creative' && <TabCreative event={event} />}
+        {activeTab === 'social' && <TabSocial event={event} />}
+        {activeTab === 'presentazioni' && <TabPresentazioni event={event} />}
         {activeTab === 'pacchetto' && <TabPacchetto event={event} />}
       </div>
     </div>

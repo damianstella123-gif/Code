@@ -76,15 +76,11 @@ export default function Presentazioni() {
   }
 
   async function loadVersions() {
-    const stored = localStorage.getItem('simmetria_presentation_versions')
-    if (stored) {
-      setVersions(JSON.parse(stored))
-    }
-  }
-
-  function saveVersions(v: PresentationVersion[]) {
-    setVersions(v)
-    localStorage.setItem('simmetria_presentation_versions', JSON.stringify(v))
+    const { data } = await supabase
+      .from('presentation_versions')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (data) setVersions(data as PresentationVersion[])
   }
 
   async function handleTemplateUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -102,18 +98,19 @@ export default function Presentazioni() {
     await loadTemplates()
   }
 
-  function handleCreateVersion(data: Omit<PresentationVersion, 'id' | 'created_at'>) {
-    const newVersion: PresentationVersion = {
-      ...data,
-      id: crypto.randomUUID(),
-      created_at: new Date().toISOString(),
-    }
-    saveVersions([newVersion, ...versions])
+  async function handleCreateVersion(data: Omit<PresentationVersion, 'id' | 'created_at'>) {
+    const { data: row } = await supabase
+      .from('presentation_versions')
+      .insert(data)
+      .select()
+      .maybeSingle()
+    if (row) setVersions(prev => [row as PresentationVersion, ...prev])
     setShowNewPresentation(false)
   }
 
-  function handleDeleteVersion(id: string) {
-    saveVersions(versions.filter(v => v.id !== id))
+  async function handleDeleteVersion(id: string) {
+    await supabase.from('presentation_versions').delete().eq('id', id)
+    setVersions(prev => prev.filter(v => v.id !== id))
   }
 
   return (
