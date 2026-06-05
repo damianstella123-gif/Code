@@ -422,16 +422,18 @@ function FlyMascot({ size = 56, state = 'idle' }: { size?: number; state?: FlySt
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        background: '#1a2235',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.4), inset 0 0 0 2px rgba(208,0,58,0.3)',
       }}
     >
       <img
         src="/image.png"
         alt="Fly - Assistente Simmetria Hub"
         style={{
-          width: '280%',
-          height: '280%',
+          width: '380%',
+          height: '380%',
           objectFit: 'cover',
-          objectPosition: '50% 18%',
+          objectPosition: '44% 22%',
           pointerEvents: 'none',
           userSelect: 'none',
         }}
