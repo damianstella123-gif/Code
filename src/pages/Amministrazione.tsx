@@ -41,21 +41,9 @@ import {
   INVOICE_STATUSES, ADMIN_DOC_TYPES,
   type Invoice, type AdminDocument,
 } from '@/lib/invoices-service'
+import { fetchEntrate, upsertEntrata, deleteEntrata, fetchFatture, upsertFattura } from '@/lib/entrate-fatture-service'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const SK_ENTRATE = 'simmetria_entrate'
-const SK_FATTURE = 'simmetria_fatture'
-
-function loadLocal<T>(key: string): T[] {
-  try {
-    const r = localStorage.getItem(key)
-    return r ? JSON.parse(r) : []
-  } catch { return [] }
-}
-function saveLocal(key: string, data: unknown) {
-  localStorage.setItem(key, JSON.stringify(data))
-}
 
 function formatEur(n: number) {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -332,12 +320,12 @@ export default function Amministrazione() {
     if (paramTab === 'entrate' || paramTab === 'uscite' || paramTab === 'fatture' || paramTab === 'invoices' || paramTab === 'documenti') return paramTab
     return 'dashboard'
   })
-  const [entrate, setEntrate] = useState<Entrata[]>(() => loadLocal(SK_ENTRATE))
+  const [entrate, setEntrate] = useState<Entrata[]>([])
   const [uscite, setUscite] = useState<Uscita[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [clients, setClients] = useState<{ id: string; nome: string }[]>([])
-  const [fatture, setFatture] = useState<Fattura[]>(() => loadLocal(SK_FATTURE))
+  const [fatture, setFatture] = useState<Fattura[]>([])
   const [showNuovoMovimento, setShowNuovoMovimento] = useState(false)
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [adminDocs, setAdminDocs] = useState<AdminDocument[]>([])
@@ -354,7 +342,7 @@ export default function Amministrazione() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([fetchBudgets(), fetchEvents(), fetchSuppliers(), fetchClients(), fetchInvoices(), fetchAdminDocuments()]).then(([bg, ev, sp, cl, inv, docs]) => {
+    Promise.all([fetchBudgets(), fetchEvents(), fetchSuppliers(), fetchClients(), fetchInvoices(), fetchAdminDocuments(), fetchEntrate(), fetchFatture()]).then(([bg, ev, sp, cl, inv, docs, ent, fat]) => {
       if (cancelled) return
       setUscite(bg)
       setEvents(ev)
@@ -362,6 +350,8 @@ export default function Amministrazione() {
       setClients(cl.map(c => ({ id: c.id, nome: c.nome })))
       setInvoices(inv)
       setAdminDocs(docs)
+      setEntrate(ent)
+      setFatture(fat)
       _clients = cl.map(c => ({ id: c.id, nome: c.nome }))
       _suppliers = sp
       _events = ev
@@ -460,14 +450,9 @@ export default function Amministrazione() {
 
   // ─── Actions ─────────────────────────────────────────────────────────────────
 
-  function segnaEntrataPagata(id: string) {
-    setEntrate(prev => {
-      const updated = prev.map(e =>
-        e.id === id ? { ...e, stato: 'pagato' as StatoPagamento, dataPagamento: new Date().toISOString().slice(0, 10) } : e
-      )
-      saveLocal(SK_ENTRATE, updated)
-      return updated
-    })
+  async function segnaEntrataPagata(id: string) {
+    const result = await upsertEntrata({ id, stato: 'pagato', dataPagamento: new Date().toISOString().slice(0, 10) })
+    if (result) setEntrate(prev => prev.map(e => e.id === id ? result : e))
   }
 
   function segnaUscitaPagata(id: string) {
@@ -478,12 +463,9 @@ export default function Amministrazione() {
     updateBudget(id, { stato: 'pagato', dataPagamento: today }).then(() => refreshUscite())
   }
 
-  function eliminaEntrata(id: string) {
-    setEntrate(prev => {
-      const updated = prev.filter(e => e.id !== id)
-      saveLocal(SK_ENTRATE, updated)
-      return updated
-    })
+  async function eliminaEntrata(id: string) {
+    const ok = await deleteEntrata(id)
+    if (ok) setEntrate(prev => prev.filter(e => e.id !== id))
   }
 
   function eliminaUscita(id: string) {
@@ -491,12 +473,9 @@ export default function Amministrazione() {
     deleteBudget(id).then(() => refreshUscite())
   }
 
-  function editEntrata(id: string, importo: number, note: string) {
-    setEntrate(prev => {
-      const updated = prev.map(e => e.id === id ? { ...e, importo, note } : e)
-      saveLocal(SK_ENTRATE, updated)
-      return updated
-    })
+  async function editEntrata(id: string, importo: number, note: string) {
+    const result = await upsertEntrata({ id, importo, note })
+    if (result) setEntrate(prev => prev.map(e => e.id === id ? result : e))
   }
 
   function editUscita(id: string, importo: number, note: string) {
@@ -504,7 +483,7 @@ export default function Amministrazione() {
     updateBudget(id, { importo, note }).then(() => refreshUscite())
   }
 
-  function generaFattura(tipo: TipoMovimento, soggettoId: string, soggetto: string, importo: number, eventoId: string | null) {
+  async function generaFattura(tipo: TipoMovimento, soggettoId: string, soggetto: string, importo: number, eventoId: string | null) {
     const num = `${tipo === 'entrata' ? 'FT' : 'FP'}-2026-${String(fatture.length + 1).padStart(3, '0')}`
     const newFat: Fattura = {
       id: `fat_new_${Date.now()}`,
@@ -521,12 +500,11 @@ export default function Amministrazione() {
       scadenza: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
       note: 'Fattura generata automaticamente',
     }
-    setFatture(prev => {
-      const updated = [...prev, newFat]
-      saveLocal(SK_FATTURE, updated)
-      return updated
-    })
-    alert(`Fattura ${num} creata in bozza.`)
+    const result = await upsertFattura(newFat)
+    if (result) {
+      setFatture(prev => [...prev, result])
+      alert(`Fattura ${num} creata in bozza.`)
+    }
   }
 
   async function esportaXLSX() {
@@ -591,7 +569,7 @@ export default function Amministrazione() {
     doc.save(`simmetria_budget_${new Date().toISOString().slice(0, 10)}.pdf`)
   }
 
-  function handleNuovoMovimento(tipo: TipoMovimento, importo: number, note: string, eventoId: string | null, soggettoId: string) {
+  async function handleNuovoMovimento(tipo: TipoMovimento, importo: number, note: string, eventoId: string | null, soggettoId: string) {
     const today = new Date().toISOString().slice(0, 10)
     if (tipo === 'entrata') {
       const newE: Entrata = {
@@ -606,7 +584,8 @@ export default function Amministrazione() {
         note,
         fatturaId: null,
       }
-      setEntrate(prev => { const u = [...prev, newE]; saveLocal(SK_ENTRATE, u); return u })
+      const result = await upsertEntrata(newE)
+      if (result) setEntrate(prev => [...prev, result])
     } else {
       const newU: Uscita = {
         id: `usc_new_${Date.now()}`,
