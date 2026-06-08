@@ -25,16 +25,16 @@ import {
   Edit3,
   Trash2,
   Package,
-  Download as DownloadIcon,
+  Upload,
   Plus as PlusIcon,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { loadTasksFromStorage, cacheEventsSnapshot, loadClientsFromStorage } from '@/lib/storage'
 import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote } from '@/lib/events-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
-import { fetchBudgets } from '@/lib/budgets-service'
+import { fetchBudgets, upsertBudget, deleteBudget } from '@/lib/budgets-service'
 import { fetchCommunications } from '@/lib/communications-service'
-import { fetchPackagesByEvent, upsertClientPackage, updateClientPackage, deleteClientPackage, type ClientPackage } from '@/lib/packages-service'
+import { fetchPackagesByEvent, upsertClientPackage, updateClientPackage, deleteClientPackage, uploadPackageFile, type ClientPackage } from '@/lib/packages-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
 import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
 import { supabase } from '@/lib/supabase'
@@ -567,29 +567,97 @@ function TabFornitoriList({ suppliers: list }: { suppliers: Supplier[] }) {
   )
 }
 
-function TabBudget({ event, budgets, suppliers }: { event: Event; budgets: Uscita[]; suppliers: Supplier[] }) {
+function TabBudget({ event, budgets, suppliers, onRefresh }: { event: Event; budgets: Uscita[]; suppliers: Supplier[]; onRefresh: () => void }) {
   const eventUscite = budgets.filter(u => u.eventoId === event.id)
-  const totUscite = eventUscite.reduce((s, u) => s + u.importo, 0)
+  const totUscite = eventUscite.reduce((s, u) => s + (u.unitPrice !== null ? u.unitPrice * u.quantity : u.importo), 0)
   const margine = event.budget - totUscite
   const usoPct = event.budget > 0 ? Math.min(Math.round((totUscite / event.budget) * 100), 100) : 0
+  const [editing, setEditing] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
 
-  const sColor = (s: string) => {
-    switch (s) {
-      case 'pagato': return 'var(--green)'
-      case 'in_attesa': return 'var(--yellow)'
-      case 'scaduto': return 'var(--red2)'
-      default: return 'var(--muted)'
+  async function handleAddRow() {
+    const id = crypto.randomUUID()
+    const newRow: Uscita = {
+      id,
+      fornitoreId: '',
+      eventoId: event.id,
+      categoria: '',
+      importo: 0,
+      quantity: 1,
+      unitPrice: 0,
+      stato: 'in_attesa',
+      scadenza: new Date().toISOString().slice(0, 10),
+      dataPagamento: null,
+      note: '',
+      fatturaId: null,
     }
+    await upsertBudget(newRow)
+    onRefresh()
+    setEditing(id)
   }
-  const statoBg = (s: string) => {
-    switch (s) {
-      case 'pagato': return 'rgba(56,210,125,0.12)'
-      case 'in_attesa': return 'rgba(255,194,75,0.12)'
-      case 'scaduto': return 'rgba(255,49,95,0.12)'
-      default: return 'var(--panel2)'
-    }
+
+  async function handleSaveRow(u: Uscita) {
+    const importo = u.unitPrice !== null ? u.unitPrice * u.quantity : u.importo
+    await upsertBudget({ ...u, importo })
+    onRefresh()
+    setEditing(null)
   }
-  const statoLbl = (s: string) => ({ pagato: 'Pagato', in_attesa: 'In attesa', scaduto: 'Scaduto', annullato: 'Annullato' }[s] ?? s)
+
+  async function handleDeleteRow(id: string) {
+    await deleteBudget(id)
+    onRefresh()
+  }
+
+  async function exportXLSX() {
+    setExporting(true)
+    const XLSX = await import('xlsx')
+    const rows: Record<string, string | number>[] = eventUscite.map(u => ({
+      'Voce': u.note || u.categoria,
+      'Fornitore': suppliers.find(s => s.id === u.fornitoreId)?.nome ?? '',
+      'Quantita': u.quantity,
+      'Prezzo Unitario': u.unitPrice ?? u.importo,
+      'Totale Riga': u.unitPrice !== null ? u.unitPrice * u.quantity : u.importo,
+      'Stato': u.stato,
+      'Scadenza': u.scadenza,
+    }))
+    rows.push({ 'Voce': '', 'Fornitore': '', 'Quantita': '', 'Prezzo Unitario': '', 'Totale Riga': '', 'Stato': '', 'Scadenza': '' })
+    rows.push({ 'Voce': 'TOTALE USCITE', 'Fornitore': '', 'Quantita': '', 'Prezzo Unitario': '', 'Totale Riga': totUscite, 'Stato': '', 'Scadenza': '' })
+    rows.push({ 'Voce': 'BUDGET EVENTO', 'Fornitore': '', 'Quantita': '', 'Prezzo Unitario': '', 'Totale Riga': event.budget, 'Stato': '', 'Scadenza': '' })
+    rows.push({ 'Voce': 'MARGINE', 'Fornitore': '', 'Quantita': '', 'Prezzo Unitario': '', 'Totale Riga': margine, 'Stato': '', 'Scadenza': '' })
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Budget')
+    XLSX.writeFile(wb, `Budget_${event.nome.replace(/\s+/g, '_')}.xlsx`)
+    setExporting(false)
+  }
+
+  async function exportPDF() {
+    setExporting(true)
+    const jsPDFModule = await import('jspdf')
+    const autoTable = (await import('jspdf-autotable')).default
+    const doc = new jsPDFModule.default()
+    doc.setFontSize(16)
+    doc.text(`Budget - ${event.nome}`, 14, 20)
+    doc.setFontSize(10)
+    doc.text(`Budget totale: ${event.budget.toLocaleString('it-IT')} EUR | Uscite: ${totUscite.toLocaleString('it-IT')} EUR | Margine: ${margine.toLocaleString('it-IT')} EUR`, 14, 30)
+
+    const tableData = eventUscite.map(u => [
+      u.note || u.categoria,
+      suppliers.find(s => s.id === u.fornitoreId)?.nome ?? '-',
+      u.quantity.toString(),
+      (u.unitPrice ?? u.importo).toLocaleString('it-IT') + ' EUR',
+      (u.unitPrice !== null ? u.unitPrice * u.quantity : u.importo).toLocaleString('it-IT') + ' EUR',
+      u.stato,
+    ])
+    autoTable(doc, {
+      startY: 36,
+      head: [['Voce', 'Fornitore', 'Qty', 'Prezzo Unit.', 'Totale', 'Stato']],
+      body: tableData,
+      foot: [['', '', '', 'TOTALE', totUscite.toLocaleString('it-IT') + ' EUR', '']],
+    })
+    doc.save(`Budget_${event.nome.replace(/\s+/g, '_')}.pdf`)
+    setExporting(false)
+  }
 
   return (
     <div className="space-y-5">
@@ -603,7 +671,7 @@ function TabBudget({ event, budgets, suppliers }: { event: Event; budgets: Uscit
           <div key={k.label} className="panel p-4 text-center">
             <p className="text-xs" style={{ color: 'var(--muted)' }}>{k.label}</p>
             <p className="text-xl font-bold mt-1" style={{ color: k.color }}>
-              €{k.value.toLocaleString('it-IT')}
+              {'\u20AC'}{k.value.toLocaleString('it-IT')}
             </p>
           </div>
         ))}
@@ -618,52 +686,157 @@ function TabBudget({ event, budgets, suppliers }: { event: Event; budgets: Uscit
           <div className="h-full rounded-full transition-all"
             style={{ width: `${usoPct}%`, background: usoPct > 90 ? 'var(--red2)' : usoPct > 70 ? 'var(--yellow)' : 'var(--green)' }} />
         </div>
-        <div className="flex justify-between text-xs mt-2" style={{ color: 'var(--muted)' }}>
-          <span>€0</span>
-          <span>€{event.budget.toLocaleString('it-IT')}</span>
-        </div>
       </div>
 
-      {eventUscite.length > 0 && (
-        <div className="panel p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <ArrowUpRight className="w-4 h-4" style={{ color: 'var(--yellow)' }} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Uscite ({eventUscite.length})</h3>
-          </div>
-          <div className="space-y-2">
-            {eventUscite.map(u => {
-              const sup = suppliers.find(s => s.id === u.fornitoreId)
-              return (
-                <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl"
-                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{u.note || u.categoria}</p>
-                    <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                      {sup?.nome ?? '—'} · Scad. {fmtShort(u.scadenza)}
-                    </p>
-                  </div>
-                  <span className="text-xs px-2 py-1 rounded flex-shrink-0"
-                    style={{ background: statoBg(u.stato), color: sColor(u.stato) }}>
-                    {statoLbl(u.stato)}
-                  </span>
-                  <span className="font-semibold text-sm flex-shrink-0" style={{ color: 'var(--yellow)' }}>
-                    €{u.importo.toLocaleString('it-IT')}
-                  </span>
-                </div>
-              )
-            })}
+      {/* Actions bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={handleAddRow}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium"
+          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+          <Plus className="w-3.5 h-3.5" /> Aggiungi Voce
+        </button>
+        <button onClick={exportXLSX} disabled={exporting || eventUscite.length === 0}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40"
+          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+          <FileText className="w-3.5 h-3.5" /> Export XLSX
+        </button>
+        <button onClick={exportPDF} disabled={exporting || eventUscite.length === 0}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40"
+          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+          <FileText className="w-3.5 h-3.5" /> Export PDF
+        </button>
+      </div>
+
+      {/* Budget table */}
+      {eventUscite.length > 0 ? (
+        <div className="panel rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr style={{ background: 'var(--panel2)' }}>
+                  <th className="text-left px-3 py-2.5 font-semibold" style={{ color: 'var(--muted)' }}>Voce</th>
+                  <th className="text-left px-3 py-2.5 font-semibold" style={{ color: 'var(--muted)' }}>Fornitore</th>
+                  <th className="text-right px-3 py-2.5 font-semibold" style={{ color: 'var(--muted)' }}>Qty</th>
+                  <th className="text-right px-3 py-2.5 font-semibold" style={{ color: 'var(--muted)' }}>Prezzo Unit.</th>
+                  <th className="text-right px-3 py-2.5 font-semibold" style={{ color: 'var(--muted)' }}>Totale</th>
+                  <th className="text-center px-3 py-2.5 font-semibold" style={{ color: 'var(--muted)' }}>Stato</th>
+                  <th className="w-16"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {eventUscite.map(u => (
+                  <BudgetRow key={u.id} row={u} suppliers={suppliers}
+                    isEditing={editing === u.id}
+                    onEdit={() => setEditing(u.id)}
+                    onSave={handleSaveRow}
+                    onCancel={() => setEditing(null)}
+                    onDelete={() => handleDeleteRow(u.id)} />
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: '2px solid var(--line)' }}>
+                  <td colSpan={4} className="px-3 py-2.5 text-right font-bold" style={{ color: 'var(--text)' }}>Totale Generale</td>
+                  <td className="px-3 py-2.5 text-right font-bold" style={{ color: 'var(--yellow)' }}>
+                    {'\u20AC'}{totUscite.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
-      )}
-
-      {eventUscite.length === 0 && (
+      ) : (
         <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <Euro className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p>Nessuna voce finanziaria registrata per questo evento</p>
-          <p className="text-xs mt-1">Aggiungile dalla sezione Amministrazione</p>
+          <p>Nessuna voce budget per questo evento</p>
+          <p className="text-xs mt-1">Clicca "Aggiungi Voce" per iniziare</p>
         </div>
       )}
     </div>
+  )
+}
+
+function BudgetRow({ row, suppliers, isEditing, onEdit, onSave, onCancel, onDelete }: {
+  row: Uscita
+  suppliers: Supplier[]
+  isEditing: boolean
+  onEdit: () => void
+  onSave: (u: Uscita) => void
+  onCancel: () => void
+  onDelete: () => void
+}) {
+  const [local, setLocal] = useState(row)
+
+  useEffect(() => { setLocal(row) }, [row])
+
+  const rowTotal = local.unitPrice !== null ? local.unitPrice * local.quantity : local.importo
+
+  if (!isEditing) {
+    const sup = suppliers.find(s => s.id === row.fornitoreId)
+    const total = row.unitPrice !== null ? row.unitPrice * row.quantity : row.importo
+    return (
+      <tr className="hover:bg-white/5 transition-colors" style={{ borderBottom: '1px solid var(--line)' }}>
+        <td className="px-3 py-2.5" style={{ color: 'var(--text)' }}>{row.note || row.categoria || '-'}</td>
+        <td className="px-3 py-2.5" style={{ color: 'var(--muted)' }}>{sup?.nome ?? '-'}</td>
+        <td className="px-3 py-2.5 text-right" style={{ color: 'var(--text)' }}>{row.quantity}</td>
+        <td className="px-3 py-2.5 text-right" style={{ color: 'var(--text)' }}>{'\u20AC'}{(row.unitPrice ?? row.importo).toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
+        <td className="px-3 py-2.5 text-right font-medium" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
+        <td className="px-3 py-2.5 text-center">
+          <span className="text-xs px-1.5 py-0.5 rounded capitalize"
+            style={{ background: row.stato === 'pagato' ? 'rgba(56,210,125,0.12)' : row.stato === 'scaduto' ? 'rgba(255,49,95,0.12)' : 'rgba(255,194,75,0.12)', color: row.stato === 'pagato' ? 'var(--green)' : row.stato === 'scaduto' ? 'var(--red2)' : 'var(--yellow)' }}>
+            {row.stato.replace(/_/g, ' ')}
+          </span>
+        </td>
+        <td className="px-2 py-2.5">
+          <div className="flex gap-1">
+            <button onClick={onEdit} className="p-1 rounded hover:bg-white/10"><Edit3 className="w-3 h-3" style={{ color: 'var(--muted)' }} /></button>
+            <button onClick={onDelete} className="p-1 rounded hover:bg-white/10"><Trash2 className="w-3 h-3" style={{ color: 'var(--red2)' }} /></button>
+          </div>
+        </td>
+      </tr>
+    )
+  }
+
+  return (
+    <tr style={{ borderBottom: '1px solid var(--line)', background: 'rgba(208,0,58,0.03)' }}>
+      <td className="px-2 py-2">
+        <input value={local.note} onChange={e => setLocal({ ...local, note: e.target.value })} placeholder="Descrizione voce"
+          className="w-full px-2 py-1 rounded text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+      </td>
+      <td className="px-2 py-2">
+        <select value={local.fornitoreId} onChange={e => setLocal({ ...local, fornitoreId: e.target.value })}
+          className="w-full px-2 py-1 rounded text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+          <option value="">-</option>
+          {suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+        </select>
+      </td>
+      <td className="px-2 py-2">
+        <input type="number" min="1" step="1" value={local.quantity} onChange={e => setLocal({ ...local, quantity: Number(e.target.value) || 1 })}
+          className="w-16 px-2 py-1 rounded text-xs text-right" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+      </td>
+      <td className="px-2 py-2">
+        <input type="number" min="0" step="0.01" value={local.unitPrice ?? ''} onChange={e => setLocal({ ...local, unitPrice: Number(e.target.value) || 0 })}
+          className="w-24 px-2 py-1 rounded text-xs text-right" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+      </td>
+      <td className="px-3 py-2 text-right font-medium text-xs" style={{ color: 'var(--yellow)' }}>
+        {'\u20AC'}{rowTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+      </td>
+      <td className="px-2 py-2">
+        <select value={local.stato} onChange={e => setLocal({ ...local, stato: e.target.value as Uscita['stato'] })}
+          className="w-full px-2 py-1 rounded text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+          <option value="in_attesa">In attesa</option>
+          <option value="pagato">Pagato</option>
+          <option value="scaduto">Scaduto</option>
+          <option value="annullato">Annullato</option>
+        </select>
+      </td>
+      <td className="px-2 py-2">
+        <div className="flex gap-1">
+          <button onClick={() => onSave(local)} className="p-1 rounded hover:bg-white/10"><CheckSquare className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} /></button>
+          <button onClick={onCancel} className="p-1 rounded hover:bg-white/10"><X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} /></button>
+        </div>
+      </td>
+    </tr>
   )
 }
 
@@ -1063,6 +1236,7 @@ function TabPresentazioni({ event }: { event: Event }) {
 function TabPacchetto({ event }: { event: Event }) {
   const [packages, setPackages] = useState<ClientPackage[]>([])
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPackagesByEvent(event.id).then(p => { setPackages(p); setLoading(false) })
@@ -1084,12 +1258,32 @@ function TabPacchetto({ event }: { event: Event }) {
     if (result) setPackages(prev => prev.map(p => p.id === result.id ? result : p))
   }
 
+  async function handleFileUpload(pkg: ClientPackage, type: 'pptx' | 'pdf_presentation' | 'xlsx' | 'pdf_budget', e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(`${pkg.id}_${type}`)
+    const url = await uploadPackageFile(file, pkg.id, type)
+    if (url) {
+      const field = type === 'pptx' ? 'pptx_url' : type === 'pdf_presentation' ? 'pdf_presentation_url' : type === 'xlsx' ? 'xlsx_url' : 'pdf_budget_url'
+      const result = await updateClientPackage(pkg.id, { [field]: url })
+      if (result) setPackages(prev => prev.map(p => p.id === result.id ? result : p))
+    }
+    setUploading(null)
+  }
+
   async function handleDelete(id: string) {
     await deleteClientPackage(id)
     setPackages(prev => prev.filter(p => p.id !== id))
   }
 
   if (loading) return <div className="text-center py-8" style={{ color: 'var(--muted)' }}>Caricamento...</div>
+
+  const fileTypes: { key: 'pptx' | 'pdf_presentation' | 'xlsx' | 'pdf_budget'; label: string; field: keyof ClientPackage; accept: string }[] = [
+    { key: 'pptx', label: 'Presentazione PPTX', field: 'pptx_url', accept: '.pptx,.ppt' },
+    { key: 'pdf_presentation', label: 'Presentazione PDF', field: 'pdf_presentation_url', accept: '.pdf' },
+    { key: 'xlsx', label: 'Budget XLSX', field: 'xlsx_url', accept: '.xlsx,.xls' },
+    { key: 'pdf_budget', label: 'Budget PDF', field: 'pdf_budget_url', accept: '.pdf' },
+  ]
 
   return (
     <div className="space-y-4">
@@ -1113,7 +1307,7 @@ function TabPacchetto({ event }: { event: Event }) {
           <p className="text-xs" style={{ color: 'var(--muted)' }}>Nessun pacchetto creato per questo evento.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {packages.map(pkg => {
             const statusColors: Record<string, string> = {
               bozza: '#9ba3aa', in_preparazione: '#4db4ff', pronto: '#38d27d', inviato: '#22c55e', archiviato: '#6b7280',
@@ -1123,9 +1317,9 @@ function TabPacchetto({ event }: { event: Event }) {
             }
             const color = statusColors[pkg.status] ?? '#9ba3aa'
             return (
-              <div key={pkg.id} className="panel p-4 rounded-xl space-y-3">
+              <div key={pkg.id} className="panel p-5 rounded-xl space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs px-2 py-1 rounded-full font-medium"
+                  <span className="text-xs px-2.5 py-1 rounded-full font-medium"
                     style={{ background: `${color}20`, color }}>
                     {statusLabels[pkg.status] ?? pkg.status}
                   </span>
@@ -1134,28 +1328,40 @@ function TabPacchetto({ event }: { event: Event }) {
                   </span>
                 </div>
 
-                {/* File links */}
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: 'PPTX', url: pkg.pptx_url },
-                    { label: 'PDF Presentazione', url: pkg.pdf_presentation_url },
-                    { label: 'XLSX Budget', url: pkg.xlsx_url },
-                    { label: 'PDF Budget', url: pkg.pdf_budget_url },
-                  ].map(f => (
-                    <div key={f.label} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-                      style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
-                      <DownloadIcon className="w-3 h-3" style={{ color: f.url ? 'var(--blue)' : 'var(--muted)' }} />
-                      {f.url ? (
-                        <a href={f.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)' }}>{f.label}</a>
-                      ) : (
-                        <span style={{ color: 'var(--muted)' }}>{f.label} (non generato)</span>
-                      )}
-                    </div>
-                  ))}
+                {/* File slots */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {fileTypes.map(ft => {
+                    const url = pkg[ft.field] as string | null
+                    const isUploading = uploading === `${pkg.id}_${ft.key}`
+                    return (
+                      <div key={ft.key} className="flex items-center gap-2 p-3 rounded-xl"
+                        style={{ background: 'var(--bg)', border: `1px solid ${url ? 'rgba(56,210,125,0.3)' : 'var(--line)'}` }}>
+                        <FileText className="w-4 h-4 flex-shrink-0" style={{ color: url ? 'var(--green)' : 'var(--muted)' }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate" style={{ color: url ? 'var(--text)' : 'var(--muted)' }}>
+                            {ft.label}
+                          </p>
+                          {url ? (
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs" style={{ color: 'var(--blue)' }}>
+                              Scarica
+                            </a>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--muted)' }}>Non caricato</span>
+                          )}
+                        </div>
+                        <label className="flex-shrink-0 p-1.5 rounded-lg cursor-pointer hover:bg-white/10 transition-all"
+                          title={`Carica ${ft.label}`}>
+                          <Upload className="w-3.5 h-3.5" style={{ color: isUploading ? 'var(--yellow)' : 'var(--muted)' }} />
+                          <input type="file" className="hidden" accept={ft.accept}
+                            onChange={e => handleFileUpload(pkg, ft.key, e)} />
+                        </label>
+                      </div>
+                    )
+                  })}
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
+                <div className="flex items-center gap-2 pt-3" style={{ borderTop: '1px solid var(--line)' }}>
                   <select value={pkg.status} onChange={e => handleStatusChange(pkg, e.target.value)}
                     className="flex-1 px-2 py-1.5 rounded-lg text-xs"
                     style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
@@ -1181,10 +1387,13 @@ function TabPacchetto({ event }: { event: Event }) {
         </div>
       )}
 
-      {/* Info */}
-      <div className="p-3 rounded-xl text-xs" style={{ background: 'rgba(77,180,255,0.06)', border: '1px solid rgba(77,180,255,0.2)', color: 'var(--muted)' }}>
-        La generazione automatica di PPTX/XLSX richiede Edge Function.
-        Al momento puoi caricare i file manualmente o usare l'export dal modulo Budget/Presentazioni.
+      {/* Technical status */}
+      <div className="p-3 rounded-xl text-xs space-y-1" style={{ background: 'rgba(77,180,255,0.06)', border: '1px solid rgba(77,180,255,0.2)' }}>
+        <p className="font-medium" style={{ color: 'var(--blue)' }}>Stato tecnico file</p>
+        <p style={{ color: 'var(--muted)' }}>
+          La generazione automatica di PPTX e XLSX da dati evento richiede una Edge Function dedicata (non ancora attiva).
+          Per ora puoi caricare manualmente i file esportati da Budget (XLSX/PDF) e Presentazioni (PPTX/PDF).
+        </p>
       </div>
     </div>
   )
@@ -1202,9 +1411,10 @@ interface EventDetailProps {
   suppliers: Supplier[]
   comunicazioni: Messaggio[]
   internalUsers: InternalUser[]
+  onRefreshBudgets: () => void
 }
 
-function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni }: EventDetailProps) {
+function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni, onRefreshBudgets }: EventDetailProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
 
   const allTasks = loadTasksFromStorage()
@@ -1378,7 +1588,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         {activeTab === 'task' && <TabTask event={event} />}
         {activeTab === 'team' && <TabTeam event={event} />}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} />}
-        {activeTab === 'budget' && <TabBudget event={event} budgets={budgets} suppliers={suppliers} />}
+        {activeTab === 'budget' && <TabBudget event={event} budgets={budgets} suppliers={suppliers} onRefresh={onRefreshBudgets} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'timeline' && <TabTimeline event={event} />}
         {activeTab === 'creative' && <TabCreative event={event} />}
@@ -1572,6 +1782,7 @@ export default function Eventi() {
           suppliers={suppliers}
           comunicazioni={comunicazioni}
           internalUsers={internalUsers}
+          onRefreshBudgets={() => fetchBudgets().then(setBudgets)}
         />
       </>
     )
