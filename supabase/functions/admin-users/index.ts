@@ -111,20 +111,43 @@ Deno.serve(async (req: Request) => {
         return json({ error: createError.message }, 400);
       }
 
-      // Ensure profile exists with correct data (trigger may have created it)
-      await adminClient.from("profiles").upsert({
-        id: newUser.user.id,
+      const userId = newUser.user.id;
+
+      // Force-set profile with correct values via UPDATE after trigger has run.
+      // The trigger may have used empty metadata defaults, so we overwrite here.
+      const { error: upsertError } = await adminClient.from("profiles").upsert({
+        id: userId,
         email,
         first_name,
         last_name,
         role,
-        nome: `${first_name} ${last_name}`,
+        nome: `${first_name} ${last_name}`.trim(),
         ruolo: role,
+        reparto: "",
         is_active: true,
         attivo: true,
       }, { onConflict: "id" });
 
-      return json({ user: { id: newUser.user.id, email } });
+      if (upsertError) {
+        // Upsert failed — force update as fallback
+        await adminClient.from("profiles").update({
+          email,
+          first_name,
+          last_name,
+          role,
+          nome: `${first_name} ${last_name}`.trim(),
+          ruolo: role,
+          is_active: true,
+          attivo: true,
+        }).eq("id", userId);
+      }
+
+      // Also ensure auth user_metadata is correct (GoTrue may not store it on create)
+      await adminClient.auth.admin.updateUserById(userId, {
+        user_metadata: { first_name, last_name, role },
+      });
+
+      return json({ user: { id: userId, email } });
     }
 
     // ─── UPDATE USER ───────────────────────────────────────────
