@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { Client } from '@/data/clients'
+import type { Client, Contatto } from '@/data/clients'
 
 interface ClientRow {
   id: string
@@ -8,6 +8,14 @@ interface ClientRow {
   email: string | null
   phone: string | null
   notes: string | null
+  referente: string | null
+  status: string | null
+  city: string | null
+  country: string | null
+  source: string | null
+  revenue: number | null
+  estimated_value: number | null
+  deal_stage: string | null
   created_at: string
   updated_at: string
 }
@@ -19,15 +27,15 @@ function rowToClient(r: ClientRow): Client {
     settore: r.company ?? '',
     email: r.email ?? '',
     telefono: r.phone ?? '',
-    referente: '',
+    referente: r.referente ?? '',
     avatar: '',
-    stato: 'prospect',
-    nazione: 'Italia',
-    citta: '',
-    source: 'contatto',
-    fatturato: 0,
-    valoreStimato: 0,
-    faseTrattativa: 'lead',
+    stato: (r.status as Client['stato']) ?? 'prospect',
+    nazione: r.country ?? 'Italia',
+    citta: r.city ?? '',
+    source: (r.source as Client['source']) ?? 'contatto',
+    fatturato: r.revenue ?? 0,
+    valoreStimato: r.estimated_value ?? 0,
+    faseTrattativa: (r.deal_stage as Client['faseTrattativa']) ?? 'lead',
     note: r.notes ?? '',
   }
 }
@@ -40,6 +48,14 @@ function clientToRow(c: Client): Omit<ClientRow, 'created_at' | 'updated_at'> {
     email: c.email ?? '',
     phone: c.telefono ?? '',
     notes: c.note ?? '',
+    referente: c.referente ?? '',
+    status: c.stato ?? 'prospect',
+    city: c.citta ?? '',
+    country: c.nazione ?? 'Italia',
+    source: c.source ?? 'contatto',
+    revenue: c.fatturato ?? 0,
+    estimated_value: c.valoreStimato ?? 0,
+    deal_stage: c.faseTrattativa ?? 'lead',
   }
 }
 
@@ -69,12 +85,20 @@ export async function upsertClient(client: Client): Promise<Client | null> {
 }
 
 export async function updateClient(id: string, patch: Partial<Client>): Promise<Client | null> {
-  const dbPatch: Partial<ClientRow> = {}
+  const dbPatch: Record<string, unknown> = {}
   if (patch.nome !== undefined) dbPatch.name = patch.nome
   if (patch.settore !== undefined) dbPatch.company = patch.settore
   if (patch.email !== undefined) dbPatch.email = patch.email
   if (patch.telefono !== undefined) dbPatch.phone = patch.telefono
   if (patch.note !== undefined) dbPatch.notes = patch.note
+  if (patch.referente !== undefined) dbPatch.referente = patch.referente
+  if (patch.stato !== undefined) dbPatch.status = patch.stato
+  if (patch.citta !== undefined) dbPatch.city = patch.citta
+  if (patch.nazione !== undefined) dbPatch.country = patch.nazione
+  if (patch.source !== undefined) dbPatch.source = patch.source
+  if (patch.fatturato !== undefined) dbPatch.revenue = patch.fatturato
+  if (patch.valoreStimato !== undefined) dbPatch.estimated_value = patch.valoreStimato
+  if (patch.faseTrattativa !== undefined) dbPatch.deal_stage = patch.faseTrattativa
 
   const { data, error } = await supabase
     .from('clients')
@@ -93,6 +117,74 @@ export async function deleteClient(id: string): Promise<boolean> {
   const { error } = await supabase.from('clients').delete().eq('id', id)
   if (error) {
     console.error('deleteClient error:', error.message)
+    return false
+  }
+  return true
+}
+
+// ─── Contacts (Contatti) ─────────────────────────────────────────────────────
+
+interface ContactRow {
+  id: string
+  client_id: string
+  date: string
+  type: string
+  title: string
+  notes: string | null
+  author: string | null
+  created_at: string
+  updated_at: string
+}
+
+function rowToContatto(r: ContactRow): Contatto {
+  return {
+    id: r.id,
+    clienteId: r.client_id,
+    data: r.date,
+    tipo: (r.type as Contatto['tipo']) ?? 'chiamata',
+    titolo: r.title,
+    note: r.notes ?? '',
+    autore: r.author ?? '',
+  }
+}
+
+export async function fetchContacts(clientId?: string): Promise<Contatto[]> {
+  let query = supabase.from('contacts').select('*').order('date', { ascending: false })
+  if (clientId) query = query.eq('client_id', clientId)
+  const { data, error } = await query
+  if (error) {
+    console.error('fetchContacts error:', error.message)
+    return []
+  }
+  return ((data ?? []) as ContactRow[]).map(rowToContatto)
+}
+
+export async function upsertContact(c: Contatto): Promise<Contatto | null> {
+  const row = {
+    id: c.id,
+    client_id: c.clienteId,
+    date: c.data,
+    type: c.tipo,
+    title: c.titolo,
+    notes: c.note ?? '',
+    author: c.autore ?? '',
+  }
+  const { data, error } = await supabase
+    .from('contacts')
+    .upsert(row, { onConflict: 'id' })
+    .select()
+    .maybeSingle()
+  if (error) {
+    console.error('upsertContact error:', error.message)
+    return null
+  }
+  return data ? rowToContatto(data as ContactRow) : null
+}
+
+export async function deleteContact(id: string): Promise<boolean> {
+  const { error } = await supabase.from('contacts').delete().eq('id', id)
+  if (error) {
+    console.error('deleteContact error:', error.message)
     return false
   }
   return true

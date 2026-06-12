@@ -31,6 +31,7 @@ import { daysLeft, fmtShort } from '@/lib/format'
 import { cachePraticheSnapshot } from '@/lib/storage'
 import { fetchPractices, upsertPractice, deletePractice as deletePracticeRemote } from '@/lib/practices-service'
 import { fetchEvents } from '@/lib/events-service'
+import { fetchAllProfiles, type Profile } from '@/lib/profiles'
 
 const CATEGORIE: { id: CategoriaPratica; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'contratto', label: 'Contratto', icon: Briefcase, color: 'var(--red2)' },
@@ -78,6 +79,7 @@ export default function Pratiche() {
   const [view, setView] = useState<View>('list')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [allEvents, setAllEvents] = useState<Event[]>([])
+  const [allUsers, setAllUsers] = useState<Profile[]>([])
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -107,6 +109,18 @@ export default function Pratiche() {
     fetchEvents().then(events => {
       if (cancelled) return
       setAllEvents(events)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Load users from Supabase
+  useEffect(() => {
+    let cancelled = false
+    fetchAllProfiles().then(profiles => {
+      if (cancelled) return
+      setAllUsers(profiles)
     })
     return () => {
       cancelled = true
@@ -195,12 +209,12 @@ export default function Pratiche() {
   }
 
   if (view === 'detail' && selected) {
-    return <DetailView pratica={selected} onBack={() => setView('list')} onEdit={() => openEdit(selected.id)} onDelete={() => deletePratica(selected.id)} allEvents={allEvents} />
+    return <DetailView pratica={selected} onBack={() => setView('list')} onEdit={() => openEdit(selected.id)} onDelete={() => deletePratica(selected.id)} allEvents={allEvents} allUsers={allUsers} />
   }
 
   if (view === 'form') {
     const editing = editingId ? allPratiche.find(p => p.id === editingId) : undefined
-    return <FormView pratica={editing} onSave={savePratica} onCancel={() => { setView(selectedId ? 'detail' : 'list') }} allEvents={allEvents} />
+    return <FormView pratica={editing} onSave={savePratica} onCancel={() => { setView(selectedId ? 'detail' : 'list') }} allEvents={allEvents} allUsers={allUsers} />
   }
 
   return (
@@ -346,7 +360,7 @@ export default function Pratiche() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  {p.responsabileId && <span className="text-xs px-2 py-0.5 rounded font-medium hidden sm:block" style={{ background: 'rgba(77,180,255,0.15)', color: 'var(--blue)' }}>{p.responsabileId}</span>}
+                  {p.responsabileId && <span className="text-xs px-2 py-0.5 rounded font-medium hidden sm:block" style={{ background: 'rgba(77,180,255,0.15)', color: 'var(--blue)' }}>{(() => { const u = allUsers.find(x => x.id === p.responsabileId); return u ? `${u.first_name} ${u.last_name}`.trim() : p.responsabileId })()}</span>}
                   <span className="text-xs px-2 py-0.5 rounded"
                     style={{ background: `${statoColor(p.stato)}15`, color: statoColor(p.stato), border: `1px solid ${statoColor(p.stato)}25` }}>
                     {statoLabel(p.stato)}
@@ -392,11 +406,13 @@ function KpiMini({ label, value, icon: Icon, color, pulse }: {
 
 // ─── Detail View ──────────────────────────────────────────────────────────────
 
-function DetailView({ pratica, onBack, onEdit, onDelete, allEvents }: {
-  pratica: Pratica; onBack: () => void; onEdit: () => void; onDelete: () => void; allEvents: Event[]
+function DetailView({ pratica, onBack, onEdit, onDelete, allEvents, allUsers }: {
+  pratica: Pratica; onBack: () => void; onEdit: () => void; onDelete: () => void; allEvents: Event[]; allUsers: Profile[]
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const evento = pratica.eventoId ? allEvents.find(e => e.id === pratica.eventoId) : null
+  const responsabile = pratica.responsabileId ? allUsers.find(u => u.id === pratica.responsabileId) : null
+  const responsabileLabel = responsabile ? `${responsabile.first_name} ${responsabile.last_name}`.trim() : (pratica.responsabileId ?? '—')
   const dl = daysLeft(pratica.scadenza)
   const overdue = pratica.stato !== 'completata' && dl < 0
   const CatIcon = catIcon(pratica.categoria)
@@ -471,7 +487,7 @@ function DetailView({ pratica, onBack, onEdit, onDelete, allEvents }: {
         {pratica.importo && (
           <InfoCard icon={Euro} label="Importo" value={`€${pratica.importo.toLocaleString('it-IT')}`} color="var(--green)" />
         )}
-        <InfoCard icon={User} label="Responsabile" value={pratica.responsabileId ?? '—'} color="var(--blue)" />
+        <InfoCard icon={User} label="Responsabile" value={responsabileLabel} color="var(--blue)" />
         <InfoCard icon={Briefcase} label="Controparte" value={pratica.controparte} color="var(--text)" />
         {evento && (
           <InfoCard icon={Calendar} label="Evento" value={evento.nome} color="var(--red2)" />
@@ -512,8 +528,8 @@ function InfoCard({ icon: Icon, label, value, color, avatar }: {
 
 // ─── Form View ────────────────────────────────────────────────────────────────
 
-function FormView({ pratica, onSave, onCancel, allEvents }: {
-  pratica?: Pratica; onSave: (p: Pratica) => void; onCancel: () => void; allEvents: Event[]
+function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
+  pratica?: Pratica; onSave: (p: Pratica) => void; onCancel: () => void; allEvents: Event[]; allUsers: Profile[]
 }) {
   const [titolo, setTitolo] = useState(pratica?.titolo ?? '')
   const [descrizione, setDescrizione] = useState(pratica?.descrizione ?? '')
@@ -631,11 +647,9 @@ function FormView({ pratica, onSave, onCancel, allEvents }: {
             <select value={responsabileId} onChange={e => setResponsabileId(e.target.value)}
               className="input w-full py-2.5 text-sm rounded-lg">
               <option value="">Seleziona responsabile</option>
-              <option value="Admin">Admin</option>
-              <option value="Manager">Manager</option>
-              <option value="Finance">Finance</option>
-              <option value="Commerciale">Commerciale</option>
-              <option value="Operativo">Operativo</option>
+              {allUsers.filter(u => u.is_active).map(u => (
+                <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
+              ))}
             </select>
           </div>
           <div>

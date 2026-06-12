@@ -17,8 +17,9 @@ import {
   Trash2,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
-import { loadEventsFromStorage, cacheTasksSnapshot } from '@/lib/storage'
+import { cacheTasksSnapshot } from '@/lib/storage'
 import { fetchTasks, upsertTask, deleteTask as deleteTaskRemote, changeTaskStatus } from '@/lib/tasks-service'
+import { fetchEvents } from '@/lib/events-service'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { daysLeft, fmtShort } from '@/lib/format'
 import type { Task } from '@/data/tasks'
@@ -39,7 +40,7 @@ function prioritaColor(p: string) {
   }
 }
 
-function getVisibleTasks(allTasks: Task[], ruolo: string, userId: string): Task[] {
+function getVisibleTasks(allTasks: Task[], ruolo: string, userId: string, eventsList: { id: string; nome: string; team?: string[]; responsabile?: string }[]): Task[] {
   switch (ruolo) {
     case 'Admin':
     case 'Partner':
@@ -47,8 +48,8 @@ function getVisibleTasks(allTasks: Task[], ruolo: string, userId: string): Task[
       return allTasks
     case 'Finance':
       return allTasks.filter(t => {
-        const evt = t.evento ? loadEventsFromStorage().find(e => e.id === t.evento) : null
-        return t.assegnatario === userId || (evt && (evt.team.includes(userId) || evt.responsabile === userId))
+        const evt = t.evento ? eventsList.find(e => e.id === t.evento) : null
+        return t.assegnatario === userId || (evt && ((evt as any).team?.includes(userId) || (evt as any).responsabile === userId))
       })
     case 'Commerciale':
       return allTasks.filter(t => t.assegnatario === userId || t.evento === null)
@@ -62,8 +63,8 @@ function getVisibleTasks(allTasks: Task[], ruolo: string, userId: string): Task[
 
 // ─── Task Form Modal ──────────────────────────────────────────────────────────
 
-function TaskFormModal({ task, onSave, onClose, users }: {
-  task?: Task; onSave: (t: Task) => void; onClose: () => void; users: Profile[]
+function TaskFormModal({ task, onSave, onClose, users, events }: {
+  task?: Task; onSave: (t: Task) => void; onClose: () => void; users: Profile[]; events: { id: string; nome: string }[]
 }) {
   const [titolo, setTitolo] = useState(task?.titolo ?? '')
   const [descrizione, setDescrizione] = useState(task?.descrizione ?? '')
@@ -120,8 +121,9 @@ function TaskFormModal({ task, onSave, onClose, users }: {
               <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Assegnatario</label>
               <select value={assegnatario} onChange={e => setAssegnatario(e.target.value)}
                 className="input w-full py-2.5 text-sm rounded-lg">
+                <option value="">Nessuno</option>
                 {users.map(u => (
-                  <option key={u.id} value={u.first_name + ' ' + u.last_name}>{u.first_name} {u.last_name}</option>
+                  <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
                 ))}
               </select>
             </div>
@@ -130,7 +132,7 @@ function TaskFormModal({ task, onSave, onClose, users }: {
               <select value={evento} onChange={e => setEvento(e.target.value)}
                 className="input w-full py-2.5 text-sm rounded-lg">
                 <option value="">Nessuno</option>
-                {loadEventsFromStorage().map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
+                {events.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
               </select>
             </div>
           </div>
@@ -176,12 +178,12 @@ function TaskFormModal({ task, onSave, onClose, users }: {
 
 // ─── Task Detail Modal ────────────────────────────────────────────────────────
 
-function TaskDetail({ task, onClose, onMove, onEdit, onDelete }: {
+function TaskDetail({ task, onClose, onMove, onEdit, onDelete, events }: {
   task: Task; onClose: () => void; onMove: (taskId: string, to: Task['stato']) => void
-  onEdit: () => void; onDelete: () => void
+  onEdit: () => void; onDelete: () => void; events: { id: string; nome: string }[]
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const evento = task.evento ? loadEventsFromStorage().find(e => e.id === task.evento) : null
+  const evento = task.evento ? events.find(e => e.id === task.evento) : null
   const dl = daysLeft(task.scadenza)
   const isOverdue = dl < 0
 
@@ -303,10 +305,10 @@ function TaskDetail({ task, onClose, onMove, onEdit, onDelete }: {
 
 // ─── Task Card ────────────────────────────────────────────────────────────────
 
-function TaskCard({ task, onClick, onQuickMove }: {
-  task: Task; onClick: () => void; onQuickMove: (to: Task['stato']) => void
+function TaskCard({ task, onClick, onQuickMove, events }: {
+  task: Task; onClick: () => void; onQuickMove: (to: Task['stato']) => void; events: { id: string; nome: string }[]
 }) {
-  const evento = task.evento ? loadEventsFromStorage().find(e => e.id === task.evento) : null
+  const evento = task.evento ? events.find(e => e.id === task.evento) : null
   const dl = daysLeft(task.scadenza)
   const isOverdue = dl < 0 && task.stato !== 'completato'
   const urgentSoon = !isOverdue && dl <= 2 && task.stato !== 'completato'
@@ -374,6 +376,7 @@ export default function TaskPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
   const [allUsers, setAllUsers] = useState<Profile[]>([])
+  const [allEvents, setAllEvents] = useState<{ id: string; nome: string }[]>([])
 
   // Task: fonte di verita' Supabase. Nessun fallback mock.
   // La snapshot in localStorage resta solo per gli altri moduli che la leggono.
@@ -401,6 +404,18 @@ export default function TaskPage() {
     }
   }, [])
 
+  // Load events from Supabase
+  useEffect(() => {
+    let cancelled = false
+    fetchEvents().then(evts => {
+      if (cancelled) return
+      setAllEvents(evts.map(e => ({ id: e.id, nome: e.nome })))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   useEffect(() => {
     const targetId = searchParams.get('id')
     if (!targetId || taskList.length === 0) return
@@ -413,8 +428,8 @@ export default function TaskPage() {
 
   const visibleTasks = useMemo(() => {
     if (!currentUser) return []
-    return getVisibleTasks(taskList, currentUser.ruolo, currentUser.id)
-  }, [taskList, currentUser])
+    return getVisibleTasks(taskList, currentUser.ruolo, currentUser.id, allEvents)
+  }, [taskList, currentUser, allEvents])
 
   const filtered = useMemo(() => {
     return visibleTasks.filter(t => {
@@ -553,7 +568,7 @@ export default function TaskPage() {
                 </div>
               ) : col.tasks.map((task, i) => (
                 <div key={task.id} className="animate-fade-in" style={{ animationDelay: `${i * 40}ms` }}>
-                  <TaskCard task={task} onClick={() => setSelected(task)} onQuickMove={to => moveTask(task.id, to)} />
+                  <TaskCard task={task} onClick={() => setSelected(task)} onQuickMove={to => moveTask(task.id, to)} events={allEvents} />
                 </div>
               ))}
             </div>
@@ -564,11 +579,11 @@ export default function TaskPage() {
       {selectedCurrent && (
         <TaskDetail task={selectedCurrent} onClose={() => setSelected(null)} onMove={moveTask}
           onEdit={() => { setEditingTask(selectedCurrent); setSelected(null); setShowForm(true) }}
-          onDelete={() => deleteTask(selectedCurrent.id)} />
+          onDelete={() => deleteTask(selectedCurrent.id)} events={allEvents} />
       )}
 
       {showForm && (
-        <TaskFormModal task={editingTask} onSave={saveTask} onClose={() => { setShowForm(false); setEditingTask(undefined) }} users={allUsers} />
+        <TaskFormModal task={editingTask} onSave={saveTask} onClose={() => { setShowForm(false); setEditingTask(undefined) }} users={allUsers} events={allEvents} />
       )}
     </div>
   )

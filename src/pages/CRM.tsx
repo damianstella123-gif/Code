@@ -21,9 +21,8 @@ import {
   Palette,
   Zap,
 } from 'lucide-react'
-import { contatti } from '@/data/clients'
 import type { Client, Contatto } from '@/data/clients'
-import { fetchClients, upsertClient, deleteClient } from '@/lib/clients-service'
+import { fetchClients, upsertClient, deleteClient, fetchContacts } from '@/lib/clients-service'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
 import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
@@ -385,6 +384,7 @@ function ClientDetail({ client, onBack, onEdit, onDelete, events }: ClientDetail
   const [clientCreative, setClientCreative] = useState<CreativeProject[]>([])
   const [clientSocial, setClientSocial] = useState<SocialContent[]>([])
   const [clientPresentations, setClientPresentations] = useState<{ id: string; template_name: string; status: string; created_at: string }[]>([])
+  const [clientContatti, setClientContatti] = useState<Contatto[]>([])
 
   useEffect(() => {
     fetchCreativeProjects().then(all => {
@@ -396,11 +396,8 @@ function ClientDetail({ client, onBack, onEdit, onDelete, events }: ClientDetail
     supabase.from('presentation_versions').select('*').eq('client_id', client.id).order('created_at', { ascending: false }).then(({ data }) => {
       if (data) setClientPresentations(data)
     })
+    fetchContacts(client.id).then(setClientContatti)
   }, [client.id])
-
-  const clientContatti = contatti
-    .filter(c => c.clienteId === client.id)
-    .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
 
   const clientEvents = events.filter(e => e.cliente === client.id)
 
@@ -839,11 +836,13 @@ export default function CRM() {
   const [editTarget, setEditTarget] = useState<Client | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Client | null>(null)
   const [events, setEvents] = useState<import('@/data/events').Event[]>([])
+  const [allContacts, setAllContacts] = useState<Contatto[]>([])
 
   const refresh = useCallback(async () => {
-    const [list, evs] = await Promise.all([fetchClients(), fetchEvents()])
+    const [list, evs, contacts] = await Promise.all([fetchClients(), fetchEvents(), fetchContacts()])
     setClientList(list)
     setEvents(evs)
+    setAllContacts(contacts)
   }, [])
 
   useEffect(() => {
@@ -1017,7 +1016,7 @@ export default function CRM() {
       ) : (
         <div className="space-y-3">
           {filtered.map((client, i) => {
-            const clientContatti = contatti.filter(c => c.clienteId === client.id)
+            const clientContatti = allContacts.filter(c => c.clienteId === client.id)
             const lastContact = clientContatti.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())[0]
             const clientEvents = events.filter(e => e.cliente === client.id)
 
