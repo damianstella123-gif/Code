@@ -29,7 +29,7 @@ import {
   Plus as PlusIcon,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
-import { loadTasksFromStorage, cacheEventsSnapshot, loadClientsFromStorage } from '@/lib/storage'
+import { loadTasksFromStorage, cacheEventsSnapshot } from '@/lib/storage'
 import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote } from '@/lib/events-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchBudgets, upsertBudget, deleteBudget } from '@/lib/budgets-service'
@@ -37,6 +37,9 @@ import { fetchCommunications } from '@/lib/communications-service'
 import { fetchPackagesByEvent, upsertClientPackage, updateClientPackage, deleteClientPackage, uploadPackageFile, type ClientPackage } from '@/lib/packages-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
 import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
+import { fetchClients as fetchClientsService } from '@/lib/clients-service'
+import type { Client } from '@/data/clients'
+import { fetchAllProfiles } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
@@ -106,9 +109,10 @@ interface InternalUser {
   avatar: string
 }
 
-function EventFormModal({ event, internalUsers, onSave, onCancel }: {
+function EventFormModal({ event, internalUsers, clients, onSave, onCancel }: {
   event?: Event
   internalUsers: InternalUser[]
+  clients: { id: string; nome: string }[]
   onSave: (e: Event) => void
   onCancel: () => void
 }) {
@@ -215,7 +219,7 @@ function EventFormModal({ event, internalUsers, onSave, onCancel }: {
                 className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
                 style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
                 <option value="">— Nessuno —</option>
-                {loadClientsFromStorage().map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                {clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>
             </div>
             <div>
@@ -318,12 +322,13 @@ function DeleteConfirm({ eventName, onConfirm, onCancel }: {
 
 // ─── Tab content components ───────────────────────────────────────────────────
 
-function TabOverview({ event, progress, completedTasks, totalTasks, budgets }: {
+function TabOverview({ event, progress, completedTasks, totalTasks, budgets, clients }: {
   event: Event
   progress: number
   completedTasks: number
   totalTasks: number
   budgets: Uscita[]
+  clients: Client[]
 }) {
   const eventUscite = budgets.filter(u => u.eventoId === event.id)
   const totUscite = eventUscite.reduce((s, u) => s + u.importo, 0)
@@ -331,7 +336,7 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets }: {
   const residuo = event.budget - speso
   const usoPct = event.budget > 0 ? Math.round((speso / event.budget) * 100) : 0
 
-  const cliente = loadClientsFromStorage().find(c => c.id === event.cliente)
+  const cliente = clients.find(c => c.id === event.cliente)
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1411,10 +1416,11 @@ interface EventDetailProps {
   suppliers: Supplier[]
   comunicazioni: Messaggio[]
   internalUsers: InternalUser[]
+  clients: Client[]
   onRefreshBudgets: () => void
 }
 
-function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni, onRefreshBudgets }: EventDetailProps) {
+function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni, clients, onRefreshBudgets }: EventDetailProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
 
   const allTasks = loadTasksFromStorage()
@@ -1484,9 +1490,9 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
                   }}>
                   {statoLabel(event.stato)}
                 </span>
-                {loadClientsFromStorage().find(c => c.id === event.cliente) && (
+                {clients.find(c => c.id === event.cliente) && (
                   <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                    Cliente: <span style={{ color: 'var(--text)' }}>{loadClientsFromStorage().find(c => c.id === event.cliente)!.nome}</span>
+                    Cliente: <span style={{ color: 'var(--text)' }}>{clients.find(c => c.id === event.cliente)!.nome}</span>
                   </span>
                 )}
               </div>
@@ -1583,7 +1589,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
       {/* Tab Content */}
       <div key={activeTab} className="animate-fade-in">
         {activeTab === 'overview' && (
-          <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} />
+          <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} clients={clients} />
         )}
         {activeTab === 'task' && <TabTask event={event} />}
         {activeTab === 'team' && <TabTeam event={event} />}
@@ -1617,6 +1623,7 @@ export default function Eventi() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [comunicazioni, setComunicazioni] = useState<Messaggio[]>([])
   const [internalUsers, setInternalUsers] = useState<InternalUser[]>([])
+  const [clientsList, setClientsList] = useState<Client[]>([])
 
   // Load events
   useEffect(() => {
@@ -1631,18 +1638,20 @@ export default function Eventi() {
     }
   }, [])
 
-  // Load budgets, suppliers, communications
+  // Load budgets, suppliers, communications, clients
   useEffect(() => {
     let cancelled = false
     Promise.all([
       fetchBudgets(),
       fetchSuppliers(),
       fetchCommunications(),
-    ]).then(([budgetsData, suppliersData, comunicazioniData]) => {
+      fetchClientsService(),
+    ]).then(([budgetsData, suppliersData, comunicazioniData, clientsData]) => {
       if (cancelled) return
       setBudgets(budgetsData)
       setSuppliers(suppliersData)
       setComunicazioni(comunicazioniData)
+      setClientsList(clientsData)
     }).catch(err => {
       console.error('Error loading data:', err)
     })
@@ -1651,14 +1660,15 @@ export default function Eventi() {
     }
   }, [])
 
-  // Mock internal users for team/responsabile fields
+  // Load internal users from profiles
   useEffect(() => {
-    setInternalUsers([
-      { id: 'user_1', nome: 'Marco Rossi', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Marco' },
-      { id: 'user_2', nome: 'Laura Bianchi', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Laura' },
-      { id: 'user_3', nome: 'Giovanni Verdi', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Giovanni' },
-      { id: 'user_4', nome: 'Maria Gialli', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Maria' },
-    ])
+    fetchAllProfiles().then(profiles => {
+      setInternalUsers(profiles.filter(p => p.is_active).map(p => ({
+        id: p.id,
+        nome: `${p.first_name} ${p.last_name}`.trim() || p.email,
+        avatar: p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.first_name}`,
+      })))
+    })
   }, [])
 
   useEffect(() => {
@@ -1745,6 +1755,7 @@ export default function Eventi() {
         <EventFormModal
           event={editingEvent}
           internalUsers={internalUsers}
+          clients={clientsList}
           onSave={handleSave}
           onCancel={() => { setShowForm(false); setEditingEvent(undefined) }}
         />
@@ -1782,6 +1793,7 @@ export default function Eventi() {
           suppliers={suppliers}
           comunicazioni={comunicazioni}
           internalUsers={internalUsers}
+          clients={clientsList}
           onRefreshBudgets={() => fetchBudgets().then(setBudgets)}
         />
       </>
@@ -1857,7 +1869,7 @@ export default function Eventi() {
       ) : (
         <div className="space-y-3">
           {filtered.map((event, i) => {
-            const cliente = loadClientsFromStorage().find(c => c.id === event.cliente)
+            const cliente = clientsList.find(c => c.id === event.cliente)
             const responsabile = internalUsers.find(u => u.id === event.responsabile)
             const teamMembers = internalUsers.filter(u => event.team.includes(u.id)).slice(0, 4)
             const allTasks = loadTasksFromStorage()
