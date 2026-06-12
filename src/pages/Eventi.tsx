@@ -33,7 +33,7 @@ import { loadTasksFromStorage, cacheEventsSnapshot, loadClientsFromStorage } fro
 import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote } from '@/lib/events-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchBudgets, upsertBudget, deleteBudget } from '@/lib/budgets-service'
-import { fetchCommunications, upsertCommunication } from '@/lib/communications-service'
+import { fetchCommunications } from '@/lib/communications-service'
 import { fetchPackagesByEvent, upsertClientPackage, updateClientPackage, deleteClientPackage, uploadPackageFile, type ClientPackage } from '@/lib/packages-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
 import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
@@ -1255,25 +1255,7 @@ function TabPacchetto({ event }: { event: Event }) {
     const patch: Partial<ClientPackage> = { status }
     if (status === 'inviato') patch.sent_at = new Date().toISOString()
     const result = await updateClientPackage(pkg.id, patch)
-    if (result) {
-      setPackages(prev => prev.map(p => p.id === result.id ? result : p))
-      if (status === 'inviato') {
-        await upsertCommunication({
-          id: `comm-pkg-${pkg.id}-${Date.now()}`,
-          oggetto: `Pacchetto cliente inviato - ${event.nome}`,
-          corpo: `Il pacchetto cliente per l'evento "${event.nome}" e' stato segnato come inviato.`,
-          mittente: 'Sistema',
-          destinatari: [],
-          canale: 'evento',
-          priorita: 'media',
-          data: new Date().toISOString(),
-          eventoId: event.id,
-          taskId: null,
-          letto: [],
-          allegati: [],
-        })
-      }
-    }
+    if (result) setPackages(prev => prev.map(p => p.id === result.id ? result : p))
   }
 
   async function handleFileUpload(pkg: ClientPackage, type: 'pptx' | 'pdf_presentation' | 'xlsx' | 'pdf_budget', e: React.ChangeEvent<HTMLInputElement>) {

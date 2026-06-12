@@ -70,22 +70,10 @@ const ALL_NAV: NavItem[] = [
   { name: 'Impostazioni', href: '/impostazioni' },
 ]
 
-const ROLE_NAV: Record<AppRole, string[]> = {
-  'Partner': ALL_NAV.map(n => n.href),
-  'Project Manager': ['/dashboard', '/eventi', '/crm', '/task', '/calendario', '/fornitori', '/amministrazione', '/comunicazioni', '/pratiche'],
-  'Amministrazione': ['/dashboard', '/crm', '/amministrazione', '/pratiche', '/comunicazioni'],
-  'Production Manager': ['/dashboard', '/eventi', '/task', '/fornitori', '/calendario', '/comunicazioni'],
-  'Digital Strategist': ['/dashboard', '/creative-studio', '/social-studio', '/presentazioni', '/calendario', '/comunicazioni'],
-  'Event Coordinator': ['/dashboard', '/eventi', '/task', '/calendario', '/fornitori', '/pratiche', '/comunicazioni'],
-  'Event Assistant': ['/dashboard', '/task', '/calendario', '/pratiche', '/comunicazioni'],
-  'Junior Event Assistant': ['/dashboard', '/task', '/calendario', '/pratiche'],
+export function getAllowedNavForRole(_role: AppRole): NavItem[] {
+  return ALL_NAV
 }
 
-export function getAllowedNavForRole(role: AppRole): NavItem[] {
-  const allowed = ROLE_NAV[role] ?? ALL_NAV.map(n => n.href)
-  return ALL_NAV.filter(n => allowed.includes(n.href))
-}
-
-export function getAllowedNav(ruolo: string): NavItem[] {
-  return getAllowedNavForRole(ruolo as AppRole)
+export function getAllowedNav(_ruolo: string): NavItem[] {
+  return ALL_NAV
 }
