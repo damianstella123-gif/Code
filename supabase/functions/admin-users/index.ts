@@ -113,10 +113,11 @@ Deno.serve(async (req: Request) => {
 
       const userId = newUser.user.id;
 
-      // Force-set profile with correct values via UPDATE after trigger has run.
-      // The trigger may have used empty metadata defaults, so we overwrite here.
-      const { error: upsertError } = await adminClient.from("profiles").upsert({
-        id: userId,
+      // Wait for the trigger to create the profile row
+      await new Promise((r) => setTimeout(r, 500));
+
+      // Force UPDATE profile with correct values (trigger may have used empty metadata)
+      const { error: updateError } = await adminClient.from("profiles").update({
         email,
         first_name,
         last_name,
@@ -126,20 +127,22 @@ Deno.serve(async (req: Request) => {
         reparto: "",
         is_active: true,
         attivo: true,
-      }, { onConflict: "id" });
+      }).eq("id", userId);
 
-      if (upsertError) {
-        // Upsert failed — force update as fallback
-        await adminClient.from("profiles").update({
+      if (updateError) {
+        // Fallback: upsert if row doesn't exist yet
+        await adminClient.from("profiles").upsert({
+          id: userId,
           email,
           first_name,
           last_name,
           role,
           nome: `${first_name} ${last_name}`.trim(),
           ruolo: role,
+          reparto: "",
           is_active: true,
           attivo: true,
-        }).eq("id", userId);
+        }, { onConflict: "id" });
       }
 
       // Also ensure auth user_metadata is correct (GoTrue may not store it on create)

@@ -38,3 +38,24 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* Date picker fix: override Tailwind preflight appearance:none and ensure
+   native calendar widget is visible and interactive in dark mode */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"] {
+  appearance: auto !important;
+  -webkit-appearance: auto !important;
+}
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+  opacity: 0.7;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
