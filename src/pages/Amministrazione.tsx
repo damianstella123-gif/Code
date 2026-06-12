@@ -133,7 +133,7 @@ function eventName(id: string | null) {
 
 interface NuovoMovimentoModalProps {
   onClose: () => void
-  onSave: (tipo: TipoMovimento, importo: number, note: string, eventoId: string | null, soggettoId: string) => void
+  onSave: (tipo: TipoMovimento, importo: number, note: string, eventoId: string | null, soggettoId: string, quantity: number, unitPrice: number | null) => void
   clients: { id: string; nome: string }[]
   suppliers: Supplier[]
   events: Event[]
@@ -145,12 +145,23 @@ function NuovoMovimentoModal({ onClose, onSave, clients, suppliers, events }: Nu
   const [note, setNote] = useState('')
   const [eventoId, setEventoId] = useState<string>('none')
   const [soggettoId, setSoggettoId] = useState<string>('')
+  const [quantity, setQuantity] = useState('1')
+  const [unitPrice, setUnitPrice] = useState('')
+
+  const computedImporto = useMemo(() => {
+    const q = parseInt(quantity) || 1
+    const up = parseFloat(unitPrice.replace(',', '.'))
+    if (up > 0) return q * up
+    return parseFloat(importo.replace(',', '.')) || 0
+  }, [quantity, unitPrice, importo])
 
   function handleSave() {
-    const amt = parseFloat(importo.replace(',', '.'))
+    const q = parseInt(quantity) || 1
+    const up = parseFloat(unitPrice.replace(',', '.'))
+    const amt = up > 0 ? q * up : (parseFloat(importo.replace(',', '.')) || 0)
     if (!amt || amt <= 0) return
     const defaultSoggetto = tipo === 'entrata' ? (clients[0]?.id ?? '') : (suppliers[0]?.id ?? '')
-    onSave(tipo, amt, note, eventoId === 'none' ? null : eventoId, soggettoId || defaultSoggetto)
+    onSave(tipo, amt, note, eventoId === 'none' ? null : eventoId, soggettoId || defaultSoggetto, q, up > 0 ? up : null)
   }
 
   return (
@@ -198,18 +209,66 @@ function NuovoMovimentoModal({ onClose, onSave, clients, suppliers, events }: Nu
             </div>
           </div>
 
-          {/* Importo */}
-          <div>
-            <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>Importo (€)</label>
-            <input
-              type="number"
-              placeholder="0.00"
-              value={importo}
-              onChange={e => setImporto(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
-            />
-          </div>
+          {/* Importo / Qty+UnitPrice */}
+          {tipo === 'uscita' ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>Quantita</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    value={quantity}
+                    onChange={e => setQuantity(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                    style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>Prezzo Unitario (€)</label>
+                  <input
+                    type="number"
+                    placeholder="0.00"
+                    value={unitPrice}
+                    onChange={e => setUnitPrice(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                    style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                  />
+                </div>
+              </div>
+              {computedImporto > 0 && (
+                <div className="text-sm font-semibold px-1" style={{ color: 'var(--text)' }}>
+                  Totale: {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(computedImporto)}
+                </div>
+              )}
+              {!unitPrice && (
+                <div>
+                  <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>Oppure importo totale (€)</label>
+                  <input
+                    type="number"
+                    placeholder="0.00"
+                    value={importo}
+                    onChange={e => setImporto(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                    style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>Importo (€)</label>
+              <input
+                type="number"
+                placeholder="0.00"
+                value={importo}
+                onChange={e => setImporto(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              />
+            </div>
+          )}
 
           {/* Soggetto */}
           <div>
@@ -591,7 +650,7 @@ export default function Amministrazione() {
     doc.save(`simmetria_budget_${new Date().toISOString().slice(0, 10)}.pdf`)
   }
 
-  function handleNuovoMovimento(tipo: TipoMovimento, importo: number, note: string, eventoId: string | null, soggettoId: string) {
+  function handleNuovoMovimento(tipo: TipoMovimento, importo: number, note: string, eventoId: string | null, soggettoId: string, quantity: number, unitPrice: number | null) {
     const today = new Date().toISOString().slice(0, 10)
     if (tipo === 'entrata') {
       const newE: Entrata = {
@@ -614,8 +673,8 @@ export default function Amministrazione() {
         eventoId,
         categoria: 'Altro',
         importo,
-        quantity: 1,
-        unitPrice: null,
+        quantity,
+        unitPrice,
         stato: 'in_attesa',
         scadenza: today,
         dataPagamento: null,
@@ -1089,7 +1148,7 @@ export default function Amministrazione() {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: 'var(--panel2)', borderBottom: '1px solid var(--line)' }}>
-                  {['Fornitore', 'Evento', 'Categoria', 'Importo', 'Stato', 'Scadenza', 'Note', ''].map(h => (
+                  {['Fornitore', 'Evento', 'Categoria', 'Qty', 'P.Unit.', 'Totale', 'Stato', 'Scadenza', 'Note', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -1116,10 +1175,12 @@ export default function Amministrazione() {
                         <span className="truncate block text-xs" style={{ color: 'var(--muted)' }}>{eventName(u.eventoId)}</span>
                       </td>
                       <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)' }}>{u.categoria}</td>
+                      <td className="px-4 py-3 text-xs" style={{ color: 'var(--text)' }}>{u.quantity ?? 1}</td>
+                      <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{u.unitPrice != null ? formatEur(u.unitPrice) : '—'}</td>
                       <td className="px-4 py-3 font-bold" style={{ color: 'var(--red2)', whiteSpace: 'nowrap' }}>{formatEur(u.importo)}</td>
                       <td className="px-4 py-3"><StatoBadge stato={u.stato} /></td>
                       <td className="px-4 py-3 text-xs" style={{ color: isScad ? 'var(--red2)' : 'var(--muted)', whiteSpace: 'nowrap' }}>
-                        {formatDateShort(u.scadenza)} {isScad && '⚠'}
+                        {formatDateShort(u.scadenza)} {isScad && '!'}
                       </td>
                       <td className="px-4 py-3 max-w-[180px]">
                         <span className="text-xs truncate block" style={{ color: 'var(--muted)' }}>{u.note}</span>
