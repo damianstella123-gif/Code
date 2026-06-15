@@ -599,12 +599,12 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
         })}
       </div>
     </div>
+  </div> 
   )
 }
 
 // ─── Weekly view ──────────────────────────────────────────────────────────────
 
-function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
 function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
   weekStart: Date;
   items: CalItem[];
