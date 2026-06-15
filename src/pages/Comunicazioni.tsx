@@ -104,7 +104,13 @@ function Composer({ currentUserId, onClose, onSend }: ComposerProps) {
   function addDest(id: string) { setDestinatari(p => [...p, id]); setDestInput('') }
   function removeDest(id: string) { setDestinatari(p => p.filter(d => d !== id)) }
 
- function handleSend() {
+function handleSend() {
+  const finalDestinatari = destinatari.length > 0
+    ? destinatari
+    : destInput.trim()
+      ? [destInput.trim()]
+      : []
+
   if (!oggetto.trim()) {
     alert('Inserisci oggetto')
     return
@@ -115,20 +121,20 @@ function Composer({ currentUserId, onClose, onSend }: ComposerProps) {
     return
   }
 
-  if (destinatari.length === 0) {
+  if (finalDestinatari.length === 0) {
     alert('Inserisci almeno un destinatario email')
     return
   }
 
   console.log('CLICK INVIA MESSAGGIO', {
-    destinatari,
+    destinatari: finalDestinatari,
     oggetto,
     corpo,
   })
 
   onSend({
     mittente: currentUserId,
-    destinatari,
+    destinatari: finalDestinatari,
     oggetto: oggetto.trim(),
     corpo: corpo.trim(),
     eventoId: eventoId === 'none' ? null : eventoId,
