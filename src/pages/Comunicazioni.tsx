@@ -284,23 +284,33 @@ function Composer({ currentUserId, onClose, onSend }: ComposerProps) {
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-1">
-            <button
-              onClick={onClose}
-              className="flex-1 py-3 rounded-xl text-sm font-medium transition-all"
-              style={{ background: 'var(--panel2)', color: 'var(--muted)', border: '1px solid var(--line)' }}
-            >
-              Annulla
-           <button
-  onClick={handleSend}
-  disabled={false}
-  className="flex-1 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-40"
-  style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}
->
-  <Send className="w-4 h-4" /> Invia
-</button>
-          </div>
+{/* Actions */}
+<div className="flex gap-3 pt-1">
+  <button
+    onClick={onClose}
+    className="flex-1 py-3 rounded-xl text-sm font-medium transition-all"
+    style={{
+      background: 'var(--panel2)',
+      color: 'var(--muted)',
+      border: '1px solid var(--line)',
+    }}
+  >
+    Annulla
+  </button>
+
+  <button
+    onClick={handleSend}
+    disabled={false}
+    className="flex-1 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-40"
+    style={{
+      background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)',
+      color: 'white',
+    }}
+  >
+    <Send className="w-4 h-4" />
+    Invia
+  </button>
+</div>
         </div>
       </div>
     </div>
