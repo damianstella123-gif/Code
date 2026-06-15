@@ -89,11 +89,11 @@ function Sidebar({ open, setOpen }: SidebarProps) {
         {/* Logo */}
         <div className="flex items-center justify-between px-5 py-5 border-b" style={{ borderColor: 'var(--line)' }}>
           <Link to="/dashboard" className="flex flex-col items-center w-full group">
-            <img
-              src="/simmetria-grigio_2023.png"
-              alt="Simmetria"
-              className="w-40 brightness-[1.8] drop-shadow-[0_2px_12px_rgba(208,0,58,0.1)]"
-            />
+<img
+  src="/logo-synergy.png"
+  alt="Simmetria Synergy"
+  className="w-48 transition-all duration-300 hover:opacity-90"
+/>
             <span
               className="text-[11px] font-bold tracking-[0.25em] uppercase mt-2"
               style={{ color: 'var(--red2)' }}
