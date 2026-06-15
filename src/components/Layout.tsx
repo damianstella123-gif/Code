@@ -328,7 +328,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
             </button>
             {notifOpen && (
               <div
-                className="absolute right-0 top-full mt-2 w-80 rounded-xl overflow-hidden animate-fade-in"
+                className="absolute right-0 top-full mt-2 w-[calc(100vw-32px)] sm:w-80 rounded-xl overflow-hidden animate-fade-in"
                 style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
               >
                 <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>

@@ -1562,7 +1562,7 @@ function InvoiceFormModal({ invoice, events, clients, suppliers, onClose, onSave
                 className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Importo</label>
               <input type="number" value={amount} onChange={e => setAmount(e.target.value)}

@@ -353,7 +353,7 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets, cli
 
       <div className="panel p-5 md:col-span-2">
         <p className="text-xs uppercase tracking-wide mb-4" style={{ color: 'var(--muted)' }}>Budget Overview</p>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { label: 'Budget Totale', value: event.budget, color: 'var(--green)' },
             { label: 'Speso (est.)', value: speso, color: 'var(--yellow)' },

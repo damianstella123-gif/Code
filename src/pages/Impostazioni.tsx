@@ -763,7 +763,7 @@ function FlyConfig({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSettings>) 
 
         <div style={{ opacity: s.flyAbilitato ? 1 : 0.4, pointerEvents: s.flyAbilitato ? 'auto' : 'none' }}>
           <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Intensità notifiche</p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {([
               { value: 'alta', label: 'Alta', desc: 'Notifica tutto', color: 'var(--red2)' },
               { value: 'media', label: 'Media', desc: 'Solo urgenze', color: 'var(--yellow)' },

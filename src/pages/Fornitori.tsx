@@ -228,7 +228,7 @@ function SupplierFormModal({ supplier, events, onSave, onCancel }: {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Location</label>
               <input type="text" value={location} onChange={e => setLocation(e.target.value)}
@@ -249,7 +249,7 @@ function SupplierFormModal({ supplier, events, onSave, onCancel }: {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Stato</label>
               <select value={stato} onChange={e => setStato(e.target.value as 'attivo' | 'inattivo')}
@@ -279,7 +279,7 @@ function SupplierFormModal({ supplier, events, onSave, onCancel }: {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Costo medio/evento</label>
               <input type="number" value={costoMedio} onChange={e => setCostoMedio(e.target.value)}
@@ -491,7 +491,7 @@ function SupplierDetail({ supplier, events, budgets, onBack, showFinance, onEdit
 
           {/* KPIs */}
           {showFinance && (
-            <div className="grid grid-cols-3 gap-3 flex-shrink-0">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-shrink-0">
               {[
                 { label: 'Costo medio', value: formatEur(supplier.costoMedioPerEvento), color: 'var(--text)' },
                 { label: 'Totale speso', value: formatEur(totalSpeso), color: 'var(--red2)' },

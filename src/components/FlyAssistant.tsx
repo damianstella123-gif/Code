@@ -603,7 +603,7 @@ export default function FlyAssistant() {
     <>
       {/* Notification toast */}
       {notif && !open && (
-        <div style={{ position: 'fixed', bottom: '100px', right: '24px', zIndex: 1000 }}>
+        <div style={{ position: 'fixed', bottom: '100px', right: '16px', zIndex: 1000, maxWidth: 'calc(100vw - 32px)' }}>
           <FlyNotifToast notif={notif} onDismiss={() => {
             setNotif(prev => prev ? { ...prev, dying: true } : null)
             setTimeout(() => setNotif(null), 300)
@@ -618,10 +618,12 @@ export default function FlyAssistant() {
           style={{
             position: 'fixed',
             bottom: '96px',
-            right: '24px',
+            right: '16px',
+            left: '16px',
             zIndex: 999,
-            width: '360px',
-            maxHeight: '520px',
+            maxWidth: '360px',
+            marginLeft: 'auto',
+            maxHeight: '70vh',
             display: 'flex',
             flexDirection: 'column',
             borderRadius: '20px',
@@ -892,10 +894,10 @@ export default function FlyAssistant() {
         style={{
           position: 'fixed',
           bottom: '24px',
-          right: '24px',
+          right: '16px',
           zIndex: 1000,
-          width: '64px',
-          height: '64px',
+          width: '56px',
+          height: '56px',
           borderRadius: '50%',
           border: '2px solid rgba(208,0,58,0.4)',
           background: 'linear-gradient(145deg, #1a0a14, #0e0820)',

@@ -136,7 +136,7 @@ function TaskFormModal({ task, onSave, onClose, users, events }: {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Priorita</label>
               <select value={priorita} onChange={e => setPriorita(e.target.value as Task['priorita'])}
@@ -504,7 +504,7 @@ export default function TaskPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {columns.map(col => (
           <div key={col.id} className="panel p-4 flex items-center gap-3">
             <div className="w-3 h-3 rounded-full" style={{ background: col.color }} />

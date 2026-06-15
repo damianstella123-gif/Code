@@ -587,7 +587,7 @@ function ClientDetail({ client, onBack, onEdit, onDelete, events }: ClientDetail
             {/* Valore commerciale */}
             <div className="panel p-5 md:col-span-2">
               <p className="text-xs uppercase tracking-wide mb-4" style={{ color: 'var(--muted)' }}>Valore Commerciale</p>
-              <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                 {[
                   { label: 'Fatturato storico', value: client.fatturato, color: 'var(--green)' },
                   { label: 'Valore stimato', value: client.valoreStimato, color: 'var(--blue)' },

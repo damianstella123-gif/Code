@@ -406,7 +406,7 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange }: 
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide mb-2" style={{ color: 'var(--muted)' }}>Cambia stato rapido</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {STATES.map(s => {
                 const active = t.stato === s
                 const sc = s === 'completato' ? 'var(--green)' : s === 'in_corso' ? 'var(--blue)' : 'var(--muted)'
@@ -539,13 +539,14 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
 
   return (
     <div className="panel overflow-hidden">
-      <div className="grid grid-cols-7 border-b" style={{ borderColor: 'var(--line)' }}>
+      <div className="overflow-x-auto">
+      <div className="grid grid-cols-7 border-b min-w-[320px]" style={{ borderColor: 'var(--line)' }}>
         {DAYS_IT.map((d, i) => (
           <div key={d} className="py-2.5 text-center text-xs font-semibold"
             style={{ color: i === 0 || i === 6 ? 'rgba(155,163,170,0.45)' : 'var(--muted)' }}>{d}</div>
         ))}
       </div>
-      <div className="grid grid-cols-7">
+      <div className="grid grid-cols-7 min-w-[320px]">
         {cells.map((day, idx) => {
           const isToday = sameDay(day, today)
           const isCurrentMonth = day.getMonth() === current.getMonth()
