@@ -28,6 +28,7 @@ import {
   updateCommunication,
   deleteCommunication,
 } from '@/lib/communications-service'
+import { supabase } from '@/lib/supabase'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -103,21 +104,41 @@ function Composer({ currentUserId, onClose, onSend }: ComposerProps) {
   function addDest(id: string) { setDestinatari(p => [...p, id]); setDestInput('') }
   function removeDest(id: string) { setDestinatari(p => p.filter(d => d !== id)) }
 
-  function handleSend() {
-    if (!oggetto.trim() || !corpo.trim() || destinatari.length === 0) return
-    onSend({
-      mittente: currentUserId,
-      destinatari,
-      oggetto: oggetto.trim(),
-      corpo: corpo.trim(),
-      eventoId: eventoId === 'none' ? null : eventoId,
-      taskId: taskId === 'none' ? null : taskId,
-      priorita,
-      data: new Date().toISOString(),
-      canale,
-      allegati: [],
-    })
+ function handleSend() {
+  if (!oggetto.trim()) {
+    alert('Inserisci oggetto')
+    return
   }
+
+  if (!corpo.trim()) {
+    alert('Inserisci messaggio')
+    return
+  }
+
+  if (destinatari.length === 0) {
+    alert('Inserisci almeno un destinatario email')
+    return
+  }
+
+  console.log('CLICK INVIA MESSAGGIO', {
+    destinatari,
+    oggetto,
+    corpo,
+  })
+
+  onSend({
+    mittente: currentUserId,
+    destinatari,
+    oggetto: oggetto.trim(),
+    corpo: corpo.trim(),
+    eventoId: eventoId === 'none' ? null : eventoId,
+    taskId: taskId === 'none' ? null : taskId,
+    priorita,
+    data: new Date().toISOString(),
+    canale,
+    allegati: [],
+  })
+}
 
   const inputStyle = {
     background: 'var(--bg)',
@@ -271,15 +292,14 @@ function Composer({ currentUserId, onClose, onSend }: ComposerProps) {
               style={{ background: 'var(--panel2)', color: 'var(--muted)', border: '1px solid var(--line)' }}
             >
               Annulla
-            </button>
-            <button
-              onClick={handleSend}
-              disabled={!oggetto.trim() || !corpo.trim() || destinatari.length === 0}
-              className="flex-1 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-40"
-              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}
-            >
-              <Send className="w-4 h-4" /> Invia
-            </button>
+           <button
+  onClick={handleSend}
+  disabled={false}
+  className="flex-1 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-40"
+  style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}
+>
+  <Send className="w-4 h-4" /> Invia
+</button>
           </div>
         </div>
       </div>
@@ -616,19 +636,44 @@ export default function Comunicazioni() {
     ))
   }
 
-  async function handleSend(data: Omit<Messaggio, 'id' | 'letto'>) {
-    const newMsg: Messaggio = {
-      ...data,
-      id: `msg_new_${Date.now()}`,
-      letto: [uid],
-    }
-    setMsgs(prev => [newMsg, ...prev])
-    setShowComposer(false)
-    setReplyTo(null)
-    setView('sent')
-    await upsertCommunication(newMsg)
-    await refresh()
+ async function handleSend(data: Omit<Messaggio, 'id' | 'letto'>) {
+  const newMsg: Messaggio = {
+    ...data,
+    id: `msg_new_${Date.now()}`,
+    letto: [uid],
   }
+
+  setMsgs(prev => [newMsg, ...prev])
+  setShowComposer(false)
+  setReplyTo(null)
+  setView('sent')
+
+  await upsertCommunication(newMsg)
+
+  const validEmails = data.destinatari.filter(d =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d)
+  )
+
+  if (validEmails.length > 0) {
+    const { error } = await supabase.functions.invoke('send-email', {
+      body: {
+        to: validEmails,
+        subject: data.oggetto,
+        html: data.corpo.replace(/\n/g, '<br />'),
+        text: data.corpo,
+      },
+    })
+
+    if (error) {
+      console.error('Errore invio email:', error)
+      alert('Messaggio salvato, ma invio email non riuscito.')
+    } else {
+      alert('Messaggio salvato ed email inviata.')
+    }
+  }
+
+  await refresh()
+}
 
   async function deleteMsg(id: string) {
     setMsgs(prev => prev.filter(m => m.id !== id))
