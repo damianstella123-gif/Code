@@ -605,9 +605,12 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
 // ─── Weekly view ──────────────────────────────────────────────────────────────
 
 function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
-  weekStart: Date; items: CalItem[]; today: Date
-  onItemClick: (item: CalItem) => void
-  onMoveItem: (id: string, type: 'event' | 'task', newDate: string) => void
+function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
+  weekStart: Date;
+  items: CalItem[];
+  today: Date;
+  onItemClick: (item: CalItem) => void;
+  onMoveItem: (id: string, type: 'event' | 'task', newDate: string) => void;
 }) {
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [dragging, setDragging] = useState<{ id: string; type: 'event' | 'task' } | null>(null)
@@ -696,9 +699,12 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
 
 // ─── Day view ─────────────────────────────────────────────────────────────────
 
-function DayView({ day, items, onItemClick }: {
-  day: Date; items: CalItem[]; onItemClick: (item: CalItem) => void
+function DayView(props: {
+  day: Date;
+  items: CalItem[];
+  onItemClick: (item: CalItem) => void;
 }) {
+  const { day, items, onItemClick } = props;
   const dayItems = items.filter(item => {
     if (item.type === 'event') {
       const ev = item.data as Event
