@@ -63,6 +63,7 @@ const ALL_NAV: NavItem[] = [
   { name: 'Creative Studio', href: '/creative-studio' },
   { name: 'Social Studio', href: '/social-studio' },
   { name: 'Presentazioni', href: '/presentazioni' },
+  { name: 'Archivio', href: '/archivio' },
   { name: 'Comunicazioni', href: '/comunicazioni' },
   { name: 'Workflow', href: '/workflow' },
   { name: 'Pratiche', href: '/pratiche' },

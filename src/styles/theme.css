@@ -1,23 +1,21 @@
-/* SIMMETRIA HUB Theme Configuration */
-
 :root {
   /* Core colors */
-  --bg: #06080b;
-  --panel: #0e1218;
-  --panel2: #121821;
-  --line: rgba(255, 255, 255, 0.10);
+  --bg: #f7f7f5;
+  --panel: #ffffff;
+  --panel2: #f1f2f0;
+  --line: rgba(35, 39, 42, 0.14);
 
   /* Text colors */
-  --text: #f5f5f5;
-  --muted: #9ba3aa;
+  --text: #25282b;
+  --muted: #5f666d;
 
   /* Accent colors */
   --red: #d0003a;
-  --red2: #ff315f;
-  --gray: #9aa1a4;
-  --green: #38d27d;
-  --yellow: #ffc24b;
-  --blue: #4db4ff;
+  --red2: #e51b4f;
+  --gray: #5f666d;
+  --green: #2f9e68;
+  --yellow: #c98920;
+  --blue: #2f6fbe;
 
   /* Typography */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
@@ -30,11 +28,11 @@
   --radius-xl: 20px;
 
   /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-red: 0 4px 20px rgba(208, 0, 58, 0.3);
-  --shadow-red-lg: 0 8px 40px rgba(208, 0, 58, 0.4);
+  --shadow-sm: 0 2px 8px rgba(35, 39, 42, 0.08);
+  --shadow-md: 0 4px 16px rgba(35, 39, 42, 0.10);
+  --shadow-lg: 0 8px 32px rgba(35, 39, 42, 0.14);
+  --shadow-red: 0 4px 20px rgba(208, 0, 58, 0.18);
+  --shadow-red-lg: 0 8px 40px rgba(208, 0, 58, 0.22);
 
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -72,7 +70,7 @@ body {
 }
 
 .panel:hover {
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(15, 23, 42, 0.18);
   box-shadow: var(--shadow-md);
 }
 
@@ -652,4 +650,78 @@ body {
 
 .fly-img-error-ring {
   border: 2px solid #ff315f;
+}
+/* Light theme hardening */
+body,
+.app-background,
+.panel,
+.panel-2,
+.sidebar,
+.topbar {
+  color: var(--text);
+}
+
+.panel *,
+.panel-2 *,
+.sidebar *,
+.topbar * {
+  color: inherit;
+}
+
+.panel [style*="color"],
+.panel-2 [style*="color"],
+.sidebar [style*="color"],
+.topbar [style*="color"] {
+  color: inherit;
+}
+
+.text-white {
+  color: var(--text) !important;
+}
+
+/* Keep white only where background is red/gradient */
+.btn-primary,
+.btn-primary *,
+[style*="var(--red)"],
+[style*="var(--red2)"],
+[style*="linear-gradient(135deg, var(--red)"] {
+  color: white !important;
+}
+
+input,
+textarea,
+select,
+option {
+  color: var(--text);
+  background: var(--panel);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+}
+
+.hover\:bg-white\/5:hover {
+  background-color: rgba(35, 39, 42, 0.06);
+}
+
+.hover\:bg-white\/10:hover {
+  background-color: rgba(35, 39, 42, 0.08);
+}
+.panel {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfbfa 100%);
+  box-shadow: var(--shadow-sm);
+}
+
+.panel:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.sidebar {
+  box-shadow: 8px 0 30px rgba(35, 39, 42, 0.06);
+}
+
+.topbar {
+  box-shadow: 0 8px 24px rgba(35, 39, 42, 0.06);
 }

@@ -94,12 +94,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
   alt="Simmetria Synergy"
   className="w-48 transition-all duration-300 hover:opacity-90"
 />
-            <span
-              className="text-[11px] font-bold tracking-[0.25em] uppercase mt-2"
-              style={{ color: 'var(--red2)' }}
-            >
-              HUB
-            </span>
+
           </Link>
           <button
             onClick={() => setOpen(false)}
@@ -120,13 +115,13 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                 to={item.href}
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 relative"
-                style={{
-                  background: isActive
-                    ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)'
-                    : 'transparent',
-                  color: isActive ? 'white' : 'var(--muted)',
-                  boxShadow: isActive ? 'var(--shadow-red)' : 'none',
-                }}
+style={{
+  background: isActive
+    ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)'
+    : 'transparent',
+  color: isActive ? 'white' : 'var(--text)',
+  boxShadow: isActive ? 'var(--shadow-red)' : 'none',
+}}
               >
                 {isActive && (
                   <div
@@ -134,7 +129,10 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                     style={{ height: '60%' }}
                   />
                 )}
-                <Icon className="w-5 h-5" style={{ color: isActive ? 'white' : 'var(--muted)' }} />
+               <Icon
+  className="w-5 h-5"
+  style={{ color: isActive ? 'white' : 'var(--text)' }}
+/>
                 <span>{item.name}</span>
               </Link>
             )
@@ -290,7 +288,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
     <header
       className="sticky top-0 z-30 h-16 topbar"
       style={{
-        background: 'rgba(14, 18, 24, 0.8)',
+background: 'rgba(255, 255, 255, 0.92)',
         backdropFilter: 'blur(20px)',
         borderBottom: '1px solid var(--line)',
       }}
@@ -329,7 +327,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
             {notifOpen && (
               <div
                 className="absolute right-0 top-full mt-2 w-[calc(100vw-32px)] sm:w-80 rounded-xl overflow-hidden animate-fade-in"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: '0 20px 60px rgba(35,39,42,0.12)' }}
               >
                 <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>
                   <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Notifiche</p>
@@ -410,7 +408,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                   style={{
                     background: 'var(--panel)',
                     border: '1px solid var(--line)',
-                    boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+                    boxShadow: '0 20px 60px rgba(35,39,42,0.12)',
                   }}
                 >
                   <div className="p-4 border-b" style={{ borderColor: 'var(--line)' }}>
@@ -496,7 +494,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <div
       className="min-h-screen app-background"
       style={{
-        background: 'linear-gradient(135deg, var(--bg) 0%, rgba(208, 0, 58, 0.03) 50%, var(--bg) 100%)',
+background: 'linear-gradient(135deg, #f7f7f5 0%, #fff3f6 48%, #f7f7f5 100%)',
         backgroundAttachment: 'fixed',
       }}
     >

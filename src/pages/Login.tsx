@@ -86,26 +86,20 @@ export default function Login() {
         background: 'linear-gradient(135deg, var(--bg) 0%, rgba(208, 0, 58, 0.04) 50%, var(--bg) 100%)',
       }}
     >
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-2xl mx-auto">
         {/* Branding */}
-        <div className="text-center mb-10">
+        <div className="text-center mb-16">
           <img
-            src="/simmetria-grigio_2023.png"
-            alt="Simmetria"
-            className="w-72 mx-auto mb-7 brightness-[1.8] drop-shadow-[0_4px_24px_rgba(208,0,58,0.12)]"
+            src="/logo-synergy.png"
+            alt="Simmetria Synergy"
+            className="w-[620px] mx-auto brightness-0 invert"
           />
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>
-            SIMMETRIA <span style={{ color: 'var(--red2)' }}>HUB</span>
-          </h1>
-          <p className="text-sm mt-3 leading-relaxed max-w-xs mx-auto" style={{ color: 'var(--muted)' }}>
-            Centralizza eventi, pratiche, team e operativit&agrave; in un unico hub aziendale.
-          </p>
         </div>
 
         {/* Login form */}
         <form
           onSubmit={handleSubmit}
-          className="p-6 space-y-5 rounded-2xl max-w-sm mx-auto"
+          className="p-8 space-y-6 rounded-3xl max-w-lg mx-auto"
           style={{
             background: 'var(--panel)',
             border: '1px solid var(--line)',
@@ -122,7 +116,7 @@ export default function Login() {
               placeholder="nome@simmetria.it"
               autoComplete="email"
               autoFocus
-              className="w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-all"
+              className="w-full px-5 py-4 rounded-xl text-base outline-none transition-all"
               style={{
                 background: 'var(--bg)',
                 border: '1px solid var(--line)',
@@ -144,7 +138,7 @@ export default function Login() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Inserisci password"
                 autoComplete="current-password"
-                className="w-full px-4 py-2.5 pr-10 rounded-lg text-sm outline-none transition-all"
+                className="w-full px-5 py-4 pr-12 rounded-xl text-base outline-none transition-all"
                 style={{
                   background: 'var(--bg)',
                   border: '1px solid var(--line)',
