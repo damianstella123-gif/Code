@@ -473,24 +473,14 @@ textarea::placeholder {
 
 /* ─── LOGIN BRANDING ───────────────────────────────────────────────────────── */
 
-.login-background {
-  background: linear-gradient(135deg, #06080b 0%, #0e1218 40%, #121821 100%);
+[data-theme="light"] .login-background {
+  background: linear-gradient(145deg, #f7f7f5 0%, #f0eeec 40%, #f5f4f2 100%);
   min-height: 100vh;
 }
 
-.login-logo {
-  /* Logo always shows as-is (white with red E on dark bg) - no filters */
-  filter: none;
-}
-
-/* ─── SIDEBAR LOGO ─────────────────────────────────────────────────────────── */
-
-[data-theme="light"] .sidebar-logo {
-  filter: brightness(0);
-}
-
-[data-theme="dark"] .sidebar-logo {
-  filter: none;
+[data-theme="dark"] .login-background {
+  background: linear-gradient(145deg, #06080b 0%, #0e1218 50%, #121821 100%);
+  min-height: 100vh;
 }
 
 /* ─── FLY ASSISTANT ────────────────────────────────────────────────────────── */

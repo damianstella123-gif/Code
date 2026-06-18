@@ -89,12 +89,13 @@ function Sidebar({ open, setOpen }: SidebarProps) {
         {/* Logo */}
         <div className="flex items-center justify-between px-5 py-5 border-b" style={{ borderColor: 'var(--line)' }}>
           <Link to="/dashboard" className="flex flex-col items-center w-full group">
-<img
-  src="/logo-synergy.png"
-  alt="Simmetria Synergy"
-  className="w-48 transition-all duration-300 hover:opacity-90 sidebar-logo"
-/>
-
+            <div className="rounded-xl p-2.5" style={{ background: 'var(--panel)' }}>
+              <img
+                src="/Logo_1.png"
+                alt="Simmetria Synergy"
+                className="w-36 transition-all duration-300 group-hover:opacity-90"
+              />
+            </div>
           </Link>
           <button
             onClick={() => setOpen(false)}

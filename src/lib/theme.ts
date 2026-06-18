@@ -52,6 +52,10 @@ export async function syncThemeFromProfile() {
   }
 }
 
+export function getResolvedTheme(): 'light' | 'dark' {
+  return resolveTheme(loadThemePreference())
+}
+
 export function initTheme() {
   applyTheme(loadThemePreference())
 }

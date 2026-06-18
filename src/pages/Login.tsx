@@ -86,28 +86,39 @@ export default function Login() {
 
   return (
     <div className="login-background flex items-center justify-center px-4">
-      <div className="w-full max-w-2xl mx-auto">
-        {/* Brand logo - always on dark background, original colors */}
-        <div className="text-center mb-16">
-          <img
-            src="/logo-synergy.png"
-            alt="Simmetria Synergy"
-            className="w-[620px] mx-auto login-logo"
-          />
+      <div className="w-full max-w-md mx-auto">
+        {/* Logo Simmetria Synergy - adapts to theme */}
+        <div className="text-center mb-12">
+          <div className="inline-block rounded-2xl p-4" style={{ background: 'var(--panel)' }}>
+            <img
+              src="/Logo_1.png"
+              alt="Simmetria Synergy"
+              className="w-44 sm:w-52 mx-auto"
+            />
+          </div>
         </div>
 
-        {/* Login form */}
+        {/* Login form - uses CSS variables for theme adaptation */}
         <form
           onSubmit={handleSubmit}
-          className="p-8 space-y-6 rounded-3xl max-w-lg mx-auto"
+          className="p-8 space-y-6 rounded-2xl"
           style={{
-            background: 'rgba(14, 18, 24, 0.7)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'var(--panel)',
+            border: '1px solid var(--line)',
+            boxShadow: 'var(--shadow-lg)',
           }}
         >
+          <div className="text-center mb-2">
+            <h1 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>
+              Accedi
+            </h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
+              Inserisci le tue credenziali
+            </p>
+          </div>
+
           <div>
-            <label className="block text-sm font-medium mb-1.5 text-white/80">
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text)' }}>
               Email
             </label>
             <input
@@ -117,18 +128,19 @@ export default function Login() {
               placeholder="nome@simmetria.it"
               autoComplete="email"
               autoFocus
-              className="w-full px-5 py-4 rounded-xl text-base outline-none transition-all text-white placeholder-white/40"
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
               style={{
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: 'var(--panel2)',
+                border: '1px solid var(--line)',
+                color: 'var(--text)',
               }}
-              onFocus={e => (e.target.style.borderColor = 'rgba(208, 0, 58, 0.6)')}
-              onBlur={e => (e.target.style.borderColor = 'rgba(255, 255, 255, 0.12)')}
+              onFocus={e => { e.target.style.borderColor = 'var(--red)'; e.target.style.boxShadow = '0 0 0 3px rgba(208,0,58,0.08)' }}
+              onBlur={e => { e.target.style.borderColor = 'var(--line)'; e.target.style.boxShadow = 'none' }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1.5 text-white/80">
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text)' }}>
               Password
             </label>
             <div className="relative">
@@ -138,30 +150,31 @@ export default function Login() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Inserisci password"
                 autoComplete="current-password"
-                className="w-full px-5 py-4 pr-12 rounded-xl text-base outline-none transition-all text-white placeholder-white/40"
+                className="w-full px-4 py-3 pr-11 rounded-xl text-sm outline-none transition-all"
                 style={{
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: 'var(--panel2)',
+                  border: '1px solid var(--line)',
+                  color: 'var(--text)',
                 }}
-                onFocus={e => (e.target.style.borderColor = 'rgba(208, 0, 58, 0.6)')}
-                onBlur={e => (e.target.style.borderColor = 'rgba(255, 255, 255, 0.12)')}
+                onFocus={e => { e.target.style.borderColor = 'var(--red)'; e.target.style.boxShadow = '0 0 0 3px rgba(208,0,58,0.08)' }}
+                onBlur={e => { e.target.style.borderColor = 'var(--line)'; e.target.style.boxShadow = 'none' }}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5"
+                className="absolute right-3 top-1/2 -translate-y-1/2"
                 tabIndex={-1}
               >
                 {showPassword
-                  ? <EyeOff className="w-4 h-4 text-white/50" />
-                  : <Eye className="w-4 h-4 text-white/50" />
+                  ? <EyeOff className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+                  : <Eye className="w-4 h-4" style={{ color: 'var(--muted)' }} />
                 }
               </button>
             </div>
           </div>
 
           {error && (
-            <p className="text-xs text-center px-2 py-2 rounded-lg" style={{ background: 'rgba(208,0,58,0.15)', color: '#ff6b8a' }}>
+            <p className="text-xs text-center px-3 py-2 rounded-lg" style={{ background: 'rgba(208,0,58,0.08)', color: 'var(--red2)' }}>
               {error}
             </p>
           )}
@@ -169,10 +182,10 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 text-white font-medium rounded-xl flex items-center justify-center gap-2 transition-all"
+            className="w-full py-3 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all text-sm"
             style={{
-              background: 'linear-gradient(135deg, #d0003a 0%, #e51b4f 100%)',
-              boxShadow: '0 4px 20px rgba(208, 0, 58, 0.3)',
+              background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)',
+              boxShadow: 'var(--shadow-red)',
               opacity: loading ? 0.6 : 1,
               cursor: loading ? 'wait' : 'pointer',
             }}
