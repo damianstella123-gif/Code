@@ -21,6 +21,7 @@ import { cacheTasksSnapshot } from '@/lib/storage'
 import { fetchTasks, upsertTask, deleteTask as deleteTaskRemote, changeTaskStatus } from '@/lib/tasks-service'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchAllProfiles } from '@/lib/profiles'
+import { useRealtimeTable } from '@/lib/use-realtime'
 import { daysLeft, fmtShort } from '@/lib/format'
 import type { Task } from '@/data/tasks'
 import type { Profile } from '@/lib/profiles'
@@ -391,6 +392,10 @@ export default function TaskPage() {
       cancelled = true
     }
   }, [])
+
+  useRealtimeTable('tasks', () => {
+    fetchTasks().then(remote => { setTaskList(remote); cacheTasksSnapshot(remote) })
+  })
 
   // Load users from Supabase
   useEffect(() => {

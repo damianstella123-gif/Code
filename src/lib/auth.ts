@@ -29,7 +29,7 @@ export function saveUser(input: Omit<AuthUser, 'nome' | 'ruolo'>): void {
   const user: AuthUser = {
     ...input,
     nome: `${input.first_name} ${input.last_name}`.trim(),
-    ruolo: 'Admin',
+    ruolo: input.role,
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
 }
@@ -43,8 +43,8 @@ export async function signOutEverywhere(): Promise<void> {
   await supabase.auth.signOut()
 }
 
-export function isPartnerUser(_user: AuthUser | null): boolean {
-  return true
+export function isPartnerUser(user: AuthUser | null): boolean {
+  return user?.role === 'Partner'
 }
 
 export type NavItem = {
@@ -71,10 +71,19 @@ const ALL_NAV: NavItem[] = [
   { name: 'Impostazioni', href: '/impostazioni' },
 ]
 
-export function getAllowedNavForRole(_role: AppRole): NavItem[] {
-  return ALL_NAV
+const PARTNER_ONLY_PATHS = ['/utenti', '/impostazioni']
+const ADMIN_PATHS = ['/amministrazione']
+
+export function getAllowedNavForRole(role: AppRole): NavItem[] {
+  if (role === 'Partner') return ALL_NAV
+
+  return ALL_NAV.filter(item => {
+    if (PARTNER_ONLY_PATHS.includes(item.href)) return false
+    if (ADMIN_PATHS.includes(item.href) && role !== 'Amministrazione') return false
+    return true
+  })
 }
 
-export function getAllowedNav(_ruolo: string): NavItem[] {
-  return ALL_NAV
+export function getAllowedNav(ruolo: string): NavItem[] {
+  return getAllowedNavForRole(ruolo as AppRole)
 }

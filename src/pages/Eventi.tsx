@@ -41,6 +41,7 @@ import { fetchClients as fetchClientsService } from '@/lib/clients-service'
 import type { Client } from '@/data/clients'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
+import { useRealtimeTable } from '@/lib/use-realtime'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
@@ -1637,6 +1638,10 @@ export default function Eventi() {
       cancelled = true
     }
   }, [])
+
+  useRealtimeTable('events', () => {
+    fetchEvents().then(remote => { setEventList(remote); cacheEventsSnapshot(remote) })
+  })
 
   // Load budgets, suppliers, communications, clients
   useEffect(() => {

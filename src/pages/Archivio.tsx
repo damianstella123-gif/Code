@@ -32,17 +32,6 @@ const [tags, setTags] = useState('')
 const [fileUrl, setFileUrl] = useState('')
 const [fileName, setFileName] = useState('')
 
-const [city, setCity] = useState('')
-const [country, setCountry] = useState('')
-const [contentType, setContentType] = useState('')
-const [budgetMin, setBudgetMin] = useState('')
-const [budgetMax, setBudgetMax] = useState('')
-const [capacityMin, setCapacityMin] = useState('')
-const [capacityMax, setCapacityMax] = useState('')
-const [season, setSeason] = useState('')
-const [rating, setRating] = useState('')
-const [reusable, setReusable] = useState(true)
-const [internalNotes, setInternalNotes] = useState('')
 
 const [editingId, setEditingId] = useState<string | null>(null)
 

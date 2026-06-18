@@ -34,6 +34,7 @@ import { loadTasksFromStorage } from '@/lib/storage'
 import { fetchSuppliers, upsertSupplier, deleteSupplier as deleteSupplierRemote } from '@/lib/suppliers-service'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchBudgets } from '@/lib/budgets-service'
+import { useRealtimeTable } from '@/lib/use-realtime'
 import type { Supplier, StatoContratto } from '@/data/suppliers'
 import type { Event } from '@/data/events'
 import type { Uscita } from '@/data/amministrazione'
@@ -861,6 +862,10 @@ export default function Fornitori() {
       cancelled = true
     }
   }, [])
+
+  useRealtimeTable('suppliers', () => {
+    fetchSuppliers().then(remote => { setSupplierList(remote); cacheSuppliersToStorage(remote) })
+  })
 
   useEffect(() => {
     const targetId = searchParams.get('id')

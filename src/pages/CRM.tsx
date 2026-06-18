@@ -27,6 +27,7 @@ import { fetchEvents } from '@/lib/events-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
 import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
 import { supabase } from '@/lib/supabase'
+import { useRealtimeTable } from '@/lib/use-realtime'
 
 type FilterStato = 'Tutti' | 'attivo' | 'vip' | 'prospect' | 'perso'
 
@@ -848,6 +849,8 @@ export default function CRM() {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  useRealtimeTable('clients', refresh)
 
   const filtered = useMemo(() => {
     return clientList.filter(c => {

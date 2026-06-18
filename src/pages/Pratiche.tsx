@@ -32,6 +32,7 @@ import { cachePraticheSnapshot } from '@/lib/storage'
 import { fetchPractices, upsertPractice, deletePractice as deletePracticeRemote } from '@/lib/practices-service'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchAllProfiles, type Profile } from '@/lib/profiles'
+import { useRealtimeTable } from '@/lib/use-realtime'
 
 const CATEGORIE: { id: CategoriaPratica; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'contratto', label: 'Contratto', icon: Briefcase, color: 'var(--red2)' },
@@ -102,6 +103,10 @@ export default function Pratiche() {
       cancelled = true
     }
   }, [])
+
+  useRealtimeTable('practices', () => {
+    fetchPractices().then(remote => { setAllPratiche(remote); cachePraticheSnapshot(remote) })
+  })
 
   // Load events from Supabase
   useEffect(() => {

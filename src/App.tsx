@@ -1,5 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Eventi from './pages/Eventi'
@@ -25,13 +25,24 @@ import { fetchProfile } from './lib/profiles'
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
+  const navigate = useNavigate()
+
+  const handleSignOut = useCallback(() => {
+    clearUser()
+    setAuthenticated(false)
+    navigate('/login', { replace: true })
+  }, [navigate])
 
   useEffect(() => {
+    let mounted = true
+
     const check = async () => {
       const stored = loadUser()
       if (stored) {
-        setAuthenticated(true)
-        setChecking(false)
+        if (mounted) {
+          setAuthenticated(true)
+          setChecking(false)
+        }
         return
       }
       const { data: { session } } = await supabase.auth.getSession()
@@ -47,16 +58,29 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
             avatar_url: profile.avatar_url,
             is_active: profile.is_active,
           })
-          setAuthenticated(true)
+          if (mounted) setAuthenticated(true)
         } else {
           clearUser()
           await supabase.auth.signOut()
         }
       }
-      setChecking(false)
+      if (mounted) setChecking(false)
     }
     check()
-  }, [])
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        if (event === 'SIGNED_OUT') {
+          handleSignOut()
+        }
+      }
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [handleSignOut])
 
   if (checking) {
     return (
