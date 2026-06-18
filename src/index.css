@@ -3,26 +3,49 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 0 0% 4%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 8%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 72% 51%;
+  :root,
+  [data-theme="light"] {
+    --background: 0 0% 97%;
+    --foreground: 210 11% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 210 11% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 11% 15%;
+    --primary: 345 100% 41%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 64%;
-    --accent: 0 72% 51%;
+    --secondary: 210 3% 94%;
+    --secondary-foreground: 210 11% 15%;
+    --muted: 210 3% 94%;
+    --muted-foreground: 210 5% 40%;
+    --accent: 345 100% 41%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;
+    --destructive: 345 100% 41%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
-    --ring: 0 72% 51%;
+    --border: 210 6% 88%;
+    --input: 210 6% 88%;
+    --ring: 345 100% 41%;
+  }
+
+  [data-theme="dark"] {
+    --background: 215 30% 3%;
+    --foreground: 210 20% 96%;
+    --card: 215 25% 7%;
+    --card-foreground: 210 20% 96%;
+    --popover: 215 25% 9%;
+    --popover-foreground: 210 20% 96%;
+    --primary: 345 100% 41%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 20% 12%;
+    --secondary-foreground: 210 20% 96%;
+    --muted: 215 20% 12%;
+    --muted-foreground: 210 8% 65%;
+    --accent: 345 100% 41%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 345 100% 41%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 15% 16%;
+    --input: 215 15% 16%;
+    --ring: 345 100% 41%;
   }
 }
 
@@ -34,20 +57,17 @@
     overflow-x: hidden;
   }
   body {
-    @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
     overflow-x: hidden;
     -webkit-text-size-adjust: 100%;
   }
 }
 
-/* Prevent horizontal overflow on mobile */
 #root {
   overflow-x: hidden;
   min-height: 100vh;
 }
 
-/* Mobile touch targets */
 @media (max-width: 640px) {
   button, a, select, input[type="checkbox"], input[type="radio"] {
     min-height: 44px;
@@ -60,8 +80,6 @@
   }
 }
 
-/* Date picker fix: override Tailwind preflight appearance:none and ensure
-   native calendar widget is visible and interactive in dark mode */
 input[type="date"],
 input[type="datetime-local"],
 input[type="time"] {
@@ -78,4 +96,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
 input[type="time"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
+}
+
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
 }

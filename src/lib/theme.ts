@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { supabase } from './supabase'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -8,20 +9,47 @@ function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
+function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
+  return mode === 'system' ? getSystemTheme() : mode
+}
+
 function applyTheme(mode: ThemeMode) {
-  const resolved = mode === 'system' ? getSystemTheme() : mode
+  const resolved = resolveTheme(mode)
   document.documentElement.setAttribute('data-theme', resolved)
 }
 
 export function loadThemePreference(): ThemeMode {
   const stored = localStorage.getItem(STORAGE_KEY)
   if (stored === 'light' || stored === 'dark' || stored === 'system') return stored
-  return 'light'
+  return 'system'
 }
 
-export function saveThemePreference(mode: ThemeMode) {
+function saveLocal(mode: ThemeMode) {
   localStorage.setItem(STORAGE_KEY, mode)
-  applyTheme(mode)
+}
+
+async function saveRemote(mode: ThemeMode) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return
+  await supabase
+    .from('profiles')
+    .update({ theme_preference: mode })
+    .eq('id', session.user.id)
+}
+
+export async function syncThemeFromProfile() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return
+  const { data } = await supabase
+    .from('profiles')
+    .select('theme_preference')
+    .eq('id', session.user.id)
+    .maybeSingle()
+  if (data?.theme_preference) {
+    const mode = data.theme_preference as ThemeMode
+    saveLocal(mode)
+    applyTheme(mode)
+  }
 }
 
 export function initTheme() {
@@ -29,11 +57,13 @@ export function initTheme() {
 }
 
 export function useTheme() {
-  const [theme, setTheme] = useState<ThemeMode>(loadThemePreference)
+  const [theme, setThemeState] = useState<ThemeMode>(loadThemePreference)
 
-  const setAndPersist = useCallback((mode: ThemeMode) => {
-    setTheme(mode)
-    saveThemePreference(mode)
+  const setTheme = useCallback((mode: ThemeMode) => {
+    setThemeState(mode)
+    saveLocal(mode)
+    applyTheme(mode)
+    saveRemote(mode)
   }, [])
 
   useEffect(() => {
@@ -47,5 +77,5 @@ export function useTheme() {
     return () => mq.removeEventListener('change', handler)
   }, [])
 
-  return { theme, setTheme: setAndPersist }
+  return { theme, setTheme }
 }

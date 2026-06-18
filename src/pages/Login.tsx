@@ -4,6 +4,7 @@ import { LogIn, Eye, EyeOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { fetchProfile } from '@/lib/profiles'
 import { saveUser } from '@/lib/auth'
+import { syncThemeFromProfile } from '@/lib/theme'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -71,6 +72,8 @@ export default function Login() {
         avatar_url: profile.avatar_url,
         is_active: profile.is_active,
       })
+
+      await syncThemeFromProfile()
       navigate('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore di connessione')
@@ -80,19 +83,14 @@ export default function Login() {
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{
-        background: 'linear-gradient(135deg, var(--bg) 0%, rgba(208, 0, 58, 0.04) 50%, var(--bg) 100%)',
-      }}
-    >
+    <div className="login-background flex items-center justify-center px-4">
       <div className="w-full max-w-2xl mx-auto">
-        {/* Branding */}
+        {/* Brand logo - always on dark background, original colors */}
         <div className="text-center mb-16">
           <img
             src="/logo-synergy.png"
             alt="Simmetria Synergy"
-            className="w-[620px] mx-auto dark-invert-logo"
+            className="w-[620px] mx-auto login-logo"
           />
         </div>
 
@@ -101,12 +99,13 @@ export default function Login() {
           onSubmit={handleSubmit}
           className="p-8 space-y-6 rounded-3xl max-w-lg mx-auto"
           style={{
-            background: 'var(--panel)',
-            border: '1px solid var(--line)',
+            background: 'rgba(14, 18, 24, 0.7)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
           }}
         >
           <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text)' }}>
+            <label className="block text-sm font-medium mb-1.5 text-white/80">
               Email
             </label>
             <input
@@ -116,19 +115,18 @@ export default function Login() {
               placeholder="nome@simmetria.it"
               autoComplete="email"
               autoFocus
-              className="w-full px-5 py-4 rounded-xl text-base outline-none transition-all"
+              className="w-full px-5 py-4 rounded-xl text-base outline-none transition-all text-white placeholder-white/40"
               style={{
-                background: 'var(--bg)',
-                border: '1px solid var(--line)',
-                color: 'var(--text)',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
               }}
-              onFocus={e => (e.target.style.borderColor = 'var(--red2)')}
-              onBlur={e => (e.target.style.borderColor = 'var(--line)')}
+              onFocus={e => (e.target.style.borderColor = 'rgba(208, 0, 58, 0.6)')}
+              onBlur={e => (e.target.style.borderColor = 'rgba(255, 255, 255, 0.12)')}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text)' }}>
+            <label className="block text-sm font-medium mb-1.5 text-white/80">
               Password
             </label>
             <div className="relative">
@@ -138,14 +136,13 @@ export default function Login() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Inserisci password"
                 autoComplete="current-password"
-                className="w-full px-5 py-4 pr-12 rounded-xl text-base outline-none transition-all"
+                className="w-full px-5 py-4 pr-12 rounded-xl text-base outline-none transition-all text-white placeholder-white/40"
                 style={{
-                  background: 'var(--bg)',
-                  border: '1px solid var(--line)',
-                  color: 'var(--text)',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
                 }}
-                onFocus={e => (e.target.style.borderColor = 'var(--red2)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--line)')}
+                onFocus={e => (e.target.style.borderColor = 'rgba(208, 0, 58, 0.6)')}
+                onBlur={e => (e.target.style.borderColor = 'rgba(255, 255, 255, 0.12)')}
               />
               <button
                 type="button"
@@ -154,15 +151,15 @@ export default function Login() {
                 tabIndex={-1}
               >
                 {showPassword
-                  ? <EyeOff className="w-4 h-4" style={{ color: 'var(--muted)' }} />
-                  : <Eye className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+                  ? <EyeOff className="w-4 h-4 text-white/50" />
+                  : <Eye className="w-4 h-4 text-white/50" />
                 }
               </button>
             </div>
           </div>
 
           {error && (
-            <p className="text-xs text-center px-2 py-2 rounded-lg" style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
+            <p className="text-xs text-center px-2 py-2 rounded-lg" style={{ background: 'rgba(208,0,58,0.15)', color: '#ff6b8a' }}>
               {error}
             </p>
           )}
@@ -170,10 +167,10 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 text-white font-medium rounded-xl flex items-center justify-center gap-2 transition-all"
+            className="w-full py-3.5 text-white font-medium rounded-xl flex items-center justify-center gap-2 transition-all"
             style={{
-              background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)',
-              boxShadow: 'var(--shadow-red)',
+              background: 'linear-gradient(135deg, #d0003a 0%, #e51b4f 100%)',
+              boxShadow: '0 4px 20px rgba(208, 0, 58, 0.3)',
               opacity: loading ? 0.6 : 1,
               cursor: loading ? 'wait' : 'pointer',
             }}
