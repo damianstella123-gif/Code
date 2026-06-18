@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { fetchProfile } from '@/lib/profiles'
 import { saveUser } from '@/lib/auth'
 import { syncThemeFromProfile } from '@/lib/theme'
+import BrandEvolutionTransition from '@/components/BrandEvolutionTransition'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -13,6 +14,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showTransition, setShowTransition] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -74,7 +76,7 @@ export default function Login() {
       })
 
       await syncThemeFromProfile()
-      navigate('/dashboard')
+      setShowTransition(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore di connessione')
     } finally {
@@ -180,6 +182,10 @@ export default function Login() {
           </button>
         </form>
       </div>
+
+      {showTransition && (
+        <BrandEvolutionTransition onComplete={() => navigate('/dashboard')} />
+      )}
     </div>
   )
 }
