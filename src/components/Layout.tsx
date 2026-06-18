@@ -225,6 +225,26 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
     loadNotifications()
   }, [notifOpen, loadNotifications])
 
+  // Realtime: reload notifications when a new one arrives for this user
+  useEffect(() => {
+    const channel = supabase
+      .channel('notifications-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
+        const row = payload.new as Notification
+        if (!user) return
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session && row.user_id === session.user.id) {
+            setNotifications(prev => [row, ...prev].slice(0, 50))
+            setUnreadCount(prev => prev + 1)
+            setNotifToast(row.title)
+            setTimeout(() => setNotifToast(null), 4000)
+          }
+        })
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user])
+
   const handleNotificationClick = async (n: Notification) => {
     if (!n.is_read) {
       await markAsRead(n.id)
@@ -254,6 +274,15 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
         break
       case 'budget':
         navigate(`/amministrazione?tab=uscite`)
+        break
+      case 'client':
+        navigate(`/crm?id=${entityId}`)
+        break
+      case 'referente':
+        navigate(`/crm`)
+        break
+      case 'archive_item':
+        navigate(`/archivio`)
         break
       case 'communication':
       case 'comunicazione':
