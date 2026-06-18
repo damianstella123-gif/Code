@@ -189,3 +189,77 @@ export async function deleteContact(id: string): Promise<boolean> {
   }
   return true
 }
+
+// ─── Referenti ──────────────────────────────────────────────────────────────
+
+export interface Referente {
+  id: string
+  client_id: string
+  nome: string
+  cognome: string
+  reparto: string
+  ruolo: string
+  email: string
+  telefono: string
+  cellulare: string
+  note: string
+  is_principale: boolean
+  created_at: string
+  updated_at: string
+}
+
+export async function fetchReferenti(clientId: string): Promise<Referente[]> {
+  const { data, error } = await supabase
+    .from('referenti')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('is_principale', { ascending: false })
+    .order('cognome', { ascending: true })
+  if (error) {
+    console.error('fetchReferenti error:', error.message)
+    return []
+  }
+  return (data ?? []) as Referente[]
+}
+
+export async function upsertReferente(r: Omit<Referente, 'created_at' | 'updated_at'>): Promise<Referente | null> {
+  const { data, error } = await supabase
+    .from('referenti')
+    .upsert({ ...r, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+    .select()
+    .maybeSingle()
+  if (error) {
+    console.error('upsertReferente error:', error.message)
+    return null
+  }
+  return data as Referente | null
+}
+
+export async function deleteReferente(id: string): Promise<boolean> {
+  const { error } = await supabase.from('referenti').delete().eq('id', id)
+  if (error) {
+    console.error('deleteReferente error:', error.message)
+    return false
+  }
+  return true
+}
+
+export async function setReferentePrincipale(clientId: string, referenteId: string): Promise<boolean> {
+  const { error: clearErr } = await supabase
+    .from('referenti')
+    .update({ is_principale: false, updated_at: new Date().toISOString() })
+    .eq('client_id', clientId)
+  if (clearErr) {
+    console.error('clearPrincipale error:', clearErr.message)
+    return false
+  }
+  const { error: setErr } = await supabase
+    .from('referenti')
+    .update({ is_principale: true, updated_at: new Date().toISOString() })
+    .eq('id', referenteId)
+  if (setErr) {
+    console.error('setPrincipale error:', setErr.message)
+    return false
+  }
+  return true
+}

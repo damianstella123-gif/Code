@@ -22,7 +22,7 @@ import {
   Zap,
 } from 'lucide-react'
 import type { Client, Contatto } from '@/data/clients'
-import { fetchClients, upsertClient, deleteClient, fetchContacts } from '@/lib/clients-service'
+import { fetchClients, upsertClient, deleteClient, fetchContacts, fetchReferenti, upsertReferente, deleteReferente, setReferentePrincipale, type Referente } from '@/lib/clients-service'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
 import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
@@ -381,11 +381,19 @@ interface ClientDetailProps {
 }
 
 function ClientDetail({ client, onBack, onEdit, onDelete, events }: ClientDetailProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'storico' | 'eventi' | 'materiali'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'referenti' | 'storico' | 'eventi' | 'materiali'>('overview')
   const [clientCreative, setClientCreative] = useState<CreativeProject[]>([])
   const [clientSocial, setClientSocial] = useState<SocialContent[]>([])
   const [clientPresentations, setClientPresentations] = useState<{ id: string; template_name: string; status: string; created_at: string }[]>([])
   const [clientContatti, setClientContatti] = useState<Contatto[]>([])
+  const [referenti, setReferenti] = useState<Referente[]>([])
+  const [referenteForm, setReferenteForm] = useState<Partial<Referente> | null>(null)
+  const [referenteSearch, setReferenteSearch] = useState('')
+  const [deleteRefTarget, setDeleteRefTarget] = useState<Referente | null>(null)
+
+  const loadReferenti = useCallback(() => {
+    fetchReferenti(client.id).then(setReferenti)
+  }, [client.id])
 
   useEffect(() => {
     fetchCreativeProjects().then(all => {
@@ -398,12 +406,16 @@ function ClientDetail({ client, onBack, onEdit, onDelete, events }: ClientDetail
       if (data) setClientPresentations(data)
     })
     fetchContacts(client.id).then(setClientContatti)
-  }, [client.id])
+    loadReferenti()
+  }, [client.id, loadReferenti])
+
+  useRealtimeTable('referenti', loadReferenti)
 
   const clientEvents = events.filter(e => e.cliente === client.id)
 
   const tabs = [
     { id: 'overview' as const, label: 'Panoramica' },
+    { id: 'referenti' as const, label: `Referenti (${referenti.length})` },
     { id: 'storico' as const, label: `Storico (${clientContatti.length})` },
     { id: 'eventi' as const, label: `Eventi (${clientEvents.length})` },
     { id: 'materiali' as const, label: `Materiali (${clientCreative.length + clientSocial.length + clientPresentations.length})` },
@@ -620,6 +632,265 @@ function ClientDetail({ client, onBack, onEdit, onDelete, events }: ClientDetail
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'referenti' && (
+          <div className="space-y-4">
+            {/* Search + Add */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Cerca referente..."
+                  value={referenteSearch}
+                  onChange={e => setReferenteSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm bg-transparent"
+                  style={{ border: '1px solid var(--line)', color: 'var(--text)' }}
+                />
+              </div>
+              <button
+                onClick={() => setReferenteForm({ client_id: client.id, nome: '', cognome: '', reparto: '', ruolo: '', email: '', telefono: '', cellulare: '', note: '', is_principale: false })}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white"
+                style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
+              >
+                <Plus className="w-4 h-4" /> Aggiungi
+              </button>
+            </div>
+
+            {/* List */}
+            {referenti.length === 0 ? (
+              <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
+                <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p>Nessun referente</p>
+                <p className="text-xs mt-1">Aggiungi il primo referente per questo cliente</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {referenti
+                  .filter(r => {
+                    if (!referenteSearch.trim()) return true
+                    const q = referenteSearch.toLowerCase()
+                    return `${r.nome} ${r.cognome}`.toLowerCase().includes(q) ||
+                      r.email.toLowerCase().includes(q) ||
+                      r.ruolo.toLowerCase().includes(q) ||
+                      r.reparto.toLowerCase().includes(q)
+                  })
+                  .map(ref => (
+                    <div
+                      key={ref.id}
+                      className="panel p-4 flex items-start gap-4 group hover:border-opacity-60 transition-all"
+                      style={{ border: ref.is_principale ? '1px solid var(--green)' : '1px solid var(--line)' }}
+                    >
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
+                        style={{ background: ref.is_principale ? 'rgba(34,197,94,0.15)' : 'var(--panel2)', color: ref.is_principale ? 'var(--green)' : 'var(--muted)' }}>
+                        {ref.nome.charAt(0)}{ref.cognome.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                            {ref.nome} {ref.cognome}
+                          </span>
+                          {ref.is_principale && (
+                            <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-semibold"
+                              style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--green)' }}>
+                              Principale
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                          {ref.ruolo && <span className="text-xs" style={{ color: 'var(--muted)' }}>{ref.ruolo}</span>}
+                          {ref.reparto && <span className="text-xs" style={{ color: 'var(--muted)' }}>| {ref.reparto}</span>}
+                        </div>
+                        <div className="flex items-center gap-4 mt-2 flex-wrap">
+                          {ref.email && (
+                            <span className="text-xs flex items-center gap-1" style={{ color: 'var(--blue)' }}>
+                              <Mail className="w-3 h-3" /> {ref.email}
+                            </span>
+                          )}
+                          {ref.telefono && (
+                            <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                              <Phone className="w-3 h-3" /> {ref.telefono}
+                            </span>
+                          )}
+                          {ref.cellulare && (
+                            <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                              <Phone className="w-3 h-3" /> {ref.cellulare}
+                            </span>
+                          )}
+                        </div>
+                        {ref.note && <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>{ref.note}</p>}
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                        {!ref.is_principale && (
+                          <button
+                            onClick={() => setReferentePrincipale(client.id, ref.id).then(ok => { if (ok) loadReferenti() })}
+                            className="p-1.5 rounded-lg hover:bg-white/10"
+                            title="Imposta come principale"
+                          >
+                            <Star className="w-3.5 h-3.5" style={{ color: 'var(--yellow)' }} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setReferenteForm(ref)}
+                          className="p-1.5 rounded-lg hover:bg-white/10"
+                          title="Modifica"
+                        >
+                          <Pencil className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                        </button>
+                        <button
+                          onClick={() => setDeleteRefTarget(ref)}
+                          className="p-1.5 rounded-lg hover:bg-white/10"
+                          title="Elimina"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {/* Referente Form Modal */}
+            {referenteForm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}
+                onClick={() => setReferenteForm(null)}>
+                <div className="w-full max-w-lg rounded-2xl overflow-hidden"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+                  onClick={e => e.stopPropagation()}>
+                  <div className="p-5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--line)' }}>
+                    <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>
+                      {referenteForm.id ? 'Modifica Referente' : 'Nuovo Referente'}
+                    </h3>
+                    <button onClick={() => setReferenteForm(null)} className="p-1.5 rounded-lg hover:bg-white/10">
+                      <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+                    </button>
+                  </div>
+                  <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Nome *</label>
+                        <input type="text" value={referenteForm.nome ?? ''} onChange={e => setReferenteForm({ ...referenteForm, nome: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Cognome *</label>
+                        <input type="text" value={referenteForm.cognome ?? ''} onChange={e => setReferenteForm({ ...referenteForm, cognome: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Reparto</label>
+                        <input type="text" value={referenteForm.reparto ?? ''} onChange={e => setReferenteForm({ ...referenteForm, reparto: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Ruolo</label>
+                        <input type="text" value={referenteForm.ruolo ?? ''} onChange={e => setReferenteForm({ ...referenteForm, ruolo: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Email</label>
+                      <input type="email" value={referenteForm.email ?? ''} onChange={e => setReferenteForm({ ...referenteForm, email: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }} />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Telefono</label>
+                        <input type="tel" value={referenteForm.telefono ?? ''} onChange={e => setReferenteForm({ ...referenteForm, telefono: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Cellulare</label>
+                        <input type="tel" value={referenteForm.cellulare ?? ''} onChange={e => setReferenteForm({ ...referenteForm, cellulare: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Note</label>
+                      <textarea value={referenteForm.note ?? ''} onChange={e => setReferenteForm({ ...referenteForm, note: e.target.value })}
+                        rows={3} className="w-full px-3 py-2 rounded-lg text-sm bg-transparent resize-none" style={{ border: '1px solid var(--line)', color: 'var(--text)' }} />
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={referenteForm.is_principale ?? false}
+                        onChange={e => setReferenteForm({ ...referenteForm, is_principale: e.target.checked })}
+                        className="rounded" />
+                      <span className="text-sm" style={{ color: 'var(--text)' }}>Referente principale</span>
+                    </label>
+                  </div>
+                  <div className="p-5 flex justify-end gap-3" style={{ borderTop: '1px solid var(--line)' }}>
+                    <button onClick={() => setReferenteForm(null)}
+                      className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>
+                      Annulla
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!referenteForm.nome?.trim() || !referenteForm.cognome?.trim()) return
+                        const payload = {
+                          id: referenteForm.id || crypto.randomUUID(),
+                          client_id: client.id,
+                          nome: referenteForm.nome?.trim() ?? '',
+                          cognome: referenteForm.cognome?.trim() ?? '',
+                          reparto: referenteForm.reparto?.trim() ?? '',
+                          ruolo: referenteForm.ruolo?.trim() ?? '',
+                          email: referenteForm.email?.trim() ?? '',
+                          telefono: referenteForm.telefono?.trim() ?? '',
+                          cellulare: referenteForm.cellulare?.trim() ?? '',
+                          note: referenteForm.note?.trim() ?? '',
+                          is_principale: referenteForm.is_principale ?? false,
+                        }
+                        if (payload.is_principale) {
+                          await setReferentePrincipale(client.id, payload.id)
+                          payload.is_principale = true
+                        }
+                        await upsertReferente(payload)
+                        loadReferenti()
+                        setReferenteForm(null)
+                      }}
+                      className="px-4 py-2 rounded-lg text-sm font-medium text-white"
+                      style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
+                      {referenteForm.id ? 'Salva' : 'Crea'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Delete confirmation */}
+            {deleteRefTarget && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}
+                onClick={() => setDeleteRefTarget(null)}>
+                <div className="w-full max-w-sm rounded-2xl p-6"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+                  onClick={e => e.stopPropagation()}>
+                  <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text)' }}>Elimina referente</h3>
+                  <p className="text-sm mb-5" style={{ color: 'var(--muted)' }}>
+                    Sei sicuro di voler eliminare <strong>{deleteRefTarget.nome} {deleteRefTarget.cognome}</strong>?
+                  </p>
+                  <div className="flex justify-end gap-3">
+                    <button onClick={() => setDeleteRefTarget(null)}
+                      className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>
+                      Annulla
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await deleteReferente(deleteRefTarget.id)
+                        loadReferenti()
+                        setDeleteRefTarget(null)
+                      }}
+                      className="px-4 py-2 rounded-lg text-sm font-medium text-white"
+                      style={{ background: 'var(--red2)' }}>
+                      Elimina
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
