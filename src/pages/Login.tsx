@@ -87,18 +87,14 @@ export default function Login() {
   return (
     <div className="login-background flex items-center justify-center px-4">
       <div className="w-full max-w-md mx-auto">
-        {/* Logo Simmetria Synergy - adapts to theme */}
         <div className="text-center mb-12">
-          <div className="inline-block rounded-2xl p-4" style={{ background: 'var(--panel)' }}>
-            <img
-              src="/Logo_1.png"
-              alt="Simmetria Synergy"
-              className="w-44 sm:w-52 mx-auto"
-            />
-          </div>
+          <img
+            src="/Logo_1.png"
+            alt="Simmetria Synergy"
+            className="w-44 sm:w-52 mx-auto login-logo"
+          />
         </div>
 
-        {/* Login form - uses CSS variables for theme adaptation */}
         <form
           onSubmit={handleSubmit}
           className="p-8 space-y-6 rounded-2xl"

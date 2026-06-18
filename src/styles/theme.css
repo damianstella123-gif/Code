@@ -483,6 +483,19 @@ textarea::placeholder {
   min-height: 100vh;
 }
 
+/* Logo on login: in light mode it shows naturally (white bg blends).
+   In dark mode, invert the white bg + gray text but preserve red via hue-rotate correction. */
+[data-theme="light"] .login-logo {
+  filter: none;
+}
+
+[data-theme="dark"] .login-logo {
+  filter: brightness(0.85) invert(1) hue-rotate(180deg);
+}
+
+/* The red elements get shifted by invert+hue-rotate back to red.
+   This makes gray text white and white bg transparent-dark while keeping red red. */
+
 /* ─── FLY ASSISTANT ────────────────────────────────────────────────────────── */
 
 @keyframes fly-float {
