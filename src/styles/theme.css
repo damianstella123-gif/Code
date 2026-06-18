@@ -1,4 +1,5 @@
-:root {
+:root,
+[data-theme="light"] {
   /* Core colors */
   --bg: #f7f7f5;
   --panel: #ffffff;
@@ -38,6 +39,33 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #0f1318;
+  --panel: #1a1f27;
+  --panel2: #232a33;
+  --line: rgba(255, 255, 255, 0.10);
+
+  --text: #edf0f4;
+  --muted: #8b929b;
+
+  --red: #d0003a;
+  --red2: #e51b4f;
+  --gray: #8b929b;
+  --green: #38d27d;
+  --yellow: #ffc24b;
+  --blue: #4db4ff;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.30);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.40);
+  --shadow-red: 0 4px 20px rgba(208, 0, 58, 0.25);
+  --shadow-red-lg: 0 8px 40px rgba(208, 0, 58, 0.30);
+
+  color-scheme: dark;
 }
 
 /* Global Styles */
@@ -47,6 +75,15 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Logo: dark in light mode, inverted in dark mode */
+.dark-invert-logo {
+  filter: brightness(0);
+}
+[data-theme="dark"] .dark-invert-logo {
+  filter: brightness(0) invert(1);
 }
 
 /* Background with subtle gradient */
@@ -70,7 +107,6 @@ body {
 }
 
 .panel:hover {
-  border-color: rgba(15, 23, 42, 0.18);
   box-shadow: var(--shadow-md);
 }
 
@@ -130,7 +166,7 @@ body {
 
 .btn-secondary:hover {
   background: var(--panel2);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--line);
 }
 
 .btn-ghost {
@@ -145,7 +181,7 @@ body {
 }
 
 .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--panel2);
   color: var(--text);
 }
 
@@ -171,7 +207,7 @@ body {
 }
 
 .sidebar-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--panel2);
   color: var(--text);
 }
 
@@ -195,10 +231,18 @@ body {
 
 /* Topbar Styles */
 .topbar {
-  background: rgba(14, 18, 24, 0.8);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--line);
+}
+
+:root .topbar,
+[data-theme="light"] .topbar {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+[data-theme="dark"] .topbar {
+  background: rgba(15, 19, 24, 0.88);
 }
 
 /* Input Styles */
@@ -271,7 +315,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--muted);
 }
 
 /* Animation Classes */
@@ -352,6 +396,10 @@ body {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--line);
+}
+
+[data-theme="light"] .glass {
+  background: rgba(255, 255, 255, 0.7);
 }
 
 /* Gradient Text */
@@ -652,40 +700,104 @@ body {
   border: 2px solid #ff315f;
 }
 /* Light theme hardening */
-body,
-.app-background,
-.panel,
-.panel-2,
-.sidebar,
-.topbar {
+:root .panel *,
+[data-theme="light"] .panel *,
+:root .panel-2 *,
+[data-theme="light"] .panel-2 *,
+:root .sidebar *,
+[data-theme="light"] .sidebar *,
+:root .topbar *,
+[data-theme="light"] .topbar * {
+  color: inherit;
+}
+
+:root .hover\:bg-white\/5:hover,
+[data-theme="light"] .hover\:bg-white\/5:hover {
+  background-color: rgba(35, 39, 42, 0.06);
+}
+
+:root .hover\:bg-white\/10:hover,
+[data-theme="light"] .hover\:bg-white\/10:hover {
+  background-color: rgba(35, 39, 42, 0.08);
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] .hover\:bg-white\/5:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .hover\:bg-white\/10:hover {
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+[data-theme="dark"] .panel {
+  background: linear-gradient(180deg, #1a1f27 0%, #181d24 100%);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme="dark"] .panel:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .sidebar {
+  box-shadow: 8px 0 30px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .topbar {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select,
+[data-theme="dark"] option {
   color: var(--text);
+  background: var(--panel2);
 }
 
-.panel *,
-.panel-2 *,
-.sidebar *,
-.topbar * {
-  color: inherit;
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--muted);
 }
 
-.panel [style*="color"],
-.panel-2 [style*="color"],
-.sidebar [style*="color"],
-.topbar [style*="color"] {
-  color: inherit;
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
 }
 
-.text-white {
-  color: var(--text) !important;
+:root input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator,
+:root input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+[data-theme="light"] input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+:root input[type="time"]::-webkit-calendar-picker-indicator,
+[data-theme="light"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: none;
 }
 
-/* Keep white only where background is red/gradient */
-.btn-primary,
-.btn-primary *,
-[style*="var(--red)"],
-[style*="var(--red2)"],
-[style*="linear-gradient(135deg, var(--red)"] {
-  color: white !important;
+/* Light-mode panel gradient */
+:root .panel,
+[data-theme="light"] .panel {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfbfa 100%);
+  box-shadow: var(--shadow-sm);
+}
+
+:root .panel:hover,
+[data-theme="light"] .panel:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+:root .sidebar,
+[data-theme="light"] .sidebar {
+  box-shadow: 8px 0 30px rgba(35, 39, 42, 0.06);
+}
+
+:root .topbar,
+[data-theme="light"] .topbar {
+  box-shadow: 0 8px 24px rgba(35, 39, 42, 0.06);
 }
 
 input,
@@ -699,29 +811,4 @@ option {
 input::placeholder,
 textarea::placeholder {
   color: var(--muted);
-}
-
-.hover\:bg-white\/5:hover {
-  background-color: rgba(35, 39, 42, 0.06);
-}
-
-.hover\:bg-white\/10:hover {
-  background-color: rgba(35, 39, 42, 0.08);
-}
-.panel {
-  background: linear-gradient(180deg, #ffffff 0%, #fbfbfa 100%);
-  box-shadow: var(--shadow-sm);
-}
-
-.panel:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-.sidebar {
-  box-shadow: 8px 0 30px rgba(35, 39, 42, 0.06);
-}
-
-.topbar {
-  box-shadow: 0 8px 24px rgba(35, 39, 42, 0.06);
 }

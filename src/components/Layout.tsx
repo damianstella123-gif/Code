@@ -92,7 +92,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
 <img
   src="/logo-synergy.png"
   alt="Simmetria Synergy"
-  className="w-48 transition-all duration-300 hover:opacity-90"
+  className="w-48 transition-all duration-300 hover:opacity-90 dark-invert-logo"
 />
 
           </Link>
@@ -317,7 +317,6 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
     <header
       className="sticky top-0 z-30 h-16 topbar"
       style={{
-background: 'rgba(255, 255, 255, 0.92)',
         backdropFilter: 'blur(20px)',
         borderBottom: '1px solid var(--line)',
       }}

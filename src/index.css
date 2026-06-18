@@ -31,7 +31,6 @@
     @apply border-border;
   }
   html {
-    color-scheme: dark;
     overflow-x: hidden;
   }
   body {
@@ -72,7 +71,6 @@ input[type="time"] {
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
   cursor: pointer;
   opacity: 0.7;
 }

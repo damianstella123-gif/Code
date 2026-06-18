@@ -4,6 +4,9 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './styles/theme.css'
 import './index.css'
+import { initTheme } from './lib/theme'
+
+initTheme()
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },

@@ -92,7 +92,7 @@ export default function Login() {
           <img
             src="/logo-synergy.png"
             alt="Simmetria Synergy"
-            className="w-[620px] mx-auto brightness-0 invert"
+            className="w-[620px] mx-auto dark-invert-logo"
           />
         </div>
 

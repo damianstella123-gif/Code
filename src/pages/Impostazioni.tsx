@@ -13,6 +13,9 @@ import {
   RotateCcw,
   Check,
   ChevronRight,
+  Sun,
+  Moon,
+  Monitor,
   Eye,
   EyeOff,
   AlertTriangle,
@@ -21,6 +24,7 @@ import {
   Download,
 } from 'lucide-react'
 import { loadUser, isPartnerUser } from '@/lib/auth'
+import { useTheme, type ThemeMode } from '@/lib/theme'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -815,10 +819,59 @@ function FlyConfig({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSettings>) 
   )
 }
 
+// ─── Tema Section ─────────────────────────────────────────────────────────────
+
+function TemaSection() {
+  const { theme, setTheme } = useTheme()
+
+  const options: { mode: ThemeMode; icon: React.ElementType; label: string; desc: string }[] = [
+    { mode: 'light', icon: Sun, label: 'Light', desc: 'Interfaccia chiara, ideale per ambienti luminosi' },
+    { mode: 'dark', icon: Moon, label: 'Dark', desc: 'Interfaccia scura, riduce l\'affaticamento visivo' },
+    { mode: 'system', icon: Monitor, label: 'Sistema', desc: 'Segue le preferenze del sistema operativo' },
+  ]
+
+  return (
+    <SectionCard icon={Sun} title="Tema" subtitle="Aspetto visivo dell'interfaccia">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {options.map(opt => {
+          const active = theme === opt.mode
+          return (
+            <button
+              key={opt.mode}
+              onClick={() => setTheme(opt.mode)}
+              className="p-5 rounded-xl text-left transition-all"
+              style={{
+                background: active ? 'rgba(208,0,58,0.06)' : 'var(--panel2)',
+                border: `2px solid ${active ? 'var(--red2)' : 'var(--line)'}`,
+              }}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ background: active ? 'rgba(208,0,58,0.12)' : 'var(--bg)' }}>
+                  <opt.icon className="w-5 h-5" style={{ color: active ? 'var(--red2)' : 'var(--muted)' }} />
+                </div>
+                {active && (
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center ml-auto"
+                    style={{ background: 'var(--red2)' }}>
+                    <Check className="w-3 h-3 text-white" />
+                  </div>
+                )}
+              </div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{opt.label}</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{opt.desc}</p>
+            </button>
+          )
+        })}
+      </div>
+    </SectionCard>
+  )
+}
+
 // ─── Sidebar nav ──────────────────────────────────────────────────────────────
 
 const SECTIONS = [
   { id: 'profilo', icon: Building2, label: 'Profilo Azienda' },
+  { id: 'tema', icon: Sun, label: 'Tema' },
   { id: 'branding', icon: Palette, label: 'Branding' },
   { id: 'ruoli', icon: ShieldCheck, label: 'Ruoli e Permessi' },
   { id: 'notifiche', icon: Bell, label: 'Notifiche' },
@@ -946,6 +999,7 @@ export default function Impostazioni() {
         {/* Content */}
         <div className="flex-1 min-w-0 space-y-0">
           {activeSection === 'profilo' && <ProfiloAzienda s={settings} upd={upd} />}
+          {activeSection === 'tema' && <TemaSection />}
           {activeSection === 'branding' && <Branding s={settings} upd={upd} />}
           {activeSection === 'ruoli' && <RuoliPermessi />}
           {activeSection === 'notifiche' && <NotificheSection s={settings} upd={upd} />}
