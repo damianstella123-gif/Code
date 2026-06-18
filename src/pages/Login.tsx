@@ -91,7 +91,7 @@ export default function Login() {
           <img
             src="/Logo_1.png"
             alt="Simmetria Synergy"
-            className="w-44 sm:w-52 mx-auto login-logo"
+            className="w-44 sm:w-52 mx-auto object-contain"
           />
         </div>
 

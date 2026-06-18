@@ -92,7 +92,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
             <img
               src="/Logo_1.png"
               alt="Simmetria Synergy"
-              className="w-36 transition-all duration-300 group-hover:opacity-90 login-logo"
+              className="w-36 object-contain transition-all duration-300 group-hover:opacity-90"
             />
           </Link>
           <button

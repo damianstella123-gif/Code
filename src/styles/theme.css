@@ -349,19 +349,27 @@ textarea::placeholder {
 /* ─── HOVER UTILITIES ──────────────────────────────────────────────────────── */
 
 [data-theme="light"] .hover\:bg-white\/5:hover {
-  background-color: rgba(35, 39, 42, 0.05);
+  background-color: rgba(35, 39, 42, 0.05) !important;
 }
 
 [data-theme="dark"] .hover\:bg-white\/5:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
 [data-theme="light"] .hover\:bg-white\/10:hover {
-  background-color: rgba(35, 39, 42, 0.08);
+  background-color: rgba(35, 39, 42, 0.08) !important;
 }
 
 [data-theme="dark"] .hover\:bg-white\/10:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="light"] .hover\:bg-white\/\[0\.02\]:hover {
+  background-color: rgba(35, 39, 42, 0.02) !important;
+}
+
+[data-theme="dark"] .hover\:bg-white\/\[0\.02\]:hover {
+  background-color: rgba(255, 255, 255, 0.02) !important;
 }
 
 /* ─── HOVER CARD ───────────────────────────────────────────────────────────── */
@@ -482,19 +490,6 @@ textarea::placeholder {
   background: linear-gradient(145deg, #06080b 0%, #0e1218 50%, #121821 100%);
   min-height: 100vh;
 }
-
-/* Logo on login: in light mode it shows naturally (white bg blends).
-   In dark mode, invert the white bg + gray text but preserve red via hue-rotate correction. */
-[data-theme="light"] .login-logo {
-  filter: none;
-}
-
-[data-theme="dark"] .login-logo {
-  filter: brightness(0.85) invert(1) hue-rotate(180deg);
-}
-
-/* The red elements get shifted by invert+hue-rotate back to red.
-   This makes gray text white and white bg transparent-dark while keeping red red. */
 
 /* ─── FLY ASSISTANT ────────────────────────────────────────────────────────── */
 
