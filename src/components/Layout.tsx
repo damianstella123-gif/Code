@@ -516,10 +516,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   return (
     <div
       className="min-h-screen app-background"
-      style={{
-background: 'linear-gradient(135deg, #f7f7f5 0%, #fff3f6 48%, #f7f7f5 100%)',
-        backgroundAttachment: 'fixed',
-      }}
+      style={{ background: 'var(--bg)' }}
     >
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
       <div className="lg:pl-64 flex flex-col min-h-screen">
