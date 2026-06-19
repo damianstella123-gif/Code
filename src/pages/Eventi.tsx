@@ -722,7 +722,7 @@ const emptySvcForm = {
 
 const HOTEL_TIPOS = [
   { value: 'pernottamento', label: 'Pernottamento' },
-  { value: 'sala_meeting', label: 'Sala Meeting' },
+  { value: 'sala_meeting', label: 'Meeting' },
   { value: 'coffee_break', label: 'Coffee Break' },
   { value: 'lunch', label: 'Lunch' },
   { value: 'dinner', label: 'Dinner' },
@@ -747,6 +747,11 @@ interface HotelDetail {
   luogo: string
   quantita: number | null
   note: string
+  room_type: string
+  meeting_pax: number | null
+  meeting_setup: string
+  meeting_equipment: string
+  natural_light: boolean
 }
 
 const emptyHotelForm = {
@@ -761,6 +766,11 @@ const emptyHotelForm = {
   luogo: '',
   quantita: '',
   note: '',
+  room_type: '',
+  meeting_pax: '',
+  meeting_setup: '',
+  meeting_equipment: '',
+  natural_light: false,
 }
 
 function isHotelSupplier(sup: Supplier): boolean {
@@ -928,6 +938,11 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       luogo: h.luogo,
       quantita: h.quantita?.toString() ?? '',
       note: h.note,
+      room_type: h.room_type ?? '',
+      meeting_pax: h.meeting_pax?.toString() ?? '',
+      meeting_setup: h.meeting_setup ?? '',
+      meeting_equipment: h.meeting_equipment ?? '',
+      natural_light: h.natural_light ?? false,
     })
     setEditingHotelId(h.id)
     setHotelFormTipo(h.tipo)
@@ -937,11 +952,12 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   async function saveHotel() {
     if (!managingHotel || !hotelFormTipo) return
     const isPernottamento = hotelFormTipo === 'pernottamento'
+    const isMeeting = hotelFormTipo === 'sala_meeting'
     const payload = {
       event_id: event.id,
       supplier_id: managingHotel,
       tipo: hotelFormTipo,
-      titolo: hotelForm.titolo.trim() || HOTEL_TIPOS.find(t => t.value === hotelFormTipo)?.label || hotelFormTipo,
+      titolo: hotelForm.titolo.trim(),
       data: isPernottamento ? null : (hotelForm.data || null),
       ora_inizio: isPernottamento ? null : (hotelForm.ora_inizio || null),
       ora_fine: isPernottamento ? null : (hotelForm.ora_fine || null),
@@ -952,6 +968,11 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       luogo: hotelForm.luogo.trim(),
       quantita: hotelForm.quantita ? parseInt(hotelForm.quantita) : null,
       note: hotelForm.note.trim(),
+      room_type: isPernottamento ? hotelForm.room_type.trim() : '',
+      meeting_pax: isMeeting && hotelForm.meeting_pax ? parseInt(hotelForm.meeting_pax) : null,
+      meeting_setup: isMeeting ? hotelForm.meeting_setup.trim() : '',
+      meeting_equipment: isMeeting ? hotelForm.meeting_equipment.trim() : '',
+      natural_light: isMeeting ? hotelForm.natural_light : false,
     }
     if (editingHotelId) {
       await supabase.from('event_hotel_details').update(payload).eq('id', editingHotelId)
@@ -1077,110 +1098,212 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
 
                 {/* Hotel panel */}
                 {isHotel && isManaging && (
-                  <div className="px-5 pb-5 pt-2 space-y-4" style={{ borderTop: '1px solid var(--line)' }}>
+                  <div className="px-5 pb-5 pt-2 space-y-5" style={{ borderTop: '1px solid var(--line)' }}>
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
-                        Scheda Hotel ({hotelDetails.length} voci)
+                        Scheda Hotel
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {HOTEL_TIPOS.map(t => (
-                        <button key={t.value} onClick={() => openNewHotel(t.value)}
-                          className="px-3 py-2 rounded-lg text-xs font-medium text-center transition-all hover:bg-white/10"
-                          style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
-                          + {t.label}
-                        </button>
-                      ))}
+                    {/* Section buttons */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <button onClick={() => openNewHotel('pernottamento')}
+                        className="px-3 py-2.5 rounded-lg text-xs font-medium text-center transition-all hover:bg-white/10"
+                        style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
+                        + Pernottamento
+                      </button>
+                      <button onClick={() => openNewHotel('sala_meeting')}
+                        className="px-3 py-2.5 rounded-lg text-xs font-medium text-center transition-all hover:bg-white/10"
+                        style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
+                        + Meeting
+                      </button>
+                      <div className="relative">
+                        <select
+                          onChange={e => { if (e.target.value) { openNewHotel(e.target.value); e.target.value = '' } }}
+                          defaultValue=""
+                          className="w-full px-3 py-2.5 rounded-lg text-xs font-medium text-center transition-all appearance-none cursor-pointer"
+                          style={{ border: '1px solid var(--line)', color: 'var(--text)', background: 'transparent' }}>
+                          <option value="" disabled>+ F&B / Altro</option>
+                          <option value="coffee_break">Coffee Break</option>
+                          <option value="lunch">Lunch</option>
+                          <option value="dinner">Dinner</option>
+                          <option value="coffee_station">Coffee Station</option>
+                          <option value="setup_sala">Setup Sala</option>
+                          <option value="attrezzature">Attrezzature</option>
+                        </select>
+                      </div>
                     </div>
 
+                    {/* Form */}
                     {showHotelForm && (
                       <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
                         <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
                           {editingHotelId ? 'Modifica' : 'Nuovo'}: {HOTEL_TIPOS.find(t => t.value === hotelFormTipo)?.label}
                         </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div className="sm:col-span-2">
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Titolo / Descrizione</label>
-                            <input type="text" value={hotelForm.titolo} onChange={e => setHotelForm(p => ({ ...p, titolo: e.target.value }))}
-                              placeholder={hotelFormTipo === 'pernottamento' ? 'Es. Camera Doppia x20' : 'Es. Sala Plenaria'}
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Quantita</label>
-                            <input type="number" value={hotelForm.quantita} onChange={e => setHotelForm(p => ({ ...p, quantita: e.target.value }))}
-                              placeholder="N."
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
 
-                          {hotelFormTipo === 'pernottamento' ? (
-                            <>
-                              <div>
-                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-in data</label>
-                                <input type="date" value={hotelForm.check_in_date} onChange={e => setHotelForm(p => ({ ...p, check_in_date: e.target.value }))}
-                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                              </div>
-                              <div>
-                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-in ora</label>
-                                <input type="time" value={hotelForm.check_in_time} onChange={e => setHotelForm(p => ({ ...p, check_in_time: e.target.value }))}
-                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                              </div>
-                              <div>
-                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-out data</label>
-                                <input type="date" value={hotelForm.check_out_date} onChange={e => setHotelForm(p => ({ ...p, check_out_date: e.target.value }))}
-                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                              </div>
-                              <div>
-                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-out ora</label>
-                                <input type="time" value={hotelForm.check_out_time} onChange={e => setHotelForm(p => ({ ...p, check_out_time: e.target.value }))}
-                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div>
-                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Data</label>
-                                <input type="date" value={hotelForm.data} onChange={e => setHotelForm(p => ({ ...p, data: e.target.value }))}
-                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                              </div>
-                              <div>
-                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora inizio</label>
-                                <input type="time" value={hotelForm.ora_inizio} onChange={e => setHotelForm(p => ({ ...p, ora_inizio: e.target.value }))}
-                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                              </div>
-                              <div>
-                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora fine</label>
-                                <input type="time" value={hotelForm.ora_fine} onChange={e => setHotelForm(p => ({ ...p, ora_fine: e.target.value }))}
-                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                              </div>
-                            </>
-                          )}
-                          <div className={hotelFormTipo === 'pernottamento' ? 'sm:col-span-3' : ''}>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>
-                              {hotelFormTipo === 'sala_meeting' || hotelFormTipo === 'setup_sala' ? 'Sala' : 'Luogo'}
-                            </label>
-                            <input type="text" value={hotelForm.luogo} onChange={e => setHotelForm(p => ({ ...p, luogo: e.target.value }))}
-                              placeholder={hotelFormTipo === 'sala_meeting' ? 'Es. Sala Plenaria, Piano 1' : 'Luogo'}
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        {/* PERNOTTAMENTO form */}
+                        {hotelFormTipo === 'pernottamento' && (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-in data *</label>
+                              <input type="date" value={hotelForm.check_in_date} onChange={e => setHotelForm(p => ({ ...p, check_in_date: e.target.value }))}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-out data *</label>
+                              <input type="date" value={hotelForm.check_out_date} onChange={e => setHotelForm(p => ({ ...p, check_out_date: e.target.value }))}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>N. Camere</label>
+                              <input type="number" value={hotelForm.quantita} onChange={e => setHotelForm(p => ({ ...p, quantita: e.target.value }))}
+                                placeholder="Es. 26"
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Tipologia camera</label>
+                              <input type="text" value={hotelForm.room_type} onChange={e => setHotelForm(p => ({ ...p, room_type: e.target.value }))}
+                                placeholder="Es. DUS, DUP, Suite"
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-in ora</label>
+                              <input type="time" value={hotelForm.check_in_time} onChange={e => setHotelForm(p => ({ ...p, check_in_time: e.target.value }))}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-out ora</label>
+                              <input type="time" value={hotelForm.check_out_time} onChange={e => setHotelForm(p => ({ ...p, check_out_time: e.target.value }))}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div className="sm:col-span-3">
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Note pernottamento</label>
+                              <textarea value={hotelForm.note} onChange={e => setHotelForm(p => ({ ...p, note: e.target.value }))}
+                                rows={2} placeholder="Richieste particolari, allergeni, late check-out..."
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
                           </div>
-                          <div className="sm:col-span-3">
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Note</label>
-                            <textarea value={hotelForm.note} onChange={e => setHotelForm(p => ({ ...p, note: e.target.value }))}
-                              rows={2} placeholder="Note aggiuntive..."
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        )}
+
+                        {/* MEETING form */}
+                        {hotelFormTipo === 'sala_meeting' && (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Data *</label>
+                              <input type="date" value={hotelForm.data} onChange={e => setHotelForm(p => ({ ...p, data: e.target.value }))}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora inizio *</label>
+                              <input type="time" value={hotelForm.ora_inizio} onChange={e => setHotelForm(p => ({ ...p, ora_inizio: e.target.value }))}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora fine *</label>
+                              <input type="time" value={hotelForm.ora_fine} onChange={e => setHotelForm(p => ({ ...p, ora_fine: e.target.value }))}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Sala</label>
+                              <input type="text" value={hotelForm.luogo} onChange={e => setHotelForm(p => ({ ...p, luogo: e.target.value }))}
+                                placeholder="Es. Sala Plenaria, Piano 1"
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>N. Pax</label>
+                              <input type="number" value={hotelForm.meeting_pax} onChange={e => setHotelForm(p => ({ ...p, meeting_pax: e.target.value }))}
+                                placeholder="26"
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Setup sala</label>
+                              <select value={hotelForm.meeting_setup} onChange={e => setHotelForm(p => ({ ...p, meeting_setup: e.target.value }))}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                                <option value="">--</option>
+                                <option value="teatro">Teatro</option>
+                                <option value="platea">Platea</option>
+                                <option value="tavolo_imperiale">Tavolo imperiale</option>
+                                <option value="ferro_cavallo">Ferro di cavallo</option>
+                                <option value="isole">Isole</option>
+                                <option value="boardroom">Boardroom</option>
+                                <option value="classe">Classe</option>
+                              </select>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Attrezzature tecniche</label>
+                              <input type="text" value={hotelForm.meeting_equipment} onChange={e => setHotelForm(p => ({ ...p, meeting_equipment: e.target.value }))}
+                                placeholder="Proiettore, lavagna, microfoni..."
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div className="flex items-end pb-1">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={hotelForm.natural_light} onChange={e => setHotelForm(p => ({ ...p, natural_light: e.target.checked }))}
+                                  className="rounded" />
+                                <span className="text-xs" style={{ color: 'var(--muted)' }}>Luce naturale</span>
+                              </label>
+                            </div>
+                            <div className="sm:col-span-3">
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Note meeting</label>
+                              <textarea value={hotelForm.note} onChange={e => setHotelForm(p => ({ ...p, note: e.target.value }))}
+                                rows={2} placeholder="Esigenze particolari..."
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
                           </div>
-                        </div>
+                        )}
+
+                        {/* F&B / OTHER form */}
+                        {hotelFormTipo !== 'pernottamento' && hotelFormTipo !== 'sala_meeting' && (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Data *</label>
+                              <input type="date" value={hotelForm.data} onChange={e => setHotelForm(p => ({ ...p, data: e.target.value }))}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora *</label>
+                              <input type="time" value={hotelForm.ora_inizio} onChange={e => setHotelForm(p => ({ ...p, ora_inizio: e.target.value }))}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Luogo / Sala</label>
+                              <input type="text" value={hotelForm.luogo} onChange={e => setHotelForm(p => ({ ...p, luogo: e.target.value }))}
+                                placeholder="Es. Foyer, Terrazza"
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>N. Persone</label>
+                              <input type="number" value={hotelForm.quantita} onChange={e => setHotelForm(p => ({ ...p, quantita: e.target.value }))}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div className="sm:col-span-2">
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Note</label>
+                              <input type="text" value={hotelForm.note} onChange={e => setHotelForm(p => ({ ...p, note: e.target.value }))}
+                                placeholder="Menu, allergie, richieste..."
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                          </div>
+                        )}
+
                         <div className="flex items-center gap-2 justify-end">
                           <button onClick={() => { setShowHotelForm(false); setEditingHotelId(null) }} className="px-4 py-2 rounded-lg text-xs font-medium"
                             style={{ color: 'var(--muted)' }}>Annulla</button>
@@ -1198,35 +1321,94 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                       </p>
                     )}
 
+                    {/* Hotel items list grouped by section */}
                     {hotelDetails.length > 0 && (
-                      <div className="space-y-2">
-                        {HOTEL_TIPOS.map(tipo => {
-                          const items = hotelDetails.filter(h => h.tipo === tipo.value)
-                          if (items.length === 0) return null
-                          return (
-                            <div key={tipo.value}>
-                              <p className="text-xs font-semibold uppercase tracking-wide mb-1.5 mt-2" style={{ color: 'var(--muted)' }}>
-                                {tipo.label} ({items.length})
-                              </p>
-                              {items.map(h => (
+                      <div className="space-y-3">
+                        {/* Pernottamento section */}
+                        {hotelDetails.filter(h => h.tipo === 'pernottamento').length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>
+                              Pernottamento
+                            </p>
+                            {hotelDetails.filter(h => h.tipo === 'pernottamento').map(h => (
+                              <div key={h.id} className="flex items-start gap-3 p-3 rounded-lg mb-1.5" style={{ background: 'var(--panel2)' }}>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--text)' }}>
+                                    <span className="font-medium">IN {h.check_in_date}{h.check_in_time ? ` ${h.check_in_time.slice(0, 5)}` : ''}</span>
+                                    <span style={{ color: 'var(--muted)' }}>→</span>
+                                    <span className="font-medium">OUT {h.check_out_date}{h.check_out_time ? ` ${h.check_out_time.slice(0, 5)}` : ''}</span>
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-1 text-xs flex-wrap" style={{ color: 'var(--muted)' }}>
+                                    {h.quantita && <span>{h.quantita} camere</span>}
+                                    {h.room_type && <span>{h.room_type}</span>}
+                                  </div>
+                                  {h.note && <p className="text-xs mt-1 italic" style={{ color: 'var(--muted)' }}>{h.note}</p>}
+                                </div>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <button onClick={() => openEditHotel(h)} className="p-1.5 rounded hover:bg-white/10">
+                                    <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                                  </button>
+                                  <button onClick={() => deleteHotel(h.id)} className="p-1.5 rounded hover:bg-white/10">
+                                    <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Meeting section */}
+                        {hotelDetails.filter(h => h.tipo === 'sala_meeting').length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>
+                              Meeting
+                            </p>
+                            {hotelDetails.filter(h => h.tipo === 'sala_meeting').map(h => (
+                              <div key={h.id} className="flex items-start gap-3 p-3 rounded-lg mb-1.5" style={{ background: 'var(--panel2)' }}>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 text-sm flex-wrap" style={{ color: 'var(--text)' }}>
+                                    <span className="font-medium">{h.data} {h.ora_inizio?.slice(0, 5)} - {h.ora_fine?.slice(0, 5)}</span>
+                                    {h.luogo && <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(208,0,58,0.08)', color: 'var(--red2)' }}>{h.luogo}</span>}
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-1 text-xs flex-wrap" style={{ color: 'var(--muted)' }}>
+                                    {h.meeting_pax && <span>{h.meeting_pax} pax</span>}
+                                    {h.meeting_setup && <span>Setup: {h.meeting_setup}</span>}
+                                    {h.meeting_equipment && <span>{h.meeting_equipment}</span>}
+                                    {h.natural_light && <span>Luce naturale</span>}
+                                  </div>
+                                  {h.note && <p className="text-xs mt-1 italic" style={{ color: 'var(--muted)' }}>{h.note}</p>}
+                                </div>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <button onClick={() => openEditHotel(h)} className="p-1.5 rounded hover:bg-white/10">
+                                    <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                                  </button>
+                                  <button onClick={() => deleteHotel(h.id)} className="p-1.5 rounded hover:bg-white/10">
+                                    <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* F&B / Other section */}
+                        {hotelDetails.filter(h => h.tipo !== 'pernottamento' && h.tipo !== 'sala_meeting').length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>
+                              F&B / Servizi
+                            </p>
+                            {hotelDetails.filter(h => h.tipo !== 'pernottamento' && h.tipo !== 'sala_meeting').map(h => {
+                              const tipoLabel = HOTEL_TIPOS.find(t => t.value === h.tipo)?.label ?? h.tipo
+                              return (
                                 <div key={h.id} className="flex items-start gap-3 p-3 rounded-lg mb-1.5" style={{ background: 'var(--panel2)' }}>
                                   <div className="flex-1 min-w-0">
-                                    <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
-                                      {h.titolo || tipo.label}
-                                    </span>
+                                    <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text)' }}>
+                                      <span className="font-medium">{tipoLabel}</span>
+                                      {h.data && <span className="text-xs" style={{ color: 'var(--muted)' }}>{h.data} {h.ora_inizio?.slice(0, 5) ?? ''}</span>}
+                                    </div>
                                     <div className="flex items-center gap-3 mt-1 text-xs flex-wrap" style={{ color: 'var(--muted)' }}>
-                                      {h.tipo === 'pernottamento' ? (
-                                        <>
-                                          {h.check_in_date && <span>Check-in: {h.check_in_date} {h.check_in_time?.slice(0, 5) ?? ''}</span>}
-                                          {h.check_out_date && <span>Check-out: {h.check_out_date} {h.check_out_time?.slice(0, 5) ?? ''}</span>}
-                                        </>
-                                      ) : (
-                                        <>
-                                          {h.data && <span>{h.data} {h.ora_inizio?.slice(0, 5) ?? ''}{h.ora_fine ? ` - ${h.ora_fine.slice(0, 5)}` : ''}</span>}
-                                        </>
-                                      )}
                                       {h.luogo && <span>{h.luogo}</span>}
-                                      {h.quantita && <span>x{h.quantita}</span>}
+                                      {h.quantita && <span>{h.quantita} pax</span>}
                                     </div>
                                     {h.note && <p className="text-xs mt-1 italic" style={{ color: 'var(--muted)' }}>{h.note}</p>}
                                   </div>
@@ -1239,10 +1421,10 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                                     </button>
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                          )
-                        })}
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2014,31 +2196,61 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
 
       for (const h of (hotelRes.data ?? []) as HotelDetail[]) {
         const tipoLabel = HOTEL_TIPOS.find(t => t.value === h.tipo)?.label ?? h.tipo
+
         if (h.tipo === 'pernottamento') {
-          if (h.check_in_date && h.check_in_time) {
+          if (h.check_in_date) {
+            const roomInfo = [h.quantita ? `${h.quantita} camere` : '', h.room_type].filter(Boolean).join(' ')
             program.push({
               id: h.id + '-cin',
               supplier_id: h.supplier_id,
-              titolo: `Check-in${h.titolo ? ': ' + h.titolo : ''}`,
+              titolo: 'Check-in Hotel',
               categoria: 'Hotel',
               data: h.check_in_date,
-              ora_inizio: h.check_in_time,
+              ora_inizio: h.check_in_time || '14:00',
               ora_fine: null,
               luogo: h.luogo,
-              note: h.quantita ? `${h.quantita} camere` : '',
+              note: roomInfo,
             })
           }
-          if (h.check_out_date && h.check_out_time) {
+          if (h.check_out_date) {
+            const roomInfo = [h.quantita ? `${h.quantita} camere` : '', h.room_type].filter(Boolean).join(' ')
             program.push({
               id: h.id + '-cout',
               supplier_id: h.supplier_id,
-              titolo: `Check-out${h.titolo ? ': ' + h.titolo : ''}`,
+              titolo: 'Check-out Hotel',
               categoria: 'Hotel',
               data: h.check_out_date,
-              ora_inizio: h.check_out_time,
+              ora_inizio: h.check_out_time || '10:00',
               ora_fine: null,
               luogo: h.luogo,
-              note: h.quantita ? `${h.quantita} camere` : '',
+              note: roomInfo,
+            })
+          }
+        } else if (h.tipo === 'sala_meeting') {
+          if (h.data && h.ora_inizio) {
+            program.push({
+              id: h.id + '-meet',
+              supplier_id: h.supplier_id,
+              titolo: `Meeting${h.luogo ? ' - ' + h.luogo : ''}${h.meeting_pax ? ' ' + h.meeting_pax + ' pax' : ''}`,
+              categoria: 'Meeting',
+              data: h.data,
+              ora_inizio: h.ora_inizio,
+              ora_fine: h.ora_fine,
+              luogo: h.luogo,
+              note: [h.meeting_setup, h.meeting_equipment, h.note].filter(Boolean).join(' | '),
+            })
+          }
+          if (h.data && h.ora_fine) {
+            program.push({
+              id: h.id + '-meetend',
+              supplier_id: h.supplier_id,
+              titolo: 'Fine meeting',
+              categoria: 'Meeting',
+              data: h.data,
+              ora_inizio: h.ora_fine,
+              ora_fine: null,
+              luogo: h.luogo,
+              note: '',
             })
           }
         } else {
@@ -2046,11 +2258,11 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
             program.push({
               id: h.id,
               supplier_id: h.supplier_id,
-              titolo: h.titolo || tipoLabel,
-              categoria: tipoLabel,
+              titolo: tipoLabel,
+              categoria: 'F&B',
               data: h.data,
               ora_inizio: h.ora_inizio,
-              ora_fine: h.ora_fine,
+              ora_fine: null,
               luogo: h.luogo,
               note: h.note,
             })
