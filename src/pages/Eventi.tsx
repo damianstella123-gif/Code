@@ -679,14 +679,57 @@ interface EventSupplierLink {
 
 
 
+const SVC_CATEGORIES = [
+  { value: 'transfer', label: 'Transfer' },
+  { value: 'hotel', label: 'Hotel' },
+  { value: 'ristorante', label: 'Ristorante' },
+  { value: 'location', label: 'Location' },
+  { value: 'allestimento', label: 'Allestimento' },
+  { value: 'audiovideo', label: 'Audio Video' },
+  { value: 'hostess', label: 'Hostess' },
+  { value: 'staff', label: 'Staff' },
+  { value: 'cliente', label: 'Cliente' },
+  { value: 'altro', label: 'Altro' },
+]
+
+interface SupplierService {
+  id: string
+  event_id: string
+  supplier_id: string
+  titolo: string
+  categoria: string
+  data: string | null
+  ora_inizio: string | null
+  ora_fine: string | null
+  luogo: string
+  partenza: string
+  destinazione: string
+  note: string
+}
+
+const emptySvcForm = {
+  titolo: '',
+  categoria: 'altro',
+  data: '',
+  ora_inizio: '',
+  ora_fine: '',
+  luogo: '',
+  partenza: '',
+  destinazione: '',
+  note: '',
+}
+
 function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const [links, setLinks] = useState<EventSupplierLink[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
   const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null)
-  const [editingOps, setEditingOps] = useState<string | null>(null)
-  const [opsForm, setOpsForm] = useState({ service_category: '', start_date: '', start_time: '', end_date: '', end_time: '', location: '', operational_notes: '' })
+  const [managingServices, setManagingServices] = useState<string | null>(null)
+  const [services, setServices] = useState<SupplierService[]>([])
+  const [svcForm, setSvcForm] = useState(emptySvcForm)
+  const [editingSvcId, setEditingSvcId] = useState<string | null>(null)
+  const [showSvcForm, setShowSvcForm] = useState(false)
 
   async function loadLinks() {
     const { data } = await supabase
@@ -713,6 +756,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   }
 
   async function handleUnlink(supplierId: string) {
+    await supabase.from('event_supplier_services').delete()
+      .eq('event_id', event.id).eq('supplier_id', supplierId)
     const { error } = await supabase
       .from('event_suppliers')
       .delete()
@@ -720,38 +765,75 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       .eq('supplier_id', supplierId)
     if (!error) {
       setLinks(prev => prev.filter(l => l.supplier_id !== supplierId))
+      if (managingServices === supplierId) setManagingServices(null)
     }
   }
 
-  function startEditOps(link: EventSupplierLink) {
-    setOpsForm({
-      service_category: link.service_category || '',
-      start_date: link.start_date || '',
-      start_time: link.start_time?.slice(0, 5) || '',
-      end_date: link.end_date || '',
-      end_time: link.end_time?.slice(0, 5) || '',
-      location: link.location || '',
-      operational_notes: link.operational_notes || '',
-    })
-    setEditingOps(link.supplier_id)
-  }
-
-  async function saveOps(supplierId: string) {
-    await supabase
-      .from('event_suppliers')
-      .update({
-        service_category: opsForm.service_category,
-        start_date: opsForm.start_date || null,
-        start_time: opsForm.start_time || null,
-        end_date: opsForm.end_date || null,
-        end_time: opsForm.end_time || null,
-        location: opsForm.location,
-        operational_notes: opsForm.operational_notes,
-      })
+  async function openServices(supplierId: string) {
+    setManagingServices(supplierId)
+    setShowSvcForm(false)
+    setEditingSvcId(null)
+    const { data } = await supabase
+      .from('event_supplier_services')
+      .select('*')
       .eq('event_id', event.id)
       .eq('supplier_id', supplierId)
-    setEditingOps(null)
-    await loadLinks()
+      .order('data', { ascending: true })
+      .order('ora_inizio', { ascending: true })
+    setServices((data ?? []) as SupplierService[])
+  }
+
+  function openNewSvc() {
+    setSvcForm(emptySvcForm)
+    setEditingSvcId(null)
+    setShowSvcForm(true)
+  }
+
+  function openEditSvc(svc: SupplierService) {
+    setSvcForm({
+      titolo: svc.titolo,
+      categoria: svc.categoria,
+      data: svc.data ?? '',
+      ora_inizio: svc.ora_inizio?.slice(0, 5) ?? '',
+      ora_fine: svc.ora_fine?.slice(0, 5) ?? '',
+      luogo: svc.luogo,
+      partenza: svc.partenza,
+      destinazione: svc.destinazione,
+      note: svc.note,
+    })
+    setEditingSvcId(svc.id)
+    setShowSvcForm(true)
+  }
+
+  async function saveSvc() {
+    if (!svcForm.titolo.trim() || !managingServices) return
+    const payload = {
+      event_id: event.id,
+      supplier_id: managingServices,
+      titolo: svcForm.titolo.trim(),
+      categoria: svcForm.categoria,
+      data: svcForm.data || null,
+      ora_inizio: svcForm.ora_inizio || null,
+      ora_fine: svcForm.ora_fine || null,
+      luogo: svcForm.luogo.trim(),
+      partenza: svcForm.partenza.trim(),
+      destinazione: svcForm.destinazione.trim(),
+      note: svcForm.note.trim(),
+    }
+    if (editingSvcId) {
+      await supabase.from('event_supplier_services').update(payload).eq('id', editingSvcId)
+    } else {
+      await supabase.from('event_supplier_services').insert(payload)
+    }
+    setShowSvcForm(false)
+    setEditingSvcId(null)
+    await openServices(managingServices)
+  }
+
+  async function deleteSvc(id: string) {
+    if (!managingServices) return
+    await supabase.from('event_supplier_services').delete().eq('id', id)
+    await openServices(managingServices)
   }
 
   const linkedSuppliers = suppliers.filter(s => linkedIds.includes(s.id))
@@ -822,13 +904,11 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       ) : (
         <div className="space-y-3">
           {linkedSuppliers.map(sup => {
-            const link = links.find(l => l.supplier_id === sup.id)!
-            const hasOps = !!link.start_date
+            const isManaging = managingServices === sup.id
             return (
-              <div key={sup.id} className="panel overflow-hidden" style={{ border: '1px solid var(--line)' }}>
-                <div className="p-5 flex items-start justify-between gap-4 cursor-pointer transition-all hover:bg-white/[0.02]"
-                  onClick={() => setViewingSupplier(sup)}>
-                  <div className="flex items-start gap-4">
+              <div key={sup.id} className="panel overflow-hidden" style={{ border: `1px solid ${isManaging ? 'var(--red2)' : 'var(--line)'}` }}>
+                <div className="p-5 flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4 cursor-pointer" onClick={() => setViewingSupplier(sup)}>
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                       style={{ background: 'rgba(208,0,58,0.1)' }}>
                       <Truck className="w-6 h-6" style={{ color: 'var(--red2)' }} />
@@ -836,86 +916,150 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                     <div>
                       <p className="font-semibold" style={{ color: 'var(--text)' }}>{sup.nome}</p>
                       <p className="text-sm" style={{ color: 'var(--muted)' }}>{sup.categoria} · {sup.location}</p>
-                      {hasOps && (
-                        <p className="text-xs mt-1" style={{ color: 'var(--red2)' }}>
-                          {link.service_category || 'Servizio'} · {link.start_date} {link.start_time?.slice(0, 5) ?? ''}
-                          {link.location ? ` · ${link.location}` : ''}
-                        </p>
-                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <button onClick={(e) => { e.stopPropagation(); startEditOps(link) }}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
-                      style={{ border: '1px solid var(--line)', color: hasOps ? 'var(--green)' : 'var(--muted)' }}
-                      title="Dati operativi">
-                      <Clock className="w-3.5 h-3.5 inline mr-1" />
-                      {hasOps ? 'Operativi' : 'Dati operativi'}
+                    <button onClick={() => isManaging ? setManagingServices(null) : openServices(sup.id)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
+                      style={{ border: '1px solid var(--line)', color: isManaging ? 'var(--red2)' : 'var(--muted)' }}>
+                      <Zap className="w-3.5 h-3.5 inline mr-1" />
+                      Gestisci Servizi
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); handleUnlink(sup.id) }}
+                    <button onClick={() => handleUnlink(sup.id)}
                       className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi collegamento">
                       <X className="w-4 h-4" style={{ color: 'var(--red2)' }} />
                     </button>
                   </div>
                 </div>
 
-                {editingOps === sup.id && (
-                  <div className="px-5 pb-5 pt-2 space-y-3" style={{ borderTop: '1px solid var(--line)' }}
-                    onClick={e => e.stopPropagation()}>
-                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Dati operativi</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Servizio</label>
-                        <input type="text" value={opsForm.service_category} onChange={e => setOpsForm(p => ({ ...p, service_category: e.target.value }))}
-                          placeholder="Es. Transfer Aeroporto, Check-in Hotel, Cena Cliente..."
-                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                      </div>
-                      <div>
-                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Data inizio</label>
-                        <input type="date" value={opsForm.start_date} onChange={e => setOpsForm(p => ({ ...p, start_date: e.target.value }))}
-                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                      </div>
-                      <div>
-                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora inizio</label>
-                        <input type="time" value={opsForm.start_time} onChange={e => setOpsForm(p => ({ ...p, start_time: e.target.value }))}
-                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                      </div>
-                      <div>
-                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Data fine</label>
-                        <input type="date" value={opsForm.end_date} onChange={e => setOpsForm(p => ({ ...p, end_date: e.target.value }))}
-                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                      </div>
-                      <div>
-                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora fine</label>
-                        <input type="time" value={opsForm.end_time} onChange={e => setOpsForm(p => ({ ...p, end_time: e.target.value }))}
-                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                      </div>
-                      <div>
-                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Luogo</label>
-                        <input type="text" value={opsForm.location} onChange={e => setOpsForm(p => ({ ...p, location: e.target.value }))}
-                          placeholder="Luogo servizio"
-                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                      </div>
-                      <div className="sm:col-span-3">
-                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Note operative</label>
-                        <textarea value={opsForm.operational_notes} onChange={e => setOpsForm(p => ({ ...p, operational_notes: e.target.value }))}
-                          rows={2} placeholder="Es. Check-in ore 15, camera 301..."
-                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
-                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                      </div>
+                {isManaging && (
+                  <div className="px-5 pb-5 pt-2 space-y-4" style={{ borderTop: '1px solid var(--line)' }}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+                        Servizi operativi ({services.length})
+                      </p>
+                      <button onClick={openNewSvc} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium"
+                        style={{ background: 'var(--red2)', color: '#fff' }}>
+                        <Plus className="w-3 h-3" /> Nuovo servizio
+                      </button>
                     </div>
-                    <div className="flex items-center gap-2 justify-end">
-                      <button onClick={() => setEditingOps(null)} className="px-4 py-2 rounded-lg text-xs font-medium"
-                        style={{ color: 'var(--muted)' }}>Annulla</button>
-                      <button onClick={() => saveOps(sup.id)} className="px-4 py-2 rounded-lg text-xs font-medium"
-                        style={{ background: 'var(--red2)', color: '#fff' }}>Salva</button>
-                    </div>
+
+                    {showSvcForm && (
+                      <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+                        <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
+                          {editingSvcId ? 'Modifica servizio' : 'Nuovo servizio'}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="sm:col-span-2">
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Titolo *</label>
+                            <input type="text" value={svcForm.titolo} onChange={e => setSvcForm(p => ({ ...p, titolo: e.target.value }))}
+                              placeholder="Es. Transfer Aeroporto → Hotel"
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Categoria</label>
+                            <select value={svcForm.categoria} onChange={e => setSvcForm(p => ({ ...p, categoria: e.target.value }))}
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                              {SVC_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Data</label>
+                            <input type="date" value={svcForm.data} onChange={e => setSvcForm(p => ({ ...p, data: e.target.value }))}
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora inizio</label>
+                            <input type="time" value={svcForm.ora_inizio} onChange={e => setSvcForm(p => ({ ...p, ora_inizio: e.target.value }))}
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora fine</label>
+                            <input type="time" value={svcForm.ora_fine} onChange={e => setSvcForm(p => ({ ...p, ora_fine: e.target.value }))}
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Luogo</label>
+                            <input type="text" value={svcForm.luogo} onChange={e => setSvcForm(p => ({ ...p, luogo: e.target.value }))}
+                              placeholder="Es. Hotel Continental"
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Partenza</label>
+                            <input type="text" value={svcForm.partenza} onChange={e => setSvcForm(p => ({ ...p, partenza: e.target.value }))}
+                              placeholder="Es. Milano Linate"
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Destinazione</label>
+                            <input type="text" value={svcForm.destinazione} onChange={e => setSvcForm(p => ({ ...p, destinazione: e.target.value }))}
+                              placeholder="Es. Hotel Continental"
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          <div className="sm:col-span-3">
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Note operative</label>
+                            <textarea value={svcForm.note} onChange={e => setSvcForm(p => ({ ...p, note: e.target.value }))}
+                              rows={2} placeholder="Note aggiuntive..."
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 justify-end">
+                          <button onClick={() => { setShowSvcForm(false); setEditingSvcId(null) }} className="px-4 py-2 rounded-lg text-xs font-medium"
+                            style={{ color: 'var(--muted)' }}>Annulla</button>
+                          <button onClick={saveSvc} className="px-4 py-2 rounded-lg text-xs font-medium"
+                            style={{ background: 'var(--red2)', color: '#fff', opacity: !svcForm.titolo.trim() ? 0.5 : 1 }}>
+                            {editingSvcId ? 'Salva' : 'Aggiungi'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {services.length === 0 && !showSvcForm && (
+                      <p className="text-xs text-center py-4" style={{ color: 'var(--muted)' }}>
+                        Nessun servizio operativo. Aggiungi i servizi per questo fornitore.
+                      </p>
+                    )}
+
+                    {services.length > 0 && (
+                      <div className="space-y-2">
+                        {services.map(svc => (
+                          <div key={svc.id} className="flex items-start gap-3 p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{svc.titolo}</span>
+                                <span className="text-xs px-2 py-0.5 rounded-full"
+                                  style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
+                                  {SVC_CATEGORIES.find(c => c.value === svc.categoria)?.label ?? svc.categoria}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+                                {svc.data && <span>{svc.data} {svc.ora_inizio?.slice(0, 5) ?? ''}{svc.ora_fine ? ` - ${svc.ora_fine.slice(0, 5)}` : ''}</span>}
+                                {svc.partenza && svc.destinazione && <span>{svc.partenza} → {svc.destinazione}</span>}
+                                {svc.luogo && !svc.partenza && <span>{svc.luogo}</span>}
+                              </div>
+                              {svc.note && <p className="text-xs mt-1 italic" style={{ color: 'var(--muted)' }}>{svc.note}</p>}
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button onClick={() => openEditSvc(svc)} className="p-1.5 rounded hover:bg-white/10">
+                                <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                              </button>
+                              <button onClick={() => deleteSvc(svc.id)} className="p-1.5 rounded hover:bg-white/10">
+                                <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1511,32 +1655,29 @@ function TabDocumenti({ event }: { event: Event }) {
 }
 
 function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
-  const [links, setLinks] = useState<EventSupplierLink[]>([])
+  const [services, setServices] = useState<SupplierService[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     supabase
-      .from('event_suppliers')
+      .from('event_supplier_services')
       .select('*')
       .eq('event_id', event.id)
+      .order('data', { ascending: true })
+      .order('ora_inizio', { ascending: true })
       .then(({ data }) => {
-        setLinks((data ?? []) as EventSupplierLink[])
+        setServices((data ?? []) as SupplierService[])
         setLoading(false)
       })
   }, [event.id])
 
-  const scheduled = links.filter(l => l.start_date && l.start_time)
-    .sort((a, b) => {
-      const da = `${a.start_date}T${a.start_time}`
-      const db = `${b.start_date}T${b.start_time}`
-      return da.localeCompare(db)
-    })
-  const unplanned = links.filter(l => !l.start_date || !l.start_time)
+  const scheduled = services.filter(s => s.data && s.ora_inizio)
+  const unscheduled = services.filter(s => !s.data || !s.ora_inizio)
 
-  const grouped = scheduled.reduce<Record<string, EventSupplierLink[]>>((acc, item) => {
-    const key = item.start_date!
+  const grouped = scheduled.reduce<Record<string, SupplierService[]>>((acc, svc) => {
+    const key = svc.data!
     if (!acc[key]) acc[key] = []
-    acc[key].push(item)
+    acc[key].push(svc)
     return acc
   }, {})
 
@@ -1544,12 +1685,12 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
     return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento programma...</div></div>
   }
 
-  if (links.length === 0) {
+  if (services.length === 0) {
     return (
       <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
         <Clock className="w-10 h-10 mx-auto mb-3 opacity-30" />
-        <p>Nessun fornitore collegato</p>
-        <p className="text-xs mt-1">Collega fornitori nel tab Fornitori e compila i dati operativi per generare il programma</p>
+        <p>Nessun servizio operativo inserito</p>
+        <p className="text-xs mt-1">Vai nel tab Fornitori, collega i fornitori e aggiungi i servizi operativi per generare il programma</p>
       </div>
     )
   }
@@ -1558,20 +1699,12 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <p className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
-          Programma evento — generato automaticamente dai fornitori collegati
+          Programma evento — generato automaticamente
         </p>
         <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
-          {scheduled.length} pianificati{unplanned.length > 0 ? ` · ${unplanned.length} senza data` : ''}
+          {scheduled.length} pianificati{unscheduled.length > 0 ? ` · ${unscheduled.length} senza data` : ''}
         </span>
       </div>
-
-      {scheduled.length === 0 && (
-        <div className="panel p-8 text-center" style={{ color: 'var(--muted)' }}>
-          <Clock className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Nessuna attivita pianificata</p>
-          <p className="text-xs mt-1">Inserisci i dati operativi (servizio, data, ora) nei fornitori collegati</p>
-        </div>
-      )}
 
       {Object.entries(grouped).map(([dateStr, dayItems]) => (
         <div key={dateStr}>
@@ -1582,35 +1715,40 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
           <div className="relative pl-6">
             <div className="absolute left-[9px] top-2 bottom-2 w-px" style={{ background: 'var(--line)' }} />
             <div className="space-y-3">
-              {dayItems.map(item => {
-                const sup = suppliers.find(s => s.id === item.supplier_id)
+              {dayItems.map(svc => {
+                const sup = suppliers.find(s => s.id === svc.supplier_id)
+                const catLabel = SVC_CATEGORIES.find(c => c.value === svc.categoria)?.label ?? svc.categoria
                 return (
-                  <div key={item.id} className="relative flex items-start gap-3">
+                  <div key={svc.id} className="relative flex items-start gap-3">
                     <div className="absolute left-[-18px] top-2.5 w-2.5 h-2.5 rounded-full border-2"
                       style={{ borderColor: 'var(--red2)', background: 'var(--bg)' }} />
                     <div className="flex-1 panel p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                              {item.start_time?.slice(0, 5)}
-                              {item.end_time ? ` - ${item.end_time.slice(0, 5)}` : ''}
-                            </span>
-                            {item.service_category && (
-                              <span className="text-xs px-2 py-0.5 rounded-full"
-                                style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
-                                {item.service_category}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm font-medium mt-1" style={{ color: 'var(--text)' }}>
-                            {sup?.nome ?? 'Fornitore'}
-                          </p>
-                          <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
-                            {item.location && <span><MapPin className="w-3 h-3 inline mr-1" />{item.location}</span>}
-                          </div>
-                          {item.operational_notes && <p className="text-xs mt-1.5 italic" style={{ color: 'var(--muted)' }}>{item.operational_notes}</p>}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                            {svc.ora_inizio?.slice(0, 5)}
+                            {svc.ora_fine ? ` - ${svc.ora_fine.slice(0, 5)}` : ''}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 rounded-full"
+                            style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
+                            {catLabel}
+                          </span>
                         </div>
+                        <p className="text-sm font-medium mt-1" style={{ color: 'var(--text)' }}>
+                          {svc.titolo}
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
+                          {sup?.nome ?? 'Fornitore'}
+                        </p>
+                        <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+                          {svc.partenza && svc.destinazione && (
+                            <span><MapPin className="w-3 h-3 inline mr-0.5" />{svc.partenza} → {svc.destinazione}</span>
+                          )}
+                          {svc.luogo && !svc.partenza && (
+                            <span><MapPin className="w-3 h-3 inline mr-0.5" />{svc.luogo}</span>
+                          )}
+                        </div>
+                        {svc.note && <p className="text-xs mt-1 italic" style={{ color: 'var(--muted)' }}>{svc.note}</p>}
                       </div>
                     </div>
                   </div>
@@ -1621,20 +1759,20 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
         </div>
       ))}
 
-      {unplanned.length > 0 && (
+      {unscheduled.length > 0 && (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide mb-3 px-1"
             style={{ color: 'var(--yellow)' }}>
-            Fornitori senza data/ora ({unplanned.length})
+            Servizi senza data/ora ({unscheduled.length})
           </p>
           <div className="space-y-2">
-            {unplanned.map(item => {
-              const sup = suppliers.find(s => s.id === item.supplier_id)
+            {unscheduled.map(svc => {
+              const sup = suppliers.find(s => s.id === svc.supplier_id)
               return (
-                <div key={item.id} className="panel p-3 flex items-center gap-3">
-                  <Truck className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
-                  <span className="text-sm" style={{ color: 'var(--text)' }}>{sup?.nome ?? 'Fornitore'}</span>
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>— inserisci dati operativi nel tab Fornitori</span>
+                <div key={svc.id} className="panel p-3 flex items-center gap-3">
+                  <Zap className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                  <span className="text-sm" style={{ color: 'var(--text)' }}>{svc.titolo}</span>
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>— {sup?.nome ?? 'Fornitore'}</span>
                 </div>
               )
             })}
