@@ -69,6 +69,7 @@ const ALL_NAV: NavItem[] = [
   { name: 'Pratiche', href: '/pratiche' },
   { name: 'Utenti', href: '/utenti' },
   { name: 'Impostazioni', href: '/impostazioni' },
+  { name: 'Feedback Beta', href: '/feedback-beta' },
 ]
 
 const PARTNER_ONLY_PATHS = ['/utenti', '/impostazioni']

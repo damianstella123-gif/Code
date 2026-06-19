@@ -23,6 +23,7 @@ import {
   Palette,
   Share2,
   Presentation,
+  MessageCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { loadUser, getAllowedNavForRole, signOutEverywhere } from '@/lib/auth'
@@ -51,6 +52,7 @@ const iconMap: Record<string, React.ElementType> = {
   '/pratiche': FileText,
   '/utenti': UserCog,
   '/impostazioni': SlidersHorizontal,
+  '/feedback-beta': MessageCircle,
 }
 
 interface SidebarProps {

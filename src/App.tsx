@@ -17,6 +17,7 @@ import CreativeStudio from './pages/CreativeStudio'
 import SocialStudio from './pages/SocialStudio'
 import Presentazioni from './pages/Presentazioni'
 import Archivio from './pages/Archivio'
+import FeedbackBeta from './pages/FeedbackBeta'
 import Login from './pages/Login'
 import { loadUser, saveUser, clearUser } from './lib/auth'
 import { supabase } from './lib/supabase'
@@ -118,6 +119,7 @@ export default function App() {
       <Route path="/archivio" element={<AuthGuard><Layout><Archivio /></Layout></AuthGuard>} />
       <Route path="/utenti" element={<AuthGuard><Layout><Utenti /></Layout></AuthGuard>} />
       <Route path="/impostazioni" element={<AuthGuard><Layout><Impostazioni /></Layout></AuthGuard>} />
+      <Route path="/feedback-beta" element={<AuthGuard><Layout><FeedbackBeta /></Layout></AuthGuard>} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
