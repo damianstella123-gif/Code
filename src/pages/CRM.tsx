@@ -8,7 +8,6 @@ import {
   Mail,
   MapPin,
   Star,
-  ChevronRight,
   Building2,
   Pencil,
   Upload,
@@ -489,51 +488,52 @@ export default function CRM() {
           {filtered.map((group, i) => (
             <div
               key={group.companyName}
-              className="panel hover-card p-5 cursor-pointer animate-fade-in relative overflow-hidden"
-              style={{ animationDelay: `${i * 40}ms`, minHeight: '140px' }}
+              className="panel hover-card cursor-pointer animate-fade-in relative overflow-hidden"
+              style={{ animationDelay: `${i * 40}ms`, minHeight: '130px' }}
               onClick={() => setSelectedName(group.companyName)}
             >
+              {/* Logo - right side, full height */}
               {group.logoUrl ? (
                 <img
                   src={group.logoUrl}
                   alt=""
                   aria-hidden
-                  className="absolute inset-0 m-auto w-[65%] h-[65%] object-contain pointer-events-none select-none"
-                  style={{ opacity: 0.07 }}
+                  className="absolute right-3 top-[50%] -translate-y-1/2 h-[80%] w-[45%] object-contain object-right pointer-events-none select-none"
+                  style={{ opacity: 0.12 }}
                 />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
-                  style={{ opacity: 0.05 }}>
+                <div className="absolute right-4 top-[50%] -translate-y-1/2 pointer-events-none select-none"
+                  style={{ opacity: 0.06 }}>
                   <span className="text-7xl font-black" style={{ color: statoColor(group.status) }}>
                     {group.companyName.charAt(0).toUpperCase()}
                   </span>
                 </div>
               )}
 
-              <div className="relative flex items-start justify-between mb-3">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-semibold truncate" style={{ color: 'var(--text)' }}>
+              {/* Gradient overlay - protects left text from logo bleed */}
+              <div className="absolute inset-0 pointer-events-none"
+                style={{ background: 'linear-gradient(to right, var(--bg) 40%, transparent 75%)' }} />
+
+              {/* Content - left aligned */}
+              <div className="relative p-5 flex flex-col justify-between h-full" style={{ minHeight: '130px' }}>
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: `${statoColor(group.status)}15`, color: statoColor(group.status), border: `1px solid ${statoColor(group.status)}30` }}>
+                      {group.status === 'vip' && <Star className="w-3 h-3 inline mr-0.5 -mt-0.5" />}
+                      {statoLabel(group.status)}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-semibold truncate max-w-[70%]" style={{ color: 'var(--text)' }}>
                     {group.companyName}
                   </h3>
                   {group.city && (
-                    <p className="text-xs flex items-center gap-1 mt-0.5" style={{ color: 'var(--muted)' }}>
-                      <MapPin className="w-3 h-3" /> {[group.city, group.country].filter(Boolean).join(', ')}
+                    <p className="text-xs flex items-center gap-1 mt-0.5 max-w-[65%]" style={{ color: 'var(--muted)' }}>
+                      <MapPin className="w-3 h-3 flex-shrink-0" /> {[group.city, group.country].filter(Boolean).join(', ')}
                     </p>
                   )}
                 </div>
-                <ChevronRight className="w-4 h-4 flex-shrink-0 mt-1" style={{ color: 'var(--muted)' }} />
-              </div>
-
-              <div className="relative flex flex-wrap items-center gap-2 mb-3">
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                  style={{ background: `${statoColor(group.status)}15`, color: statoColor(group.status), border: `1px solid ${statoColor(group.status)}30` }}>
-                  {group.status === 'vip' && <Star className="w-3 h-3 inline mr-0.5 -mt-0.5" />}
-                  {statoLabel(group.status)}
-                </span>
-              </div>
-
-              <div className="relative flex items-center pt-3" style={{ borderTop: '1px solid var(--line)' }}>
-                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--muted)' }}>
+                <div className="flex items-center gap-1.5 text-xs mt-3" style={{ color: 'var(--muted)' }}>
                   <Users className="w-3.5 h-3.5" />
                   {group.rows.length} referent{group.rows.length !== 1 ? 'i' : 'e'}
                 </div>
