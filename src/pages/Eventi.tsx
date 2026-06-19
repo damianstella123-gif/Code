@@ -668,6 +668,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
+  const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null)
 
   async function loadLinks() {
     const { data } = await supabase
@@ -770,7 +771,9 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       ) : (
         <div className="space-y-3">
           {linkedSuppliers.map(sup => (
-            <div key={sup.id} className="panel p-5 flex items-start justify-between gap-4">
+            <div key={sup.id} className="panel p-5 flex items-start justify-between gap-4 cursor-pointer transition-all hover:border-[rgba(208,0,58,0.3)]"
+              style={{ border: '1px solid var(--line)' }}
+              onClick={() => setViewingSupplier(sup)}>
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ background: 'rgba(208,0,58,0.1)' }}>
@@ -791,7 +794,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                   }}>
                   {sup.stato === 'attivo' ? 'Attivo' : 'Inattivo'}
                 </span>
-                <button onClick={() => handleUnlink(sup.id)}
+                <button onClick={(e) => { e.stopPropagation(); handleUnlink(sup.id) }}
                   className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi collegamento">
                   <X className="w-4 h-4" style={{ color: 'var(--red2)' }} />
                 </button>
@@ -800,6 +803,99 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
           ))}
         </div>
       )}
+
+      {viewingSupplier && (
+        <SupplierDetailModal supplier={viewingSupplier} onClose={() => setViewingSupplier(null)} />
+      )}
+    </div>
+  )
+}
+
+function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}
+      onClick={onClose}>
+      <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl p-6"
+        style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl flex items-center justify-center"
+              style={{ background: 'rgba(208,0,58,0.1)' }}>
+              <Truck className="w-7 h-7" style={{ color: 'var(--red2)' }} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{supplier.nome}</h2>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>{supplier.categoria}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg transition-all hover:bg-white/5">
+            <X className="w-5 h-5" style={{ color: 'var(--muted)' }} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <DetailField label="Email" value={supplier.email} />
+            <DetailField label="Telefono" value={supplier.telefono} />
+            <DetailField label="Referente" value={supplier.referente} />
+            <DetailField label="Tel. Referente" value={supplier.referenteTelefono} />
+            <DetailField label="Location" value={supplier.location} />
+            <DetailField label="Sito Web" value={supplier.sito} />
+            <DetailField label="P.IVA" value={supplier.piva} />
+            <DetailField label="Stato" value={supplier.stato === 'attivo' ? 'Attivo' : 'Inattivo'} />
+          </div>
+
+          {supplier.servizi.length > 0 && (
+            <div>
+              <p className="text-xs uppercase tracking-wide font-medium mb-2" style={{ color: 'var(--muted)' }}>Servizi</p>
+              <div className="flex flex-wrap gap-1.5">
+                {supplier.servizi.map(s => (
+                  <span key={s} className="text-xs px-2.5 py-1 rounded-lg"
+                    style={{ background: 'var(--panel2)', color: 'var(--text)' }}>{s}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-3 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
+            <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>Rating</p>
+              <p className="text-lg font-bold mt-0.5" style={{ color: 'var(--yellow)' }}>{supplier.rating}/5</p>
+            </div>
+            <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>Contratto</p>
+              <p className="text-sm font-semibold mt-1" style={{
+                color: supplier.statoContratto === 'attivo' ? 'var(--green)' : supplier.statoContratto === 'in_scadenza' ? 'var(--yellow)' : 'var(--red2)'
+              }}>{supplier.statoContratto}</p>
+            </div>
+            <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>Costo medio</p>
+              <p className="text-sm font-semibold mt-1" style={{ color: 'var(--text)' }}>
+                {supplier.costoMedioPerEvento > 0 ? `€${supplier.costoMedioPerEvento.toLocaleString('it-IT')}` : 'N/D'}
+              </p>
+            </div>
+          </div>
+
+          {supplier.noteOperative && (
+            <div>
+              <p className="text-xs uppercase tracking-wide font-medium mb-2" style={{ color: 'var(--muted)' }}>Note operative</p>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{supplier.noteOperative}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{label}</p>
+      <p className="text-sm mt-0.5" style={{ color: value ? 'var(--text)' : 'var(--muted)' }}>
+        {value || 'Non inserito'}
+      </p>
     </div>
   )
 }
