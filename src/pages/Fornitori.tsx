@@ -819,7 +819,7 @@ function SupplierDetail({ supplier, events, budgets, onBack, showFinance, onEdit
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-const CATEGORIE = ['Tutte', 'Audio/Video', 'Catering', 'Allestimento', 'Sicurezza', 'Fotografia', 'Tecnologia', 'Trasporti', 'Intrattenimento']
+const CATEGORIE = ['Tutte', 'Audio/Video', 'Catering', 'Allestimento', 'Hotel', 'Sicurezza', 'Fotografia', 'Tecnologia', 'Trasporti', 'Intrattenimento']
 const CONTRATTO_FILTERS: { id: string; label: string }[] = [
   { id: 'tutti', label: 'Tutti' },
   { id: 'attivo', label: 'Attivo' },

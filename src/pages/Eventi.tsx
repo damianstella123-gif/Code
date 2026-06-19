@@ -27,6 +27,7 @@ import {
   Package,
   Upload,
   Download,
+  Building2,
   Plus as PlusIcon,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
@@ -719,6 +720,53 @@ const emptySvcForm = {
   note: '',
 }
 
+const HOTEL_TIPOS = [
+  { value: 'pernottamento', label: 'Pernottamento' },
+  { value: 'sala_meeting', label: 'Sala Meeting' },
+  { value: 'coffee_break', label: 'Coffee Break' },
+  { value: 'lunch', label: 'Lunch' },
+  { value: 'dinner', label: 'Dinner' },
+  { value: 'coffee_station', label: 'Coffee Station' },
+  { value: 'setup_sala', label: 'Setup Sala' },
+  { value: 'attrezzature', label: 'Attrezzature Tecniche' },
+]
+
+interface HotelDetail {
+  id: string
+  event_id: string
+  supplier_id: string
+  tipo: string
+  titolo: string
+  data: string | null
+  ora_inizio: string | null
+  ora_fine: string | null
+  check_in_date: string | null
+  check_in_time: string | null
+  check_out_date: string | null
+  check_out_time: string | null
+  luogo: string
+  quantita: number | null
+  note: string
+}
+
+const emptyHotelForm = {
+  titolo: '',
+  data: '',
+  ora_inizio: '',
+  ora_fine: '',
+  check_in_date: '',
+  check_in_time: '',
+  check_out_date: '',
+  check_out_time: '',
+  luogo: '',
+  quantita: '',
+  note: '',
+}
+
+function isHotelSupplier(sup: Supplier): boolean {
+  return sup.categoria.toLowerCase().includes('hotel') || sup.categoria.toLowerCase().includes('albergo')
+}
+
 function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const [links, setLinks] = useState<EventSupplierLink[]>([])
   const [loading, setLoading] = useState(true)
@@ -730,6 +778,12 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   const [svcForm, setSvcForm] = useState(emptySvcForm)
   const [editingSvcId, setEditingSvcId] = useState<string | null>(null)
   const [showSvcForm, setShowSvcForm] = useState(false)
+  const [managingHotel, setManagingHotel] = useState<string | null>(null)
+  const [hotelDetails, setHotelDetails] = useState<HotelDetail[]>([])
+  const [hotelForm, setHotelForm] = useState(emptyHotelForm)
+  const [editingHotelId, setEditingHotelId] = useState<string | null>(null)
+  const [showHotelForm, setShowHotelForm] = useState(false)
+  const [hotelFormTipo, setHotelFormTipo] = useState('')
 
   async function loadLinks() {
     const { data } = await supabase
@@ -758,6 +812,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   async function handleUnlink(supplierId: string) {
     await supabase.from('event_supplier_services').delete()
       .eq('event_id', event.id).eq('supplier_id', supplierId)
+    await supabase.from('event_hotel_details').delete()
+      .eq('event_id', event.id).eq('supplier_id', supplierId)
     const { error } = await supabase
       .from('event_suppliers')
       .delete()
@@ -766,6 +822,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
     if (!error) {
       setLinks(prev => prev.filter(l => l.supplier_id !== supplierId))
       if (managingServices === supplierId) setManagingServices(null)
+      if (managingHotel === supplierId) setManagingHotel(null)
     }
   }
 
@@ -836,6 +893,82 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
     await openServices(managingServices)
   }
 
+  async function openHotel(supplierId: string) {
+    setManagingHotel(supplierId)
+    setManagingServices(null)
+    setShowHotelForm(false)
+    setEditingHotelId(null)
+    const { data } = await supabase
+      .from('event_hotel_details')
+      .select('*')
+      .eq('event_id', event.id)
+      .eq('supplier_id', supplierId)
+      .order('data', { ascending: true })
+      .order('ora_inizio', { ascending: true })
+    setHotelDetails((data ?? []) as HotelDetail[])
+  }
+
+  function openNewHotel(tipo: string) {
+    setHotelForm(emptyHotelForm)
+    setEditingHotelId(null)
+    setHotelFormTipo(tipo)
+    setShowHotelForm(true)
+  }
+
+  function openEditHotel(h: HotelDetail) {
+    setHotelForm({
+      titolo: h.titolo,
+      data: h.data ?? '',
+      ora_inizio: h.ora_inizio?.slice(0, 5) ?? '',
+      ora_fine: h.ora_fine?.slice(0, 5) ?? '',
+      check_in_date: h.check_in_date ?? '',
+      check_in_time: h.check_in_time?.slice(0, 5) ?? '',
+      check_out_date: h.check_out_date ?? '',
+      check_out_time: h.check_out_time?.slice(0, 5) ?? '',
+      luogo: h.luogo,
+      quantita: h.quantita?.toString() ?? '',
+      note: h.note,
+    })
+    setEditingHotelId(h.id)
+    setHotelFormTipo(h.tipo)
+    setShowHotelForm(true)
+  }
+
+  async function saveHotel() {
+    if (!managingHotel || !hotelFormTipo) return
+    const isPernottamento = hotelFormTipo === 'pernottamento'
+    const payload = {
+      event_id: event.id,
+      supplier_id: managingHotel,
+      tipo: hotelFormTipo,
+      titolo: hotelForm.titolo.trim() || HOTEL_TIPOS.find(t => t.value === hotelFormTipo)?.label || hotelFormTipo,
+      data: isPernottamento ? null : (hotelForm.data || null),
+      ora_inizio: isPernottamento ? null : (hotelForm.ora_inizio || null),
+      ora_fine: isPernottamento ? null : (hotelForm.ora_fine || null),
+      check_in_date: isPernottamento ? (hotelForm.check_in_date || null) : null,
+      check_in_time: isPernottamento ? (hotelForm.check_in_time || null) : null,
+      check_out_date: isPernottamento ? (hotelForm.check_out_date || null) : null,
+      check_out_time: isPernottamento ? (hotelForm.check_out_time || null) : null,
+      luogo: hotelForm.luogo.trim(),
+      quantita: hotelForm.quantita ? parseInt(hotelForm.quantita) : null,
+      note: hotelForm.note.trim(),
+    }
+    if (editingHotelId) {
+      await supabase.from('event_hotel_details').update(payload).eq('id', editingHotelId)
+    } else {
+      await supabase.from('event_hotel_details').insert(payload)
+    }
+    setShowHotelForm(false)
+    setEditingHotelId(null)
+    await openHotel(managingHotel)
+  }
+
+  async function deleteHotel(id: string) {
+    if (!managingHotel) return
+    await supabase.from('event_hotel_details').delete().eq('id', id)
+    await openHotel(managingHotel)
+  }
+
   const linkedSuppliers = suppliers.filter(s => linkedIds.includes(s.id))
   const availableSuppliers = suppliers.filter(s =>
     !linkedIds.includes(s.id) &&
@@ -904,7 +1037,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       ) : (
         <div className="space-y-3">
           {linkedSuppliers.map(sup => {
-            const isManaging = managingServices === sup.id
+            const isHotel = isHotelSupplier(sup)
+            const isManaging = isHotel ? managingHotel === sup.id : managingServices === sup.id
             return (
               <div key={sup.id} className="panel overflow-hidden" style={{ border: `1px solid ${isManaging ? 'var(--red2)' : 'var(--line)'}` }}>
                 <div className="p-5 flex items-start justify-between gap-4">
@@ -919,12 +1053,21 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <button onClick={() => isManaging ? setManagingServices(null) : openServices(sup.id)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
-                      style={{ border: '1px solid var(--line)', color: isManaging ? 'var(--red2)' : 'var(--muted)' }}>
-                      <Zap className="w-3.5 h-3.5 inline mr-1" />
-                      Gestisci Servizi
-                    </button>
+                    {isHotel ? (
+                      <button onClick={() => isManaging ? setManagingHotel(null) : openHotel(sup.id)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
+                        style={{ border: '1px solid var(--line)', color: isManaging ? 'var(--red2)' : 'var(--muted)' }}>
+                        <Building2 className="w-3.5 h-3.5 inline mr-1" />
+                        Scheda Hotel
+                      </button>
+                    ) : (
+                      <button onClick={() => isManaging ? setManagingServices(null) : openServices(sup.id)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
+                        style={{ border: '1px solid var(--line)', color: isManaging ? 'var(--red2)' : 'var(--muted)' }}>
+                        <Zap className="w-3.5 h-3.5 inline mr-1" />
+                        Gestisci Servizi
+                      </button>
+                    )}
                     <button onClick={() => handleUnlink(sup.id)}
                       className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi collegamento">
                       <X className="w-4 h-4" style={{ color: 'var(--red2)' }} />
@@ -932,7 +1075,181 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                   </div>
                 </div>
 
-                {isManaging && (
+                {/* Hotel panel */}
+                {isHotel && isManaging && (
+                  <div className="px-5 pb-5 pt-2 space-y-4" style={{ borderTop: '1px solid var(--line)' }}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+                        Scheda Hotel ({hotelDetails.length} voci)
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {HOTEL_TIPOS.map(t => (
+                        <button key={t.value} onClick={() => openNewHotel(t.value)}
+                          className="px-3 py-2 rounded-lg text-xs font-medium text-center transition-all hover:bg-white/10"
+                          style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
+                          + {t.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {showHotelForm && (
+                      <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+                        <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
+                          {editingHotelId ? 'Modifica' : 'Nuovo'}: {HOTEL_TIPOS.find(t => t.value === hotelFormTipo)?.label}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="sm:col-span-2">
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Titolo / Descrizione</label>
+                            <input type="text" value={hotelForm.titolo} onChange={e => setHotelForm(p => ({ ...p, titolo: e.target.value }))}
+                              placeholder={hotelFormTipo === 'pernottamento' ? 'Es. Camera Doppia x20' : 'Es. Sala Plenaria'}
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Quantita</label>
+                            <input type="number" value={hotelForm.quantita} onChange={e => setHotelForm(p => ({ ...p, quantita: e.target.value }))}
+                              placeholder="N."
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+
+                          {hotelFormTipo === 'pernottamento' ? (
+                            <>
+                              <div>
+                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-in data</label>
+                                <input type="date" value={hotelForm.check_in_date} onChange={e => setHotelForm(p => ({ ...p, check_in_date: e.target.value }))}
+                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                              </div>
+                              <div>
+                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-in ora</label>
+                                <input type="time" value={hotelForm.check_in_time} onChange={e => setHotelForm(p => ({ ...p, check_in_time: e.target.value }))}
+                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                              </div>
+                              <div>
+                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-out data</label>
+                                <input type="date" value={hotelForm.check_out_date} onChange={e => setHotelForm(p => ({ ...p, check_out_date: e.target.value }))}
+                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                              </div>
+                              <div>
+                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-out ora</label>
+                                <input type="time" value={hotelForm.check_out_time} onChange={e => setHotelForm(p => ({ ...p, check_out_time: e.target.value }))}
+                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div>
+                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Data</label>
+                                <input type="date" value={hotelForm.data} onChange={e => setHotelForm(p => ({ ...p, data: e.target.value }))}
+                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                              </div>
+                              <div>
+                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora inizio</label>
+                                <input type="time" value={hotelForm.ora_inizio} onChange={e => setHotelForm(p => ({ ...p, ora_inizio: e.target.value }))}
+                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                              </div>
+                              <div>
+                                <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora fine</label>
+                                <input type="time" value={hotelForm.ora_fine} onChange={e => setHotelForm(p => ({ ...p, ora_fine: e.target.value }))}
+                                  className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                              </div>
+                            </>
+                          )}
+                          <div className={hotelFormTipo === 'pernottamento' ? 'sm:col-span-3' : ''}>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>
+                              {hotelFormTipo === 'sala_meeting' || hotelFormTipo === 'setup_sala' ? 'Sala' : 'Luogo'}
+                            </label>
+                            <input type="text" value={hotelForm.luogo} onChange={e => setHotelForm(p => ({ ...p, luogo: e.target.value }))}
+                              placeholder={hotelFormTipo === 'sala_meeting' ? 'Es. Sala Plenaria, Piano 1' : 'Luogo'}
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          <div className="sm:col-span-3">
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Note</label>
+                            <textarea value={hotelForm.note} onChange={e => setHotelForm(p => ({ ...p, note: e.target.value }))}
+                              rows={2} placeholder="Note aggiuntive..."
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 justify-end">
+                          <button onClick={() => { setShowHotelForm(false); setEditingHotelId(null) }} className="px-4 py-2 rounded-lg text-xs font-medium"
+                            style={{ color: 'var(--muted)' }}>Annulla</button>
+                          <button onClick={saveHotel} className="px-4 py-2 rounded-lg text-xs font-medium"
+                            style={{ background: 'var(--red2)', color: '#fff' }}>
+                            {editingHotelId ? 'Salva' : 'Aggiungi'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {hotelDetails.length === 0 && !showHotelForm && (
+                      <p className="text-xs text-center py-4" style={{ color: 'var(--muted)' }}>
+                        Nessuna voce hotel. Usa i pulsanti sopra per aggiungere servizi.
+                      </p>
+                    )}
+
+                    {hotelDetails.length > 0 && (
+                      <div className="space-y-2">
+                        {HOTEL_TIPOS.map(tipo => {
+                          const items = hotelDetails.filter(h => h.tipo === tipo.value)
+                          if (items.length === 0) return null
+                          return (
+                            <div key={tipo.value}>
+                              <p className="text-xs font-semibold uppercase tracking-wide mb-1.5 mt-2" style={{ color: 'var(--muted)' }}>
+                                {tipo.label} ({items.length})
+                              </p>
+                              {items.map(h => (
+                                <div key={h.id} className="flex items-start gap-3 p-3 rounded-lg mb-1.5" style={{ background: 'var(--panel2)' }}>
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                                      {h.titolo || tipo.label}
+                                    </span>
+                                    <div className="flex items-center gap-3 mt-1 text-xs flex-wrap" style={{ color: 'var(--muted)' }}>
+                                      {h.tipo === 'pernottamento' ? (
+                                        <>
+                                          {h.check_in_date && <span>Check-in: {h.check_in_date} {h.check_in_time?.slice(0, 5) ?? ''}</span>}
+                                          {h.check_out_date && <span>Check-out: {h.check_out_date} {h.check_out_time?.slice(0, 5) ?? ''}</span>}
+                                        </>
+                                      ) : (
+                                        <>
+                                          {h.data && <span>{h.data} {h.ora_inizio?.slice(0, 5) ?? ''}{h.ora_fine ? ` - ${h.ora_fine.slice(0, 5)}` : ''}</span>}
+                                        </>
+                                      )}
+                                      {h.luogo && <span>{h.luogo}</span>}
+                                      {h.quantita && <span>x{h.quantita}</span>}
+                                    </div>
+                                    {h.note && <p className="text-xs mt-1 italic" style={{ color: 'var(--muted)' }}>{h.note}</p>}
+                                  </div>
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <button onClick={() => openEditHotel(h)} className="p-1.5 rounded hover:bg-white/10">
+                                      <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                                    </button>
+                                    <button onClick={() => deleteHotel(h.id)} className="p-1.5 rounded hover:bg-white/10">
+                                      <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Services panel (non-hotel) */}
+                {!isHotel && isManaging && (
                   <div className="px-5 pb-5 pt-2 space-y-4" style={{ borderTop: '1px solid var(--line)' }}>
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
@@ -1654,30 +1971,108 @@ function TabDocumenti({ event }: { event: Event }) {
   )
 }
 
+interface ProgramEntry {
+  id: string
+  supplier_id: string
+  titolo: string
+  categoria: string
+  data: string
+  ora_inizio: string
+  ora_fine: string | null
+  luogo: string
+  note: string
+}
+
 function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
-  const [services, setServices] = useState<SupplierService[]>([])
+  const [entries, setEntries] = useState<ProgramEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase
-      .from('event_supplier_services')
-      .select('*')
-      .eq('event_id', event.id)
-      .order('data', { ascending: true })
-      .order('ora_inizio', { ascending: true })
-      .then(({ data }) => {
-        setServices((data ?? []) as SupplierService[])
-        setLoading(false)
+    async function load() {
+      const [svcRes, hotelRes] = await Promise.all([
+        supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
+        supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
+      ])
+
+      const program: ProgramEntry[] = []
+
+      for (const svc of (svcRes.data ?? []) as SupplierService[]) {
+        if (svc.data && svc.ora_inizio) {
+          program.push({
+            id: svc.id,
+            supplier_id: svc.supplier_id,
+            titolo: svc.titolo,
+            categoria: SVC_CATEGORIES.find(c => c.value === svc.categoria)?.label ?? svc.categoria,
+            data: svc.data,
+            ora_inizio: svc.ora_inizio,
+            ora_fine: svc.ora_fine,
+            luogo: svc.partenza && svc.destinazione ? `${svc.partenza} → ${svc.destinazione}` : svc.luogo,
+            note: svc.note,
+          })
+        }
+      }
+
+      for (const h of (hotelRes.data ?? []) as HotelDetail[]) {
+        const tipoLabel = HOTEL_TIPOS.find(t => t.value === h.tipo)?.label ?? h.tipo
+        if (h.tipo === 'pernottamento') {
+          if (h.check_in_date && h.check_in_time) {
+            program.push({
+              id: h.id + '-cin',
+              supplier_id: h.supplier_id,
+              titolo: `Check-in${h.titolo ? ': ' + h.titolo : ''}`,
+              categoria: 'Hotel',
+              data: h.check_in_date,
+              ora_inizio: h.check_in_time,
+              ora_fine: null,
+              luogo: h.luogo,
+              note: h.quantita ? `${h.quantita} camere` : '',
+            })
+          }
+          if (h.check_out_date && h.check_out_time) {
+            program.push({
+              id: h.id + '-cout',
+              supplier_id: h.supplier_id,
+              titolo: `Check-out${h.titolo ? ': ' + h.titolo : ''}`,
+              categoria: 'Hotel',
+              data: h.check_out_date,
+              ora_inizio: h.check_out_time,
+              ora_fine: null,
+              luogo: h.luogo,
+              note: h.quantita ? `${h.quantita} camere` : '',
+            })
+          }
+        } else {
+          if (h.data && h.ora_inizio) {
+            program.push({
+              id: h.id,
+              supplier_id: h.supplier_id,
+              titolo: h.titolo || tipoLabel,
+              categoria: tipoLabel,
+              data: h.data,
+              ora_inizio: h.ora_inizio,
+              ora_fine: h.ora_fine,
+              luogo: h.luogo,
+              note: h.note,
+            })
+          }
+        }
+      }
+
+      program.sort((a, b) => {
+        const cmpDate = a.data.localeCompare(b.data)
+        if (cmpDate !== 0) return cmpDate
+        return a.ora_inizio.localeCompare(b.ora_inizio)
       })
+
+      setEntries(program)
+      setLoading(false)
+    }
+    load()
   }, [event.id])
 
-  const scheduled = services.filter(s => s.data && s.ora_inizio)
-  const unscheduled = services.filter(s => !s.data || !s.ora_inizio)
-
-  const grouped = scheduled.reduce<Record<string, SupplierService[]>>((acc, svc) => {
-    const key = svc.data!
-    if (!acc[key]) acc[key] = []
-    acc[key].push(svc)
+  const grouped = entries.reduce<Record<string, ProgramEntry[]>>((acc, e) => {
+    if (!acc[e.data]) acc[e.data] = []
+    acc[e.data].push(e)
     return acc
   }, {})
 
@@ -1685,7 +2080,7 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
     return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento programma...</div></div>
   }
 
-  if (services.length === 0) {
+  if (entries.length === 0) {
     return (
       <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
         <Clock className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -1702,7 +2097,7 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
           Programma evento — generato automaticamente
         </p>
         <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
-          {scheduled.length} pianificati{unscheduled.length > 0 ? ` · ${unscheduled.length} senza data` : ''}
+          {entries.length} attivita
         </span>
       </div>
 
@@ -1715,40 +2110,36 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
           <div className="relative pl-6">
             <div className="absolute left-[9px] top-2 bottom-2 w-px" style={{ background: 'var(--line)' }} />
             <div className="space-y-3">
-              {dayItems.map(svc => {
-                const sup = suppliers.find(s => s.id === svc.supplier_id)
-                const catLabel = SVC_CATEGORIES.find(c => c.value === svc.categoria)?.label ?? svc.categoria
+              {dayItems.map(entry => {
+                const sup = suppliers.find(s => s.id === entry.supplier_id)
                 return (
-                  <div key={svc.id} className="relative flex items-start gap-3">
+                  <div key={entry.id} className="relative flex items-start gap-3">
                     <div className="absolute left-[-18px] top-2.5 w-2.5 h-2.5 rounded-full border-2"
                       style={{ borderColor: 'var(--red2)', background: 'var(--bg)' }} />
                     <div className="flex-1 panel p-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                            {svc.ora_inizio?.slice(0, 5)}
-                            {svc.ora_fine ? ` - ${svc.ora_fine.slice(0, 5)}` : ''}
+                            {entry.ora_inizio?.slice(0, 5)}
+                            {entry.ora_fine ? ` - ${entry.ora_fine.slice(0, 5)}` : ''}
                           </span>
                           <span className="text-xs px-2 py-0.5 rounded-full"
                             style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
-                            {catLabel}
+                            {entry.categoria}
                           </span>
                         </div>
                         <p className="text-sm font-medium mt-1" style={{ color: 'var(--text)' }}>
-                          {svc.titolo}
+                          {entry.titolo}
                         </p>
                         <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
                           {sup?.nome ?? 'Fornitore'}
                         </p>
-                        <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
-                          {svc.partenza && svc.destinazione && (
-                            <span><MapPin className="w-3 h-3 inline mr-0.5" />{svc.partenza} → {svc.destinazione}</span>
-                          )}
-                          {svc.luogo && !svc.partenza && (
-                            <span><MapPin className="w-3 h-3 inline mr-0.5" />{svc.luogo}</span>
-                          )}
-                        </div>
-                        {svc.note && <p className="text-xs mt-1 italic" style={{ color: 'var(--muted)' }}>{svc.note}</p>}
+                        {entry.luogo && (
+                          <div className="flex items-center gap-1 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+                            <MapPin className="w-3 h-3 inline" />{entry.luogo}
+                          </div>
+                        )}
+                        {entry.note && <p className="text-xs mt-1 italic" style={{ color: 'var(--muted)' }}>{entry.note}</p>}
                       </div>
                     </div>
                   </div>
@@ -1758,27 +2149,6 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
           </div>
         </div>
       ))}
-
-      {unscheduled.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide mb-3 px-1"
-            style={{ color: 'var(--yellow)' }}>
-            Servizi senza data/ora ({unscheduled.length})
-          </p>
-          <div className="space-y-2">
-            {unscheduled.map(svc => {
-              const sup = suppliers.find(s => s.id === svc.supplier_id)
-              return (
-                <div key={svc.id} className="panel p-3 flex items-center gap-3">
-                  <Zap className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
-                  <span className="text-sm" style={{ color: 'var(--text)' }}>{svc.titolo}</span>
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>— {sup?.nome ?? 'Fornitore'}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
