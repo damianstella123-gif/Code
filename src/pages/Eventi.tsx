@@ -1754,13 +1754,24 @@ export default function Eventi() {
     })
   }, [visibleEvents, search, filterStato])
 
+  const uniqueClients = useMemo(() => {
+    const seen = new Map<string, { id: string; nome: string }>()
+    for (const c of clientsList) {
+      const key = c.nome.trim().toUpperCase()
+      if (!seen.has(key)) {
+        seen.set(key, { id: c.id, nome: c.nome })
+      }
+    }
+    return Array.from(seen.values()).sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [clientsList])
+
   const overlays = (
     <>
       {showForm && (
         <EventFormModal
           event={editingEvent}
           internalUsers={internalUsers}
-          clients={clientsList}
+          clients={uniqueClients}
           onSave={handleSave}
           onCancel={() => { setShowForm(false); setEditingEvent(undefined) }}
         />
