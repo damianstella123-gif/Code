@@ -79,27 +79,6 @@ function buildGroups(clients: Client[]): CompanyGroup[] {
   return groups
 }
 
-function CompanyLogo({ logoUrl, companyName, size = 44 }: { logoUrl?: string; companyName: string; size?: number }) {
-  if (logoUrl) {
-    return (
-      <img
-        src={logoUrl}
-        alt={companyName}
-        className="rounded-xl object-contain flex-shrink-0"
-        style={{ width: size, height: size }}
-      />
-    )
-  }
-  return (
-    <div
-      className="rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold"
-      style={{ width: size, height: size, background: 'var(--panel2)', color: 'var(--muted)' }}
-    >
-      {companyName.charAt(0).toUpperCase()}
-    </div>
-  )
-}
-
 interface EditReferenteModalProps {
   row: Client
   onClose: () => void
@@ -266,12 +245,13 @@ function CompanyDetail({ group, onBack, onRefresh }: CompanyDetailProps) {
           style={{ background: `linear-gradient(135deg, ${statoColor(group.status)} 0%, transparent 60%)` }} />
         {group.logoUrl ? (
           <img src={group.logoUrl} alt="" aria-hidden
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-48 h-48 object-contain pointer-events-none select-none"
-            style={{ opacity: 0.07 }} />
+            className="absolute inset-0 m-auto w-[70%] h-[70%] object-contain pointer-events-none select-none"
+            style={{ opacity: 0.06 }} />
         ) : (
-          <div className="absolute right-8 top-1/2 -translate-y-1/2 text-7xl font-black pointer-events-none select-none"
-            style={{ opacity: 0.05, color: statoColor(group.status) }}>
-            {group.companyName.split(' ').map(w => w[0]).join('').slice(0, 3)}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+            <span className="text-8xl font-black" style={{ opacity: 0.05, color: statoColor(group.status) }}>
+              {group.companyName.split(' ').map(w => w[0]).join('').slice(0, 3)}
+            </span>
           </div>
         )}
         <div className="relative flex flex-wrap items-start gap-6">
@@ -510,14 +490,27 @@ export default function CRM() {
             <div
               key={group.companyName}
               className="panel hover-card p-5 cursor-pointer animate-fade-in relative overflow-hidden"
-              style={{ animationDelay: `${i * 40}ms` }}
+              style={{ animationDelay: `${i * 40}ms`, minHeight: '140px' }}
               onClick={() => setSelectedName(group.companyName)}
             >
-              <div className="absolute top-0 right-0 w-24 h-24 opacity-[0.06] rounded-bl-full"
-                style={{ background: statoColor(group.status) }} />
+              {group.logoUrl ? (
+                <img
+                  src={group.logoUrl}
+                  alt=""
+                  aria-hidden
+                  className="absolute inset-0 m-auto w-[65%] h-[65%] object-contain pointer-events-none select-none"
+                  style={{ opacity: 0.07 }}
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
+                  style={{ opacity: 0.05 }}>
+                  <span className="text-7xl font-black" style={{ color: statoColor(group.status) }}>
+                    {group.companyName.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
 
-              <div className="flex items-start gap-3 mb-3">
-                <CompanyLogo logoUrl={group.logoUrl} companyName={group.companyName} size={44} />
+              <div className="relative flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
                   <h3 className="text-base font-semibold truncate" style={{ color: 'var(--text)' }}>
                     {group.companyName}
@@ -531,7 +524,7 @@ export default function CRM() {
                 <ChevronRight className="w-4 h-4 flex-shrink-0 mt-1" style={{ color: 'var(--muted)' }} />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 mb-3">
+              <div className="relative flex flex-wrap items-center gap-2 mb-3">
                 <span className="text-xs px-2 py-0.5 rounded-full font-medium"
                   style={{ background: `${statoColor(group.status)}15`, color: statoColor(group.status), border: `1px solid ${statoColor(group.status)}30` }}>
                   {group.status === 'vip' && <Star className="w-3 h-3 inline mr-0.5 -mt-0.5" />}
@@ -539,7 +532,7 @@ export default function CRM() {
                 </span>
               </div>
 
-              <div className="flex items-center pt-3" style={{ borderTop: '1px solid var(--line)' }}>
+              <div className="relative flex items-center pt-3" style={{ borderTop: '1px solid var(--line)' }}>
                 <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--muted)' }}>
                   <Users className="w-3.5 h-3.5" />
                   {group.rows.length} referent{group.rows.length !== 1 ? 'i' : 'e'}
