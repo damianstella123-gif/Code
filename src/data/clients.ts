@@ -14,6 +14,7 @@ export interface Client {
   valoreStimato: number
   faseTrattativa: 'lead' | 'qualificato' | 'proposta' | 'negoziazione' | 'chiuso_vinto' | 'chiuso_perso'
   note: string
+  logoUrl?: string
 }
 
 export interface Contatto {

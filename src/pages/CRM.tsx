@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   Users,
   Search,
@@ -10,9 +10,12 @@ import {
   Star,
   ChevronRight,
   Building2,
+  Pencil,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react'
 import type { Client } from '@/data/clients'
-import { fetchClients } from '@/lib/clients-service'
+import { fetchClients, updateClient, uploadCompanyLogo, setCompanyLogo } from '@/lib/clients-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
 
 type FilterStato = 'Tutti' | 'attivo' | 'vip' | 'prospect' | 'perso'
@@ -23,6 +26,7 @@ interface CompanyGroup {
   city: string
   country: string
   status: Client['stato']
+  logoUrl?: string
 }
 
 const FILTERS: { id: FilterStato; label: string; color: string }[] = [
@@ -63,30 +67,147 @@ function buildGroups(clients: Client[]): CompanyGroup[] {
     const first = rows[0]
     const city = rows.find(r => r.citta)?.citta ?? ''
     const country = rows.find(r => r.nazione)?.nazione ?? ''
+    const logoUrl = rows.find(r => r.logoUrl)?.logoUrl
     const statusPriority: Client['stato'][] = ['vip', 'attivo', 'prospect', 'perso']
     let status: Client['stato'] = 'prospect'
     for (const s of statusPriority) {
       if (rows.some(r => r.stato === s)) { status = s; break }
     }
-    groups.push({
-      companyName: first.nome,
-      rows,
-      city,
-      country,
-      status,
-    })
+    groups.push({ companyName: first.nome, rows, city, country, status, logoUrl })
   }
   groups.sort((a, b) => a.companyName.localeCompare(b.companyName))
   return groups
 }
 
+function CompanyLogo({ logoUrl, companyName, size = 44 }: { logoUrl?: string; companyName: string; size?: number }) {
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl}
+        alt={companyName}
+        className="rounded-xl object-contain flex-shrink-0"
+        style={{ width: size, height: size }}
+      />
+    )
+  }
+  return (
+    <div
+      className="rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold"
+      style={{ width: size, height: size, background: 'var(--panel2)', color: 'var(--muted)' }}
+    >
+      {companyName.charAt(0).toUpperCase()}
+    </div>
+  )
+}
+
+interface EditReferenteModalProps {
+  row: Client
+  onClose: () => void
+  onSaved: () => void
+}
+
+function EditReferenteModal({ row, onClose, onSaved }: EditReferenteModalProps) {
+  const [referente, setReferente] = useState(row.referente)
+  const [email, setEmail] = useState(row.email)
+  const [telefono, setTelefono] = useState(row.telefono)
+  const [note, setNote] = useState(row.note)
+  const [stato, setStato] = useState<Client['stato']>(row.stato)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = async () => {
+    setSaving(true)
+    setError(null)
+    const result = await updateClient(row.id, { referente, email, telefono, note, stato })
+    setSaving(false)
+    if (!result) {
+      setError('Salvataggio non riuscito')
+      return
+    }
+    onSaved()
+    onClose()
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+      onClick={onClose}
+    >
+      <div className="w-full max-w-md panel p-6 animate-fade-in" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Modifica referente</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5">
+            <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+          </button>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>Nome referente</label>
+            <input type="text" value={referente} onChange={e => setReferente(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>Email</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>Telefono</label>
+            <input type="tel" value={telefono} onChange={e => setTelefono(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>Carica / Note</label>
+            <input type="text" value={note} onChange={e => setNote(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>Status</label>
+            <select value={stato} onChange={e => setStato(e.target.value as Client['stato'])}
+              className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+              <option value="attivo">Attivo</option>
+              <option value="vip">VIP</option>
+              <option value="prospect">Prospect</option>
+              <option value="perso">Perso</option>
+            </select>
+          </div>
+          {error && <p className="text-xs" style={{ color: 'var(--red2)' }}>{error}</p>}
+        </div>
+        <div className="flex justify-end gap-2 mt-6">
+          <button onClick={onClose}
+            className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/5"
+            style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>
+            Annulla
+          </button>
+          <button onClick={submit} disabled={saving}
+            className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+            style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+            {saving ? 'Salvataggio...' : 'Salva'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 interface CompanyDetailProps {
   group: CompanyGroup
   onBack: () => void
+  onRefresh: () => void
 }
 
-function CompanyDetail({ group, onBack }: CompanyDetailProps) {
+function CompanyDetail({ group, onBack, onRefresh }: CompanyDetailProps) {
   const [referenteSearch, setReferenteSearch] = useState('')
+  const [editTarget, setEditTarget] = useState<Client | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const filteredRefs = useMemo(() => {
     if (!referenteSearch.trim()) return group.rows
@@ -97,6 +218,39 @@ function CompanyDetail({ group, onBack }: CompanyDetailProps) {
       r.note.toLowerCase().includes(q)
     )
   }, [group.rows, referenteSearch])
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
+    if (!allowed.includes(file.type)) {
+      setUploadError('Formato non supportato. Usa PNG, JPG, WEBP o SVG.')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError('File troppo grande. Max 2MB.')
+      return
+    }
+
+    setUploading(true)
+    setUploadError(null)
+
+    const publicUrl = await uploadCompanyLogo(group.companyName, file)
+    if (!publicUrl) {
+      setUploadError('Upload non riuscito.')
+      setUploading(false)
+      return
+    }
+
+    const ok = await setCompanyLogo(group.companyName, publicUrl)
+    setUploading(false)
+    if (!ok) {
+      setUploadError('Salvataggio URL non riuscito.')
+      return
+    }
+    onRefresh()
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -111,9 +265,35 @@ function CompanyDetail({ group, onBack }: CompanyDetailProps) {
         <div className="absolute inset-0 opacity-10"
           style={{ background: `linear-gradient(135deg, ${statoColor(group.status)} 0%, transparent 60%)` }} />
         <div className="relative flex flex-wrap items-start gap-6">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 text-xl font-bold"
-            style={{ background: `${statoColor(group.status)}18`, color: statoColor(group.status) }}>
-            <Building2 className="w-7 h-7" />
+          <div className="relative group">
+            {group.logoUrl ? (
+              <img src={group.logoUrl} alt={group.companyName}
+                className="w-20 h-20 rounded-2xl object-contain"
+                style={{ background: 'var(--panel2)' }} />
+            ) : (
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold"
+                style={{ background: `${statoColor(group.status)}18`, color: statoColor(group.status) }}>
+                <Building2 className="w-8 h-8" />
+              </div>
+            )}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="absolute inset-0 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{ background: 'rgba(0,0,0,0.6)' }}>
+              {uploading ? (
+                <span className="text-xs text-white">...</span>
+              ) : (
+                <Upload className="w-5 h-5 text-white" />
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp,.svg"
+              className="hidden"
+              onChange={handleLogoUpload}
+            />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -134,6 +314,10 @@ function CompanyDetail({ group, onBack }: CompanyDetailProps) {
                 <Users className="w-3.5 h-3.5" /> {group.rows.length} referent{group.rows.length !== 1 ? 'i' : 'e'}
               </span>
             </div>
+            {uploadError && <p className="text-xs mt-2" style={{ color: 'var(--red2)' }}>{uploadError}</p>}
+            <p className="text-xs mt-2 flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+              <ImageIcon className="w-3 h-3" /> Passa sopra il logo per caricarne uno nuovo
+            </p>
           </div>
         </div>
       </div>
@@ -160,7 +344,7 @@ function CompanyDetail({ group, onBack }: CompanyDetailProps) {
           <div className="space-y-2">
             {filteredRefs.map((row, i) => (
               <div key={row.id}
-                className="panel p-4 flex items-start gap-4 transition-all animate-fade-in"
+                className="panel p-4 flex items-start gap-4 group transition-all animate-fade-in"
                 style={{ animationDelay: `${i * 30}ms`, border: '1px solid var(--line)' }}>
                 <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
                   style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>
@@ -192,18 +376,32 @@ function CompanyDetail({ group, onBack }: CompanyDetailProps) {
                     </span>
                   )}
                 </div>
+                <button
+                  onClick={() => setEditTarget(row)}
+                  className="p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10 flex-shrink-0"
+                  title="Modifica referente">
+                  <Pencil className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+                </button>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {editTarget && (
+        <EditReferenteModal
+          row={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={onRefresh}
+        />
+      )}
     </div>
   )
 }
 
 export default function CRM() {
   const [clientList, setClientList] = useState<Client[]>([])
-  const [selected, setSelected] = useState<CompanyGroup | null>(null)
+  const [selectedName, setSelectedName] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterStato>('Tutti')
   const [search, setSearch] = useState('')
 
@@ -216,6 +414,11 @@ export default function CRM() {
   useRealtimeTable('clients', refresh)
 
   const groups = useMemo(() => buildGroups(clientList), [clientList])
+
+  const selectedGroup = useMemo(() => {
+    if (!selectedName) return null
+    return groups.find(g => g.companyName.toUpperCase() === selectedName.toUpperCase()) ?? null
+  }, [groups, selectedName])
 
   const filtered = useMemo(() => {
     return groups.filter(g => {
@@ -233,8 +436,14 @@ export default function CRM() {
     })
   }, [groups, filter, search])
 
-  if (selected) {
-    return <CompanyDetail group={selected} onBack={() => setSelected(null)} />
+  if (selectedGroup) {
+    return (
+      <CompanyDetail
+        group={selectedGroup}
+        onBack={() => setSelectedName(null)}
+        onRefresh={refresh}
+      />
+    )
   }
 
   return (
@@ -292,16 +501,13 @@ export default function CRM() {
               key={group.companyName}
               className="panel hover-card p-5 cursor-pointer animate-fade-in relative overflow-hidden"
               style={{ animationDelay: `${i * 40}ms` }}
-              onClick={() => setSelected(group)}
+              onClick={() => setSelectedName(group.companyName)}
             >
               <div className="absolute top-0 right-0 w-24 h-24 opacity-[0.06] rounded-bl-full"
                 style={{ background: statoColor(group.status) }} />
 
               <div className="flex items-start gap-3 mb-3">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold"
-                  style={{ background: `${statoColor(group.status)}15`, color: statoColor(group.status) }}>
-                  {group.companyName.charAt(0).toUpperCase()}
-                </div>
+                <CompanyLogo logoUrl={group.logoUrl} companyName={group.companyName} size={44} />
                 <div className="flex-1 min-w-0">
                   <h3 className="text-base font-semibold truncate" style={{ color: 'var(--text)' }}>
                     {group.companyName}

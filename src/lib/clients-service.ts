@@ -16,6 +16,7 @@ interface ClientRow {
   revenue: number | null
   estimated_value: number | null
   deal_stage: string | null
+  logo_url: string | null
   created_at: string
   updated_at: string
 }
@@ -37,6 +38,7 @@ function rowToClient(r: ClientRow): Client {
     valoreStimato: r.estimated_value ?? 0,
     faseTrattativa: (r.deal_stage as Client['faseTrattativa']) ?? 'lead',
     note: r.notes ?? '',
+    logoUrl: r.logo_url ?? undefined,
   }
 }
 
@@ -56,6 +58,7 @@ function clientToRow(c: Client): Omit<ClientRow, 'created_at' | 'updated_at'> {
     revenue: c.fatturato ?? 0,
     estimated_value: c.valoreStimato ?? 0,
     deal_stage: c.faseTrattativa ?? 'lead',
+    logo_url: c.logoUrl ?? null,
   }
 }
 
@@ -272,6 +275,38 @@ export async function setReferentePrincipale(clientId: string, referenteId: stri
     .eq('id', referenteId)
   if (setErr) {
     console.error('setPrincipale error:', setErr.message)
+    return false
+  }
+  return true
+}
+
+// ─── Company Logo ───────────────────────────────────────────────────────────
+
+export async function uploadCompanyLogo(companyName: string, file: File): Promise<string | null> {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png'
+  const path = `${companyName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_${Date.now()}.${ext}`
+
+  const { error: uploadErr } = await supabase.storage
+    .from('company-logos')
+    .upload(path, file, { upsert: true, contentType: file.type })
+
+  if (uploadErr) {
+    console.error('uploadCompanyLogo error:', uploadErr.message)
+    return null
+  }
+
+  const { data: urlData } = supabase.storage.from('company-logos').getPublicUrl(path)
+  return urlData.publicUrl
+}
+
+export async function setCompanyLogo(companyName: string, logoUrl: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('clients')
+    .update({ logo_url: logoUrl })
+    .ilike('name', companyName)
+
+  if (error) {
+    console.error('setCompanyLogo error:', error.message)
     return false
   }
   return true
