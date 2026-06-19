@@ -1529,33 +1529,128 @@ function TabDocumenti({ event }: { event: Event }) {
   )
 }
 
-function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
-  const [links, setLinks] = useState<EventSupplierLink[]>([])
-  const [loading, setLoading] = useState(true)
+const PROGRAM_CATEGORIES = [
+  { value: 'transfer', label: 'Transfer', color: 'var(--blue)' },
+  { value: 'hotel', label: 'Hotel', color: '#8b5cf6' },
+  { value: 'ristorante', label: 'Ristorante', color: '#e67e22' },
+  { value: 'riunione', label: 'Riunione', color: '#06b6d4' },
+  { value: 'allestimento', label: 'Allestimento', color: 'var(--red2)' },
+  { value: 'evento', label: 'Evento', color: 'var(--green)' },
+  { value: 'staff', label: 'Staff', color: '#ec4899' },
+  { value: 'cliente', label: 'Cliente', color: 'var(--yellow)' },
+  { value: 'altro', label: 'Altro', color: 'var(--muted)' },
+]
+function getProgColor(cat: string) {
+  return PROGRAM_CATEGORIES.find(c => c.value === cat)?.color ?? 'var(--muted)'
+}
+function getProgLabel(cat: string) {
+  return PROGRAM_CATEGORIES.find(c => c.value === cat)?.label ?? (cat || 'Altro')
+}
 
-  useEffect(() => {
-    supabase
-      .from('event_suppliers')
+interface ProgramActivity {
+  id: string
+  event_id: string
+  titolo: string
+  categoria: string
+  data: string
+  ora_inizio: string
+  ora_fine: string | null
+  luogo: string
+  note: string
+  supplier_id: string | null
+}
+
+const emptyActivity = {
+  titolo: '',
+  categoria: 'altro',
+  data: '',
+  ora_inizio: '',
+  ora_fine: '',
+  luogo: '',
+  note: '',
+  supplier_id: '',
+}
+
+function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
+  const [activities, setActivities] = useState<ProgramActivity[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState(emptyActivity)
+  const [eventSupplierIds, setEventSupplierIds] = useState<string[]>([])
+
+  async function loadActivities() {
+    const { data } = await supabase
+      .from('event_program')
       .select('*')
       .eq('event_id', event.id)
-      .then(({ data }) => {
-        setLinks((data ?? []) as EventSupplierLink[])
-        setLoading(false)
-      })
+      .order('data', { ascending: true })
+      .order('ora_inizio', { ascending: true })
+    setActivities((data ?? []) as ProgramActivity[])
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadActivities()
+    supabase.from('event_suppliers').select('supplier_id').eq('event_id', event.id)
+      .then(({ data }) => setEventSupplierIds((data ?? []).map((d: { supplier_id: string }) => d.supplier_id)))
   }, [event.id])
 
-  const scheduled = links.filter(l => l.start_date && l.start_time)
-    .sort((a, b) => {
-      const da = `${a.start_date}T${a.start_time}`
-      const db = `${b.start_date}T${b.start_time}`
-      return da.localeCompare(db)
-    })
-  const unplanned = links.filter(l => !l.start_date || !l.start_time)
+  const linkedSuppliers = suppliers.filter(s => eventSupplierIds.includes(s.id))
 
-  const grouped = scheduled.reduce<Record<string, EventSupplierLink[]>>((acc, item) => {
-    const key = item.start_date!
+  function openNew() {
+    setForm(emptyActivity)
+    setEditingId(null)
+    setShowForm(true)
+  }
+
+  function openEdit(act: ProgramActivity) {
+    setForm({
+      titolo: act.titolo,
+      categoria: act.categoria,
+      data: act.data,
+      ora_inizio: act.ora_inizio?.slice(0, 5) ?? '',
+      ora_fine: act.ora_fine?.slice(0, 5) ?? '',
+      luogo: act.luogo,
+      note: act.note,
+      supplier_id: act.supplier_id ?? '',
+    })
+    setEditingId(act.id)
+    setShowForm(true)
+  }
+
+  async function saveActivity() {
+    if (!form.titolo.trim() || !form.data || !form.ora_inizio) return
+    const payload = {
+      event_id: event.id,
+      titolo: form.titolo.trim(),
+      categoria: form.categoria,
+      data: form.data,
+      ora_inizio: form.ora_inizio,
+      ora_fine: form.ora_fine || null,
+      luogo: form.luogo.trim(),
+      note: form.note.trim(),
+      supplier_id: form.supplier_id || null,
+    }
+    if (editingId) {
+      await supabase.from('event_program').update(payload).eq('id', editingId)
+    } else {
+      await supabase.from('event_program').insert(payload)
+    }
+    setShowForm(false)
+    setEditingId(null)
+    await loadActivities()
+  }
+
+  async function deleteActivity(id: string) {
+    await supabase.from('event_program').delete().eq('id', id)
+    await loadActivities()
+  }
+
+  const grouped = activities.reduce<Record<string, ProgramActivity[]>>((acc, act) => {
+    const key = act.data
     if (!acc[key]) acc[key] = []
-    acc[key].push(item)
+    acc[key].push(act)
     return acc
   }, {})
 
@@ -1563,27 +1658,97 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
     return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento programma...</div></div>
   }
 
-  if (links.length === 0) {
-    return (
-      <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
-        <Clock className="w-10 h-10 mx-auto mb-3 opacity-30" />
-        <p>Nessun fornitore collegato</p>
-        <p className="text-xs mt-1">Collega fornitori e inserisci i dati operativi per generare il programma</p>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
-      <p className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
-        Programma evento ({scheduled.length} pianificat{scheduled.length === 1 ? 'o' : 'i'}{unplanned.length > 0 ? ` · ${unplanned.length} da pianificare` : ''})
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
+          Programma evento ({activities.length} attivit{activities.length === 1 ? 'a' : 'a'})
+        </p>
+        <button onClick={openNew} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
+          style={{ background: 'var(--red2)', color: '#fff' }}>
+          <Plus className="w-3.5 h-3.5" /> Aggiungi attivita
+        </button>
+      </div>
 
-      {scheduled.length === 0 && (
-        <div className="panel p-8 text-center" style={{ color: 'var(--muted)' }}>
-          <Clock className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Nessuna attivit&agrave; pianificata</p>
-          <p className="text-xs mt-1">Inserisci i dati operativi nei fornitori collegati (tab Fornitori)</p>
+      {showForm && (
+        <div className="panel p-5 space-y-4" style={{ border: '1px solid var(--red2)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+            {editingId ? 'Modifica attivita' : 'Nuova attivita'}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label className="text-xs" style={{ color: 'var(--muted)' }}>Titolo attivita *</label>
+              <input type="text" value={form.titolo} onChange={e => setForm(p => ({ ...p, titolo: e.target.value }))}
+                placeholder="Es. Transfer Aeroporto → Hotel"
+                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs" style={{ color: 'var(--muted)' }}>Categoria</label>
+              <select value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value }))}
+                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                {PROGRAM_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs" style={{ color: 'var(--muted)' }}>Fornitore collegato (facoltativo)</label>
+              <select value={form.supplier_id} onChange={e => setForm(p => ({ ...p, supplier_id: e.target.value }))}
+                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <option value="">-- Nessuno --</option>
+                {linkedSuppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs" style={{ color: 'var(--muted)' }}>Data *</label>
+              <input type="date" value={form.data} onChange={e => setForm(p => ({ ...p, data: e.target.value }))}
+                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora inizio *</label>
+              <input type="time" value={form.ora_inizio} onChange={e => setForm(p => ({ ...p, ora_inizio: e.target.value }))}
+                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora fine</label>
+              <input type="time" value={form.ora_fine} onChange={e => setForm(p => ({ ...p, ora_fine: e.target.value }))}
+                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs" style={{ color: 'var(--muted)' }}>Luogo</label>
+              <input type="text" value={form.luogo} onChange={e => setForm(p => ({ ...p, luogo: e.target.value }))}
+                placeholder="Es. Milano Linate"
+                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs" style={{ color: 'var(--muted)' }}>Note</label>
+              <textarea value={form.note} onChange={e => setForm(p => ({ ...p, note: e.target.value }))}
+                rows={2} placeholder="Note operative..."
+                className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 justify-end">
+            <button onClick={() => { setShowForm(false); setEditingId(null) }} className="px-4 py-2 rounded-lg text-xs font-medium"
+              style={{ color: 'var(--muted)' }}>Annulla</button>
+            <button onClick={saveActivity} className="px-4 py-2 rounded-lg text-xs font-medium"
+              style={{ background: 'var(--red2)', color: '#fff', opacity: (!form.titolo.trim() || !form.data || !form.ora_inizio) ? 0.5 : 1 }}>
+              {editingId ? 'Salva modifiche' : 'Aggiungi'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activities.length === 0 && !showForm && (
+        <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
+          <Clock className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p>Nessuna attivita nel programma</p>
+          <p className="text-xs mt-1">Aggiungi le attivita operative dell'evento (transfer, check-in, cene, allestimenti...)</p>
         </div>
       )}
 
@@ -1596,33 +1761,42 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
           <div className="relative pl-6">
             <div className="absolute left-[9px] top-2 bottom-2 w-px" style={{ background: 'var(--line)' }} />
             <div className="space-y-3">
-              {dayItems.map(item => {
-                const sup = suppliers.find(s => s.id === item.supplier_id)
-                const catColor = getSvcColor(item.service_category)
+              {dayItems.map(act => {
+                const sup = act.supplier_id ? suppliers.find(s => s.id === act.supplier_id) : null
+                const catColor = getProgColor(act.categoria)
                 return (
-                  <div key={item.id} className="relative flex items-start gap-3">
+                  <div key={act.id} className="relative flex items-start gap-3">
                     <div className="absolute left-[-18px] top-2.5 w-2.5 h-2.5 rounded-full border-2"
                       style={{ borderColor: catColor, background: 'var(--bg)' }} />
-                    <div className="flex-1 panel p-4">
+                    <div className="flex-1 panel p-4 group">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                              {item.start_time?.slice(0, 5)}
-                              {item.end_time ? ` - ${item.end_time.slice(0, 5)}` : ''}
+                              {act.ora_inizio?.slice(0, 5)}
+                              {act.ora_fine ? ` - ${act.ora_fine.slice(0, 5)}` : ''}
                             </span>
                             <span className="text-xs px-2 py-0.5 rounded-full"
                               style={{ background: `${catColor}18`, color: catColor }}>
-                              {getSvcLabel(item.service_category)}
+                              {getProgLabel(act.categoria)}
                             </span>
                           </div>
-                          <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>
-                            {sup?.nome ?? 'Fornitore'}
+                          <p className="text-sm font-medium mt-1" style={{ color: 'var(--text)' }}>
+                            {act.titolo}
                           </p>
                           <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
-                            {item.location && <span>{item.location}</span>}
+                            {sup && <span><Truck className="w-3 h-3 inline mr-1" />{sup.nome}</span>}
+                            {act.luogo && <span><MapPin className="w-3 h-3 inline mr-1" />{act.luogo}</span>}
                           </div>
-                          {item.operational_notes && <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>{item.operational_notes}</p>}
+                          {act.note && <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>{act.note}</p>}
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => openEdit(act)} className="p-1.5 rounded hover:bg-white/10" title="Modifica">
+                            <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                          </button>
+                          <button onClick={() => deleteActivity(act.id)} className="p-1.5 rounded hover:bg-white/10" title="Elimina">
+                            <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1633,27 +1807,6 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
           </div>
         </div>
       ))}
-
-      {unplanned.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide mb-3 px-1"
-            style={{ color: 'var(--yellow)' }}>
-            Da pianificare ({unplanned.length})
-          </p>
-          <div className="space-y-2">
-            {unplanned.map(item => {
-              const sup = suppliers.find(s => s.id === item.supplier_id)
-              return (
-                <div key={item.id} className="panel p-3 flex items-center gap-3">
-                  <Truck className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
-                  <span className="text-sm" style={{ color: 'var(--text)' }}>{sup?.nome ?? 'Fornitore'}</span>
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>— dati operativi mancanti</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
