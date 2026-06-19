@@ -55,7 +55,7 @@ import type { EventoWorkflow } from '@/data/workflow'
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 type StatoEvento = Event['stato']
 
-type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'documenti' | 'timeline' | 'creative' | 'social' | 'presentazioni' | 'pacchetto'
+type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'documenti' | 'programma' | 'timeline' | 'creative' | 'social' | 'presentazioni' | 'pacchetto'
 
 function statoColor(stato: string) {
   switch (stato) {
@@ -1391,6 +1391,237 @@ function TabDocumenti({ event }: { event: Event }) {
   )
 }
 
+const PROGRAM_CATEGORIES = [
+  { value: 'trasporto', label: 'Trasporto', color: 'var(--blue)' },
+  { value: 'hotel', label: 'Hotel', color: '#8b5cf6' },
+  { value: 'ristorante', label: 'Ristorante', color: '#e67e22' },
+  { value: 'riunione', label: 'Riunione', color: 'var(--green)' },
+  { value: 'allestimento', label: 'Allestimento', color: 'var(--red2)' },
+  { value: 'evento', label: 'Evento', color: 'var(--yellow)' },
+  { value: 'staff', label: 'Staff', color: '#06b6d4' },
+  { value: 'cliente', label: 'Cliente', color: '#ec4899' },
+  { value: 'altro', label: 'Altro', color: 'var(--muted)' },
+] as const
+
+interface ProgramItem {
+  id: string
+  event_id: string
+  titolo: string
+  categoria: string
+  data: string
+  ora_inizio: string
+  ora_fine: string | null
+  luogo: string
+  note: string
+  created_at: string
+}
+
+function TabProgramma({ event }: { event: Event }) {
+  const [items, setItems] = useState<ProgramItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [editingItem, setEditingItem] = useState<ProgramItem | null>(null)
+  const [form, setForm] = useState({ titolo: '', categoria: 'evento', data: event.dataInizio.slice(0, 10), ora_inizio: '09:00', ora_fine: '', luogo: '', note: '' })
+
+  async function loadItems() {
+    const { data } = await supabase
+      .from('event_program')
+      .select('*')
+      .eq('event_id', event.id)
+      .order('data', { ascending: true })
+      .order('ora_inizio', { ascending: true })
+    setItems((data ?? []) as ProgramItem[])
+    setLoading(false)
+  }
+
+  useEffect(() => { loadItems() }, [event.id])
+
+  function resetForm() {
+    setForm({ titolo: '', categoria: 'evento', data: event.dataInizio.slice(0, 10), ora_inizio: '09:00', ora_fine: '', luogo: '', note: '' })
+    setEditingItem(null)
+    setShowForm(false)
+  }
+
+  async function handleSave() {
+    if (!form.titolo.trim() || !form.data || !form.ora_inizio) return
+    const payload = {
+      event_id: event.id,
+      titolo: form.titolo.trim(),
+      categoria: form.categoria,
+      data: form.data,
+      ora_inizio: form.ora_inizio,
+      ora_fine: form.ora_fine || null,
+      luogo: form.luogo.trim(),
+      note: form.note.trim(),
+    }
+
+    if (editingItem) {
+      await supabase.from('event_program').update(payload).eq('id', editingItem.id)
+    } else {
+      await supabase.from('event_program').insert(payload)
+    }
+    resetForm()
+    await loadItems()
+  }
+
+  async function handleDelete(id: string) {
+    await supabase.from('event_program').delete().eq('id', id)
+    setItems(prev => prev.filter(i => i.id !== id))
+  }
+
+  function startEdit(item: ProgramItem) {
+    setForm({
+      titolo: item.titolo,
+      categoria: item.categoria,
+      data: item.data,
+      ora_inizio: item.ora_inizio.slice(0, 5),
+      ora_fine: item.ora_fine?.slice(0, 5) ?? '',
+      luogo: item.luogo,
+      note: item.note,
+    })
+    setEditingItem(item)
+    setShowForm(true)
+  }
+
+  function getCatColor(cat: string) {
+    return PROGRAM_CATEGORIES.find(c => c.value === cat)?.color ?? 'var(--muted)'
+  }
+  function getCatLabel(cat: string) {
+    return PROGRAM_CATEGORIES.find(c => c.value === cat)?.label ?? cat
+  }
+
+  const grouped = items.reduce<Record<string, ProgramItem[]>>((acc, item) => {
+    const key = item.data
+    if (!acc[key]) acc[key] = []
+    acc[key].push(item)
+    return acc
+  }, {})
+
+  if (loading) {
+    return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento programma...</div></div>
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
+          Programma evento ({items.length} attivit&agrave;)
+        </p>
+        {!showForm && (
+          <button onClick={() => setShowForm(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+            style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.35)' }}>
+            <Plus className="w-3.5 h-3.5" /> Aggiungi attivit&agrave;
+          </button>
+        )}
+      </div>
+
+      {showForm && (
+        <div className="panel p-5 space-y-4" style={{ border: '1px solid rgba(208,0,58,0.2)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+            {editingItem ? 'Modifica attivit\u00E0' : 'Nuova attivit\u00E0'}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <input type="text" value={form.titolo} onChange={e => setForm(p => ({ ...p, titolo: e.target.value }))}
+                placeholder="Titolo *" className="w-full px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <select value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value }))}
+              className="px-3 py-2 rounded-lg text-sm"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+              {PROGRAM_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+            <input type="date" value={form.data} onChange={e => setForm(p => ({ ...p, data: e.target.value }))}
+              className="px-3 py-2 rounded-lg text-sm"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            <input type="time" value={form.ora_inizio} onChange={e => setForm(p => ({ ...p, ora_inizio: e.target.value }))}
+              className="px-3 py-2 rounded-lg text-sm"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            <input type="time" value={form.ora_fine} onChange={e => setForm(p => ({ ...p, ora_fine: e.target.value }))}
+              placeholder="Ora fine (opz.)" className="px-3 py-2 rounded-lg text-sm"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            <div className="sm:col-span-2">
+              <input type="text" value={form.luogo} onChange={e => setForm(p => ({ ...p, luogo: e.target.value }))}
+                placeholder="Luogo" className="w-full px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div className="sm:col-span-2">
+              <textarea value={form.note} onChange={e => setForm(p => ({ ...p, note: e.target.value }))}
+                placeholder="Note" rows={2} className="w-full px-3 py-2 rounded-lg text-sm resize-none"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 justify-end">
+            <button onClick={resetForm} className="px-4 py-2 rounded-lg text-xs font-medium"
+              style={{ color: 'var(--muted)' }}>Annulla</button>
+            <button onClick={handleSave} className="px-4 py-2 rounded-lg text-xs font-medium"
+              style={{ background: 'var(--red2)', color: '#fff' }}>
+              {editingItem ? 'Salva modifiche' : 'Aggiungi'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {items.length === 0 && !showForm ? (
+        <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
+          <Clock className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p>Nessuna attivit&agrave; nel programma</p>
+          <p className="text-xs mt-1">Costruisci la timeline operativa dell'evento</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(grouped).map(([dateStr, dayItems]) => (
+            <div key={dateStr}>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-3 px-1"
+                style={{ color: 'var(--muted)' }}>
+                {new Date(dateStr + 'T00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+              <div className="relative pl-6">
+                <div className="absolute left-[9px] top-2 bottom-2 w-px" style={{ background: 'var(--line)' }} />
+                <div className="space-y-3">
+                  {dayItems.map(item => (
+                    <div key={item.id} className="relative flex items-start gap-3">
+                      <div className="absolute left-[-18px] top-2.5 w-2.5 h-2.5 rounded-full border-2"
+                        style={{ borderColor: getCatColor(item.categoria), background: 'var(--bg)' }} />
+                      <div className="flex-1 panel p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{item.titolo}</span>
+                              <span className="text-xs px-2 py-0.5 rounded-full"
+                                style={{ background: `${getCatColor(item.categoria)}18`, color: getCatColor(item.categoria) }}>
+                                {getCatLabel(item.categoria)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+                              <span>{item.ora_inizio.slice(0, 5)}{item.ora_fine ? ` - ${item.ora_fine.slice(0, 5)}` : ''}</span>
+                              {item.luogo && <span>· {item.luogo}</span>}
+                            </div>
+                            {item.note && <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>{item.note}</p>}
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button onClick={() => startEdit(item)} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Modifica">
+                              <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                            </button>
+                            <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Elimina">
+                              <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TabTimeline({ event }: { event: Event }) {
   const allTasks = loadTasksFromStorage()
   const eventTasks = allTasks.filter(t => t.evento === event.id)
@@ -1937,6 +2168,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
     { id: 'budget', label: 'Budget' },
     { id: 'comunicazioni', label: `Comunicazioni${eventMsg.length > 0 ? ` (${eventMsg.length})` : ''}` },
     { id: 'documenti', label: 'Documenti' },
+    { id: 'programma', label: 'Programma' },
     { id: 'timeline', label: 'Timeline' },
     { id: 'creative', label: 'Creative Studio' },
     { id: 'social', label: 'Social' },
@@ -1967,9 +2199,23 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
       </div>
 
       {/* Hero panel */}
-      <div className="panel p-6 relative overflow-hidden">
+      <div className="panel p-6 relative overflow-hidden" style={{ minHeight: '140px' }}>
         <div className="absolute inset-0 opacity-10"
           style={{ background: `linear-gradient(135deg, ${statoColor(event.stato)} 0%, transparent 60%)` }} />
+        {(() => {
+          const eventClient = clients.find(c => c.id === event.cliente)
+          const clientLogo = eventClient?.logoUrl
+          return clientLogo ? (
+            <img src={clientLogo} alt="" aria-hidden
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-44 h-44 object-contain pointer-events-none select-none"
+              style={{ opacity: 0.07 }} />
+          ) : (
+            <div className="absolute right-8 top-1/2 -translate-y-1/2 text-6xl font-black pointer-events-none select-none"
+              style={{ opacity: 0.04, color: statoColor(event.stato) }}>
+              {event.nome.split(' ').map(w => w[0]).join('').slice(0, 3)}
+            </div>
+          )
+        })()}
         <div className="relative">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex-1">
@@ -1985,6 +2231,11 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
                 {clients.find(c => c.id === event.cliente) && (
                   <span className="text-xs" style={{ color: 'var(--muted)' }}>
                     Cliente: <span style={{ color: 'var(--text)' }}>{clients.find(c => c.id === event.cliente)!.nome}</span>
+                  </span>
+                )}
+                {clients.find(c => c.id === event.cliente)?.referente && (
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                    Referente: <span style={{ color: 'var(--text)' }}>{clients.find(c => c.id === event.cliente)!.referente}</span>
                   </span>
                 )}
               </div>
@@ -2089,6 +2340,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         {activeTab === 'budget' && <TabBudget event={event} budgets={budgets} suppliers={suppliers} onRefresh={onRefreshBudgets} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} />}
+        {activeTab === 'programma' && <TabProgramma event={event} />}
         {activeTab === 'timeline' && <TabTimeline event={event} />}
         {activeTab === 'creative' && <TabCreative event={event} />}
         {activeTab === 'social' && <TabSocial event={event} />}

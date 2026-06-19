@@ -261,9 +261,19 @@ function CompanyDetail({ group, onBack, onRefresh }: CompanyDetailProps) {
       </button>
 
       {/* Hero */}
-      <div className="panel p-6 relative overflow-hidden">
+      <div className="panel p-6 relative overflow-hidden" style={{ minHeight: '140px' }}>
         <div className="absolute inset-0 opacity-10"
           style={{ background: `linear-gradient(135deg, ${statoColor(group.status)} 0%, transparent 60%)` }} />
+        {group.logoUrl ? (
+          <img src={group.logoUrl} alt="" aria-hidden
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-48 h-48 object-contain pointer-events-none select-none"
+            style={{ opacity: 0.07 }} />
+        ) : (
+          <div className="absolute right-8 top-1/2 -translate-y-1/2 text-7xl font-black pointer-events-none select-none"
+            style={{ opacity: 0.05, color: statoColor(group.status) }}>
+            {group.companyName.split(' ').map(w => w[0]).join('').slice(0, 3)}
+          </div>
+        )}
         <div className="relative flex flex-wrap items-start gap-6">
           <div className="relative group">
             {group.logoUrl ? (
@@ -273,7 +283,7 @@ function CompanyDetail({ group, onBack, onRefresh }: CompanyDetailProps) {
             ) : (
               <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold"
                 style={{ background: `${statoColor(group.status)}18`, color: statoColor(group.status) }}>
-                <Building2 className="w-8 h-8" />
+                {group.companyName.split(' ').map(w => w[0]).join('').slice(0, 2)}
               </div>
             )}
             <button
