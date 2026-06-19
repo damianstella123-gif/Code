@@ -11,7 +11,6 @@ import {
   Building2,
   Pencil,
   Upload,
-  Image as ImageIcon,
 } from 'lucide-react'
 import type { Client } from '@/data/clients'
 import { fetchClients, updateClient, uploadCompanyLogo, setCompanyLogo } from '@/lib/clients-service'
@@ -239,60 +238,35 @@ function CompanyDetail({ group, onBack, onRefresh }: CompanyDetailProps) {
       </button>
 
       {/* Hero */}
-      <div className="panel p-6 relative overflow-hidden" style={{ minHeight: '140px' }}>
-        <div className="absolute inset-0 opacity-10"
-          style={{ background: `linear-gradient(135deg, ${statoColor(group.status)} 0%, transparent 60%)` }} />
+      <div className="panel relative overflow-hidden" style={{ minHeight: '150px' }}>
+        {/* Logo watermark - right side only */}
         {group.logoUrl ? (
           <img src={group.logoUrl} alt="" aria-hidden
-            className="absolute inset-0 m-auto w-[70%] h-[70%] object-contain pointer-events-none select-none"
-            style={{ opacity: 0.06 }} />
+            className="absolute right-4 top-[50%] -translate-y-1/2 h-[80%] w-[45%] object-contain object-right pointer-events-none select-none"
+            style={{ opacity: 0.10 }} />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-            <span className="text-8xl font-black" style={{ opacity: 0.05, color: statoColor(group.status) }}>
+          <div className="absolute right-6 top-[50%] -translate-y-1/2 pointer-events-none select-none">
+            <span className="text-8xl font-black" style={{ opacity: 0.06, color: statoColor(group.status) }}>
               {group.companyName.split(' ').map(w => w[0]).join('').slice(0, 3)}
             </span>
           </div>
         )}
-        <div className="relative flex flex-wrap items-start gap-6">
-          <div className="relative group">
-            {group.logoUrl ? (
-              <img src={group.logoUrl} alt={group.companyName}
-                className="w-20 h-20 rounded-2xl object-contain"
-                style={{ background: 'var(--panel2)' }} />
-            ) : (
-              <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold"
-                style={{ background: `${statoColor(group.status)}18`, color: statoColor(group.status) }}>
-                {group.companyName.split(' ').map(w => w[0]).join('').slice(0, 2)}
-              </div>
-            )}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="absolute inset-0 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ background: 'rgba(0,0,0,0.6)' }}>
-              {uploading ? (
-                <span className="text-xs text-white">...</span>
-              ) : (
-                <Upload className="w-5 h-5 text-white" />
-              )}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".png,.jpg,.jpeg,.webp,.svg"
-              className="hidden"
-              onChange={handleLogoUpload}
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-1">
+
+        {/* Gradient overlay - protects left text */}
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ background: 'linear-gradient(to right, var(--bg) 45%, transparent 80%)' }} />
+
+        {/* Content */}
+        <div className="relative p-6 flex flex-col justify-between" style={{ minHeight: '150px' }}>
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
               <span className="text-xs px-2.5 py-1 rounded-full font-semibold"
                 style={{ background: `${statoColor(group.status)}18`, color: statoColor(group.status), border: `1px solid ${statoColor(group.status)}35` }}>
                 {group.status === 'vip' && <Star className="w-3 h-3 inline mr-1 -mt-0.5" />}
                 {statoLabel(group.status)}
               </span>
             </div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{group.companyName}</h1>
+            <h1 className="text-2xl font-bold max-w-[70%]" style={{ color: 'var(--text)' }}>{group.companyName}</h1>
             <div className="flex flex-wrap items-center gap-4 mt-2">
               {(group.city || group.country) && (
                 <span className="text-sm flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
@@ -303,10 +277,29 @@ function CompanyDetail({ group, onBack, onRefresh }: CompanyDetailProps) {
                 <Users className="w-3.5 h-3.5" /> {group.rows.length} referent{group.rows.length !== 1 ? 'i' : 'e'}
               </span>
             </div>
-            {uploadError && <p className="text-xs mt-2" style={{ color: 'var(--red2)' }}>{uploadError}</p>}
-            <p className="text-xs mt-2 flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-              <ImageIcon className="w-3 h-3" /> Passa sopra il logo per caricarne uno nuovo
-            </p>
+          </div>
+
+          {/* Upload logo button */}
+          <div className="mt-3">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80"
+              style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>
+              {uploading ? (
+                <span>Caricamento...</span>
+              ) : (
+                <><Upload className="w-3 h-3" /> {group.logoUrl ? 'Cambia logo' : 'Carica logo'}</>
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp,.svg"
+              className="hidden"
+              onChange={handleLogoUpload}
+            />
+            {uploadError && <p className="text-xs mt-1.5" style={{ color: 'var(--red2)' }}>{uploadError}</p>}
           </div>
         </div>
       </div>
