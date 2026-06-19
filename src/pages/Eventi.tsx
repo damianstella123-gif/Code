@@ -664,61 +664,142 @@ function TabTeam({ event, internalUsers }: { event: Event; internalUsers: Intern
 }
 
 function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
-  const eventSuppliers = suppliers.filter(s => s.eventiId.includes(event.id))
-  return <TabFornitoriList suppliers={eventSuppliers} />
-}
+  const [linkedIds, setLinkedIds] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [adding, setAdding] = useState(false)
+  const [search, setSearch] = useState('')
 
-function TabFornitoriList({ suppliers: list }: { suppliers: Supplier[] }) {
+  async function loadLinks() {
+    const { data } = await supabase
+      .from('event_suppliers')
+      .select('supplier_id')
+      .eq('event_id', event.id)
+    setLinkedIds((data ?? []).map(r => r.supplier_id))
+    setLoading(false)
+  }
+
+  useEffect(() => { loadLinks() }, [event.id])
+
+  async function handleLink(supplierId: string) {
+    const { error } = await supabase
+      .from('event_suppliers')
+      .insert({ event_id: event.id, supplier_id: supplierId })
+    if (!error) {
+      setLinkedIds(prev => [...prev, supplierId])
+      setAdding(false)
+      setSearch('')
+    }
+  }
+
+  async function handleUnlink(supplierId: string) {
+    const { error } = await supabase
+      .from('event_suppliers')
+      .delete()
+      .eq('event_id', event.id)
+      .eq('supplier_id', supplierId)
+    if (!error) {
+      setLinkedIds(prev => prev.filter(id => id !== supplierId))
+    }
+  }
+
+  const linkedSuppliers = suppliers.filter(s => linkedIds.includes(s.id))
+  const availableSuppliers = suppliers.filter(s =>
+    !linkedIds.includes(s.id) &&
+    (search === '' || s.nome.toLowerCase().includes(search.toLowerCase()) || s.categoria.toLowerCase().includes(search.toLowerCase()))
+  )
+
+  if (loading) {
+    return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</div></div>
+  }
+
   return (
-    <div className="space-y-3">
-      {list.length === 0 ? (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
+          Fornitori collegati ({linkedSuppliers.length})
+        </p>
+        {!adding && (
+          <button onClick={() => setAdding(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+            style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.35)' }}>
+            <Plus className="w-3.5 h-3.5" /> Collega fornitore
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="panel p-4 space-y-3" style={{ border: '1px solid rgba(208,0,58,0.2)' }}>
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Cerca fornitore per nome o categoria..."
+              className="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              autoFocus />
+            <button onClick={() => { setAdding(false); setSearch('') }}
+              className="p-1.5 rounded-lg" style={{ color: 'var(--muted)' }}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {availableSuppliers.length === 0 ? (
+              <p className="text-xs p-2" style={{ color: 'var(--muted)' }}>
+                {suppliers.length === 0 ? 'Nessun fornitore nel sistema' : 'Nessun fornitore trovato'}
+              </p>
+            ) : availableSuppliers.slice(0, 10).map(s => (
+              <button key={s.id} onClick={() => handleLink(s.id)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all hover:bg-white/5"
+                style={{ border: '1px solid var(--line)' }}>
+                <Truck className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--red2)' }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{s.nome}</p>
+                  <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{s.categoria} · {s.location}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {linkedSuppliers.length === 0 && !adding ? (
         <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <Truck className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p>Nessun fornitore assegnato a questo evento</p>
+          <p>Nessun fornitore collegato a questo evento</p>
+          <p className="text-xs mt-1">Usa il pulsante "Collega fornitore" per aggiungerne uno</p>
         </div>
-      ) : list.map(sup => (
-        <div key={sup.id} className="panel p-5 flex items-start justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(208,0,58,0.1)' }}>
-              <Truck className="w-6 h-6" style={{ color: 'var(--red2)' }} />
-            </div>
-            <div>
-              <p className="font-semibold" style={{ color: 'var(--text)' }}>{sup.nome}</p>
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>{sup.categoria} · {sup.location}</p>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {sup.servizi.slice(0, 3).map(s => (
-                  <span key={s} className="text-xs px-2 py-0.5 rounded"
-                    style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>{s}</span>
-                ))}
+      ) : (
+        <div className="space-y-3">
+          {linkedSuppliers.map(sup => (
+            <div key={sup.id} className="panel p-5 flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(208,0,58,0.1)' }}>
+                  <Truck className="w-6 h-6" style={{ color: 'var(--red2)' }} />
+                </div>
+                <div>
+                  <p className="font-semibold" style={{ color: 'var(--text)' }}>{sup.nome}</p>
+                  <p className="text-sm" style={{ color: 'var(--muted)' }}>{sup.categoria} · {sup.location}</p>
+                  {sup.referente && <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Ref: {sup.referente}</p>}
+                  {sup.telefono && <p className="text-xs" style={{ color: 'var(--muted)' }}>{sup.telefono}</p>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-xs px-2 py-0.5 rounded"
+                  style={{
+                    background: sup.stato === 'attivo' ? 'rgba(56,210,125,0.15)' : 'rgba(155,163,170,0.15)',
+                    color: sup.stato === 'attivo' ? 'var(--green)' : 'var(--muted)',
+                  }}>
+                  {sup.stato === 'attivo' ? 'Attivo' : 'Inattivo'}
+                </span>
+                <button onClick={() => handleUnlink(sup.id)}
+                  className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi collegamento">
+                  <X className="w-4 h-4" style={{ color: 'var(--red2)' }} />
+                </button>
               </div>
             </div>
-          </div>
-          <div className="text-right flex-shrink-0">
-            <div className="flex items-center gap-1 justify-end">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: i < Math.round(sup.rating) ? 'var(--yellow)' : 'var(--line)' }} />
-              ))}
-              <span className="text-xs ml-1" style={{ color: 'var(--yellow)' }}>{sup.rating}</span>
-            </div>
-            <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{sup.referente}</p>
-            <span className="inline-block text-xs px-2 py-0.5 rounded mt-1"
-              style={{
-                background: sup.stato === 'attivo' ? 'rgba(56,210,125,0.15)' : 'rgba(155,163,170,0.15)',
-                color: sup.stato === 'attivo' ? 'var(--green)' : 'var(--muted)',
-              }}>
-              {sup.stato === 'attivo' ? 'Confermato' : 'In attesa'}
-            </span>
-            <p className="text-xs mt-1.5"
-              style={{
-                color: sup.statoContratto === 'attivo' ? 'var(--green)' : sup.statoContratto === 'in_scadenza' ? 'var(--yellow)' : 'var(--red2)',
-              }}>
-              Contratto: {sup.statoContratto}
-            </p>
-          </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   )
 }
