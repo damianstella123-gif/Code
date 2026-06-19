@@ -29,8 +29,9 @@ import {
   Plus as PlusIcon,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
-import { loadTasksFromStorage, cacheEventsSnapshot } from '@/lib/storage'
+import { loadTasksFromStorage, cacheEventsSnapshot, loadWorkflowsFromStorage } from '@/lib/storage'
 import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote } from '@/lib/events-service'
+import { fetchTasksByEvent, upsertTask, changeTaskStatus } from '@/lib/tasks-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchBudgets, upsertBudget, deleteBudget } from '@/lib/budgets-service'
 import { fetchCommunications } from '@/lib/communications-service'
@@ -44,9 +45,11 @@ import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
+import type { Task } from '@/data/tasks'
 import type { Supplier } from '@/data/suppliers'
 import type { Messaggio } from '@/data/comunicazioni'
 import type { Uscita } from '@/data/amministrazione'
+import type { EventoWorkflow } from '@/data/workflow'
 
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 type StatoEvento = Event['stato']
@@ -110,15 +113,17 @@ interface InternalUser {
   avatar: string
 }
 
-function EventFormModal({ event, internalUsers, clients, onSave, onCancel }: {
+function EventFormModal({ event, internalUsers, allClients, onSave, onCancel }: {
   event?: Event
   internalUsers: InternalUser[]
-  clients: { id: string; nome: string }[]
+  allClients: Client[]
   onSave: (e: Event) => void
   onCancel: () => void
 }) {
+  const existingClient = allClients.find(c => c.id === event?.cliente)
   const [nome, setNome] = useState(event?.nome ?? '')
   const [descrizione, setDescrizione] = useState(event?.descrizione ?? '')
+  const [selectedCompany, setSelectedCompany] = useState(existingClient?.nome?.trim().toUpperCase() ?? '')
   const [cliente, setCliente] = useState(event?.cliente ?? '')
   const [dataInizio, setDataInizio] = useState(event?.dataInizio ?? '')
   const [dataFine, setDataFine] = useState(event?.dataFine ?? '')
@@ -128,6 +133,31 @@ function EventFormModal({ event, internalUsers, clients, onSave, onCancel }: {
   const [partecipanti, setPartecipanti] = useState(event?.partecipanti?.toString() ?? '')
   const [responsabile, setResponsabile] = useState(event?.responsabile ?? (loadUser()?.id ?? ''))
   const [teamIds, setTeamIds] = useState<string[]>(event?.team ?? [])
+
+  const uniqueCompanies = useMemo(() => {
+    const seen = new Set<string>()
+    const result: { key: string; label: string }[] = []
+    for (const c of allClients) {
+      const key = c.nome.trim().toUpperCase()
+      if (!seen.has(key)) {
+        seen.add(key)
+        result.push({ key, label: c.nome })
+      }
+    }
+    return result.sort((a, b) => a.label.localeCompare(b.label))
+  }, [allClients])
+
+  const companyReferenti = useMemo(() => {
+    if (!selectedCompany) return []
+    return allClients
+      .filter(c => c.nome.trim().toUpperCase() === selectedCompany)
+      .sort((a, b) => (a.referente ?? '').localeCompare(b.referente ?? ''))
+  }, [allClients, selectedCompany])
+
+  function handleCompanyChange(companyKey: string) {
+    setSelectedCompany(companyKey)
+    setCliente('')
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -215,14 +245,27 @@ function EventFormModal({ event, internalUsers, clients, onSave, onCancel }: {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Cliente</label>
-              <select value={cliente} onChange={e => setCliente(e.target.value)}
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Azienda / Cliente</label>
+              <select value={selectedCompany} onChange={e => handleCompanyChange(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
                 style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
                 <option value="">— Nessuno —</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                {uniqueCompanies.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
               </select>
             </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Referente</label>
+              <select value={cliente} onChange={e => setCliente(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                disabled={!selectedCompany}>
+                <option value="">{selectedCompany ? '— Scegli referente —' : '— Seleziona prima azienda —'}</option>
+                {companyReferenti.map(c => <option key={c.id} value={c.id}>{c.referente || c.email || c.id}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Budget (EUR)</label>
               <input type="number" value={budget} onChange={e => setBudget(e.target.value)}
@@ -333,9 +376,9 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets, cli
 }) {
   const eventUscite = budgets.filter(u => u.eventoId === event.id)
   const totUscite = eventUscite.reduce((s, u) => s + u.importo, 0)
-  const speso = totUscite > 0 ? totUscite : Math.round(event.budget * 0.62)
-  const residuo = event.budget - speso
-  const usoPct = event.budget > 0 ? Math.round((speso / event.budget) * 100) : 0
+  const hasRealData = eventUscite.length > 0
+  const residuo = event.budget - totUscite
+  const usoPct = event.budget > 0 && hasRealData ? Math.round((totUscite / event.budget) * 100) : 0
 
   const cliente = clients.find(c => c.id === event.cliente)
 
@@ -356,28 +399,30 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets, cli
         <p className="text-xs uppercase tracking-wide mb-4" style={{ color: 'var(--muted)' }}>Budget Overview</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { label: 'Budget Totale', value: event.budget, color: 'var(--green)' },
-            { label: 'Speso (est.)', value: speso, color: 'var(--yellow)' },
-            { label: 'Residuo', value: residuo, color: residuo >= 0 ? 'var(--blue)' : 'var(--red2)' },
+            { label: 'Budget Totale', value: event.budget > 0 ? `€${event.budget.toLocaleString('it-IT')}` : 'Non inserito', color: 'var(--green)' },
+            { label: 'Speso', value: hasRealData ? `€${totUscite.toLocaleString('it-IT')}` : 'Non ancora inserito', color: 'var(--yellow)' },
+            { label: 'Residuo', value: hasRealData ? `€${residuo.toLocaleString('it-IT')}` : 'Non calcolabile', color: hasRealData && residuo >= 0 ? 'var(--blue)' : hasRealData ? 'var(--red2)' : 'var(--muted)' },
           ].map(item => (
             <div key={item.label} className="text-center p-4 rounded-xl" style={{ background: 'var(--panel2)' }}>
               <p className="text-xs" style={{ color: 'var(--muted)' }}>{item.label}</p>
               <p className="text-xl font-bold mt-1" style={{ color: item.color }}>
-                €{item.value.toLocaleString('it-IT')}
+                {item.value}
               </p>
             </div>
           ))}
         </div>
-        <div className="mt-4">
-          <div className="flex text-xs justify-between mb-1" style={{ color: 'var(--muted)' }}>
-            <span>Utilizzo budget</span>
-            <span>{usoPct}%</span>
+        {hasRealData && (
+          <div className="mt-4">
+            <div className="flex text-xs justify-between mb-1" style={{ color: 'var(--muted)' }}>
+              <span>Utilizzo budget</span>
+              <span>{usoPct}%</span>
+            </div>
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
+              <div className="h-full rounded-full transition-all"
+                style={{ width: `${Math.min(usoPct, 100)}%`, background: usoPct > 90 ? 'var(--red2)' : usoPct > 70 ? 'var(--yellow)' : 'var(--blue)' }} />
+            </div>
           </div>
-          <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
-            <div className="h-full rounded-full transition-all"
-              style={{ width: `${Math.min(usoPct, 100)}%`, background: usoPct > 90 ? 'var(--red2)' : usoPct > 70 ? 'var(--yellow)' : 'var(--blue)' }} />
-          </div>
-        </div>
+        )}
       </div>
 
       {totalTasks > 0 && (
@@ -404,19 +449,19 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets, cli
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ArrowDownLeft className="w-4 h-4" style={{ color: 'var(--green)' }} />
-              <span className="text-sm" style={{ color: 'var(--muted)' }}>Entrate previste</span>
+              <span className="text-sm" style={{ color: 'var(--muted)' }}>Budget evento</span>
             </div>
-            <span className="font-semibold text-sm" style={{ color: 'var(--green)' }}>
-              €{event.budget.toLocaleString('it-IT')}
+            <span className="font-semibold text-sm" style={{ color: event.budget > 0 ? 'var(--green)' : 'var(--muted)' }}>
+              {event.budget > 0 ? `€${event.budget.toLocaleString('it-IT')}` : 'Non inserito'}
             </span>
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ArrowUpRight className="w-4 h-4" style={{ color: 'var(--yellow)' }} />
-              <span className="text-sm" style={{ color: 'var(--muted)' }}>Uscite stimate</span>
+              <span className="text-sm" style={{ color: 'var(--muted)' }}>Uscite registrate</span>
             </div>
-            <span className="font-semibold text-sm" style={{ color: 'var(--yellow)' }}>
-              €{speso.toLocaleString('it-IT')}
+            <span className="font-semibold text-sm" style={{ color: hasRealData ? 'var(--yellow)' : 'var(--muted)' }}>
+              {hasRealData ? `€${totUscite.toLocaleString('it-IT')}` : 'Nessuna'}
             </span>
           </div>
         </div>
@@ -427,47 +472,124 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets, cli
 
 function TabTask({ event }: { event: Event }) {
   const [filter, setFilter] = useState<'tutti' | 'da_fare' | 'in_corso' | 'completato'>('tutti')
-  const allTasks = loadTasksFromStorage()
-  const eventTasks = allTasks.filter(t => t.evento === event.id)
-  const filtered = filter === 'tutti' ? eventTasks : eventTasks.filter(t => t.stato === filter)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [adding, setAdding] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [newPriority, setNewPriority] = useState<Task['priorita']>('media')
 
+  useEffect(() => {
+    fetchTasksByEvent(event.id).then(t => { setTasks(t); setLoading(false) })
+  }, [event.id])
+
+  const filtered = filter === 'tutti' ? tasks : tasks.filter(t => t.stato === filter)
   const counts = {
-    da_fare: eventTasks.filter(t => t.stato === 'da_fare').length,
-    in_corso: eventTasks.filter(t => t.stato === 'in_corso').length,
-    completato: eventTasks.filter(t => t.stato === 'completato').length,
+    da_fare: tasks.filter(t => t.stato === 'da_fare').length,
+    in_corso: tasks.filter(t => t.stato === 'in_corso').length,
+    completato: tasks.filter(t => t.stato === 'completato').length,
+  }
+
+  async function handleAdd() {
+    if (!newTitle.trim()) return
+    const currentUser = loadUser()
+    const task: Task = {
+      id: `tsk_${Date.now()}`,
+      titolo: newTitle.trim(),
+      descrizione: '',
+      assegnatario: currentUser?.id ?? '',
+      evento: event.id,
+      priorita: newPriority,
+      stato: 'da_fare',
+      scadenza: event.dataInizio,
+      creatoIl: new Date().toISOString(),
+    }
+    const saved = await upsertTask(task)
+    if (saved) {
+      setTasks(prev => [...prev, saved])
+      setNewTitle('')
+      setAdding(false)
+    }
+  }
+
+  async function handleStatusChange(taskId: string, newStatus: Task['stato']) {
+    const result = await changeTaskStatus(taskId, newStatus)
+    if (result) {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, stato: newStatus } : t))
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="panel p-10 text-center">
+        <div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento task...</div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap">
-        {([
-          { id: 'tutti', label: `Tutti (${eventTasks.length})` },
-          { id: 'da_fare', label: `Da fare (${counts.da_fare})` },
-          { id: 'in_corso', label: `In corso (${counts.in_corso})` },
-          { id: 'completato', label: `Completati (${counts.completato})` },
-        ] as const).map(f => (
-          <button key={f.id} onClick={() => setFilter(f.id)}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-            style={{
-              background: filter === f.id ? 'rgba(208,0,58,0.12)' : 'var(--panel)',
-              color: filter === f.id ? 'var(--red2)' : 'var(--muted)',
-              border: `1px solid ${filter === f.id ? 'rgba(208,0,58,0.35)' : 'var(--line)'}`,
-            }}>
-            {f.label}
-          </button>
-        ))}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
+          {([
+            { id: 'tutti', label: `Tutti (${tasks.length})` },
+            { id: 'da_fare', label: `Da fare (${counts.da_fare})` },
+            { id: 'in_corso', label: `In corso (${counts.in_corso})` },
+            { id: 'completato', label: `Completati (${counts.completato})` },
+          ] as const).map(f => (
+            <button key={f.id} onClick={() => setFilter(f.id)}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{
+                background: filter === f.id ? 'rgba(208,0,58,0.12)' : 'var(--panel)',
+                color: filter === f.id ? 'var(--red2)' : 'var(--muted)',
+                border: `1px solid ${filter === f.id ? 'rgba(208,0,58,0.35)' : 'var(--line)'}`,
+              }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setAdding(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.35)' }}>
+          <Plus className="w-3.5 h-3.5" /> Aggiungi task
+        </button>
       </div>
+
+      {adding && (
+        <div className="panel p-4 space-y-3" style={{ border: '1px solid rgba(208,0,58,0.2)' }}>
+          <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)}
+            placeholder="Titolo task..."
+            className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+            autoFocus onKeyDown={e => { if (e.key === 'Enter') handleAdd() }} />
+          <div className="flex items-center gap-3">
+            <select value={newPriority} onChange={e => setNewPriority(e.target.value as Task['priorita'])}
+              className="px-3 py-2 rounded-lg text-xs focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+              <option value="bassa">Bassa</option>
+              <option value="media">Media</option>
+              <option value="alta">Alta</option>
+            </select>
+            <button onClick={handleAdd} className="px-4 py-2 rounded-lg text-xs font-semibold text-white" style={{ background: 'var(--red2)' }}>
+              Crea
+            </button>
+            <button onClick={() => setAdding(false)} className="px-4 py-2 rounded-lg text-xs" style={{ color: 'var(--muted)' }}>
+              Annulla
+            </button>
+          </div>
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <CheckSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p>Nessun task in questa categoria</p>
+          <p>{tasks.length === 0 ? 'Nessun task collegato a questo evento' : 'Nessun task in questa categoria'}</p>
+          {tasks.length === 0 && <p className="text-xs mt-1">Usa il pulsante "Aggiungi task" per crearne uno</p>}
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map(task => {
             const dl = daysLeft(task.scadenza)
-            const isOverdue = dl < 0
+            const isOverdue = dl < 0 && task.stato !== 'completato'
             const priColor = task.priorita === 'alta' ? 'var(--red2)' : task.priorita === 'media' ? 'var(--yellow)' : 'var(--muted)'
             const sColor = task.stato === 'completato' ? 'var(--green)' : task.stato === 'in_corso' ? 'var(--blue)' : 'var(--yellow)'
             const statoBg = task.stato === 'completato' ? 'rgba(56,210,125,0.12)' : task.stato === 'in_corso' ? 'rgba(77,180,255,0.12)' : 'rgba(255,194,75,0.12)'
@@ -476,12 +598,16 @@ function TabTask({ event }: { event: Event }) {
                 <div className="w-1.5 h-12 rounded-full flex-shrink-0" style={{ background: priColor }} />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm" style={{ color: 'var(--text)' }}>{task.titolo}</p>
-                  <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--muted)' }}>{task.descrizione}</p>
+                  {task.descrizione && <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--muted)' }}>{task.descrizione}</p>}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs px-2 py-1 rounded" style={{ background: statoBg, color: sColor }}>
-                    {task.stato === 'da_fare' ? 'Da fare' : task.stato === 'in_corso' ? 'In corso' : 'Fatto'}
-                  </span>
+                  <select value={task.stato} onChange={e => handleStatusChange(task.id, e.target.value as Task['stato'])}
+                    className="text-xs px-2 py-1 rounded cursor-pointer focus:outline-none"
+                    style={{ background: statoBg, color: sColor, border: 'none' }}>
+                    <option value="da_fare">Da fare</option>
+                    <option value="in_corso">In corso</option>
+                    <option value="completato">Completato</option>
+                  </select>
                   <span className="text-xs flex items-center gap-1"
                     style={{ color: isOverdue ? 'var(--red2)' : 'var(--muted)' }}>
                     <Clock className="w-3 h-3" />
@@ -497,24 +623,48 @@ function TabTask({ event }: { event: Event }) {
   )
 }
 
-function TabTeam({ event: _event }: { event: Event }) {
-  return (
-    <div className="space-y-4">
-      <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
-        <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-        <p>Gestione team disponibile dal profilo utente</p>
+function TabTeam({ event, internalUsers }: { event: Event; internalUsers: InternalUser[] }) {
+  const teamMembers = internalUsers.filter(u => event.team.includes(u.id))
+  const responsabile = internalUsers.find(u => u.id === event.responsabile)
+
+  if (teamMembers.length === 0 && !responsabile) {
+    return (
+      <div className="space-y-4">
+        <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
+          <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p>Nessun membro del team assegnato</p>
+          <p className="text-xs mt-1">Modifica l'evento per aggiungere il team</p>
+        </div>
       </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {responsabile && (
+        <div className="panel p-4 flex items-center gap-4" style={{ border: '1px solid rgba(208,0,58,0.2)' }}>
+          <img src={responsabile.avatar} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm" style={{ color: 'var(--text)' }}>{responsabile.nome}</p>
+            <p className="text-xs" style={{ color: 'var(--red2)' }}>Responsabile evento</p>
+          </div>
+        </div>
+      )}
+      {teamMembers.filter(m => m.id !== event.responsabile).map(m => (
+        <div key={m.id} className="panel p-4 flex items-center gap-4">
+          <img src={m.avatar} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm" style={{ color: 'var(--text)' }}>{m.nome}</p>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Membro team</p>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
 
 function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const eventSuppliers = suppliers.filter(s => s.eventiId.includes(event.id))
-
-  if (eventSuppliers.length === 0) {
-    const fallback = suppliers.slice(0, event.stato === 'completato' ? 3 : 2)
-    return <TabFornitoriList suppliers={fallback} />
-  }
   return <TabFornitoriList suppliers={eventSuppliers} />
 }
 
@@ -1421,7 +1571,7 @@ interface EventDetailProps {
   onRefreshBudgets: () => void
 }
 
-function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni, clients, onRefreshBudgets }: EventDetailProps) {
+function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni, internalUsers, clients, onRefreshBudgets }: EventDetailProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
 
   const allTasks = loadTasksFromStorage()
@@ -1593,7 +1743,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
           <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} clients={clients} />
         )}
         {activeTab === 'task' && <TabTask event={event} />}
-        {activeTab === 'team' && <TabTeam event={event} />}
+        {activeTab === 'team' && <TabTeam event={event} internalUsers={internalUsers} />}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} />}
         {activeTab === 'budget' && <TabBudget event={event} budgets={budgets} suppliers={suppliers} onRefresh={onRefreshBudgets} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
@@ -1605,6 +1755,31 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
       </div>
     </div>
   )
+}
+
+// ─── Workflow auto-creation ──────────────────────────────────────────────────
+
+const WF_KEY = 'simmetria_workflows'
+
+function createWorkflowForEvent(event: Event) {
+  const existing: EventoWorkflow[] = loadWorkflowsFromStorage()
+  if (existing.some(w => w.eventoId === event.id)) return
+  const now = new Date().toISOString().slice(0, 10)
+  const wf: EventoWorkflow = {
+    id: `wf_${event.id}`,
+    eventoId: event.id,
+    faseCorrenteOrdine: 1,
+    fasi: [
+      { id: `f1_${event.id}`, ordine: 1, nome: 'Evento Creato', descrizione: 'Evento registrato nel sistema', stato: 'completata', responsabileId: event.responsabile, taskIds: [], taskCriticiIds: [], deadline: now, avanzamento: 100, log: [], fornitoriIds: [], note: '' },
+      { id: `f2_${event.id}`, ordine: 2, nome: 'Pianificazione', descrizione: 'Definizione dettagli operativi, team e fornitori', stato: 'in_attesa', responsabileId: event.responsabile, taskIds: [], taskCriticiIds: [], deadline: event.dataInizio, avanzamento: 0, log: [], fornitoriIds: [], note: '' },
+      { id: `f3_${event.id}`, ordine: 3, nome: 'Operativo', descrizione: 'Produzione, allestimenti e coordinamento', stato: 'in_attesa', responsabileId: event.responsabile, taskIds: [], taskCriticiIds: [], deadline: event.dataInizio, avanzamento: 0, log: [], fornitoriIds: [], note: '' },
+      { id: `f4_${event.id}`, ordine: 4, nome: 'Chiusura', descrizione: 'Rendiconto, fatturazione e feedback', stato: 'in_attesa', responsabileId: event.responsabile, taskIds: [], taskCriticiIds: [], deadline: event.dataFine, avanzamento: 0, log: [], fornitoriIds: [], note: '' },
+    ],
+    creatoIl: now,
+    aggiornatoIl: now,
+  }
+  const updated = [...existing, wf]
+  try { localStorage.setItem(WF_KEY, JSON.stringify(updated)) } catch { /* ignore */ }
 }
 
 // ─── Events list page ─────────────────────────────────────────────────────────
@@ -1706,6 +1881,9 @@ export default function Eventi() {
       setErrorMessage(isEdit ? 'Salvataggio modifica fallito. Riprova.' : 'Creazione evento fallita. Riprova.')
       return
     }
+    if (!isEdit) {
+      createWorkflowForEvent(saved)
+    }
     const remote = await refreshEvents()
     setShowForm(false)
     setEditingEvent(undefined)
@@ -1754,24 +1932,13 @@ export default function Eventi() {
     })
   }, [visibleEvents, search, filterStato])
 
-  const uniqueClients = useMemo(() => {
-    const seen = new Map<string, { id: string; nome: string }>()
-    for (const c of clientsList) {
-      const key = c.nome.trim().toUpperCase()
-      if (!seen.has(key)) {
-        seen.set(key, { id: c.id, nome: c.nome })
-      }
-    }
-    return Array.from(seen.values()).sort((a, b) => a.nome.localeCompare(b.nome))
-  }, [clientsList])
-
   const overlays = (
     <>
       {showForm && (
         <EventFormModal
           event={editingEvent}
           internalUsers={internalUsers}
-          clients={uniqueClients}
+          allClients={clientsList}
           onSave={handleSave}
           onCancel={() => { setShowForm(false); setEditingEvent(undefined) }}
         />
