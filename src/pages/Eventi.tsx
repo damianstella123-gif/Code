@@ -26,6 +26,7 @@ import {
   Trash2,
   Package,
   Upload,
+  Download,
   Plus as PlusIcon,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
@@ -54,7 +55,7 @@ import type { EventoWorkflow } from '@/data/workflow'
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 type StatoEvento = Event['stato']
 
-type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'timeline' | 'creative' | 'social' | 'presentazioni' | 'pacchetto'
+type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'documenti' | 'timeline' | 'creative' | 'social' | 'presentazioni' | 'pacchetto'
 
 function statoColor(stato: string) {
   switch (stato) {
@@ -1228,6 +1229,168 @@ function TabComunicazioni({ event, comunicazioni }: { event: Event; comunicazion
   )
 }
 
+interface EventDocument {
+  id: string
+  event_id: string
+  file_name: string
+  file_type: string
+  file_size: number
+  storage_path: string
+  uploaded_by: string
+  uploaded_by_name: string
+  created_at: string
+}
+
+const FILE_ICONS: Record<string, string> = {
+  'application/pdf': 'PDF',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
+  'application/vnd.ms-excel': 'XLS',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PPTX',
+  'application/vnd.ms-powerpoint': 'PPT',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+}
+
+function getFileLabel(mimeType: string): string {
+  if (FILE_ICONS[mimeType]) return FILE_ICONS[mimeType]
+  if (mimeType.startsWith('image/')) return 'IMG'
+  return 'FILE'
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1048576).toFixed(1)} MB`
+}
+
+function TabDocumenti({ event }: { event: Event }) {
+  const [docs, setDocs] = useState<EventDocument[]>([])
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+
+  async function loadDocs() {
+    const { data } = await supabase
+      .from('event_documents')
+      .select('*')
+      .eq('event_id', event.id)
+      .order('created_at', { ascending: false })
+    setDocs((data ?? []) as EventDocument[])
+    setLoading(false)
+  }
+
+  useEffect(() => { loadDocs() }, [event.id])
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    setUploading(true)
+    const currentUser = loadUser()
+    const userName = currentUser?.nome ?? 'Utente'
+
+    for (const file of Array.from(files)) {
+      const ext = file.name.split('.').pop() ?? ''
+      const storagePath = `${event.id}/${Date.now()}_${file.name}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('event-documents')
+        .upload(storagePath, file)
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError.message)
+        continue
+      }
+
+      await supabase.from('event_documents').insert({
+        event_id: event.id,
+        file_name: file.name,
+        file_type: file.type || `application/${ext}`,
+        file_size: file.size,
+        storage_path: storagePath,
+        uploaded_by: currentUser?.id ?? '',
+        uploaded_by_name: userName,
+      })
+    }
+
+    await loadDocs()
+    setUploading(false)
+    e.target.value = ''
+  }
+
+  async function handleDownload(doc: EventDocument) {
+    const { data } = await supabase.storage
+      .from('event-documents')
+      .createSignedUrl(doc.storage_path, 60)
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank')
+    }
+  }
+
+  async function handleDelete(doc: EventDocument) {
+    await supabase.storage.from('event-documents').remove([doc.storage_path])
+    await supabase.from('event_documents').delete().eq('id', doc.id)
+    setDocs(prev => prev.filter(d => d.id !== doc.id))
+  }
+
+  if (loading) {
+    return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento documenti...</div></div>
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
+          Documenti ({docs.length})
+        </p>
+        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer"
+          style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.35)' }}>
+          <Upload className="w-3.5 h-3.5" />
+          {uploading ? 'Caricamento...' : 'Carica documento'}
+          <input type="file" className="hidden" onChange={handleUpload} multiple disabled={uploading}
+            accept=".pdf,.xlsx,.xls,.pptx,.ppt,.docx,.jpg,.jpeg,.png,.gif,.webp" />
+        </label>
+      </div>
+
+      {docs.length === 0 ? (
+        <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
+          <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p>Nessun documento caricato per questo evento</p>
+          <p className="text-xs mt-1">Carica PDF, Excel, PowerPoint, Word o immagini</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {docs.map(doc => {
+            const label = getFileLabel(doc.file_type)
+            const labelColor = label === 'PDF' ? 'var(--red2)' : label === 'XLSX' || label === 'XLS' ? 'var(--green)' : label === 'PPTX' || label === 'PPT' ? '#e67e22' : label === 'DOCX' ? 'var(--blue)' : 'var(--muted)'
+            return (
+              <div key={doc.id} className="panel p-4 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                  style={{ background: `${labelColor}15`, color: labelColor }}>
+                  {label}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{doc.file_name}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                    {formatFileSize(doc.file_size)} · {doc.uploaded_by_name || 'Utente'} · {new Date(doc.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button onClick={() => handleDownload(doc)} title="Scarica"
+                    className="p-2 rounded-lg transition-all hover:bg-white/10">
+                    <Download className="w-4 h-4" style={{ color: 'var(--blue)' }} />
+                  </button>
+                  <button onClick={() => handleDelete(doc)} title="Elimina"
+                    className="p-2 rounded-lg transition-all hover:bg-white/10">
+                    <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TabTimeline({ event }: { event: Event }) {
   const allTasks = loadTasksFromStorage()
   const eventTasks = allTasks.filter(t => t.evento === event.id)
@@ -1773,6 +1936,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
     { id: 'fornitori', label: `Fornitori${eventSuppliers.length > 0 ? ` (${eventSuppliers.length})` : ''}` },
     { id: 'budget', label: 'Budget' },
     { id: 'comunicazioni', label: `Comunicazioni${eventMsg.length > 0 ? ` (${eventMsg.length})` : ''}` },
+    { id: 'documenti', label: 'Documenti' },
     { id: 'timeline', label: 'Timeline' },
     { id: 'creative', label: 'Creative Studio' },
     { id: 'social', label: 'Social' },
@@ -1924,6 +2088,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} />}
         {activeTab === 'budget' && <TabBudget event={event} budgets={budgets} suppliers={suppliers} onRefresh={onRefreshBudgets} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
+        {activeTab === 'documenti' && <TabDocumenti event={event} />}
         {activeTab === 'timeline' && <TabTimeline event={event} />}
         {activeTab === 'creative' && <TabCreative event={event} />}
         {activeTab === 'social' && <TabSocial event={event} />}
