@@ -22,7 +22,7 @@ import {
   Building2,
 } from 'lucide-react'
 import type { Client, Contatto } from '@/data/clients'
-import { fetchClients, upsertClient, deleteClient, fetchContacts, fetchReferenti, upsertReferente, deleteReferente, setReferentePrincipale, type Referente } from '@/lib/clients-service'
+import { fetchClients, upsertClient, deleteClient, fetchContacts, fetchAllReferenti, upsertReferente, deleteReferente, setReferentePrincipale, type Referente } from '@/lib/clients-service'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
 import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
@@ -920,14 +920,14 @@ export default function CRM() {
   const [allReferenti, setAllReferenti] = useState<Record<string, Referente[]>>({})
 
   const refresh = useCallback(async () => {
-    const [list, evs] = await Promise.all([fetchClients(), fetchEvents()])
+    const [list, evs, allRefs] = await Promise.all([fetchClients(), fetchEvents(), fetchAllReferenti()])
     setClientList(list)
     setEvents(evs)
     const refMap: Record<string, Referente[]> = {}
-    await Promise.all(list.map(async (c) => {
-      const refs = await fetchReferenti(c.id)
-      refMap[c.id] = refs
-    }))
+    for (const ref of allRefs) {
+      if (!refMap[ref.client_id]) refMap[ref.client_id] = []
+      refMap[ref.client_id].push(ref)
+    }
     setAllReferenti(refMap)
   }, [])
 

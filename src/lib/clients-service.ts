@@ -222,6 +222,19 @@ export async function fetchReferenti(clientId: string): Promise<Referente[]> {
   return (data ?? []) as Referente[]
 }
 
+export async function fetchAllReferenti(): Promise<Referente[]> {
+  const { data, error } = await supabase
+    .from('referenti')
+    .select('*')
+    .order('is_principale', { ascending: false })
+    .order('cognome', { ascending: true })
+  if (error) {
+    console.error('fetchAllReferenti error:', error.message)
+    return []
+  }
+  return (data ?? []) as Referente[]
+}
+
 export async function upsertReferente(r: Omit<Referente, 'created_at' | 'updated_at'>): Promise<Referente | null> {
   const { data, error } = await supabase
     .from('referenti')
