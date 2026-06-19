@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
 
+let channelCounter = 0
+
 export function useRealtimeTable(table: string, onUpdate: () => void) {
   const callbackRef = useRef(onUpdate)
   callbackRef.current = onUpdate
 
   useEffect(() => {
+    const id = ++channelCounter
     const channel = supabase
-      .channel(`realtime-${table}`)
+      .channel(`realtime-${table}-${id}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table },
