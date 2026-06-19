@@ -1,27 +1,36 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import Layout from './components/Layout'
-import Dashboard from './pages/Dashboard'
-import Eventi from './pages/Eventi'
-import CRM from './pages/CRM'
-import Task from './pages/Task'
-import Calendario from './pages/Calendario'
-import Fornitori from './pages/Fornitori'
-import Amministrazione from './pages/Amministrazione'
-import Comunicazioni from './pages/Comunicazioni'
-import Workflow from './pages/Workflow'
-import Utenti from './pages/Utenti'
-import Pratiche from './pages/Pratiche'
-import Impostazioni from './pages/Impostazioni'
-import CreativeStudio from './pages/CreativeStudio'
-import SocialStudio from './pages/SocialStudio'
-import Presentazioni from './pages/Presentazioni'
-import Archivio from './pages/Archivio'
-import FeedbackBeta from './pages/FeedbackBeta'
 import Login from './pages/Login'
 import { loadUser, saveUser, clearUser } from './lib/auth'
 import { supabase } from './lib/supabase'
 import { fetchProfile } from './lib/profiles'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Eventi = lazy(() => import('./pages/Eventi'))
+const CRM = lazy(() => import('./pages/CRM'))
+const Task = lazy(() => import('./pages/Task'))
+const Calendario = lazy(() => import('./pages/Calendario'))
+const Fornitori = lazy(() => import('./pages/Fornitori'))
+const Amministrazione = lazy(() => import('./pages/Amministrazione'))
+const Comunicazioni = lazy(() => import('./pages/Comunicazioni'))
+const Workflow = lazy(() => import('./pages/Workflow'))
+const Pratiche = lazy(() => import('./pages/Pratiche'))
+const CreativeStudio = lazy(() => import('./pages/CreativeStudio'))
+const SocialStudio = lazy(() => import('./pages/SocialStudio'))
+const Presentazioni = lazy(() => import('./pages/Presentazioni'))
+const Archivio = lazy(() => import('./pages/Archivio'))
+const Utenti = lazy(() => import('./pages/Utenti'))
+const Impostazioni = lazy(() => import('./pages/Impostazioni'))
+const FeedbackBeta = lazy(() => import('./pages/FeedbackBeta'))
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center py-32">
+      <div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</div>
+    </div>
+  )
+}
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true)
@@ -98,28 +107,36 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function LazyPage({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      {children}
+    </Suspense>
+  )
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
 
-      <Route path="/dashboard" element={<AuthGuard><Layout><Dashboard /></Layout></AuthGuard>} />
-      <Route path="/eventi" element={<AuthGuard><Layout><Eventi /></Layout></AuthGuard>} />
-      <Route path="/crm" element={<AuthGuard><Layout><CRM /></Layout></AuthGuard>} />
-      <Route path="/task" element={<AuthGuard><Layout><Task /></Layout></AuthGuard>} />
-      <Route path="/calendario" element={<AuthGuard><Layout><Calendario /></Layout></AuthGuard>} />
-      <Route path="/fornitori" element={<AuthGuard><Layout><Fornitori /></Layout></AuthGuard>} />
-      <Route path="/amministrazione" element={<AuthGuard><Layout><Amministrazione /></Layout></AuthGuard>} />
-      <Route path="/comunicazioni" element={<AuthGuard><Layout><Comunicazioni /></Layout></AuthGuard>} />
-      <Route path="/workflow" element={<AuthGuard><Layout><Workflow /></Layout></AuthGuard>} />
-      <Route path="/pratiche" element={<AuthGuard><Layout><Pratiche /></Layout></AuthGuard>} />
-      <Route path="/creative-studio" element={<AuthGuard><Layout><CreativeStudio /></Layout></AuthGuard>} />
-      <Route path="/social-studio" element={<AuthGuard><Layout><SocialStudio /></Layout></AuthGuard>} />
-      <Route path="/presentazioni" element={<AuthGuard><Layout><Presentazioni /></Layout></AuthGuard>} />
-      <Route path="/archivio" element={<AuthGuard><Layout><Archivio /></Layout></AuthGuard>} />
-      <Route path="/utenti" element={<AuthGuard><Layout><Utenti /></Layout></AuthGuard>} />
-      <Route path="/impostazioni" element={<AuthGuard><Layout><Impostazioni /></Layout></AuthGuard>} />
-      <Route path="/feedback-beta" element={<AuthGuard><Layout><FeedbackBeta /></Layout></AuthGuard>} />
+      <Route path="/dashboard" element={<AuthGuard><Layout><LazyPage><Dashboard /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/eventi" element={<AuthGuard><Layout><LazyPage><Eventi /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/crm" element={<AuthGuard><Layout><LazyPage><CRM /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/task" element={<AuthGuard><Layout><LazyPage><Task /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/calendario" element={<AuthGuard><Layout><LazyPage><Calendario /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/fornitori" element={<AuthGuard><Layout><LazyPage><Fornitori /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/amministrazione" element={<AuthGuard><Layout><LazyPage><Amministrazione /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/comunicazioni" element={<AuthGuard><Layout><LazyPage><Comunicazioni /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/workflow" element={<AuthGuard><Layout><LazyPage><Workflow /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/pratiche" element={<AuthGuard><Layout><LazyPage><Pratiche /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/creative-studio" element={<AuthGuard><Layout><LazyPage><CreativeStudio /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/social-studio" element={<AuthGuard><Layout><LazyPage><SocialStudio /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/presentazioni" element={<AuthGuard><Layout><LazyPage><Presentazioni /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/archivio" element={<AuthGuard><Layout><LazyPage><Archivio /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/utenti" element={<AuthGuard><Layout><LazyPage><Utenti /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/impostazioni" element={<AuthGuard><Layout><LazyPage><Impostazioni /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/feedback-beta" element={<AuthGuard><Layout><LazyPage><FeedbackBeta /></LazyPage></Layout></AuthGuard>} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

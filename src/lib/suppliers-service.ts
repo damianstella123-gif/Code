@@ -92,6 +92,7 @@ export async function fetchSuppliers(): Promise<Supplier[]> {
     .from('suppliers')
     .select('*')
     .order('name', { ascending: true })
+    .limit(500)
   if (error) {
     console.error('fetchSuppliers error:', error.message)
     return []

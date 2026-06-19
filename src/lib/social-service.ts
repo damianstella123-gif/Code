@@ -39,6 +39,7 @@ export async function fetchSocialContents(): Promise<SocialContent[]> {
     .from('social_contents')
     .select('*')
     .order('created_at', { ascending: false })
+    .limit(500)
   if (error) {
     console.error('fetchSocialContents error:', error.message)
     return []

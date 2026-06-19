@@ -67,6 +67,7 @@ export async function fetchInvoices(): Promise<Invoice[]> {
     .from('invoices')
     .select('*')
     .order('created_at', { ascending: false })
+    .limit(500)
   if (error) {
     console.error('fetchInvoices error:', error.message)
     return []
@@ -117,6 +118,7 @@ export async function fetchPayments(): Promise<Payment[]> {
     .from('payments')
     .select('*')
     .order('paid_at', { ascending: false })
+    .limit(500)
   if (error) {
     console.error('fetchPayments error:', error.message)
     return []
@@ -153,6 +155,7 @@ export async function fetchAdminDocuments(): Promise<AdminDocument[]> {
     .from('admin_documents')
     .select('*')
     .order('created_at', { ascending: false })
+    .limit(500)
   if (error) {
     console.error('fetchAdminDocuments error:', error.message)
     return []

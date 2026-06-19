@@ -67,6 +67,7 @@ export async function fetchClients(): Promise<Client[]> {
     .from('clients')
     .select('*')
     .order('name', { ascending: true })
+    .limit(1000)
   if (error) {
     console.error('fetchClients error:', error.message)
     return []

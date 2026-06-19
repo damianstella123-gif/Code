@@ -57,6 +57,7 @@ export async function fetchEvents(): Promise<Event[]> {
     .from('events')
     .select('*')
     .order('start_date', { ascending: true })
+    .limit(500)
   if (error) {
     console.error('fetchEvents error:', error.message)
     return []

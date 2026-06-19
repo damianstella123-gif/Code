@@ -47,6 +47,7 @@ export async function fetchTasks(): Promise<Task[]> {
     .from('tasks')
     .select('*')
     .order('due_date', { ascending: true })
+    .limit(500)
   if (error) {
     console.error('fetchTasks error:', error.message)
     return []

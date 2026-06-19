@@ -66,6 +66,7 @@ export async function fetchPractices(): Promise<Pratica[]> {
     .from('practices')
     .select('*')
     .order('created_at', { ascending: false })
+    .limit(500)
   if (error) {
     console.error('fetchPractices error:', error.message)
     return []

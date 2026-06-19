@@ -26,16 +26,17 @@ export function useRealtimeRefresh(tables: string[]): number {
   const [tick, setTick] = useState(0)
 
   useEffect(() => {
-    const channels = tables.map((table, i) =>
-      supabase
-        .channel(`rt-refresh-${table}-${i}`)
+    const channels = tables.map((table) => {
+      const id = ++channelCounter
+      return supabase
+        .channel(`rt-refresh-${table}-${id}`)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table },
           () => { setTick(t => t + 1) }
         )
         .subscribe()
-    )
+    })
 
     return () => { channels.forEach(ch => supabase.removeChannel(ch)) }
   }, [tables.join(',')])
