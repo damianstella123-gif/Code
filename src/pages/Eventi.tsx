@@ -664,32 +664,69 @@ function TabTeam({ event, internalUsers }: { event: Event; internalUsers: Intern
   )
 }
 
+interface EventSupplierLink {
+  id: string
+  event_id: string
+  supplier_id: string
+  service_category: string
+  start_date: string | null
+  start_time: string | null
+  end_date: string | null
+  end_time: string | null
+  location: string
+  operational_notes: string
+}
+
+const SERVICE_CATEGORIES = [
+  { value: '', label: '-- Seleziona --' },
+  { value: 'hotel', label: 'Hotel', color: '#8b5cf6' },
+  { value: 'transfer', label: 'Transfer', color: 'var(--blue)' },
+  { value: 'ristorante', label: 'Ristorante', color: '#e67e22' },
+  { value: 'allestimento', label: 'Allestimento', color: 'var(--red2)' },
+  { value: 'location', label: 'Location', color: 'var(--green)' },
+  { value: 'staff', label: 'Staff', color: '#06b6d4' },
+  { value: 'catering', label: 'Catering', color: '#ec4899' },
+  { value: 'tecnico', label: 'Tecnico AV', color: 'var(--yellow)' },
+  { value: 'altro', label: 'Altro', color: 'var(--muted)' },
+]
+
+function getSvcColor(cat: string) {
+  return SERVICE_CATEGORIES.find(c => c.value === cat)?.color ?? 'var(--muted)'
+}
+function getSvcLabel(cat: string) {
+  return SERVICE_CATEGORIES.find(c => c.value === cat)?.label ?? (cat || 'Non definita')
+}
+
 function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
-  const [linkedIds, setLinkedIds] = useState<string[]>([])
+  const [links, setLinks] = useState<EventSupplierLink[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
   const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null)
+  const [editingOps, setEditingOps] = useState<string | null>(null)
+  const [opsForm, setOpsForm] = useState({ service_category: '', start_date: '', start_time: '', end_date: '', end_time: '', location: '', operational_notes: '' })
 
   async function loadLinks() {
     const { data } = await supabase
       .from('event_suppliers')
-      .select('supplier_id')
+      .select('*')
       .eq('event_id', event.id)
-    setLinkedIds((data ?? []).map(r => r.supplier_id))
+    setLinks((data ?? []) as EventSupplierLink[])
     setLoading(false)
   }
 
   useEffect(() => { loadLinks() }, [event.id])
+
+  const linkedIds = links.map(l => l.supplier_id)
 
   async function handleLink(supplierId: string) {
     const { error } = await supabase
       .from('event_suppliers')
       .insert({ event_id: event.id, supplier_id: supplierId })
     if (!error) {
-      setLinkedIds(prev => [...prev, supplierId])
       setAdding(false)
       setSearch('')
+      await loadLinks()
     }
   }
 
@@ -700,8 +737,39 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       .eq('event_id', event.id)
       .eq('supplier_id', supplierId)
     if (!error) {
-      setLinkedIds(prev => prev.filter(id => id !== supplierId))
+      setLinks(prev => prev.filter(l => l.supplier_id !== supplierId))
     }
+  }
+
+  function startEditOps(link: EventSupplierLink) {
+    setOpsForm({
+      service_category: link.service_category || '',
+      start_date: link.start_date || '',
+      start_time: link.start_time?.slice(0, 5) || '',
+      end_date: link.end_date || '',
+      end_time: link.end_time?.slice(0, 5) || '',
+      location: link.location || '',
+      operational_notes: link.operational_notes || '',
+    })
+    setEditingOps(link.supplier_id)
+  }
+
+  async function saveOps(supplierId: string) {
+    await supabase
+      .from('event_suppliers')
+      .update({
+        service_category: opsForm.service_category,
+        start_date: opsForm.start_date || null,
+        start_time: opsForm.start_time || null,
+        end_date: opsForm.end_date || null,
+        end_time: opsForm.end_time || null,
+        location: opsForm.location,
+        operational_notes: opsForm.operational_notes,
+      })
+      .eq('event_id', event.id)
+      .eq('supplier_id', supplierId)
+    setEditingOps(null)
+    await loadLinks()
   }
 
   const linkedSuppliers = suppliers.filter(s => linkedIds.includes(s.id))
@@ -771,37 +839,107 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
         </div>
       ) : (
         <div className="space-y-3">
-          {linkedSuppliers.map(sup => (
-            <div key={sup.id} className="panel p-5 flex items-start justify-between gap-4 cursor-pointer transition-all hover:border-[rgba(208,0,58,0.3)]"
-              style={{ border: '1px solid var(--line)' }}
-              onClick={() => setViewingSupplier(sup)}>
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'rgba(208,0,58,0.1)' }}>
-                  <Truck className="w-6 h-6" style={{ color: 'var(--red2)' }} />
+          {linkedSuppliers.map(sup => {
+            const link = links.find(l => l.supplier_id === sup.id)!
+            const hasOps = !!link.start_date
+            return (
+              <div key={sup.id} className="panel overflow-hidden" style={{ border: '1px solid var(--line)' }}>
+                <div className="p-5 flex items-start justify-between gap-4 cursor-pointer transition-all hover:bg-white/[0.02]"
+                  onClick={() => setViewingSupplier(sup)}>
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'rgba(208,0,58,0.1)' }}>
+                      <Truck className="w-6 h-6" style={{ color: 'var(--red2)' }} />
+                    </div>
+                    <div>
+                      <p className="font-semibold" style={{ color: 'var(--text)' }}>{sup.nome}</p>
+                      <p className="text-sm" style={{ color: 'var(--muted)' }}>{sup.categoria} · {sup.location}</p>
+                      {hasOps && (
+                        <p className="text-xs mt-1" style={{ color: getSvcColor(link.service_category) }}>
+                          {getSvcLabel(link.service_category)} · {link.start_date} {link.start_time?.slice(0, 5) ?? ''}
+                          {link.location ? ` · ${link.location}` : ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={(e) => { e.stopPropagation(); startEditOps(link) }}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
+                      style={{ border: '1px solid var(--line)', color: hasOps ? 'var(--green)' : 'var(--muted)' }}
+                      title="Dati operativi">
+                      <Clock className="w-3.5 h-3.5 inline mr-1" />
+                      {hasOps ? 'Operativi' : 'Dati operativi'}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); handleUnlink(sup.id) }}
+                      className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi collegamento">
+                      <X className="w-4 h-4" style={{ color: 'var(--red2)' }} />
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-semibold" style={{ color: 'var(--text)' }}>{sup.nome}</p>
-                  <p className="text-sm" style={{ color: 'var(--muted)' }}>{sup.categoria} · {sup.location}</p>
-                  {sup.referente && <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Ref: {sup.referente}</p>}
-                  {sup.telefono && <p className="text-xs" style={{ color: 'var(--muted)' }}>{sup.telefono}</p>}
-                </div>
+
+                {editingOps === sup.id && (
+                  <div className="px-5 pb-5 pt-2 space-y-3" style={{ borderTop: '1px solid var(--line)' }}
+                    onClick={e => e.stopPropagation()}>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Dati operativi</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Categoria servizio</label>
+                        <select value={opsForm.service_category} onChange={e => setOpsForm(p => ({ ...p, service_category: e.target.value }))}
+                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                          {SERVICE_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Data inizio</label>
+                        <input type="date" value={opsForm.start_date} onChange={e => setOpsForm(p => ({ ...p, start_date: e.target.value }))}
+                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                      <div>
+                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora inizio</label>
+                        <input type="time" value={opsForm.start_time} onChange={e => setOpsForm(p => ({ ...p, start_time: e.target.value }))}
+                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                      <div>
+                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Data fine</label>
+                        <input type="date" value={opsForm.end_date} onChange={e => setOpsForm(p => ({ ...p, end_date: e.target.value }))}
+                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                      <div>
+                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora fine</label>
+                        <input type="time" value={opsForm.end_time} onChange={e => setOpsForm(p => ({ ...p, end_time: e.target.value }))}
+                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                      <div>
+                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Luogo</label>
+                        <input type="text" value={opsForm.location} onChange={e => setOpsForm(p => ({ ...p, location: e.target.value }))}
+                          placeholder="Luogo servizio"
+                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Note operative</label>
+                        <textarea value={opsForm.operational_notes} onChange={e => setOpsForm(p => ({ ...p, operational_notes: e.target.value }))}
+                          rows={2} placeholder="Es. Check-in ore 15, camera 301..."
+                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
+                          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button onClick={() => setEditingOps(null)} className="px-4 py-2 rounded-lg text-xs font-medium"
+                        style={{ color: 'var(--muted)' }}>Annulla</button>
+                      <button onClick={() => saveOps(sup.id)} className="px-4 py-2 rounded-lg text-xs font-medium"
+                        style={{ background: 'var(--red2)', color: '#fff' }}>Salva</button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-xs px-2 py-0.5 rounded"
-                  style={{
-                    background: sup.stato === 'attivo' ? 'rgba(56,210,125,0.15)' : 'rgba(155,163,170,0.15)',
-                    color: sup.stato === 'attivo' ? 'var(--green)' : 'var(--muted)',
-                  }}>
-                  {sup.stato === 'attivo' ? 'Attivo' : 'Inattivo'}
-                </span>
-                <button onClick={(e) => { e.stopPropagation(); handleUnlink(sup.id) }}
-                  className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi collegamento">
-                  <X className="w-4 h-4" style={{ color: 'var(--red2)' }} />
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -1391,107 +1529,31 @@ function TabDocumenti({ event }: { event: Event }) {
   )
 }
 
-const PROGRAM_CATEGORIES = [
-  { value: 'trasporto', label: 'Trasporto', color: 'var(--blue)' },
-  { value: 'hotel', label: 'Hotel', color: '#8b5cf6' },
-  { value: 'ristorante', label: 'Ristorante', color: '#e67e22' },
-  { value: 'riunione', label: 'Riunione', color: 'var(--green)' },
-  { value: 'allestimento', label: 'Allestimento', color: 'var(--red2)' },
-  { value: 'evento', label: 'Evento', color: 'var(--yellow)' },
-  { value: 'staff', label: 'Staff', color: '#06b6d4' },
-  { value: 'cliente', label: 'Cliente', color: '#ec4899' },
-  { value: 'altro', label: 'Altro', color: 'var(--muted)' },
-] as const
-
-interface ProgramItem {
-  id: string
-  event_id: string
-  titolo: string
-  categoria: string
-  data: string
-  ora_inizio: string
-  ora_fine: string | null
-  luogo: string
-  note: string
-  created_at: string
-}
-
-function TabProgramma({ event }: { event: Event }) {
-  const [items, setItems] = useState<ProgramItem[]>([])
+function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
+  const [links, setLinks] = useState<EventSupplierLink[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [editingItem, setEditingItem] = useState<ProgramItem | null>(null)
-  const [form, setForm] = useState({ titolo: '', categoria: 'evento', data: event.dataInizio.slice(0, 10), ora_inizio: '09:00', ora_fine: '', luogo: '', note: '' })
 
-  async function loadItems() {
-    const { data } = await supabase
-      .from('event_program')
+  useEffect(() => {
+    supabase
+      .from('event_suppliers')
       .select('*')
       .eq('event_id', event.id)
-      .order('data', { ascending: true })
-      .order('ora_inizio', { ascending: true })
-    setItems((data ?? []) as ProgramItem[])
-    setLoading(false)
-  }
+      .then(({ data }) => {
+        setLinks((data ?? []) as EventSupplierLink[])
+        setLoading(false)
+      })
+  }, [event.id])
 
-  useEffect(() => { loadItems() }, [event.id])
-
-  function resetForm() {
-    setForm({ titolo: '', categoria: 'evento', data: event.dataInizio.slice(0, 10), ora_inizio: '09:00', ora_fine: '', luogo: '', note: '' })
-    setEditingItem(null)
-    setShowForm(false)
-  }
-
-  async function handleSave() {
-    if (!form.titolo.trim() || !form.data || !form.ora_inizio) return
-    const payload = {
-      event_id: event.id,
-      titolo: form.titolo.trim(),
-      categoria: form.categoria,
-      data: form.data,
-      ora_inizio: form.ora_inizio,
-      ora_fine: form.ora_fine || null,
-      luogo: form.luogo.trim(),
-      note: form.note.trim(),
-    }
-
-    if (editingItem) {
-      await supabase.from('event_program').update(payload).eq('id', editingItem.id)
-    } else {
-      await supabase.from('event_program').insert(payload)
-    }
-    resetForm()
-    await loadItems()
-  }
-
-  async function handleDelete(id: string) {
-    await supabase.from('event_program').delete().eq('id', id)
-    setItems(prev => prev.filter(i => i.id !== id))
-  }
-
-  function startEdit(item: ProgramItem) {
-    setForm({
-      titolo: item.titolo,
-      categoria: item.categoria,
-      data: item.data,
-      ora_inizio: item.ora_inizio.slice(0, 5),
-      ora_fine: item.ora_fine?.slice(0, 5) ?? '',
-      luogo: item.luogo,
-      note: item.note,
+  const scheduled = links.filter(l => l.start_date && l.start_time)
+    .sort((a, b) => {
+      const da = `${a.start_date}T${a.start_time}`
+      const db = `${b.start_date}T${b.start_time}`
+      return da.localeCompare(db)
     })
-    setEditingItem(item)
-    setShowForm(true)
-  }
+  const unplanned = links.filter(l => !l.start_date || !l.start_time)
 
-  function getCatColor(cat: string) {
-    return PROGRAM_CATEGORIES.find(c => c.value === cat)?.color ?? 'var(--muted)'
-  }
-  function getCatLabel(cat: string) {
-    return PROGRAM_CATEGORIES.find(c => c.value === cat)?.label ?? cat
-  }
-
-  const grouped = items.reduce<Record<string, ProgramItem[]>>((acc, item) => {
-    const key = item.data
+  const grouped = scheduled.reduce<Record<string, EventSupplierLink[]>>((acc, item) => {
+    const key = item.start_date!
     if (!acc[key]) acc[key] = []
     acc[key].push(item)
     return acc
@@ -1501,121 +1563,95 @@ function TabProgramma({ event }: { event: Event }) {
     return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento programma...</div></div>
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
-          Programma evento ({items.length} attivit&agrave;)
-        </p>
-        {!showForm && (
-          <button onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-            style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.35)' }}>
-            <Plus className="w-3.5 h-3.5" /> Aggiungi attivit&agrave;
-          </button>
-        )}
+  if (links.length === 0) {
+    return (
+      <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
+        <Clock className="w-10 h-10 mx-auto mb-3 opacity-30" />
+        <p>Nessun fornitore collegato</p>
+        <p className="text-xs mt-1">Collega fornitori e inserisci i dati operativi per generare il programma</p>
       </div>
+    )
+  }
 
-      {showForm && (
-        <div className="panel p-5 space-y-4" style={{ border: '1px solid rgba(208,0,58,0.2)' }}>
-          <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-            {editingItem ? 'Modifica attivit\u00E0' : 'Nuova attivit\u00E0'}
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-2">
-              <input type="text" value={form.titolo} onChange={e => setForm(p => ({ ...p, titolo: e.target.value }))}
-                placeholder="Titolo *" className="w-full px-3 py-2 rounded-lg text-sm"
-                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-            </div>
-            <select value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value }))}
-              className="px-3 py-2 rounded-lg text-sm"
-              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-              {PROGRAM_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-            <input type="date" value={form.data} onChange={e => setForm(p => ({ ...p, data: e.target.value }))}
-              className="px-3 py-2 rounded-lg text-sm"
-              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-            <input type="time" value={form.ora_inizio} onChange={e => setForm(p => ({ ...p, ora_inizio: e.target.value }))}
-              className="px-3 py-2 rounded-lg text-sm"
-              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-            <input type="time" value={form.ora_fine} onChange={e => setForm(p => ({ ...p, ora_fine: e.target.value }))}
-              placeholder="Ora fine (opz.)" className="px-3 py-2 rounded-lg text-sm"
-              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-            <div className="sm:col-span-2">
-              <input type="text" value={form.luogo} onChange={e => setForm(p => ({ ...p, luogo: e.target.value }))}
-                placeholder="Luogo" className="w-full px-3 py-2 rounded-lg text-sm"
-                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-            </div>
-            <div className="sm:col-span-2">
-              <textarea value={form.note} onChange={e => setForm(p => ({ ...p, note: e.target.value }))}
-                placeholder="Note" rows={2} className="w-full px-3 py-2 rounded-lg text-sm resize-none"
-                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-            </div>
-          </div>
-          <div className="flex items-center gap-2 justify-end">
-            <button onClick={resetForm} className="px-4 py-2 rounded-lg text-xs font-medium"
-              style={{ color: 'var(--muted)' }}>Annulla</button>
-            <button onClick={handleSave} className="px-4 py-2 rounded-lg text-xs font-medium"
-              style={{ background: 'var(--red2)', color: '#fff' }}>
-              {editingItem ? 'Salva modifiche' : 'Aggiungi'}
-            </button>
-          </div>
+  return (
+    <div className="space-y-6">
+      <p className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
+        Programma evento ({scheduled.length} pianificat{scheduled.length === 1 ? 'o' : 'i'}{unplanned.length > 0 ? ` · ${unplanned.length} da pianificare` : ''})
+      </p>
+
+      {scheduled.length === 0 && (
+        <div className="panel p-8 text-center" style={{ color: 'var(--muted)' }}>
+          <Clock className="w-8 h-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">Nessuna attivit&agrave; pianificata</p>
+          <p className="text-xs mt-1">Inserisci i dati operativi nei fornitori collegati (tab Fornitori)</p>
         </div>
       )}
 
-      {items.length === 0 && !showForm ? (
-        <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
-          <Clock className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p>Nessuna attivit&agrave; nel programma</p>
-          <p className="text-xs mt-1">Costruisci la timeline operativa dell'evento</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {Object.entries(grouped).map(([dateStr, dayItems]) => (
-            <div key={dateStr}>
-              <p className="text-xs font-semibold uppercase tracking-wide mb-3 px-1"
-                style={{ color: 'var(--muted)' }}>
-                {new Date(dateStr + 'T00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-              </p>
-              <div className="relative pl-6">
-                <div className="absolute left-[9px] top-2 bottom-2 w-px" style={{ background: 'var(--line)' }} />
-                <div className="space-y-3">
-                  {dayItems.map(item => (
-                    <div key={item.id} className="relative flex items-start gap-3">
-                      <div className="absolute left-[-18px] top-2.5 w-2.5 h-2.5 rounded-full border-2"
-                        style={{ borderColor: getCatColor(item.categoria), background: 'var(--bg)' }} />
-                      <div className="flex-1 panel p-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{item.titolo}</span>
-                              <span className="text-xs px-2 py-0.5 rounded-full"
-                                style={{ background: `${getCatColor(item.categoria)}18`, color: getCatColor(item.categoria) }}>
-                                {getCatLabel(item.categoria)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
-                              <span>{item.ora_inizio.slice(0, 5)}{item.ora_fine ? ` - ${item.ora_fine.slice(0, 5)}` : ''}</span>
-                              {item.luogo && <span>· {item.luogo}</span>}
-                            </div>
-                            {item.note && <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>{item.note}</p>}
+      {Object.entries(grouped).map(([dateStr, dayItems]) => (
+        <div key={dateStr}>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-3 px-1"
+            style={{ color: 'var(--muted)' }}>
+            {new Date(dateStr + 'T00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+          <div className="relative pl-6">
+            <div className="absolute left-[9px] top-2 bottom-2 w-px" style={{ background: 'var(--line)' }} />
+            <div className="space-y-3">
+              {dayItems.map(item => {
+                const sup = suppliers.find(s => s.id === item.supplier_id)
+                const catColor = getSvcColor(item.service_category)
+                return (
+                  <div key={item.id} className="relative flex items-start gap-3">
+                    <div className="absolute left-[-18px] top-2.5 w-2.5 h-2.5 rounded-full border-2"
+                      style={{ borderColor: catColor, background: 'var(--bg)' }} />
+                    <div className="flex-1 panel p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                              {item.start_time?.slice(0, 5)}
+                              {item.end_time ? ` - ${item.end_time.slice(0, 5)}` : ''}
+                            </span>
+                            <span className="text-xs px-2 py-0.5 rounded-full"
+                              style={{ background: `${catColor}18`, color: catColor }}>
+                              {getSvcLabel(item.service_category)}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <button onClick={() => startEdit(item)} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Modifica">
-                              <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-                            </button>
-                            <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Elimina">
-                              <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
-                            </button>
+                          <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>
+                            {sup?.nome ?? 'Fornitore'}
+                          </p>
+                          <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+                            {item.location && <span>{item.location}</span>}
                           </div>
+                          {item.operational_notes && <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>{item.operational_notes}</p>}
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                )
+              })}
             </div>
-          ))}
+          </div>
+        </div>
+      ))}
+
+      {unplanned.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-3 px-1"
+            style={{ color: 'var(--yellow)' }}>
+            Da pianificare ({unplanned.length})
+          </p>
+          <div className="space-y-2">
+            {unplanned.map(item => {
+              const sup = suppliers.find(s => s.id === item.supplier_id)
+              return (
+                <div key={item.id} className="panel p-3 flex items-center gap-3">
+                  <Truck className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                  <span className="text-sm" style={{ color: 'var(--text)' }}>{sup?.nome ?? 'Fornitore'}</span>
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>— dati operativi mancanti</span>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -2340,7 +2376,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         {activeTab === 'budget' && <TabBudget event={event} budgets={budgets} suppliers={suppliers} onRefresh={onRefreshBudgets} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} />}
-        {activeTab === 'programma' && <TabProgramma event={event} />}
+        {activeTab === 'programma' && <TabProgramma event={event} suppliers={suppliers} />}
         {activeTab === 'timeline' && <TabTimeline event={event} />}
         {activeTab === 'creative' && <TabCreative event={event} />}
         {activeTab === 'social' && <TabSocial event={event} />}
