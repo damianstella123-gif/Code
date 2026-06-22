@@ -97,7 +97,7 @@ export default function BrandEvolutionTransition({ onComplete }: Props) {
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           >
             <img
-              src="/Logo_1.png"
+              src="/logo-synergy.png"
               alt="Simmetria Synergy"
               className="h-16 sm:h-20 object-contain"
               style={{ filter: logoFilter }}
