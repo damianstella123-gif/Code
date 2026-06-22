@@ -36,7 +36,7 @@ import { loadTasksFromStorage, cacheEventsSnapshot, loadWorkflowsFromStorage } f
 import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote } from '@/lib/events-service'
 import { fetchTasksByEvent, upsertTask, changeTaskStatus } from '@/lib/tasks-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
-import { fetchBudgets, upsertBudget, deleteBudget } from '@/lib/budgets-service'
+import { fetchBudgets } from '@/lib/budgets-service'
 import { fetchCommunications } from '@/lib/communications-service'
 import { fetchPackagesByEvent, upsertClientPackage, updateClientPackage, deleteClientPackage, uploadPackageFile, type ClientPackage } from '@/lib/packages-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
@@ -370,6 +370,73 @@ function DeleteConfirm({ eventName, onConfirm, onCancel }: {
 
 // ─── Tab content components ───────────────────────────────────────────────────
 
+function EventEconomicSummary({ event }: { event: Event }) {
+  const [totals, setTotals] = useState({ venduto: 0, costo: 0, margine: 0, marginePct: 0 })
+
+  useEffect(() => {
+    async function load() {
+      const [svcRes, hotelRes, restRes] = await Promise.all([
+        supabase.from('event_supplier_services').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
+        supabase.from('event_hotel_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
+        supabase.from('event_restaurant_details').select('budget_per_persona,budget_totale,costo_per_persona,costo_totale_reale,pax_confermati,pax_previsti').eq('event_id', event.id),
+      ])
+      let venduto = 0, costo = 0
+      for (const s of (svcRes.data ?? [])) {
+        const qty = s.quantita ?? 1
+        venduto += s.venduto_totale ?? (s.venduto_unitario ? s.venduto_unitario * qty : 0)
+        costo += s.costo_totale ?? (s.costo_unitario ? s.costo_unitario * qty : 0)
+      }
+      for (const h of (hotelRes.data ?? [])) {
+        const qty = h.quantita ?? 1
+        venduto += h.venduto_totale ?? (h.venduto_unitario ? h.venduto_unitario * qty : 0)
+        costo += h.costo_totale ?? (h.costo_unitario ? h.costo_unitario * qty : 0)
+      }
+      for (const r of (restRes.data ?? [])) {
+        const pax = r.pax_confermati ?? r.pax_previsti ?? 1
+        venduto += r.budget_totale ? Number(r.budget_totale) : (r.budget_per_persona ? Number(r.budget_per_persona) * pax : 0)
+        costo += r.costo_totale_reale ? Number(r.costo_totale_reale) : (r.costo_per_persona ? Number(r.costo_per_persona) * pax : 0)
+      }
+      const margine = venduto - costo
+      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+      setTotals({ venduto, costo, margine, marginePct })
+    }
+    load()
+  }, [event.id])
+
+  if (!totals.venduto && !totals.costo) {
+    return (
+      <div className="panel p-5 md:col-span-2">
+        <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Controllo Economico</p>
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>Inserisci venduto e costo nei servizi operativi per visualizzare il riepilogo.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="panel p-5 md:col-span-2">
+      <p className="text-xs uppercase tracking-wide mb-4" style={{ color: 'var(--muted)' }}>Controllo Economico</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Venduto</p>
+          <p className="text-lg font-bold mt-1" style={{ color: 'var(--text)' }}>{'\u20AC'}{totals.venduto.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</p>
+        </div>
+        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Costi</p>
+          <p className="text-lg font-bold mt-1" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{totals.costo.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</p>
+        </div>
+        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Margine</p>
+          <p className="text-lg font-bold mt-1" style={{ color: totals.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{totals.margine.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</p>
+        </div>
+        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Margine %</p>
+          <p className="text-lg font-bold mt-1" style={{ color: totals.marginePct >= 20 ? 'var(--green)' : totals.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{totals.marginePct.toFixed(1)}%</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TabOverview({ event, progress, completedTasks, totalTasks, budgets, clients }: {
   event: Event
   progress: number
@@ -381,8 +448,6 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets, cli
   const eventUscite = budgets.filter(u => u.eventoId === event.id)
   const totUscite = eventUscite.reduce((s, u) => s + u.importo, 0)
   const hasRealData = eventUscite.length > 0
-  const residuo = event.budget - totUscite
-  const usoPct = event.budget > 0 && hasRealData ? Math.round((totUscite / event.budget) * 100) : 0
 
   const cliente = clients.find(c => c.id === event.cliente)
 
@@ -399,35 +464,7 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets, cli
         </div>
       )}
 
-      <div className="panel p-5 md:col-span-2">
-        <p className="text-xs uppercase tracking-wide mb-4" style={{ color: 'var(--muted)' }}>Budget Overview</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { label: 'Budget Totale', value: event.budget > 0 ? `€${event.budget.toLocaleString('it-IT')}` : 'Non inserito', color: 'var(--green)' },
-            { label: 'Speso', value: hasRealData ? `€${totUscite.toLocaleString('it-IT')}` : 'Non ancora inserito', color: 'var(--yellow)' },
-            { label: 'Residuo', value: hasRealData ? `€${residuo.toLocaleString('it-IT')}` : 'Non calcolabile', color: hasRealData && residuo >= 0 ? 'var(--blue)' : hasRealData ? 'var(--red2)' : 'var(--muted)' },
-          ].map(item => (
-            <div key={item.label} className="text-center p-4 rounded-xl" style={{ background: 'var(--panel2)' }}>
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>{item.label}</p>
-              <p className="text-xl font-bold mt-1" style={{ color: item.color }}>
-                {item.value}
-              </p>
-            </div>
-          ))}
-        </div>
-        {hasRealData && (
-          <div className="mt-4">
-            <div className="flex text-xs justify-between mb-1" style={{ color: 'var(--muted)' }}>
-              <span>Utilizzo budget</span>
-              <span>{usoPct}%</span>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
-              <div className="h-full rounded-full transition-all"
-                style={{ width: `${Math.min(usoPct, 100)}%`, background: usoPct > 90 ? 'var(--red2)' : usoPct > 70 ? 'var(--yellow)' : 'var(--blue)' }} />
-            </div>
-          </div>
-        )}
-      </div>
+      <EventEconomicSummary event={event} />
 
       {totalTasks > 0 && (
         <div className="panel p-5">
@@ -711,6 +748,8 @@ interface SupplierService {
   costo_unitario: number | null
   quantita: number | null
   costo_totale: number | null
+  venduto_unitario: number | null
+  venduto_totale: number | null
 }
 
 const emptySvcForm = {
@@ -726,6 +765,8 @@ const emptySvcForm = {
   costo_unitario: '',
   quantita: '1',
   costo_totale: '',
+  venduto_unitario: '',
+  venduto_totale: '',
 }
 
 const HOTEL_TIPOS = [
@@ -762,6 +803,8 @@ interface HotelDetail {
   natural_light: boolean
   costo_unitario: number | null
   costo_totale: number | null
+  venduto_unitario: number | null
+  venduto_totale: number | null
 }
 
 const emptyHotelForm = {
@@ -783,6 +826,8 @@ const emptyHotelForm = {
   natural_light: false,
   costo_unitario: '',
   costo_totale: '',
+  venduto_unitario: '',
+  venduto_totale: '',
 }
 
 function isHotelSupplier(sup: Supplier): boolean {
@@ -808,6 +853,8 @@ interface RestaurantDetail {
   menu_descrizione: string
   budget_per_persona: number | null
   budget_totale: number | null
+  costo_per_persona: number | null
+  costo_totale_reale: number | null
   area_riservata: boolean
   sala_privata: boolean
   esclusiva_parziale: boolean
@@ -836,6 +883,8 @@ const emptyRestaurantForm = {
   menu_descrizione: '',
   budget_per_persona: '',
   budget_totale: '',
+  costo_per_persona: '',
+  costo_totale_reale: '',
   area_riservata: false,
   sala_privata: false,
   esclusiva_parziale: false,
@@ -952,6 +1001,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       costo_unitario: svc.costo_unitario?.toString() ?? '',
       quantita: svc.quantita?.toString() ?? '1',
       costo_totale: svc.costo_totale?.toString() ?? '',
+      venduto_unitario: svc.venduto_unitario?.toString() ?? '',
+      venduto_totale: svc.venduto_totale?.toString() ?? '',
     })
     setEditingSvcId(svc.id)
     setShowSvcForm(true)
@@ -961,6 +1012,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
     if (!svcForm.titolo.trim() || !managingServices) return
     const qty = svcForm.quantita ? parseInt(svcForm.quantita) : 1
     const unitCost = svcForm.costo_unitario ? parseFloat(svcForm.costo_unitario) : null
+    const unitVenduto = svcForm.venduto_unitario ? parseFloat(svcForm.venduto_unitario) : null
     const payload = {
       event_id: event.id,
       supplier_id: managingServices,
@@ -976,6 +1028,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       costo_unitario: unitCost,
       quantita: qty,
       costo_totale: svcForm.costo_totale ? parseFloat(svcForm.costo_totale) : (unitCost ? unitCost * qty : null),
+      venduto_unitario: unitVenduto,
+      venduto_totale: svcForm.venduto_totale ? parseFloat(svcForm.venduto_totale) : (unitVenduto ? unitVenduto * qty : null),
     }
     if (editingSvcId) {
       await supabase.from('event_supplier_services').update(payload).eq('id', editingSvcId)
@@ -1035,6 +1089,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       natural_light: h.natural_light ?? false,
       costo_unitario: h.costo_unitario?.toString() ?? '',
       costo_totale: h.costo_totale?.toString() ?? '',
+      venduto_unitario: h.venduto_unitario?.toString() ?? '',
+      venduto_totale: h.venduto_totale?.toString() ?? '',
     })
     setEditingHotelId(h.id)
     setHotelFormTipo(h.tipo)
@@ -1068,6 +1124,9 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       costo_unitario: hotelForm.costo_unitario ? parseFloat(hotelForm.costo_unitario) : null,
       costo_totale: hotelForm.costo_totale ? parseFloat(hotelForm.costo_totale)
         : (hotelForm.costo_unitario && hotelForm.quantita ? parseFloat(hotelForm.costo_unitario) * parseInt(hotelForm.quantita) : null),
+      venduto_unitario: hotelForm.venduto_unitario ? parseFloat(hotelForm.venduto_unitario) : null,
+      venduto_totale: hotelForm.venduto_totale ? parseFloat(hotelForm.venduto_totale)
+        : (hotelForm.venduto_unitario && hotelForm.quantita ? parseFloat(hotelForm.venduto_unitario) * parseInt(hotelForm.quantita) : null),
     }
     if (editingHotelId) {
       await supabase.from('event_hotel_details').update(payload).eq('id', editingHotelId)
@@ -1108,6 +1167,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
         menu_descrizione: data.menu_descrizione ?? '',
         budget_per_persona: data.budget_per_persona?.toString() ?? '',
         budget_totale: data.budget_totale?.toString() ?? '',
+        costo_per_persona: data.costo_per_persona?.toString() ?? '',
+        costo_totale_reale: data.costo_totale_reale?.toString() ?? '',
         area_riservata: data.area_riservata ?? false,
         sala_privata: data.sala_privata ?? false,
         esclusiva_parziale: data.esclusiva_parziale ?? false,
@@ -1135,6 +1196,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
     const paxConf = restaurantForm.pax_confermati ? parseInt(restaurantForm.pax_confermati) : null
     const budgetPP = restaurantForm.budget_per_persona ? parseFloat(restaurantForm.budget_per_persona) : null
     const autoTotal = paxConf && budgetPP ? paxConf * budgetPP : null
+    const costoPP = restaurantForm.costo_per_persona ? parseFloat(restaurantForm.costo_per_persona) : null
+    const autoCostoTotal = paxConf && costoPP ? paxConf * costoPP : null
     const payload = {
       event_id: event.id,
       supplier_id: managingRestaurant,
@@ -1148,6 +1211,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       menu_descrizione: restaurantForm.menu_descrizione,
       budget_per_persona: budgetPP,
       budget_totale: restaurantForm.budget_totale ? parseFloat(restaurantForm.budget_totale) : autoTotal,
+      costo_per_persona: costoPP,
+      costo_totale_reale: restaurantForm.costo_totale_reale ? parseFloat(restaurantForm.costo_totale_reale) : autoCostoTotal,
       area_riservata: restaurantForm.area_riservata,
       sala_privata: restaurantForm.sala_privata,
       esclusiva_parziale: restaurantForm.esclusiva_parziale,
@@ -1495,28 +1560,38 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                         )}
 
                         {/* Cost fields */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo unitario</label>
-                            <input type="number" step="0.01" value={hotelForm.costo_unitario} onChange={e => setHotelForm(p => ({ ...p, costo_unitario: e.target.value }))}
-                              placeholder="0.00"
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo totale</label>
-                            <input type="number" step="0.01" value={hotelForm.costo_totale} onChange={e => setHotelForm(p => ({ ...p, costo_totale: e.target.value }))}
-                              placeholder={hotelForm.costo_unitario && hotelForm.quantita ? `Auto: ${(parseFloat(hotelForm.costo_unitario) * parseInt(hotelForm.quantita || '1')).toFixed(2)}` : 'Qty x Costo unit.'}
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                          {hotelForm.costo_unitario && hotelForm.quantita && (
-                            <div className="flex items-end pb-2">
-                              <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                                Calc: {hotelForm.quantita} x {hotelForm.costo_unitario} = {(parseFloat(hotelForm.costo_unitario) * parseInt(hotelForm.quantita)).toFixed(2)}
-                              </p>
+                        <div className="pt-2 space-y-3" style={{ borderTop: '1px solid var(--line)' }}>
+                          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Economica</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Venduto unit.</label>
+                              <input type="number" step="0.01" value={hotelForm.venduto_unitario} onChange={e => setHotelForm(p => ({ ...p, venduto_unitario: e.target.value }))}
+                                placeholder="0.00"
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
                             </div>
-                          )}
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Venduto totale</label>
+                              <input type="number" step="0.01" value={hotelForm.venduto_totale} onChange={e => setHotelForm(p => ({ ...p, venduto_totale: e.target.value }))}
+                                placeholder={hotelForm.venduto_unitario && hotelForm.quantita ? `Auto: ${(parseFloat(hotelForm.venduto_unitario) * parseInt(hotelForm.quantita || '1')).toFixed(2)}` : ''}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo unit.</label>
+                              <input type="number" step="0.01" value={hotelForm.costo_unitario} onChange={e => setHotelForm(p => ({ ...p, costo_unitario: e.target.value }))}
+                                placeholder="0.00"
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo totale</label>
+                              <input type="number" step="0.01" value={hotelForm.costo_totale} onChange={e => setHotelForm(p => ({ ...p, costo_totale: e.target.value }))}
+                                placeholder={hotelForm.costo_unitario && hotelForm.quantita ? `Auto: ${(parseFloat(hotelForm.costo_unitario) * parseInt(hotelForm.quantita || '1')).toFixed(2)}` : ''}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                          </div>
                         </div>
 
                         <div className="flex items-center gap-2 justify-end">
@@ -1734,12 +1809,12 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                       </div>
                     </div>
 
-                    {/* Sezione 4: Budget */}
+                    {/* Sezione 4: Economica */}
                     <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Budget</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Economica</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Budget per persona</label>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Venduto /persona</label>
                           <input type="number" step="0.01" value={restaurantForm.budget_per_persona}
                             onChange={e => setRestaurantForm(p => ({ ...p, budget_per_persona: e.target.value }))}
                             placeholder="70.00"
@@ -1747,21 +1822,32 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                             style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
                         </div>
                         <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Budget totale</label>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Venduto totale</label>
                           <input type="number" step="0.01" value={restaurantForm.budget_totale}
                             onChange={e => setRestaurantForm(p => ({ ...p, budget_totale: e.target.value }))}
                             placeholder={restaurantForm.pax_confermati && restaurantForm.budget_per_persona
-                              ? `Auto: ${(parseInt(restaurantForm.pax_confermati) * parseFloat(restaurantForm.budget_per_persona)).toFixed(2)}`
-                              : 'Pax × Budget/persona'}
+                              ? `${(parseInt(restaurantForm.pax_confermati) * parseFloat(restaurantForm.budget_per_persona)).toFixed(2)}`
+                              : 'Pax x Venduto/pax'}
                             className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
                             style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
                         </div>
-                        <div className="flex items-end">
-                          {restaurantForm.pax_confermati && restaurantForm.budget_per_persona && (
-                            <p className="text-xs pb-2" style={{ color: 'var(--muted)' }}>
-                              Calcolo: {restaurantForm.pax_confermati} pax × {restaurantForm.budget_per_persona} = {(parseInt(restaurantForm.pax_confermati) * parseFloat(restaurantForm.budget_per_persona)).toFixed(2)}
-                            </p>
-                          )}
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo /persona</label>
+                          <input type="number" step="0.01" value={restaurantForm.costo_per_persona}
+                            onChange={e => setRestaurantForm(p => ({ ...p, costo_per_persona: e.target.value }))}
+                            placeholder="55.00"
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo totale</label>
+                          <input type="number" step="0.01" value={restaurantForm.costo_totale_reale}
+                            onChange={e => setRestaurantForm(p => ({ ...p, costo_totale_reale: e.target.value }))}
+                            placeholder={restaurantForm.pax_confermati && restaurantForm.costo_per_persona
+                              ? `${(parseInt(restaurantForm.pax_confermati) * parseFloat(restaurantForm.costo_per_persona)).toFixed(2)}`
+                              : 'Pax x Costo/pax'}
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
                         </div>
                       </div>
                     </div>
@@ -1973,27 +2059,44 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                           </div>
                         </div>
                         {/* Cost fields */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo unitario</label>
-                            <input type="number" step="0.01" value={svcForm.costo_unitario} onChange={e => setSvcForm(p => ({ ...p, costo_unitario: e.target.value }))}
-                              placeholder="0.00"
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Quantita</label>
-                            <input type="number" value={svcForm.quantita} onChange={e => setSvcForm(p => ({ ...p, quantita: e.target.value }))}
-                              placeholder="1"
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo totale</label>
-                            <input type="number" step="0.01" value={svcForm.costo_totale} onChange={e => setSvcForm(p => ({ ...p, costo_totale: e.target.value }))}
-                              placeholder={svcForm.costo_unitario && svcForm.quantita ? `Auto: ${(parseFloat(svcForm.costo_unitario) * parseInt(svcForm.quantita || '1')).toFixed(2)}` : 'Qty x Unit.'}
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        <div className="pt-2 space-y-3" style={{ borderTop: '1px solid var(--line)' }}>
+                          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Economica</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Quantita</label>
+                              <input type="number" value={svcForm.quantita} onChange={e => setSvcForm(p => ({ ...p, quantita: e.target.value }))}
+                                placeholder="1"
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Venduto unit.</label>
+                              <input type="number" step="0.01" value={svcForm.venduto_unitario} onChange={e => setSvcForm(p => ({ ...p, venduto_unitario: e.target.value }))}
+                                placeholder="0.00"
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Venduto totale</label>
+                              <input type="number" step="0.01" value={svcForm.venduto_totale} onChange={e => setSvcForm(p => ({ ...p, venduto_totale: e.target.value }))}
+                                placeholder={svcForm.venduto_unitario && svcForm.quantita ? `${(parseFloat(svcForm.venduto_unitario) * parseInt(svcForm.quantita || '1')).toFixed(2)}` : ''}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo unit.</label>
+                              <input type="number" step="0.01" value={svcForm.costo_unitario} onChange={e => setSvcForm(p => ({ ...p, costo_unitario: e.target.value }))}
+                                placeholder="0.00"
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
+                            <div>
+                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo totale</label>
+                              <input type="number" step="0.01" value={svcForm.costo_totale} onChange={e => setSvcForm(p => ({ ...p, costo_totale: e.target.value }))}
+                                placeholder={svcForm.costo_unitario && svcForm.quantita ? `${(parseFloat(svcForm.costo_unitario) * parseInt(svcForm.quantita || '1')).toFixed(2)}` : ''}
+                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 justify-end">
@@ -2148,409 +2251,185 @@ function DetailField({ label, value }: { label: string; value: string }) {
   )
 }
 
-function TabBudget({ event, budgets, suppliers, onRefresh }: { event: Event; budgets: Uscita[]; suppliers: Supplier[]; onRefresh: () => void }) {
-  const eventUscite = budgets.filter(u => u.eventoId === event.id)
-  const totUscite = eventUscite.reduce((s, u) => s + (u.unitPrice !== null ? u.unitPrice * u.quantity : u.importo), 0)
-  const [realCosts, setRealCosts] = useState<{ categoria: string; items: { titolo: string; fornitore: string; qty: number; unitario: number; totale: number }[] }[]>([])
-  const [realTotal, setRealTotal] = useState(0)
-  const [ricavoCliente, setRicavoCliente] = useState(event.ricavo_cliente?.toString() ?? '')
-  const [savingRicavo, setSavingRicavo] = useState(false)
+function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
+  const [lines, setLines] = useState<{ categoria: string; items: { titolo: string; fornitore: string; qty: number; venduto: number; costo: number; margine: number; marginePct: number }[] }[]>([])
+  const [totals, setTotals] = useState({ venduto: 0, costo: 0, margine: 0, marginePct: 0 })
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function loadRealCosts() {
+    async function load() {
       const [svcRes, hotelRes, restRes] = await Promise.all([
         supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
         supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
         supabase.from('event_restaurant_details').select('*').eq('event_id', event.id),
       ])
-      const grouped: Record<string, { titolo: string; fornitore: string; qty: number; unitario: number; totale: number }[]> = {}
+      const grouped: Record<string, { titolo: string; fornitore: string; qty: number; venduto: number; costo: number; margine: number; marginePct: number }[]> = {}
 
       for (const s of (svcRes.data ?? []) as SupplierService[]) {
-        if (!s.costo_unitario && !s.costo_totale) continue
-        const cat = suppliers.find(sup => sup.id === s.supplier_id)?.categoria ?? 'Altro'
         const qty = s.quantita ?? 1
-        const unitario = s.costo_unitario ?? 0
-        const totale = s.costo_totale ?? unitario * qty
+        const venduto = s.venduto_totale ?? (s.venduto_unitario ? s.venduto_unitario * qty : 0)
+        const costo = s.costo_totale ?? (s.costo_unitario ? s.costo_unitario * qty : 0)
+        if (!venduto && !costo) continue
+        const margine = venduto - costo
+        const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+        const cat = suppliers.find(sup => sup.id === s.supplier_id)?.categoria ?? 'Altro'
         if (!grouped[cat]) grouped[cat] = []
-        grouped[cat].push({ titolo: s.titolo, fornitore: suppliers.find(sup => sup.id === s.supplier_id)?.nome ?? '', qty, unitario, totale })
+        grouped[cat].push({ titolo: s.titolo, fornitore: suppliers.find(sup => sup.id === s.supplier_id)?.nome ?? '', qty, venduto, costo, margine, marginePct })
       }
 
       for (const h of (hotelRes.data ?? []) as HotelDetail[]) {
-        if (!h.costo_unitario && !h.costo_totale) continue
-        const cat = 'Hotel'
         const qty = h.quantita ?? 1
-        const unitario = h.costo_unitario ?? 0
-        const totale = h.costo_totale ?? unitario * qty
+        const venduto = h.venduto_totale ?? (h.venduto_unitario ? h.venduto_unitario * qty : 0)
+        const costo = h.costo_totale ?? (h.costo_unitario ? h.costo_unitario * qty : 0)
+        if (!venduto && !costo) continue
+        const margine = venduto - costo
+        const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
         const label = h.titolo || HOTEL_TIPOS.find(t => t.value === h.tipo)?.label || h.tipo
-        if (!grouped[cat]) grouped[cat] = []
-        grouped[cat].push({ titolo: label, fornitore: suppliers.find(sup => sup.id === h.supplier_id)?.nome ?? '', qty, unitario, totale })
+        if (!grouped['Hotel']) grouped['Hotel'] = []
+        grouped['Hotel'].push({ titolo: label, fornitore: suppliers.find(sup => sup.id === h.supplier_id)?.nome ?? '', qty, venduto, costo, margine, marginePct })
       }
 
       for (const r of (restRes.data ?? []) as RestaurantDetail[]) {
-        if (!r.budget_totale && !r.budget_per_persona) continue
-        const cat = 'Ristorante'
         const pax = r.pax_confermati ?? r.pax_previsti ?? 1
-        const unitario = r.budget_per_persona ? Number(r.budget_per_persona) : 0
-        const totale = r.budget_totale ? Number(r.budget_totale) : unitario * pax
+        const venduto = r.budget_totale ? Number(r.budget_totale) : (r.budget_per_persona ? Number(r.budget_per_persona) * pax : 0)
+        const costo = r.costo_totale_reale ? Number(r.costo_totale_reale) : (r.costo_per_persona ? Number(r.costo_per_persona) * pax : 0)
+        if (!venduto && !costo) continue
+        const margine = venduto - costo
+        const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
         const label = r.tipologia_servizio || 'Servizio ristorante'
-        if (!grouped[cat]) grouped[cat] = []
-        grouped[cat].push({ titolo: label, fornitore: suppliers.find(sup => sup.id === r.supplier_id)?.nome ?? '', qty: pax, unitario, totale })
+        if (!grouped['Ristorante']) grouped['Ristorante'] = []
+        grouped['Ristorante'].push({ titolo: label, fornitore: suppliers.find(sup => sup.id === r.supplier_id)?.nome ?? '', qty: pax, venduto, costo, margine, marginePct })
       }
 
       const result = Object.entries(grouped).map(([categoria, items]) => ({ categoria, items }))
       result.sort((a, b) => a.categoria.localeCompare(b.categoria))
-      setRealCosts(result)
-      setRealTotal(result.reduce((sum, g) => sum + g.items.reduce((s, i) => s + i.totale, 0), 0))
+      setLines(result)
+
+      const totVenduto = result.reduce((sum, g) => sum + g.items.reduce((s, i) => s + i.venduto, 0), 0)
+      const totCosto = result.reduce((sum, g) => sum + g.items.reduce((s, i) => s + i.costo, 0), 0)
+      const totMargine = totVenduto - totCosto
+      const totMarginePct = totVenduto > 0 ? (totMargine / totVenduto) * 100 : 0
+      setTotals({ venduto: totVenduto, costo: totCosto, margine: totMargine, marginePct: totMarginePct })
+      setLoading(false)
     }
-    loadRealCosts()
+    load()
   }, [event.id, suppliers])
 
-  async function saveRicavo() {
-    setSavingRicavo(true)
-    await supabase.from('events').update({ ricavo_cliente: ricavoCliente ? parseFloat(ricavoCliente) : null }).eq('id', event.id)
-    setSavingRicavo(false)
-  }
-  const margine = event.budget - totUscite
-  const usoPct = event.budget > 0 ? Math.min(Math.round((totUscite / event.budget) * 100), 100) : 0
-  const [editing, setEditing] = useState<string | null>(null)
-  const [exporting, setExporting] = useState(false)
-
-  async function handleAddRow() {
-    const id = crypto.randomUUID()
-    const newRow: Uscita = {
-      id,
-      fornitoreId: '',
-      eventoId: event.id,
-      categoria: '',
-      importo: 0,
-      quantity: 1,
-      unitPrice: 0,
-      stato: 'in_attesa',
-      scadenza: new Date().toISOString().slice(0, 10),
-      dataPagamento: null,
-      note: '',
-      fatturaId: null,
-    }
-    await upsertBudget(newRow)
-    onRefresh()
-    setEditing(id)
-  }
-
-  async function handleSaveRow(u: Uscita) {
-    const importo = u.unitPrice !== null ? u.unitPrice * u.quantity : u.importo
-    await upsertBudget({ ...u, importo })
-    onRefresh()
-    setEditing(null)
-  }
-
-  async function handleDeleteRow(id: string) {
-    await deleteBudget(id)
-    onRefresh()
-  }
-
-  async function exportXLSX() {
-    setExporting(true)
-    const XLSX = await import('xlsx')
-    const rows: Record<string, string | number>[] = eventUscite.map(u => ({
-      'Voce': u.note || u.categoria,
-      'Fornitore': suppliers.find(s => s.id === u.fornitoreId)?.nome ?? '',
-      'Quantita': u.quantity,
-      'Prezzo Unitario': u.unitPrice ?? u.importo,
-      'Totale Riga': u.unitPrice !== null ? u.unitPrice * u.quantity : u.importo,
-      'Stato': u.stato,
-      'Scadenza': u.scadenza,
-    }))
-    rows.push({ 'Voce': '', 'Fornitore': '', 'Quantita': '', 'Prezzo Unitario': '', 'Totale Riga': '', 'Stato': '', 'Scadenza': '' })
-    rows.push({ 'Voce': 'TOTALE USCITE', 'Fornitore': '', 'Quantita': '', 'Prezzo Unitario': '', 'Totale Riga': totUscite, 'Stato': '', 'Scadenza': '' })
-    rows.push({ 'Voce': 'BUDGET EVENTO', 'Fornitore': '', 'Quantita': '', 'Prezzo Unitario': '', 'Totale Riga': event.budget, 'Stato': '', 'Scadenza': '' })
-    rows.push({ 'Voce': 'MARGINE', 'Fornitore': '', 'Quantita': '', 'Prezzo Unitario': '', 'Totale Riga': margine, 'Stato': '', 'Scadenza': '' })
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Budget')
-    XLSX.writeFile(wb, `Budget_${event.nome.replace(/\s+/g, '_')}.xlsx`)
-    setExporting(false)
-  }
-
-  async function exportPDF() {
-    setExporting(true)
-    const jsPDFModule = await import('jspdf')
-    const autoTable = (await import('jspdf-autotable')).default
-    const doc = new jsPDFModule.default()
-    doc.setFontSize(16)
-    doc.text(`Budget - ${event.nome}`, 14, 20)
-    doc.setFontSize(10)
-    doc.text(`Budget totale: ${event.budget.toLocaleString('it-IT')} EUR | Uscite: ${totUscite.toLocaleString('it-IT')} EUR | Margine: ${margine.toLocaleString('it-IT')} EUR`, 14, 30)
-
-    const tableData = eventUscite.map(u => [
-      u.note || u.categoria,
-      suppliers.find(s => s.id === u.fornitoreId)?.nome ?? '-',
-      u.quantity.toString(),
-      (u.unitPrice ?? u.importo).toLocaleString('it-IT') + ' EUR',
-      (u.unitPrice !== null ? u.unitPrice * u.quantity : u.importo).toLocaleString('it-IT') + ' EUR',
-      u.stato,
-    ])
-    autoTable(doc, {
-      startY: 36,
-      head: [['Voce', 'Fornitore', 'Qty', 'Prezzo Unit.', 'Totale', 'Stato']],
-      body: tableData,
-      foot: [['', '', '', 'TOTALE', totUscite.toLocaleString('it-IT') + ' EUR', '']],
-    })
-    doc.save(`Budget_${event.nome.replace(/\s+/g, '_')}.pdf`)
-    setExporting(false)
+  if (loading) {
+    return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento budget...</div></div>
   }
 
   return (
     <div className="space-y-5">
+      {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Budget Totale', value: event.budget, color: 'var(--text)' },
-          { label: 'Entrate Prev.', value: event.budget, color: 'var(--green)' },
-          { label: 'Uscite', value: totUscite, color: 'var(--yellow)' },
-          { label: 'Margine', value: margine, color: margine >= 0 ? 'var(--green)' : 'var(--red2)' },
-        ].map(k => (
-          <div key={k.label} className="panel p-4 text-center">
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>{k.label}</p>
-            <p className="text-xl font-bold mt-1" style={{ color: k.color }}>
-              {'\u20AC'}{k.value.toLocaleString('it-IT')}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <div className="panel p-5">
-        <div className="flex justify-between text-xs mb-2">
-          <span style={{ color: 'var(--muted)' }}>Utilizzo budget</span>
-          <span style={{ color: usoPct > 90 ? 'var(--red2)' : 'var(--text)' }}>{usoPct}%</span>
+        <div className="panel p-4 text-center">
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Venduto Cliente</p>
+          <p className="text-xl font-bold mt-1" style={{ color: 'var(--text)' }}>{'\u20AC'}{totals.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
         </div>
-        <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
-          <div className="h-full rounded-full transition-all"
-            style={{ width: `${usoPct}%`, background: usoPct > 90 ? 'var(--red2)' : usoPct > 70 ? 'var(--yellow)' : 'var(--green)' }} />
+        <div className="panel p-4 text-center">
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Costi Reali</p>
+          <p className="text-xl font-bold mt-1" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{totals.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
+        </div>
+        <div className="panel p-4 text-center">
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Margine</p>
+          <p className="text-xl font-bold mt-1" style={{ color: totals.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{totals.margine.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
+        </div>
+        <div className="panel p-4 text-center">
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Margine %</p>
+          <p className="text-xl font-bold mt-1" style={{ color: totals.marginePct >= 20 ? 'var(--green)' : totals.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{totals.marginePct.toFixed(1)}%</p>
         </div>
       </div>
 
-      {/* Budget Reale - from operational services */}
-      <div className="panel p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>Budget Reale (da servizi operativi)</p>
-          <p className="text-lg font-bold" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{realTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
-        </div>
-
-        {realCosts.length === 0 ? (
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Nessun costo inserito nei servizi operativi. Aggiungi costi dalla scheda Fornitori.</p>
-        ) : (
-          <div className="space-y-3">
-            {realCosts.map(group => {
-              const catTotal = group.items.reduce((s, i) => s + i.totale, 0)
-              return (
-                <div key={group.categoria}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{group.categoria}</p>
-                    <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>{'\u20AC'}{catTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
-                  </div>
-                  <div className="rounded-lg overflow-hidden" style={{ border: '1px solid var(--line)' }}>
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr style={{ background: 'var(--panel2)' }}>
-                          <th className="text-left px-3 py-2" style={{ color: 'var(--muted)' }}>Servizio</th>
-                          <th className="text-left px-3 py-2" style={{ color: 'var(--muted)' }}>Fornitore</th>
-                          <th className="text-right px-3 py-2" style={{ color: 'var(--muted)' }}>Qty</th>
-                          <th className="text-right px-3 py-2" style={{ color: 'var(--muted)' }}>Unitario</th>
-                          <th className="text-right px-3 py-2" style={{ color: 'var(--muted)' }}>Totale</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {group.items.map((item, idx) => (
-                          <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid var(--line)' : undefined }}>
-                            <td className="px-3 py-2" style={{ color: 'var(--text)' }}>{item.titolo}</td>
-                            <td className="px-3 py-2" style={{ color: 'var(--muted)' }}>{item.fornitore}</td>
-                            <td className="px-3 py-2 text-right" style={{ color: 'var(--text)' }}>{item.qty}</td>
-                            <td className="px-3 py-2 text-right" style={{ color: 'var(--text)' }}>{'\u20AC'}{item.unitario.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
-                            <td className="px-3 py-2 text-right font-medium" style={{ color: 'var(--text)' }}>{'\u20AC'}{item.totale.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )
-            })}
+      {/* Margin bar */}
+      {totals.venduto > 0 && (
+        <div className="panel p-5">
+          <div className="flex justify-between text-xs mb-2">
+            <span style={{ color: 'var(--muted)' }}>Margine operativo</span>
+            <span style={{ color: totals.marginePct >= 20 ? 'var(--green)' : 'var(--yellow)' }}>{totals.marginePct.toFixed(1)}%</span>
           </div>
-        )}
-
-        {/* Ricavo Cliente */}
-        <div className="pt-3 flex items-end gap-3" style={{ borderTop: '1px solid var(--line)' }}>
-          <div className="flex-1">
-            <label className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Ricavo Cliente (fatturato)</label>
-            <input type="number" step="0.01" value={ricavoCliente} onChange={e => setRicavoCliente(e.target.value)}
-              placeholder="Inserisci ricavo cliente"
-              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-          </div>
-          <button onClick={saveRicavo} disabled={savingRicavo}
-            className="px-4 py-2 rounded-lg text-xs font-medium"
-            style={{ background: 'var(--red2)', color: '#fff' }}>
-            Salva
-          </button>
-          {ricavoCliente && realTotal > 0 && (
-            <div className="text-right">
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>Margine Operativo</p>
-              <p className="text-sm font-bold" style={{ color: parseFloat(ricavoCliente) - realTotal >= 0 ? 'var(--green)' : 'var(--red2)' }}>
-                {'\u20AC'}{(parseFloat(ricavoCliente) - realTotal).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Actions bar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button onClick={handleAddRow}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium"
-          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
-          <Plus className="w-3.5 h-3.5" /> Aggiungi Voce
-        </button>
-        <button onClick={exportXLSX} disabled={exporting || eventUscite.length === 0}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40"
-          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-          <FileText className="w-3.5 h-3.5" /> Export XLSX
-        </button>
-        <button onClick={exportPDF} disabled={exporting || eventUscite.length === 0}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-40"
-          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-          <FileText className="w-3.5 h-3.5" /> Export PDF
-        </button>
-      </div>
-
-      {/* Budget table */}
-      {eventUscite.length > 0 ? (
-        <div className="panel rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr style={{ background: 'var(--panel2)' }}>
-                  <th className="text-left px-3 py-2.5 font-semibold" style={{ color: 'var(--muted)' }}>Voce</th>
-                  <th className="text-left px-3 py-2.5 font-semibold" style={{ color: 'var(--muted)' }}>Fornitore</th>
-                  <th className="text-right px-3 py-2.5 font-semibold" style={{ color: 'var(--muted)' }}>Qty</th>
-                  <th className="text-right px-3 py-2.5 font-semibold" style={{ color: 'var(--muted)' }}>Prezzo Unit.</th>
-                  <th className="text-right px-3 py-2.5 font-semibold" style={{ color: 'var(--muted)' }}>Totale</th>
-                  <th className="text-center px-3 py-2.5 font-semibold" style={{ color: 'var(--muted)' }}>Stato</th>
-                  <th className="w-16"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {eventUscite.map(u => (
-                  <BudgetRow key={u.id} row={u} suppliers={suppliers}
-                    isEditing={editing === u.id}
-                    onEdit={() => setEditing(u.id)}
-                    onSave={handleSaveRow}
-                    onCancel={() => setEditing(null)}
-                    onDelete={() => handleDeleteRow(u.id)} />
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ borderTop: '2px solid var(--line)' }}>
-                  <td colSpan={4} className="px-3 py-2.5 text-right font-bold" style={{ color: 'var(--text)' }}>Totale Generale</td>
-                  <td className="px-3 py-2.5 text-right font-bold" style={{ color: 'var(--yellow)' }}>
-                    {'\u20AC'}{totUscite.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td colSpan={2}></td>
-                </tr>
-              </tfoot>
-            </table>
+          <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
+            <div className="h-full rounded-full transition-all"
+              style={{ width: `${Math.min(Math.max(totals.marginePct, 0), 100)}%`, background: totals.marginePct >= 20 ? 'var(--green)' : totals.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }} />
           </div>
         </div>
-      ) : (
+      )}
+
+      {/* Categories breakdown */}
+      {lines.length === 0 ? (
         <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <Euro className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p>Nessuna voce budget per questo evento</p>
-          <p className="text-xs mt-1">Clicca "Aggiungi Voce" per iniziare</p>
+          <p>Nessun dato economico</p>
+          <p className="text-xs mt-1">Inserisci venduto e costo nei servizi operativi (tab Fornitori)</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {lines.map(group => {
+            const catVenduto = group.items.reduce((s, i) => s + i.venduto, 0)
+            const catCosto = group.items.reduce((s, i) => s + i.costo, 0)
+            const catMargine = catVenduto - catCosto
+            const catMarginePct = catVenduto > 0 ? (catMargine / catVenduto) * 100 : 0
+            return (
+              <div key={group.categoria} className="panel overflow-hidden">
+                <div className="px-4 py-3 flex items-center justify-between" style={{ background: 'var(--panel2)' }}>
+                  <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>{group.categoria}</p>
+                  <div className="flex items-center gap-4 text-xs">
+                    <span style={{ color: 'var(--muted)' }}>V: <strong style={{ color: 'var(--text)' }}>{'\u20AC'}{catVenduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</strong></span>
+                    <span style={{ color: 'var(--muted)' }}>C: <strong style={{ color: 'var(--yellow)' }}>{'\u20AC'}{catCosto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</strong></span>
+                    <span style={{ color: 'var(--muted)' }}>M: <strong style={{ color: catMargine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{catMargine.toLocaleString('it-IT', { minimumFractionDigits: 2 })} ({catMarginePct.toFixed(0)}%)</strong></span>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                        <th className="text-left px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Servizio</th>
+                        <th className="text-left px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Fornitore</th>
+                        <th className="text-right px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Qty</th>
+                        <th className="text-right px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Venduto</th>
+                        <th className="text-right px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Costo</th>
+                        <th className="text-right px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Margine</th>
+                        <th className="text-right px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.items.map((item, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid var(--line)' }}>
+                          <td className="px-4 py-2.5" style={{ color: 'var(--text)' }}>{item.titolo}</td>
+                          <td className="px-4 py-2.5" style={{ color: 'var(--muted)' }}>{item.fornitore}</td>
+                          <td className="px-4 py-2.5 text-right" style={{ color: 'var(--text)' }}>{item.qty}</td>
+                          <td className="px-4 py-2.5 text-right" style={{ color: 'var(--text)' }}>{'\u20AC'}{item.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
+                          <td className="px-4 py-2.5 text-right" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{item.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
+                          <td className="px-4 py-2.5 text-right font-medium" style={{ color: item.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{item.margine.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
+                          <td className="px-4 py-2.5 text-right font-medium" style={{ color: item.marginePct >= 20 ? 'var(--green)' : item.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{item.marginePct.toFixed(0)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Grand total row */}
+      {lines.length > 0 && (
+        <div className="panel p-4">
+          <table className="w-full text-sm">
+            <tbody>
+              <tr>
+                <td className="py-1 font-bold" style={{ color: 'var(--text)' }}>TOTALE EVENTO</td>
+                <td className="py-1 text-right" style={{ color: 'var(--text)' }}>{'\u20AC'}{totals.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
+                <td className="py-1 text-right" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{totals.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
+                <td className="py-1 text-right font-bold" style={{ color: totals.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{totals.margine.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
+                <td className="py-1 text-right font-bold" style={{ color: totals.marginePct >= 20 ? 'var(--green)' : 'var(--yellow)' }}>{totals.marginePct.toFixed(1)}%</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       )}
     </div>
-  )
-}
-
-function BudgetRow({ row, suppliers, isEditing, onEdit, onSave, onCancel, onDelete }: {
-  row: Uscita
-  suppliers: Supplier[]
-  isEditing: boolean
-  onEdit: () => void
-  onSave: (u: Uscita) => void
-  onCancel: () => void
-  onDelete: () => void
-}) {
-  const [local, setLocal] = useState(row)
-
-  useEffect(() => { setLocal(row) }, [row])
-
-  const rowTotal = local.unitPrice !== null ? local.unitPrice * local.quantity : local.importo
-
-  if (!isEditing) {
-    const sup = suppliers.find(s => s.id === row.fornitoreId)
-    const total = row.unitPrice !== null ? row.unitPrice * row.quantity : row.importo
-    return (
-      <tr className="hover:bg-white/5 transition-colors" style={{ borderBottom: '1px solid var(--line)' }}>
-        <td className="px-3 py-2.5" style={{ color: 'var(--text)' }}>{row.note || row.categoria || '-'}</td>
-        <td className="px-3 py-2.5" style={{ color: 'var(--muted)' }}>{sup?.nome ?? '-'}</td>
-        <td className="px-3 py-2.5 text-right" style={{ color: 'var(--text)' }}>{row.quantity}</td>
-        <td className="px-3 py-2.5 text-right" style={{ color: 'var(--text)' }}>{'\u20AC'}{(row.unitPrice ?? row.importo).toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
-        <td className="px-3 py-2.5 text-right font-medium" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
-        <td className="px-3 py-2.5 text-center">
-          <span className="text-xs px-1.5 py-0.5 rounded capitalize"
-            style={{ background: row.stato === 'pagato' ? 'rgba(56,210,125,0.12)' : row.stato === 'scaduto' ? 'rgba(255,49,95,0.12)' : 'rgba(255,194,75,0.12)', color: row.stato === 'pagato' ? 'var(--green)' : row.stato === 'scaduto' ? 'var(--red2)' : 'var(--yellow)' }}>
-            {row.stato.replace(/_/g, ' ')}
-          </span>
-        </td>
-        <td className="px-2 py-2.5">
-          <div className="flex gap-1">
-            <button onClick={onEdit} className="p-1 rounded hover:bg-white/10"><Edit3 className="w-3 h-3" style={{ color: 'var(--muted)' }} /></button>
-            <button onClick={onDelete} className="p-1 rounded hover:bg-white/10"><Trash2 className="w-3 h-3" style={{ color: 'var(--red2)' }} /></button>
-          </div>
-        </td>
-      </tr>
-    )
-  }
-
-  return (
-    <tr style={{ borderBottom: '1px solid var(--line)', background: 'rgba(208,0,58,0.03)' }}>
-      <td className="px-2 py-2">
-        <input value={local.note} onChange={e => setLocal({ ...local, note: e.target.value })} placeholder="Descrizione voce"
-          className="w-full px-2 py-1 rounded text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-      </td>
-      <td className="px-2 py-2">
-        <select value={local.fornitoreId} onChange={e => setLocal({ ...local, fornitoreId: e.target.value })}
-          className="w-full px-2 py-1 rounded text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-          <option value="">-</option>
-          {suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-        </select>
-      </td>
-      <td className="px-2 py-2">
-        <input type="number" min="1" step="1" value={local.quantity} onChange={e => setLocal({ ...local, quantity: Number(e.target.value) || 1 })}
-          className="w-16 px-2 py-1 rounded text-xs text-right" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-      </td>
-      <td className="px-2 py-2">
-        <input type="number" min="0" step="0.01" value={local.unitPrice ?? ''} onChange={e => setLocal({ ...local, unitPrice: Number(e.target.value) || 0 })}
-          className="w-24 px-2 py-1 rounded text-xs text-right" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-      </td>
-      <td className="px-3 py-2 text-right font-medium text-xs" style={{ color: 'var(--yellow)' }}>
-        {'\u20AC'}{rowTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-      </td>
-      <td className="px-2 py-2">
-        <select value={local.stato} onChange={e => setLocal({ ...local, stato: e.target.value as Uscita['stato'] })}
-          className="w-full px-2 py-1 rounded text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-          <option value="in_attesa">In attesa</option>
-          <option value="pagato">Pagato</option>
-          <option value="scaduto">Scaduto</option>
-          <option value="annullato">Annullato</option>
-        </select>
-      </td>
-      <td className="px-2 py-2">
-        <div className="flex gap-1">
-          <button onClick={() => onSave(local)} className="p-1 rounded hover:bg-white/10"><CheckSquare className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} /></button>
-          <button onClick={onCancel} className="p-1 rounded hover:bg-white/10"><X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} /></button>
-        </div>
-      </td>
-    </tr>
   )
 }
 
@@ -3531,10 +3410,9 @@ interface EventDetailProps {
   comunicazioni: Messaggio[]
   internalUsers: InternalUser[]
   clients: Client[]
-  onRefreshBudgets: () => void
 }
 
-function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni, internalUsers, clients, onRefreshBudgets }: EventDetailProps) {
+function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni, internalUsers, clients }: EventDetailProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
 
   const allTasks = loadTasksFromStorage()
@@ -3729,7 +3607,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         {activeTab === 'task' && <TabTask event={event} />}
         {activeTab === 'team' && <TabTeam event={event} internalUsers={internalUsers} />}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} />}
-        {activeTab === 'budget' && <TabBudget event={event} budgets={budgets} suppliers={suppliers} onRefresh={onRefreshBudgets} />}
+        {activeTab === 'budget' && <TabBudget event={event} suppliers={suppliers} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} />}
         {activeTab === 'programma' && <TabProgramma event={event} suppliers={suppliers} />}
@@ -3963,7 +3841,6 @@ export default function Eventi() {
           comunicazioni={comunicazioni}
           internalUsers={internalUsers}
           clients={clientsList}
-          onRefreshBudgets={() => fetchBudgets().then(setBudgets)}
         />
       </>
     )
