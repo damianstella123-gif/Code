@@ -378,7 +378,7 @@ function EventEconomicSummary({ event }: { event: Event }) {
 
   useEffect(() => {
     async function load() {
-      const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes] = await Promise.all([
+      const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes] = await Promise.all([
         supabase.from('event_supplier_services').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
         supabase.from('event_hotel_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
         supabase.from('event_restaurant_details').select('budget_per_persona,budget_totale,costo_per_persona,costo_totale_reale,pax_confermati,pax_previsti').eq('event_id', event.id),
@@ -387,6 +387,9 @@ function EventEconomicSummary({ event }: { event: Event }) {
         supabase.from('event_staff_interno_details').select('venduto_totale,costo_giornaliero,costo_totale').eq('event_id', event.id),
         supabase.from('event_staff_esterno_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
         supabase.from('event_varie_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
+        supabase.from('event_audio_video_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
+        supabase.from('event_allestimenti_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
+        supabase.from('event_grafica_stampa_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
       ])
       let venduto = 0, costo = 0
       for (const s of (svcRes.data ?? [])) {
@@ -427,6 +430,21 @@ function EventEconomicSummary({ event }: { event: Event }) {
         const qty = v.quantita ?? 1
         venduto += v.venduto_totale ?? (v.venduto_unitario ? v.venduto_unitario * qty : 0)
         costo += v.costo_totale ?? (v.costo_unitario ? v.costo_unitario * qty : 0)
+      }
+      for (const av of (avRes.data ?? [])) {
+        const qty = av.quantita ?? 1
+        venduto += av.venduto_totale ?? (av.venduto_unitario ? av.venduto_unitario * qty : 0)
+        costo += av.costo_totale ?? (av.costo_unitario ? av.costo_unitario * qty : 0)
+      }
+      for (const al of (allestRes.data ?? [])) {
+        const qty = al.quantita ?? 1
+        venduto += al.venduto_totale ?? (al.venduto_unitario ? al.venduto_unitario * qty : 0)
+        costo += al.costo_totale ?? (al.costo_unitario ? al.costo_unitario * qty : 0)
+      }
+      for (const g of (graficaRes.data ?? [])) {
+        const qty = g.quantita ?? 1
+        venduto += g.venduto_totale ?? (g.venduto_unitario ? g.venduto_unitario * qty : 0)
+        costo += g.costo_totale ?? (g.costo_unitario ? g.costo_unitario * qty : 0)
       }
       const margine = venduto - costo
       const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
@@ -2369,7 +2387,7 @@ function DetailField({ label, value }: { label: string; value: string }) {
   )
 }
 
-type BudgetLineSource = 'service' | 'hotel' | 'restaurant' | 'experience' | 'catering' | 'staff_interno' | 'staff_esterno' | 'varie'
+type BudgetLineSource = 'service' | 'hotel' | 'restaurant' | 'experience' | 'catering' | 'staff_interno' | 'staff_esterno' | 'varie' | 'audio_video' | 'allestimenti' | 'grafica_stampa'
 interface BudgetLine {
   id: string
   source: BudgetLineSource
@@ -2396,7 +2414,7 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
-    const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes] = await Promise.all([
+    const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes] = await Promise.all([
       supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
       supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
       supabase.from('event_restaurant_details').select('*').eq('event_id', event.id),
@@ -2405,6 +2423,9 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
       supabase.from('event_staff_interno_details').select('*').eq('event_id', event.id),
       supabase.from('event_staff_esterno_details').select('*').eq('event_id', event.id),
       supabase.from('event_varie_details').select('*').eq('event_id', event.id),
+      supabase.from('event_audio_video_details').select('*').eq('event_id', event.id),
+      supabase.from('event_allestimenti_details').select('*').eq('event_id', event.id),
+      supabase.from('event_grafica_stampa_details').select('*').eq('event_id', event.id),
     ])
     const all: BudgetLine[] = []
 
@@ -2496,6 +2517,39 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
       all.push({ id: v.id, source: 'varie', categoria: 'Varie', titolo: v.descrizione || 'Voce varia', fornitore: sup?.nome ?? '', supplierId: v.supplier_id ?? '', qty, venduto, costo, margine, marginePct, raw: v })
     }
 
+    for (const av of (avRes.data ?? []) as Record<string, unknown>[]) {
+      const qty = (av.quantita as number) ?? 1
+      const venduto = (av.venduto_totale as number) ?? ((av.venduto_unitario as number) ? (av.venduto_unitario as number) * qty : 0)
+      const costo = (av.costo_totale as number) ?? ((av.costo_unitario as number) ? (av.costo_unitario as number) * qty : 0)
+      if (!venduto && !costo) continue
+      const margine = venduto - costo
+      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+      const sup = av.supplier_id ? suppliers.find(sup => sup.id === av.supplier_id) : null
+      all.push({ id: av.id as string, source: 'audio_video' as BudgetLineSource, categoria: 'Audio Video', titolo: (av.tipologia_servizio as string) || 'Audio Video', fornitore: sup?.nome ?? '', supplierId: (av.supplier_id as string) ?? '', qty, venduto, costo, margine, marginePct, raw: av as unknown as VarieDetail })
+    }
+
+    for (const al of (allestRes.data ?? []) as Record<string, unknown>[]) {
+      const qty = (al.quantita as number) ?? 1
+      const venduto = (al.venduto_totale as number) ?? ((al.venduto_unitario as number) ? (al.venduto_unitario as number) * qty : 0)
+      const costo = (al.costo_totale as number) ?? ((al.costo_unitario as number) ? (al.costo_unitario as number) * qty : 0)
+      if (!venduto && !costo) continue
+      const margine = venduto - costo
+      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+      const sup = al.supplier_id ? suppliers.find(sup => sup.id === al.supplier_id) : null
+      all.push({ id: al.id as string, source: 'allestimenti' as BudgetLineSource, categoria: 'Allestimenti', titolo: (al.descrizione as string) || 'Allestimento', fornitore: sup?.nome ?? '', supplierId: (al.supplier_id as string) ?? '', qty, venduto, costo, margine, marginePct, raw: al as unknown as VarieDetail })
+    }
+
+    for (const g of (graficaRes.data ?? []) as Record<string, unknown>[]) {
+      const qty = (g.quantita as number) ?? 1
+      const venduto = (g.venduto_totale as number) ?? ((g.venduto_unitario as number) ? (g.venduto_unitario as number) * qty : 0)
+      const costo = (g.costo_totale as number) ?? ((g.costo_unitario as number) ? (g.costo_unitario as number) * qty : 0)
+      if (!venduto && !costo) continue
+      const margine = venduto - costo
+      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+      const sup = g.supplier_id ? suppliers.find(sup => sup.id === g.supplier_id) : null
+      all.push({ id: g.id as string, source: 'grafica_stampa' as BudgetLineSource, categoria: 'Grafica/Stampa', titolo: (g.tipo_materiale as string) || 'Grafica', fornitore: sup?.nome ?? '', supplierId: (g.supplier_id as string) ?? '', qty, venduto, costo, margine, marginePct, raw: g as unknown as VarieDetail })
+    }
+
     all.sort((a, b) => a.categoria.localeCompare(b.categoria) || a.titolo.localeCompare(b.titolo))
     setLines(all)
 
@@ -2544,6 +2598,7 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
       service: 'event_supplier_services', hotel: 'event_hotel_details', restaurant: 'event_restaurant_details',
       experience: 'event_experience_details', catering: 'event_catering_details',
       staff_interno: 'event_staff_interno_details', staff_esterno: 'event_staff_esterno_details', varie: 'event_varie_details',
+      audio_video: 'event_audio_video_details', allestimenti: 'event_allestimenti_details', grafica_stampa: 'event_grafica_stampa_details',
     }
     const table = tableMap[line.source]
 
@@ -2614,6 +2669,7 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
       service: 'event_supplier_services', hotel: 'event_hotel_details', restaurant: 'event_restaurant_details',
       experience: 'event_experience_details', catering: 'event_catering_details',
       staff_interno: 'event_staff_interno_details', staff_esterno: 'event_staff_esterno_details', varie: 'event_varie_details',
+      audio_video: 'event_audio_video_details', allestimenti: 'event_allestimenti_details', grafica_stampa: 'event_grafica_stampa_details',
     }
     await supabase.from(tableMap[line.source]).delete().eq('id', line.id)
     setDeletingId(null)
@@ -2767,7 +2823,7 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
 
 function BudgetLineDetail({ line, onEdit, onDelete }: { line: BudgetLine; onEdit: () => void; onDelete: () => void }) {
   const detailFields: { label: string; value: string }[] = []
-  const sourceLabels: Record<BudgetLineSource, string> = { service: 'Servizio', hotel: 'Hotel', restaurant: 'Ristorante', experience: 'Experience', catering: 'Catering', staff_interno: 'Staff Simmetria', staff_esterno: 'Staff Esterno', varie: 'Varie' }
+  const sourceLabels: Record<BudgetLineSource, string> = { service: 'Servizio', hotel: 'Hotel', restaurant: 'Ristorante', experience: 'Experience', catering: 'Catering', staff_interno: 'Staff Simmetria', staff_esterno: 'Staff Esterno', varie: 'Varie', audio_video: 'Audio Video', allestimenti: 'Allestimenti', grafica_stampa: 'Grafica/Stampa' }
 
   if (line.source === 'service') {
     const s = line.raw as SupplierService
@@ -3271,7 +3327,7 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
 
   useEffect(() => {
     async function load() {
-      const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes] = await Promise.all([
+      const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes] = await Promise.all([
         supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
         supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
         supabase.from('event_restaurant_details').select('*').eq('event_id', event.id),
@@ -3280,6 +3336,9 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
         supabase.from('event_staff_interno_details').select('*').eq('event_id', event.id),
         supabase.from('event_staff_esterno_details').select('*').eq('event_id', event.id),
         supabase.from('event_varie_details').select('*').eq('event_id', event.id),
+        supabase.from('event_audio_video_details').select('*').eq('event_id', event.id),
+        supabase.from('event_allestimenti_details').select('*').eq('event_id', event.id),
+        supabase.from('event_grafica_stampa_details').select('*').eq('event_id', event.id),
       ])
 
       const program: ProgramEntry[] = []
@@ -3484,6 +3543,36 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
             luogo: '',
             note: v.note || '',
           })
+        }
+      }
+
+      for (const av of (avRes.data ?? []) as Record<string, unknown>[]) {
+        if (av.data_montaggio && av.ora_montaggio) {
+          program.push({ id: av.id + '-mont', supplier_id: (av.supplier_id as string) ?? '', titolo: 'Montaggio AV', categoria: 'Audio Video', data: av.data_montaggio as string, ora_inizio: av.ora_montaggio as string, ora_fine: null, luogo: '', note: (av.tipologia_servizio as string) || '' })
+        }
+        if (av.data_prove && av.ora_prove) {
+          program.push({ id: av.id + '-prove', supplier_id: (av.supplier_id as string) ?? '', titolo: 'Prove AV', categoria: 'Audio Video', data: av.data_prove as string, ora_inizio: av.ora_prove as string, ora_fine: null, luogo: '', note: '' })
+        }
+        if (av.data_evento && av.ora_evento) {
+          program.push({ id: av.id + '-evt', supplier_id: (av.supplier_id as string) ?? '', titolo: (av.tipologia_servizio as string) || 'Servizio AV', categoria: 'Audio Video', data: av.data_evento as string, ora_inizio: av.ora_evento as string, ora_fine: null, luogo: '', note: '' })
+        }
+        if (av.data_smontaggio && av.ora_smontaggio) {
+          program.push({ id: av.id + '-smont', supplier_id: (av.supplier_id as string) ?? '', titolo: 'Smontaggio AV', categoria: 'Audio Video', data: av.data_smontaggio as string, ora_inizio: av.ora_smontaggio as string, ora_fine: null, luogo: '', note: '' })
+        }
+      }
+
+      for (const al of (allestRes.data ?? []) as Record<string, unknown>[]) {
+        if (al.data_montaggio && al.ora_montaggio) {
+          program.push({ id: al.id + '-mont', supplier_id: (al.supplier_id as string) ?? '', titolo: `Montaggio: ${(al.descrizione as string) || 'Allestimento'}`, categoria: 'Allestimenti', data: al.data_montaggio as string, ora_inizio: al.ora_montaggio as string, ora_fine: null, luogo: (al.area_utilizzo as string) || '', note: '' })
+        }
+        if (al.data_smontaggio && al.ora_smontaggio) {
+          program.push({ id: al.id + '-smont', supplier_id: (al.supplier_id as string) ?? '', titolo: `Smontaggio: ${(al.descrizione as string) || 'Allestimento'}`, categoria: 'Allestimenti', data: al.data_smontaggio as string, ora_inizio: al.ora_smontaggio as string, ora_fine: null, luogo: (al.area_utilizzo as string) || '', note: '' })
+        }
+      }
+
+      for (const g of (graficaRes.data ?? []) as Record<string, unknown>[]) {
+        if (g.data_consegna) {
+          program.push({ id: g.id as string, supplier_id: (g.supplier_id as string) ?? '', titolo: `Consegna: ${(g.tipo_materiale as string) || 'Materiale'}`, categoria: 'Grafica/Stampa', data: g.data_consegna as string, ora_inizio: '09:00', ora_fine: null, luogo: '', note: (g.formato as string) || '' })
         }
       }
 
