@@ -89,7 +89,7 @@ export default function Login() {
       <div className="w-full max-w-md mx-auto">
         <div className="text-center mb-12">
           <img
-            src="/Logo_1.png"
+            src="/logo-synergy.png"
             alt="Simmetria Synergy"
             className="w-44 sm:w-52 mx-auto object-contain"
           />
