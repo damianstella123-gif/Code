@@ -8,6 +8,8 @@ import {
   Truck,
   Clock,
   ChevronRight,
+  ChevronDown,
+  Save,
   Search,
   X,
   ArrowLeft,
@@ -2251,69 +2253,154 @@ function DetailField({ label, value }: { label: string; value: string }) {
   )
 }
 
+type BudgetLineSource = 'service' | 'hotel' | 'restaurant'
+interface BudgetLine {
+  id: string
+  source: BudgetLineSource
+  categoria: string
+  titolo: string
+  fornitore: string
+  supplierId: string
+  qty: number
+  venduto: number
+  costo: number
+  margine: number
+  marginePct: number
+  raw: SupplierService | HotelDetail | RestaurantDetail
+}
+
 function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
-  const [lines, setLines] = useState<{ categoria: string; items: { titolo: string; fornitore: string; qty: number; venduto: number; costo: number; margine: number; marginePct: number }[] }[]>([])
+  const [lines, setLines] = useState<BudgetLine[]>([])
   const [totals, setTotals] = useState({ venduto: 0, costo: 0, margine: 0, marginePct: 0 })
   const [loading, setLoading] = useState(true)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<Record<string, string | number | boolean>>({})
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function load() {
-      const [svcRes, hotelRes, restRes] = await Promise.all([
-        supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
-        supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
-        supabase.from('event_restaurant_details').select('*').eq('event_id', event.id),
-      ])
-      const grouped: Record<string, { titolo: string; fornitore: string; qty: number; venduto: number; costo: number; margine: number; marginePct: number }[]> = {}
+  const loadData = useCallback(async () => {
+    const [svcRes, hotelRes, restRes] = await Promise.all([
+      supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
+      supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
+      supabase.from('event_restaurant_details').select('*').eq('event_id', event.id),
+    ])
+    const all: BudgetLine[] = []
 
-      for (const s of (svcRes.data ?? []) as SupplierService[]) {
-        const qty = s.quantita ?? 1
-        const venduto = s.venduto_totale ?? (s.venduto_unitario ? s.venduto_unitario * qty : 0)
-        const costo = s.costo_totale ?? (s.costo_unitario ? s.costo_unitario * qty : 0)
-        if (!venduto && !costo) continue
-        const margine = venduto - costo
-        const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
-        const cat = suppliers.find(sup => sup.id === s.supplier_id)?.categoria ?? 'Altro'
-        if (!grouped[cat]) grouped[cat] = []
-        grouped[cat].push({ titolo: s.titolo, fornitore: suppliers.find(sup => sup.id === s.supplier_id)?.nome ?? '', qty, venduto, costo, margine, marginePct })
-      }
-
-      for (const h of (hotelRes.data ?? []) as HotelDetail[]) {
-        const qty = h.quantita ?? 1
-        const venduto = h.venduto_totale ?? (h.venduto_unitario ? h.venduto_unitario * qty : 0)
-        const costo = h.costo_totale ?? (h.costo_unitario ? h.costo_unitario * qty : 0)
-        if (!venduto && !costo) continue
-        const margine = venduto - costo
-        const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
-        const label = h.titolo || HOTEL_TIPOS.find(t => t.value === h.tipo)?.label || h.tipo
-        if (!grouped['Hotel']) grouped['Hotel'] = []
-        grouped['Hotel'].push({ titolo: label, fornitore: suppliers.find(sup => sup.id === h.supplier_id)?.nome ?? '', qty, venduto, costo, margine, marginePct })
-      }
-
-      for (const r of (restRes.data ?? []) as RestaurantDetail[]) {
-        const pax = r.pax_confermati ?? r.pax_previsti ?? 1
-        const venduto = r.budget_totale ? Number(r.budget_totale) : (r.budget_per_persona ? Number(r.budget_per_persona) * pax : 0)
-        const costo = r.costo_totale_reale ? Number(r.costo_totale_reale) : (r.costo_per_persona ? Number(r.costo_per_persona) * pax : 0)
-        if (!venduto && !costo) continue
-        const margine = venduto - costo
-        const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
-        const label = r.tipologia_servizio || 'Servizio ristorante'
-        if (!grouped['Ristorante']) grouped['Ristorante'] = []
-        grouped['Ristorante'].push({ titolo: label, fornitore: suppliers.find(sup => sup.id === r.supplier_id)?.nome ?? '', qty: pax, venduto, costo, margine, marginePct })
-      }
-
-      const result = Object.entries(grouped).map(([categoria, items]) => ({ categoria, items }))
-      result.sort((a, b) => a.categoria.localeCompare(b.categoria))
-      setLines(result)
-
-      const totVenduto = result.reduce((sum, g) => sum + g.items.reduce((s, i) => s + i.venduto, 0), 0)
-      const totCosto = result.reduce((sum, g) => sum + g.items.reduce((s, i) => s + i.costo, 0), 0)
-      const totMargine = totVenduto - totCosto
-      const totMarginePct = totVenduto > 0 ? (totMargine / totVenduto) * 100 : 0
-      setTotals({ venduto: totVenduto, costo: totCosto, margine: totMargine, marginePct: totMarginePct })
-      setLoading(false)
+    for (const s of (svcRes.data ?? []) as SupplierService[]) {
+      const qty = s.quantita ?? 1
+      const venduto = s.venduto_totale ?? (s.venduto_unitario ? s.venduto_unitario * qty : 0)
+      const costo = s.costo_totale ?? (s.costo_unitario ? s.costo_unitario * qty : 0)
+      if (!venduto && !costo) continue
+      const margine = venduto - costo
+      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+      const sup = suppliers.find(sup => sup.id === s.supplier_id)
+      all.push({ id: s.id, source: 'service', categoria: sup?.categoria ?? 'Altro', titolo: s.titolo, fornitore: sup?.nome ?? '', supplierId: s.supplier_id, qty, venduto, costo, margine, marginePct, raw: s })
     }
-    load()
+
+    for (const h of (hotelRes.data ?? []) as HotelDetail[]) {
+      const qty = h.quantita ?? 1
+      const venduto = h.venduto_totale ?? (h.venduto_unitario ? h.venduto_unitario * qty : 0)
+      const costo = h.costo_totale ?? (h.costo_unitario ? h.costo_unitario * qty : 0)
+      if (!venduto && !costo) continue
+      const margine = venduto - costo
+      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+      const label = h.titolo || HOTEL_TIPOS.find(t => t.value === h.tipo)?.label || h.tipo
+      const sup = suppliers.find(sup => sup.id === h.supplier_id)
+      all.push({ id: h.id, source: 'hotel', categoria: 'Hotel', titolo: label, fornitore: sup?.nome ?? '', supplierId: h.supplier_id, qty, venduto, costo, margine, marginePct, raw: h })
+    }
+
+    for (const r of (restRes.data ?? []) as RestaurantDetail[]) {
+      const pax = r.pax_confermati ?? r.pax_previsti ?? 1
+      const venduto = r.budget_totale ? Number(r.budget_totale) : (r.budget_per_persona ? Number(r.budget_per_persona) * pax : 0)
+      const costo = r.costo_totale_reale ? Number(r.costo_totale_reale) : (r.costo_per_persona ? Number(r.costo_per_persona) * pax : 0)
+      if (!venduto && !costo) continue
+      const margine = venduto - costo
+      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+      const label = r.tipologia_servizio || 'Servizio ristorante'
+      const sup = suppliers.find(sup => sup.id === r.supplier_id)
+      all.push({ id: r.id, source: 'restaurant', categoria: 'Ristorante', titolo: label, fornitore: sup?.nome ?? '', supplierId: r.supplier_id, qty: pax, venduto, costo, margine, marginePct, raw: r })
+    }
+
+    all.sort((a, b) => a.categoria.localeCompare(b.categoria) || a.titolo.localeCompare(b.titolo))
+    setLines(all)
+
+    const totVenduto = all.reduce((s, i) => s + i.venduto, 0)
+    const totCosto = all.reduce((s, i) => s + i.costo, 0)
+    const totMargine = totVenduto - totCosto
+    const totMarginePct = totVenduto > 0 ? (totMargine / totVenduto) * 100 : 0
+    setTotals({ venduto: totVenduto, costo: totCosto, margine: totMargine, marginePct: totMarginePct })
+    setLoading(false)
   }, [event.id, suppliers])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  function startEdit(line: BudgetLine) {
+    setEditingId(line.id)
+    if (line.source === 'service') {
+      const s = line.raw as SupplierService
+      setEditForm({ titolo: s.titolo, quantita: s.quantita ?? 1, venduto_unitario: s.venduto_unitario ?? '', venduto_totale: s.venduto_totale ?? '', costo_unitario: s.costo_unitario ?? '', costo_totale: s.costo_totale ?? '', data: s.data ?? '', ora_inizio: s.ora_inizio ?? '', ora_fine: s.ora_fine ?? '', luogo: s.luogo ?? '', partenza: s.partenza ?? '', destinazione: s.destinazione ?? '', note: s.note ?? '' })
+    } else if (line.source === 'hotel') {
+      const h = line.raw as HotelDetail
+      setEditForm({ titolo: h.titolo, quantita: h.quantita ?? 1, venduto_unitario: h.venduto_unitario ?? '', venduto_totale: h.venduto_totale ?? '', costo_unitario: h.costo_unitario ?? '', costo_totale: h.costo_totale ?? '', check_in_date: h.check_in_date ?? '', check_in_time: h.check_in_time ?? '', check_out_date: h.check_out_date ?? '', check_out_time: h.check_out_time ?? '', room_type: h.room_type ?? '', note: h.note ?? '' })
+    } else {
+      const r = line.raw as RestaurantDetail
+      setEditForm({ tipologia_servizio: r.tipologia_servizio ?? '', pax_previsti: r.pax_previsti ?? '', pax_confermati: r.pax_confermati ?? '', budget_per_persona: r.budget_per_persona ?? '', budget_totale: r.budget_totale ?? '', costo_per_persona: r.costo_per_persona ?? '', costo_totale_reale: r.costo_totale_reale ?? '', menu_portate: r.menu_portate ?? '', menu_descrizione: r.menu_descrizione ?? '', area_riservata: r.area_riservata ?? false, allergie: r.allergie ?? '', intolleranze: r.intolleranze ?? '', note_operative: r.note_operative ?? '', data: r.data ?? '', ora_inizio: r.ora_inizio ?? '', ora_fine: r.ora_fine ?? '' })
+    }
+  }
+
+  async function saveEdit(line: BudgetLine) {
+    setSaving(true)
+    const table = line.source === 'service' ? 'event_supplier_services' : line.source === 'hotel' ? 'event_hotel_details' : 'event_restaurant_details'
+
+    let patch: Record<string, unknown> = {}
+    if (line.source === 'service') {
+      const qty = Number(editForm.quantita) || 1
+      const vu = editForm.venduto_unitario !== '' ? Number(editForm.venduto_unitario) : null
+      const vt = editForm.venduto_totale !== '' ? Number(editForm.venduto_totale) : (vu ? vu * qty : null)
+      const cu = editForm.costo_unitario !== '' ? Number(editForm.costo_unitario) : null
+      const ct = editForm.costo_totale !== '' ? Number(editForm.costo_totale) : (cu ? cu * qty : null)
+      patch = { titolo: editForm.titolo, quantita: qty, venduto_unitario: vu, venduto_totale: vt, costo_unitario: cu, costo_totale: ct, data: editForm.data || null, ora_inizio: editForm.ora_inizio || null, ora_fine: editForm.ora_fine || null, luogo: editForm.luogo || '', partenza: editForm.partenza || '', destinazione: editForm.destinazione || '', note: editForm.note || '' }
+    } else if (line.source === 'hotel') {
+      const qty = Number(editForm.quantita) || 1
+      const vu = editForm.venduto_unitario !== '' ? Number(editForm.venduto_unitario) : null
+      const vt = editForm.venduto_totale !== '' ? Number(editForm.venduto_totale) : (vu ? vu * qty : null)
+      const cu = editForm.costo_unitario !== '' ? Number(editForm.costo_unitario) : null
+      const ct = editForm.costo_totale !== '' ? Number(editForm.costo_totale) : (cu ? cu * qty : null)
+      patch = { titolo: editForm.titolo, quantita: qty, venduto_unitario: vu, venduto_totale: vt, costo_unitario: cu, costo_totale: ct, check_in_date: editForm.check_in_date || null, check_in_time: editForm.check_in_time || null, check_out_date: editForm.check_out_date || null, check_out_time: editForm.check_out_time || null, room_type: editForm.room_type || '', note: editForm.note || '' }
+    } else {
+      const paxP = editForm.pax_previsti !== '' ? Number(editForm.pax_previsti) : null
+      const paxC = editForm.pax_confermati !== '' ? Number(editForm.pax_confermati) : null
+      const pax = paxC ?? paxP ?? 1
+      const bpp = editForm.budget_per_persona !== '' ? Number(editForm.budget_per_persona) : null
+      const bt = editForm.budget_totale !== '' ? Number(editForm.budget_totale) : (bpp ? bpp * pax : null)
+      const cpp = editForm.costo_per_persona !== '' ? Number(editForm.costo_per_persona) : null
+      const ctr = editForm.costo_totale_reale !== '' ? Number(editForm.costo_totale_reale) : (cpp ? cpp * pax : null)
+      patch = { tipologia_servizio: editForm.tipologia_servizio || '', pax_previsti: paxP, pax_confermati: paxC, budget_per_persona: bpp, budget_totale: bt, costo_per_persona: cpp, costo_totale_reale: ctr, menu_portate: editForm.menu_portate || '', menu_descrizione: editForm.menu_descrizione || '', area_riservata: editForm.area_riservata ?? false, allergie: editForm.allergie || '', intolleranze: editForm.intolleranze || '', note_operative: editForm.note_operative || '', data: editForm.data || null, ora_inizio: editForm.ora_inizio || null, ora_fine: editForm.ora_fine || null }
+    }
+
+    await supabase.from(table).update(patch).eq('id', line.id)
+    setEditingId(null)
+    setSaving(false)
+    await loadData()
+  }
+
+  async function deleteLine(line: BudgetLine) {
+    const table = line.source === 'service' ? 'event_supplier_services' : line.source === 'hotel' ? 'event_hotel_details' : 'event_restaurant_details'
+    await supabase.from(table).delete().eq('id', line.id)
+    setDeletingId(null)
+    setExpandedId(null)
+    await loadData()
+  }
+
+  const grouped = useMemo(() => {
+    const map: Record<string, BudgetLine[]> = {}
+    for (const l of lines) {
+      if (!map[l.categoria]) map[l.categoria] = []
+      map[l.categoria].push(l)
+    }
+    return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]))
+  }, [lines])
 
   if (loading) {
     return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento budget...</div></div>
@@ -2355,7 +2442,7 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
         </div>
       )}
 
-      {/* Categories breakdown */}
+      {/* Categories breakdown with expandable rows */}
       {lines.length === 0 ? (
         <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <Euro className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -2364,48 +2451,53 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
         </div>
       ) : (
         <div className="space-y-4">
-          {lines.map(group => {
-            const catVenduto = group.items.reduce((s, i) => s + i.venduto, 0)
-            const catCosto = group.items.reduce((s, i) => s + i.costo, 0)
+          {grouped.map(([categoria, items]) => {
+            const catVenduto = items.reduce((s, i) => s + i.venduto, 0)
+            const catCosto = items.reduce((s, i) => s + i.costo, 0)
             const catMargine = catVenduto - catCosto
             const catMarginePct = catVenduto > 0 ? (catMargine / catVenduto) * 100 : 0
             return (
-              <div key={group.categoria} className="panel overflow-hidden">
+              <div key={categoria} className="panel overflow-hidden">
                 <div className="px-4 py-3 flex items-center justify-between" style={{ background: 'var(--panel2)' }}>
-                  <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>{group.categoria}</p>
+                  <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>{categoria}</p>
                   <div className="flex items-center gap-4 text-xs">
                     <span style={{ color: 'var(--muted)' }}>V: <strong style={{ color: 'var(--text)' }}>{'\u20AC'}{catVenduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</strong></span>
                     <span style={{ color: 'var(--muted)' }}>C: <strong style={{ color: 'var(--yellow)' }}>{'\u20AC'}{catCosto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</strong></span>
                     <span style={{ color: 'var(--muted)' }}>M: <strong style={{ color: catMargine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{catMargine.toLocaleString('it-IT', { minimumFractionDigits: 2 })} ({catMarginePct.toFixed(0)}%)</strong></span>
                   </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                        <th className="text-left px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Servizio</th>
-                        <th className="text-left px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Fornitore</th>
-                        <th className="text-right px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Qty</th>
-                        <th className="text-right px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Venduto</th>
-                        <th className="text-right px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Costo</th>
-                        <th className="text-right px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Margine</th>
-                        <th className="text-right px-4 py-2 font-semibold" style={{ color: 'var(--muted)' }}>%</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {group.items.map((item, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid var(--line)' }}>
-                          <td className="px-4 py-2.5" style={{ color: 'var(--text)' }}>{item.titolo}</td>
-                          <td className="px-4 py-2.5" style={{ color: 'var(--muted)' }}>{item.fornitore}</td>
-                          <td className="px-4 py-2.5 text-right" style={{ color: 'var(--text)' }}>{item.qty}</td>
-                          <td className="px-4 py-2.5 text-right" style={{ color: 'var(--text)' }}>{'\u20AC'}{item.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
-                          <td className="px-4 py-2.5 text-right" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{item.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
-                          <td className="px-4 py-2.5 text-right font-medium" style={{ color: item.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{item.margine.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
-                          <td className="px-4 py-2.5 text-right font-medium" style={{ color: item.marginePct >= 20 ? 'var(--green)' : item.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{item.marginePct.toFixed(0)}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div>
+                  {items.map(item => {
+                    const isExpanded = expandedId === item.id
+                    const isEditing = editingId === item.id
+                    return (
+                      <div key={item.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                        <button
+                          className="w-full text-left px-4 py-3 flex items-center gap-3 hover:opacity-80 transition-opacity"
+                          onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                        >
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform flex-shrink-0 ${isExpanded ? '' : '-rotate-90'}`} style={{ color: 'var(--muted)' }} />
+                          <span className="flex-1 text-xs font-medium truncate" style={{ color: 'var(--text)' }}>{item.titolo}</span>
+                          <span className="text-xs" style={{ color: 'var(--muted)' }}>{item.fornitore}</span>
+                          <span className="text-xs w-8 text-right" style={{ color: 'var(--text)' }}>{item.qty}</span>
+                          <span className="text-xs w-20 text-right" style={{ color: 'var(--text)' }}>{'\u20AC'}{item.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                          <span className="text-xs w-20 text-right" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{item.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                          <span className="text-xs w-20 text-right font-medium" style={{ color: item.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{item.margine.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+                          <span className="text-xs w-12 text-right font-medium" style={{ color: item.marginePct >= 20 ? 'var(--green)' : item.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{item.marginePct.toFixed(0)}%</span>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="px-4 pb-4 pt-1" style={{ background: 'var(--bg)' }}>
+                            {isEditing ? (
+                              <BudgetLineEditForm source={item.source} form={editForm} setForm={setEditForm} onSave={() => saveEdit(item)} onCancel={() => setEditingId(null)} saving={saving} />
+                            ) : (
+                              <BudgetLineDetail line={item} onEdit={() => startEdit(item)} onDelete={() => setDeletingId(item.id)} />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )
@@ -2416,19 +2508,187 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
       {/* Grand total row */}
       {lines.length > 0 && (
         <div className="panel p-4">
-          <table className="w-full text-sm">
-            <tbody>
-              <tr>
-                <td className="py-1 font-bold" style={{ color: 'var(--text)' }}>TOTALE EVENTO</td>
-                <td className="py-1 text-right" style={{ color: 'var(--text)' }}>{'\u20AC'}{totals.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
-                <td className="py-1 text-right" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{totals.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
-                <td className="py-1 text-right font-bold" style={{ color: totals.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{totals.margine.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
-                <td className="py-1 text-right font-bold" style={{ color: totals.marginePct >= 20 ? 'var(--green)' : 'var(--yellow)' }}>{totals.marginePct.toFixed(1)}%</td>
-              </tr>
-            </tbody>
-          </table>
+          <div className="flex items-center justify-between text-sm px-2">
+            <span className="font-bold" style={{ color: 'var(--text)' }}>TOTALE EVENTO</span>
+            <div className="flex items-center gap-6">
+              <span style={{ color: 'var(--text)' }}>{'\u20AC'}{totals.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+              <span style={{ color: 'var(--yellow)' }}>{'\u20AC'}{totals.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+              <span className="font-bold" style={{ color: totals.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{totals.margine.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</span>
+              <span className="font-bold" style={{ color: totals.marginePct >= 20 ? 'var(--green)' : 'var(--yellow)' }}>{totals.marginePct.toFixed(1)}%</span>
+            </div>
+          </div>
         </div>
       )}
+
+      {/* Delete confirmation */}
+      {deletingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDeletingId(null)}>
+          <div className="panel p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+            <p className="font-semibold mb-2" style={{ color: 'var(--text)' }}>Elimina voce budget</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Questa azione elimina il servizio operativo collegato. Il fornitore NON viene eliminato.</p>
+            <div className="flex gap-3 justify-end">
+              <button className="px-4 py-2 rounded-lg text-sm" style={{ background: 'var(--panel2)', color: 'var(--text)' }} onClick={() => setDeletingId(null)}>Annulla</button>
+              <button className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--red2)', color: '#fff' }} onClick={() => { const l = lines.find(x => x.id === deletingId); if (l) deleteLine(l) }}>Elimina</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BudgetLineDetail({ line, onEdit, onDelete }: { line: BudgetLine; onEdit: () => void; onDelete: () => void }) {
+  const detailFields: { label: string; value: string }[] = []
+
+  if (line.source === 'service') {
+    const s = line.raw as SupplierService
+    if (s.data) detailFields.push({ label: 'Data', value: s.data })
+    if (s.ora_inizio) detailFields.push({ label: 'Orario', value: `${s.ora_inizio}${s.ora_fine ? ' - ' + s.ora_fine : ''}` })
+    if (s.partenza) detailFields.push({ label: 'Partenza', value: s.partenza })
+    if (s.destinazione) detailFields.push({ label: 'Destinazione', value: s.destinazione })
+    if (s.luogo) detailFields.push({ label: 'Luogo', value: s.luogo })
+    detailFields.push({ label: 'Quantita', value: String(s.quantita ?? 1) })
+    if (s.venduto_unitario) detailFields.push({ label: 'Venduto unitario', value: `\u20AC${Number(s.venduto_unitario).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Venduto totale', value: `\u20AC${line.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (s.costo_unitario) detailFields.push({ label: 'Costo unitario', value: `\u20AC${Number(s.costo_unitario).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Costo totale', value: `\u20AC${line.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (s.note) detailFields.push({ label: 'Note', value: s.note })
+  } else if (line.source === 'hotel') {
+    const h = line.raw as HotelDetail
+    if (h.room_type) detailFields.push({ label: 'Tipologia camera', value: h.room_type })
+    detailFields.push({ label: 'Quantita', value: String(h.quantita ?? 1) })
+    if (h.check_in_date) detailFields.push({ label: 'Check-in', value: `${h.check_in_date}${h.check_in_time ? ' ' + h.check_in_time : ''}` })
+    if (h.check_out_date) detailFields.push({ label: 'Check-out', value: `${h.check_out_date}${h.check_out_time ? ' ' + h.check_out_time : ''}` })
+    if (h.venduto_unitario) detailFields.push({ label: 'Venduto/camera', value: `\u20AC${Number(h.venduto_unitario).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Venduto totale', value: `\u20AC${line.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (h.costo_unitario) detailFields.push({ label: 'Costo/camera', value: `\u20AC${Number(h.costo_unitario).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Costo totale', value: `\u20AC${line.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (h.note) detailFields.push({ label: 'Note', value: h.note })
+  } else {
+    const r = line.raw as RestaurantDetail
+    if (r.data) detailFields.push({ label: 'Data', value: r.data })
+    if (r.ora_inizio) detailFields.push({ label: 'Orario', value: `${r.ora_inizio}${r.ora_fine ? ' - ' + r.ora_fine : ''}` })
+    if (r.pax_previsti) detailFields.push({ label: 'Pax previsti', value: String(r.pax_previsti) })
+    if (r.pax_confermati) detailFields.push({ label: 'Pax confermati', value: String(r.pax_confermati) })
+    if (r.menu_portate) detailFields.push({ label: 'Menu', value: r.menu_portate })
+    if (r.menu_descrizione) detailFields.push({ label: 'Descrizione menu', value: r.menu_descrizione })
+    if (r.budget_per_persona) detailFields.push({ label: 'Venduto/persona', value: `\u20AC${Number(r.budget_per_persona).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Venduto totale', value: `\u20AC${line.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (r.costo_per_persona) detailFields.push({ label: 'Costo/persona', value: `\u20AC${Number(r.costo_per_persona).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Costo totale', value: `\u20AC${line.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (r.area_riservata) detailFields.push({ label: 'Area riservata', value: 'Si' })
+    if (r.allergie) detailFields.push({ label: 'Allergie', value: r.allergie })
+    if (r.intolleranze) detailFields.push({ label: 'Intolleranze', value: r.intolleranze })
+    if (r.note_operative) detailFields.push({ label: 'Note operative', value: r.note_operative })
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs font-medium px-2 py-0.5 rounded" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>{line.source === 'service' ? 'Servizio' : line.source === 'hotel' ? 'Hotel' : 'Ristorante'}</span>
+        <span className="text-xs" style={{ color: 'var(--muted)' }}>Fornitore: <strong style={{ color: 'var(--text)' }}>{line.fornitore}</strong></span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 mb-4">
+        {detailFields.map(f => (
+          <div key={f.label}>
+            <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{f.label}</p>
+            <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text)' }}>{f.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
+        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style={{ background: 'var(--panel2)', color: 'var(--blue)' }} onClick={onEdit}>
+          <Edit3 className="w-3 h-3" /> Modifica
+        </button>
+        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:opacity-80" style={{ background: 'var(--panel2)', color: 'var(--red2)' }} onClick={onDelete}>
+          <Trash2 className="w-3 h-3" /> Elimina
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function BudgetLineEditForm({ source, form, setForm, onSave, onCancel, saving }: { source: BudgetLineSource; form: Record<string, string | number | boolean>; setForm: (f: Record<string, string | number | boolean>) => void; onSave: () => void; onCancel: () => void; saving: boolean }) {
+  const upd = (key: string, val: string | number | boolean) => setForm({ ...form, [key]: val })
+  const inp = (key: string, label: string, type: string = 'text', opts?: { half?: boolean }) => (
+    <div className={opts?.half ? '' : ''}>
+      <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>{label}</label>
+      <input type={type} value={String(form[key] ?? '')} onChange={e => upd(key, e.target.value)} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+    </div>
+  )
+
+  return (
+    <div>
+      {source === 'service' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+          {inp('titolo', 'Titolo')}
+          {inp('quantita', 'Quantita', 'number')}
+          {inp('data', 'Data', 'date')}
+          {inp('ora_inizio', 'Ora inizio', 'time')}
+          {inp('ora_fine', 'Ora fine', 'time')}
+          {inp('luogo', 'Luogo')}
+          {inp('partenza', 'Partenza')}
+          {inp('destinazione', 'Destinazione')}
+          {inp('venduto_unitario', 'Venduto unit.', 'number')}
+          {inp('venduto_totale', 'Venduto totale', 'number')}
+          {inp('costo_unitario', 'Costo unit.', 'number')}
+          {inp('costo_totale', 'Costo totale', 'number')}
+          <div className="sm:col-span-3">
+            {inp('note', 'Note')}
+          </div>
+        </div>
+      )}
+      {source === 'hotel' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+          {inp('titolo', 'Titolo')}
+          {inp('quantita', 'Quantita camere', 'number')}
+          {inp('room_type', 'Tipo camera')}
+          {inp('check_in_date', 'Check-in data', 'date')}
+          {inp('check_in_time', 'Check-in ora', 'time')}
+          {inp('check_out_date', 'Check-out data', 'date')}
+          {inp('check_out_time', 'Check-out ora', 'time')}
+          {inp('venduto_unitario', 'Venduto/camera', 'number')}
+          {inp('venduto_totale', 'Venduto totale', 'number')}
+          {inp('costo_unitario', 'Costo/camera', 'number')}
+          {inp('costo_totale', 'Costo totale', 'number')}
+          <div className="sm:col-span-3">
+            {inp('note', 'Note')}
+          </div>
+        </div>
+      )}
+      {source === 'restaurant' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+          {inp('tipologia_servizio', 'Tipologia servizio')}
+          {inp('pax_previsti', 'Pax previsti', 'number')}
+          {inp('pax_confermati', 'Pax confermati', 'number')}
+          {inp('data', 'Data', 'date')}
+          {inp('ora_inizio', 'Ora inizio', 'time')}
+          {inp('ora_fine', 'Ora fine', 'time')}
+          {inp('menu_portate', 'Menu portate')}
+          {inp('budget_per_persona', 'Venduto/persona', 'number')}
+          {inp('budget_totale', 'Venduto totale', 'number')}
+          {inp('costo_per_persona', 'Costo/persona', 'number')}
+          {inp('costo_totale_reale', 'Costo totale', 'number')}
+          {inp('allergie', 'Allergie')}
+          {inp('intolleranze', 'Intolleranze')}
+          <div className="sm:col-span-3">
+            {inp('menu_descrizione', 'Descrizione menu')}
+          </div>
+          <div className="sm:col-span-3">
+            {inp('note_operative', 'Note operative')}
+          </div>
+          <div className="flex items-center gap-2 sm:col-span-3">
+            <input type="checkbox" checked={!!form.area_riservata} onChange={e => upd('area_riservata', e.target.checked)} id="budget_area_ris" />
+            <label htmlFor="budget_area_ris" className="text-xs" style={{ color: 'var(--text)' }}>Area riservata</label>
+          </div>
+        </div>
+      )}
+      <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
+        <button disabled={saving} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-colors" style={{ background: 'var(--blue)', color: '#fff', opacity: saving ? 0.6 : 1 }} onClick={onSave}>
+          <Save className="w-3 h-3" /> {saving ? 'Salvataggio...' : 'Salva'}
+        </button>
+        <button className="px-4 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--muted)' }} onClick={onCancel}>Annulla</button>
+      </div>
     </div>
   )
 }
