@@ -83,7 +83,7 @@ export default function BrandEvolutionTransition({ onComplete }: Props) {
               }}
               initial={{ width: 0 }}
               animate={{ width: 64 }}
-              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.50, ease: [0.4, 0, 0.2, 1] }}
             />
           </motion.div>
         )}
