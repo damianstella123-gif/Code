@@ -29,8 +29,6 @@ import {
   Package,
   Upload,
   Download,
-  Building2,
-  UtensilsCrossed,
   Plus as PlusIcon,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
@@ -48,7 +46,7 @@ import type { Client } from '@/data/clients'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
-import { TabOperativo } from '@/components/TabOperativo'
+import { SupplierCategoryPanel, detectSupplierCategory, CATEGORY_LABELS } from '@/components/TabOperativo'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
@@ -60,7 +58,7 @@ import type { EventoWorkflow } from '@/data/workflow'
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 type StatoEvento = Event['stato']
 
-type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'operativo' | 'budget' | 'comunicazioni' | 'documenti' | 'programma' | 'timeline' | 'creative' | 'social' | 'presentazioni' | 'pacchetto'
+type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'documenti' | 'programma' | 'timeline' | 'creative' | 'social' | 'presentazioni' | 'pacchetto'
 
 function statoColor(stato: string) {
   switch (stato) {
@@ -802,22 +800,6 @@ interface SupplierService {
   venduto_totale: number | null
 }
 
-const emptySvcForm = {
-  titolo: '',
-  categoria: 'altro',
-  data: '',
-  ora_inizio: '',
-  ora_fine: '',
-  luogo: '',
-  partenza: '',
-  destinazione: '',
-  note: '',
-  costo_unitario: '',
-  quantita: '1',
-  costo_totale: '',
-  venduto_unitario: '',
-  venduto_totale: '',
-}
 
 const HOTEL_TIPOS = [
   { value: 'pernottamento', label: 'Pernottamento' },
@@ -857,37 +839,7 @@ interface HotelDetail {
   venduto_totale: number | null
 }
 
-const emptyHotelForm = {
-  titolo: '',
-  data: '',
-  ora_inizio: '',
-  ora_fine: '',
-  check_in_date: '',
-  check_in_time: '',
-  check_out_date: '',
-  check_out_time: '',
-  luogo: '',
-  quantita: '',
-  note: '',
-  room_type: '',
-  meeting_pax: '',
-  meeting_setup: '',
-  meeting_equipment: '',
-  natural_light: false,
-  costo_unitario: '',
-  costo_totale: '',
-  venduto_unitario: '',
-  venduto_totale: '',
-}
 
-function isHotelSupplier(sup: Supplier): boolean {
-  return sup.categoria.toLowerCase().includes('hotel') || sup.categoria.toLowerCase().includes('albergo')
-}
-
-function isRestaurantSupplier(sup: Supplier): boolean {
-  const c = sup.categoria.toLowerCase()
-  return c.includes('ristorante') || c.includes('ristorazione') || c.includes('catering')
-}
 
 interface RestaurantDetail {
   id: string
@@ -922,35 +874,6 @@ interface RestaurantDetail {
   note_operative: string
 }
 
-const emptyRestaurantForm = {
-  data: '',
-  ora_inizio: '',
-  ora_fine: '',
-  pax_previsti: '',
-  pax_confermati: '',
-  tipologia_servizio: '',
-  menu_portate: '',
-  menu_descrizione: '',
-  budget_per_persona: '',
-  budget_totale: '',
-  costo_per_persona: '',
-  costo_totale_reale: '',
-  area_riservata: false,
-  sala_privata: false,
-  esclusiva_parziale: false,
-  esclusiva_totale: false,
-  nome_sala: '',
-  note_location: '',
-  num_vegetariani: '',
-  num_vegani: '',
-  allergie: '',
-  intolleranze: '',
-  note_alimentari: '',
-  setup_tavoli: '',
-  branding_cliente: '',
-  richieste_speciali: '',
-  note_operative: '',
-}
 
 interface ExperienceDetail {
   id: string
@@ -1044,20 +967,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
   const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null)
-  const [managingServices, setManagingServices] = useState<string | null>(null)
-  const [services, setServices] = useState<SupplierService[]>([])
-  const [svcForm, setSvcForm] = useState(emptySvcForm)
-  const [editingSvcId, setEditingSvcId] = useState<string | null>(null)
-  const [showSvcForm, setShowSvcForm] = useState(false)
-  const [managingHotel, setManagingHotel] = useState<string | null>(null)
-  const [hotelDetails, setHotelDetails] = useState<HotelDetail[]>([])
-  const [hotelForm, setHotelForm] = useState(emptyHotelForm)
-  const [editingHotelId, setEditingHotelId] = useState<string | null>(null)
-  const [showHotelForm, setShowHotelForm] = useState(false)
-  const [hotelFormTipo, setHotelFormTipo] = useState('')
-  const [managingRestaurant, setManagingRestaurant] = useState<string | null>(null)
-  const [restaurantDetail, setRestaurantDetail] = useState<RestaurantDetail | null>(null)
-  const [restaurantForm, setRestaurantForm] = useState(emptyRestaurantForm)
+  const [managingCategory, setManagingCategory] = useState<string | null>(null)
 
   async function loadLinks() {
     const { data } = await supabase
@@ -1084,293 +994,18 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   }
 
   async function handleUnlink(supplierId: string) {
-    await supabase.from('event_supplier_services').delete()
-      .eq('event_id', event.id).eq('supplier_id', supplierId)
-    await supabase.from('event_hotel_details').delete()
-      .eq('event_id', event.id).eq('supplier_id', supplierId)
-    await supabase.from('event_restaurant_details').delete()
-      .eq('event_id', event.id).eq('supplier_id', supplierId)
-    const { error } = await supabase
-      .from('event_suppliers')
-      .delete()
-      .eq('event_id', event.id)
-      .eq('supplier_id', supplierId)
+    const tables = [
+      'event_supplier_services', 'event_hotel_details', 'event_restaurant_details',
+      'event_experience_details', 'event_catering_details', 'event_audio_video_details',
+      'event_allestimenti_details', 'event_staff_interno_details', 'event_staff_esterno_details',
+      'event_grafica_stampa_details', 'event_varie_details',
+    ]
+    await Promise.all(tables.map(t => supabase.from(t).delete().eq('event_id', event.id).eq('supplier_id', supplierId)))
+    const { error } = await supabase.from('event_suppliers').delete().eq('event_id', event.id).eq('supplier_id', supplierId)
     if (!error) {
       setLinks(prev => prev.filter(l => l.supplier_id !== supplierId))
-      if (managingServices === supplierId) setManagingServices(null)
-      if (managingHotel === supplierId) setManagingHotel(null)
-      if (managingRestaurant === supplierId) setManagingRestaurant(null)
+      if (managingCategory === supplierId) setManagingCategory(null)
     }
-  }
-
-  async function openServices(supplierId: string) {
-    setManagingServices(supplierId)
-    setShowSvcForm(false)
-    setEditingSvcId(null)
-    const { data } = await supabase
-      .from('event_supplier_services')
-      .select('*')
-      .eq('event_id', event.id)
-      .eq('supplier_id', supplierId)
-      .order('data', { ascending: true })
-      .order('ora_inizio', { ascending: true })
-    setServices((data ?? []) as SupplierService[])
-  }
-
-  function openNewSvc() {
-    setSvcForm(emptySvcForm)
-    setEditingSvcId(null)
-    setShowSvcForm(true)
-  }
-
-  function openEditSvc(svc: SupplierService) {
-    setSvcForm({
-      titolo: svc.titolo,
-      categoria: svc.categoria,
-      data: svc.data ?? '',
-      ora_inizio: svc.ora_inizio?.slice(0, 5) ?? '',
-      ora_fine: svc.ora_fine?.slice(0, 5) ?? '',
-      luogo: svc.luogo,
-      partenza: svc.partenza,
-      destinazione: svc.destinazione,
-      note: svc.note,
-      costo_unitario: svc.costo_unitario?.toString() ?? '',
-      quantita: svc.quantita?.toString() ?? '1',
-      costo_totale: svc.costo_totale?.toString() ?? '',
-      venduto_unitario: svc.venduto_unitario?.toString() ?? '',
-      venduto_totale: svc.venduto_totale?.toString() ?? '',
-    })
-    setEditingSvcId(svc.id)
-    setShowSvcForm(true)
-  }
-
-  async function saveSvc() {
-    if (!svcForm.titolo.trim() || !managingServices) return
-    const qty = svcForm.quantita ? parseInt(svcForm.quantita) : 1
-    const unitCost = svcForm.costo_unitario ? parseFloat(svcForm.costo_unitario) : null
-    const unitVenduto = svcForm.venduto_unitario ? parseFloat(svcForm.venduto_unitario) : null
-    const payload = {
-      event_id: event.id,
-      supplier_id: managingServices,
-      titolo: svcForm.titolo.trim(),
-      categoria: svcForm.categoria,
-      data: svcForm.data || null,
-      ora_inizio: svcForm.ora_inizio || null,
-      ora_fine: svcForm.ora_fine || null,
-      luogo: svcForm.luogo.trim(),
-      partenza: svcForm.partenza.trim(),
-      destinazione: svcForm.destinazione.trim(),
-      note: svcForm.note.trim(),
-      costo_unitario: unitCost,
-      quantita: qty,
-      costo_totale: svcForm.costo_totale ? parseFloat(svcForm.costo_totale) : (unitCost ? unitCost * qty : null),
-      venduto_unitario: unitVenduto,
-      venduto_totale: svcForm.venduto_totale ? parseFloat(svcForm.venduto_totale) : (unitVenduto ? unitVenduto * qty : null),
-    }
-    if (editingSvcId) {
-      await supabase.from('event_supplier_services').update(payload).eq('id', editingSvcId)
-    } else {
-      await supabase.from('event_supplier_services').insert(payload)
-    }
-    setShowSvcForm(false)
-    setEditingSvcId(null)
-    await openServices(managingServices)
-  }
-
-  async function deleteSvc(id: string) {
-    if (!managingServices) return
-    await supabase.from('event_supplier_services').delete().eq('id', id)
-    await openServices(managingServices)
-  }
-
-  async function openHotel(supplierId: string) {
-    setManagingHotel(supplierId)
-    setManagingServices(null)
-    setShowHotelForm(false)
-    setEditingHotelId(null)
-    const { data } = await supabase
-      .from('event_hotel_details')
-      .select('*')
-      .eq('event_id', event.id)
-      .eq('supplier_id', supplierId)
-      .order('data', { ascending: true })
-      .order('ora_inizio', { ascending: true })
-    setHotelDetails((data ?? []) as HotelDetail[])
-  }
-
-  function openNewHotel(tipo: string) {
-    setHotelForm(emptyHotelForm)
-    setEditingHotelId(null)
-    setHotelFormTipo(tipo)
-    setShowHotelForm(true)
-  }
-
-  function openEditHotel(h: HotelDetail) {
-    setHotelForm({
-      titolo: h.titolo,
-      data: h.data ?? '',
-      ora_inizio: h.ora_inizio?.slice(0, 5) ?? '',
-      ora_fine: h.ora_fine?.slice(0, 5) ?? '',
-      check_in_date: h.check_in_date ?? '',
-      check_in_time: h.check_in_time?.slice(0, 5) ?? '',
-      check_out_date: h.check_out_date ?? '',
-      check_out_time: h.check_out_time?.slice(0, 5) ?? '',
-      luogo: h.luogo,
-      quantita: h.quantita?.toString() ?? '',
-      note: h.note,
-      room_type: h.room_type ?? '',
-      meeting_pax: h.meeting_pax?.toString() ?? '',
-      meeting_setup: h.meeting_setup ?? '',
-      meeting_equipment: h.meeting_equipment ?? '',
-      natural_light: h.natural_light ?? false,
-      costo_unitario: h.costo_unitario?.toString() ?? '',
-      costo_totale: h.costo_totale?.toString() ?? '',
-      venduto_unitario: h.venduto_unitario?.toString() ?? '',
-      venduto_totale: h.venduto_totale?.toString() ?? '',
-    })
-    setEditingHotelId(h.id)
-    setHotelFormTipo(h.tipo)
-    setShowHotelForm(true)
-  }
-
-  async function saveHotel() {
-    if (!managingHotel || !hotelFormTipo) return
-    const isPernottamento = hotelFormTipo === 'pernottamento'
-    const isMeeting = hotelFormTipo === 'sala_meeting'
-    const payload = {
-      event_id: event.id,
-      supplier_id: managingHotel,
-      tipo: hotelFormTipo,
-      titolo: hotelForm.titolo.trim(),
-      data: isPernottamento ? null : (hotelForm.data || null),
-      ora_inizio: isPernottamento ? null : (hotelForm.ora_inizio || null),
-      ora_fine: isPernottamento ? null : (hotelForm.ora_fine || null),
-      check_in_date: isPernottamento ? (hotelForm.check_in_date || null) : null,
-      check_in_time: isPernottamento ? (hotelForm.check_in_time || null) : null,
-      check_out_date: isPernottamento ? (hotelForm.check_out_date || null) : null,
-      check_out_time: isPernottamento ? (hotelForm.check_out_time || null) : null,
-      luogo: hotelForm.luogo.trim(),
-      quantita: hotelForm.quantita ? parseInt(hotelForm.quantita) : null,
-      note: hotelForm.note.trim(),
-      room_type: isPernottamento ? hotelForm.room_type.trim() : '',
-      meeting_pax: isMeeting && hotelForm.meeting_pax ? parseInt(hotelForm.meeting_pax) : null,
-      meeting_setup: isMeeting ? hotelForm.meeting_setup.trim() : '',
-      meeting_equipment: isMeeting ? hotelForm.meeting_equipment.trim() : '',
-      natural_light: isMeeting ? hotelForm.natural_light : false,
-      costo_unitario: hotelForm.costo_unitario ? parseFloat(hotelForm.costo_unitario) : null,
-      costo_totale: hotelForm.costo_totale ? parseFloat(hotelForm.costo_totale)
-        : (hotelForm.costo_unitario && hotelForm.quantita ? parseFloat(hotelForm.costo_unitario) * parseInt(hotelForm.quantita) : null),
-      venduto_unitario: hotelForm.venduto_unitario ? parseFloat(hotelForm.venduto_unitario) : null,
-      venduto_totale: hotelForm.venduto_totale ? parseFloat(hotelForm.venduto_totale)
-        : (hotelForm.venduto_unitario && hotelForm.quantita ? parseFloat(hotelForm.venduto_unitario) * parseInt(hotelForm.quantita) : null),
-    }
-    if (editingHotelId) {
-      await supabase.from('event_hotel_details').update(payload).eq('id', editingHotelId)
-    } else {
-      await supabase.from('event_hotel_details').insert(payload)
-    }
-    setShowHotelForm(false)
-    setEditingHotelId(null)
-    await openHotel(managingHotel)
-  }
-
-  async function deleteHotel(id: string) {
-    if (!managingHotel) return
-    await supabase.from('event_hotel_details').delete().eq('id', id)
-    await openHotel(managingHotel)
-  }
-
-  async function openRestaurant(supplierId: string) {
-    setManagingRestaurant(supplierId)
-    setManagingServices(null)
-    setManagingHotel(null)
-    const { data } = await supabase
-      .from('event_restaurant_details')
-      .select('*')
-      .eq('event_id', event.id)
-      .eq('supplier_id', supplierId)
-      .maybeSingle()
-    if (data) {
-      setRestaurantDetail(data as RestaurantDetail)
-      setRestaurantForm({
-        data: data.data ?? '',
-        ora_inizio: data.ora_inizio?.slice(0, 5) ?? '',
-        ora_fine: data.ora_fine?.slice(0, 5) ?? '',
-        pax_previsti: data.pax_previsti?.toString() ?? '',
-        pax_confermati: data.pax_confermati?.toString() ?? '',
-        tipologia_servizio: data.tipologia_servizio ?? '',
-        menu_portate: data.menu_portate ?? '',
-        menu_descrizione: data.menu_descrizione ?? '',
-        budget_per_persona: data.budget_per_persona?.toString() ?? '',
-        budget_totale: data.budget_totale?.toString() ?? '',
-        costo_per_persona: data.costo_per_persona?.toString() ?? '',
-        costo_totale_reale: data.costo_totale_reale?.toString() ?? '',
-        area_riservata: data.area_riservata ?? false,
-        sala_privata: data.sala_privata ?? false,
-        esclusiva_parziale: data.esclusiva_parziale ?? false,
-        esclusiva_totale: data.esclusiva_totale ?? false,
-        nome_sala: data.nome_sala ?? '',
-        note_location: data.note_location ?? '',
-        num_vegetariani: data.num_vegetariani?.toString() ?? '',
-        num_vegani: data.num_vegani?.toString() ?? '',
-        allergie: data.allergie ?? '',
-        intolleranze: data.intolleranze ?? '',
-        note_alimentari: data.note_alimentari ?? '',
-        setup_tavoli: data.setup_tavoli ?? '',
-        branding_cliente: data.branding_cliente ?? '',
-        richieste_speciali: data.richieste_speciali ?? '',
-        note_operative: data.note_operative ?? '',
-      })
-    } else {
-      setRestaurantDetail(null)
-      setRestaurantForm(emptyRestaurantForm)
-    }
-  }
-
-  async function saveRestaurant() {
-    if (!managingRestaurant) return
-    const paxConf = restaurantForm.pax_confermati ? parseInt(restaurantForm.pax_confermati) : null
-    const budgetPP = restaurantForm.budget_per_persona ? parseFloat(restaurantForm.budget_per_persona) : null
-    const autoTotal = paxConf && budgetPP ? paxConf * budgetPP : null
-    const costoPP = restaurantForm.costo_per_persona ? parseFloat(restaurantForm.costo_per_persona) : null
-    const autoCostoTotal = paxConf && costoPP ? paxConf * costoPP : null
-    const payload = {
-      event_id: event.id,
-      supplier_id: managingRestaurant,
-      data: restaurantForm.data || null,
-      ora_inizio: restaurantForm.ora_inizio || null,
-      ora_fine: restaurantForm.ora_fine || null,
-      pax_previsti: restaurantForm.pax_previsti ? parseInt(restaurantForm.pax_previsti) : null,
-      pax_confermati: paxConf,
-      tipologia_servizio: restaurantForm.tipologia_servizio,
-      menu_portate: restaurantForm.menu_portate,
-      menu_descrizione: restaurantForm.menu_descrizione,
-      budget_per_persona: budgetPP,
-      budget_totale: restaurantForm.budget_totale ? parseFloat(restaurantForm.budget_totale) : autoTotal,
-      costo_per_persona: costoPP,
-      costo_totale_reale: restaurantForm.costo_totale_reale ? parseFloat(restaurantForm.costo_totale_reale) : autoCostoTotal,
-      area_riservata: restaurantForm.area_riservata,
-      sala_privata: restaurantForm.sala_privata,
-      esclusiva_parziale: restaurantForm.esclusiva_parziale,
-      esclusiva_totale: restaurantForm.esclusiva_totale,
-      nome_sala: restaurantForm.nome_sala,
-      note_location: restaurantForm.note_location,
-      num_vegetariani: restaurantForm.num_vegetariani ? parseInt(restaurantForm.num_vegetariani) : null,
-      num_vegani: restaurantForm.num_vegani ? parseInt(restaurantForm.num_vegani) : null,
-      allergie: restaurantForm.allergie,
-      intolleranze: restaurantForm.intolleranze,
-      note_alimentari: restaurantForm.note_alimentari,
-      setup_tavoli: restaurantForm.setup_tavoli,
-      branding_cliente: restaurantForm.branding_cliente,
-      richieste_speciali: restaurantForm.richieste_speciali,
-      note_operative: restaurantForm.note_operative,
-    }
-    if (restaurantDetail) {
-      await supabase.from('event_restaurant_details').update(payload).eq('id', restaurantDetail.id)
-    } else {
-      await supabase.from('event_restaurant_details').insert(payload)
-    }
-    await openRestaurant(managingRestaurant)
   }
 
   const linkedSuppliers = suppliers.filter(s => linkedIds.includes(s.id))
@@ -1441,9 +1076,9 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       ) : (
         <div className="space-y-3">
           {linkedSuppliers.map(sup => {
-            const isHotel = isHotelSupplier(sup)
-            const isRestaurant = !isHotel && isRestaurantSupplier(sup)
-            const isManaging = isHotel ? managingHotel === sup.id : isRestaurant ? managingRestaurant === sup.id : managingServices === sup.id
+            const catType = detectSupplierCategory(sup.categoria)
+            const catLabel = CATEGORY_LABELS[catType]
+            const isManaging = managingCategory === sup.id
             return (
               <div key={sup.id} className="panel overflow-hidden" style={{ border: `1px solid ${isManaging ? 'var(--red2)' : 'var(--line)'}` }}>
                 <div className="p-5 flex items-start justify-between gap-4">
@@ -1458,28 +1093,12 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {isHotel ? (
-                      <button onClick={() => isManaging ? setManagingHotel(null) : openHotel(sup.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
-                        style={{ border: '1px solid var(--line)', color: isManaging ? 'var(--red2)' : 'var(--muted)' }}>
-                        <Building2 className="w-3.5 h-3.5 inline mr-1" />
-                        Scheda Hotel
-                      </button>
-                    ) : isRestaurant ? (
-                      <button onClick={() => isManaging ? setManagingRestaurant(null) : openRestaurant(sup.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
-                        style={{ border: '1px solid var(--line)', color: isManaging ? 'var(--red2)' : 'var(--muted)' }}>
-                        <UtensilsCrossed className="w-3.5 h-3.5 inline mr-1" />
-                        Scheda Ristorante
-                      </button>
-                    ) : (
-                      <button onClick={() => isManaging ? setManagingServices(null) : openServices(sup.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
-                        style={{ border: '1px solid var(--line)', color: isManaging ? 'var(--red2)' : 'var(--muted)' }}>
-                        <Zap className="w-3.5 h-3.5 inline mr-1" />
-                        Gestisci Servizi
-                      </button>
-                    )}
+                    <button onClick={() => setManagingCategory(isManaging ? null : sup.id)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
+                      style={{ border: '1px solid var(--line)', color: isManaging ? 'var(--red2)' : 'var(--muted)' }}>
+                      <Zap className="w-3.5 h-3.5 inline mr-1" />
+                      Scheda {catLabel}
+                    </button>
                     <button onClick={() => handleUnlink(sup.id)}
                       className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi collegamento">
                       <X className="w-4 h-4" style={{ color: 'var(--red2)' }} />
@@ -1487,803 +1106,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                   </div>
                 </div>
 
-                {/* Hotel panel */}
-                {isHotel && isManaging && (
-                  <div className="px-5 pb-5 pt-2 space-y-5" style={{ borderTop: '1px solid var(--line)' }}>
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
-                        Scheda Hotel
-                      </p>
-                    </div>
-
-                    {/* Section buttons */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <button onClick={() => openNewHotel('pernottamento')}
-                        className="px-3 py-2.5 rounded-lg text-xs font-medium text-center transition-all hover:bg-white/10"
-                        style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
-                        + Pernottamento
-                      </button>
-                      <button onClick={() => openNewHotel('sala_meeting')}
-                        className="px-3 py-2.5 rounded-lg text-xs font-medium text-center transition-all hover:bg-white/10"
-                        style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
-                        + Meeting
-                      </button>
-                      <div className="relative">
-                        <select
-                          onChange={e => { if (e.target.value) { openNewHotel(e.target.value); e.target.value = '' } }}
-                          defaultValue=""
-                          className="w-full px-3 py-2.5 rounded-lg text-xs font-medium text-center transition-all appearance-none cursor-pointer"
-                          style={{ border: '1px solid var(--line)', color: 'var(--text)', background: 'transparent' }}>
-                          <option value="" disabled>+ F&B / Altro</option>
-                          <option value="coffee_break">Coffee Break</option>
-                          <option value="lunch">Lunch</option>
-                          <option value="dinner">Dinner</option>
-                          <option value="coffee_station">Coffee Station</option>
-                          <option value="setup_sala">Setup Sala</option>
-                          <option value="attrezzature">Attrezzature</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Form */}
-                    {showHotelForm && (
-                      <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                        <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
-                          {editingHotelId ? 'Modifica' : 'Nuovo'}: {HOTEL_TIPOS.find(t => t.value === hotelFormTipo)?.label}
-                        </p>
-
-                        {/* PERNOTTAMENTO form */}
-                        {hotelFormTipo === 'pernottamento' && (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-in data *</label>
-                              <input type="date" value={hotelForm.check_in_date} onChange={e => setHotelForm(p => ({ ...p, check_in_date: e.target.value }))}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-out data *</label>
-                              <input type="date" value={hotelForm.check_out_date} onChange={e => setHotelForm(p => ({ ...p, check_out_date: e.target.value }))}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>N. Camere</label>
-                              <input type="number" value={hotelForm.quantita} onChange={e => setHotelForm(p => ({ ...p, quantita: e.target.value }))}
-                                placeholder="Es. 26"
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Tipologia camera</label>
-                              <input type="text" value={hotelForm.room_type} onChange={e => setHotelForm(p => ({ ...p, room_type: e.target.value }))}
-                                placeholder="Es. DUS, DUP, Suite"
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-in ora</label>
-                              <input type="time" value={hotelForm.check_in_time} onChange={e => setHotelForm(p => ({ ...p, check_in_time: e.target.value }))}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Check-out ora</label>
-                              <input type="time" value={hotelForm.check_out_time} onChange={e => setHotelForm(p => ({ ...p, check_out_time: e.target.value }))}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div className="sm:col-span-3">
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Note pernottamento</label>
-                              <textarea value={hotelForm.note} onChange={e => setHotelForm(p => ({ ...p, note: e.target.value }))}
-                                rows={2} placeholder="Richieste particolari, allergeni, late check-out..."
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* MEETING form */}
-                        {hotelFormTipo === 'sala_meeting' && (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Data *</label>
-                              <input type="date" value={hotelForm.data} onChange={e => setHotelForm(p => ({ ...p, data: e.target.value }))}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora inizio *</label>
-                              <input type="time" value={hotelForm.ora_inizio} onChange={e => setHotelForm(p => ({ ...p, ora_inizio: e.target.value }))}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora fine *</label>
-                              <input type="time" value={hotelForm.ora_fine} onChange={e => setHotelForm(p => ({ ...p, ora_fine: e.target.value }))}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Sala</label>
-                              <input type="text" value={hotelForm.luogo} onChange={e => setHotelForm(p => ({ ...p, luogo: e.target.value }))}
-                                placeholder="Es. Sala Plenaria, Piano 1"
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>N. Pax</label>
-                              <input type="number" value={hotelForm.meeting_pax} onChange={e => setHotelForm(p => ({ ...p, meeting_pax: e.target.value }))}
-                                placeholder="26"
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Setup sala</label>
-                              <select value={hotelForm.meeting_setup} onChange={e => setHotelForm(p => ({ ...p, meeting_setup: e.target.value }))}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                                <option value="">--</option>
-                                <option value="teatro">Teatro</option>
-                                <option value="platea">Platea</option>
-                                <option value="tavolo_imperiale">Tavolo imperiale</option>
-                                <option value="ferro_cavallo">Ferro di cavallo</option>
-                                <option value="isole">Isole</option>
-                                <option value="boardroom">Boardroom</option>
-                                <option value="classe">Classe</option>
-                              </select>
-                            </div>
-                            <div className="sm:col-span-2">
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Attrezzature tecniche</label>
-                              <input type="text" value={hotelForm.meeting_equipment} onChange={e => setHotelForm(p => ({ ...p, meeting_equipment: e.target.value }))}
-                                placeholder="Proiettore, lavagna, microfoni..."
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div className="flex items-end pb-1">
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={hotelForm.natural_light} onChange={e => setHotelForm(p => ({ ...p, natural_light: e.target.checked }))}
-                                  className="rounded" />
-                                <span className="text-xs" style={{ color: 'var(--muted)' }}>Luce naturale</span>
-                              </label>
-                            </div>
-                            <div className="sm:col-span-3">
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Note meeting</label>
-                              <textarea value={hotelForm.note} onChange={e => setHotelForm(p => ({ ...p, note: e.target.value }))}
-                                rows={2} placeholder="Esigenze particolari..."
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* F&B / OTHER form */}
-                        {hotelFormTipo !== 'pernottamento' && hotelFormTipo !== 'sala_meeting' && (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Data *</label>
-                              <input type="date" value={hotelForm.data} onChange={e => setHotelForm(p => ({ ...p, data: e.target.value }))}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora *</label>
-                              <input type="time" value={hotelForm.ora_inizio} onChange={e => setHotelForm(p => ({ ...p, ora_inizio: e.target.value }))}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Luogo / Sala</label>
-                              <input type="text" value={hotelForm.luogo} onChange={e => setHotelForm(p => ({ ...p, luogo: e.target.value }))}
-                                placeholder="Es. Foyer, Terrazza"
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>N. Persone</label>
-                              <input type="number" value={hotelForm.quantita} onChange={e => setHotelForm(p => ({ ...p, quantita: e.target.value }))}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div className="sm:col-span-2">
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Note</label>
-                              <input type="text" value={hotelForm.note} onChange={e => setHotelForm(p => ({ ...p, note: e.target.value }))}
-                                placeholder="Menu, allergie, richieste..."
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Cost fields */}
-                        <div className="pt-2 space-y-3" style={{ borderTop: '1px solid var(--line)' }}>
-                          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Economica</p>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Venduto unit.</label>
-                              <input type="number" step="0.01" value={hotelForm.venduto_unitario} onChange={e => setHotelForm(p => ({ ...p, venduto_unitario: e.target.value }))}
-                                placeholder="0.00"
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Venduto totale</label>
-                              <input type="number" step="0.01" value={hotelForm.venduto_totale} onChange={e => setHotelForm(p => ({ ...p, venduto_totale: e.target.value }))}
-                                placeholder={hotelForm.venduto_unitario && hotelForm.quantita ? `Auto: ${(parseFloat(hotelForm.venduto_unitario) * parseInt(hotelForm.quantita || '1')).toFixed(2)}` : ''}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo unit.</label>
-                              <input type="number" step="0.01" value={hotelForm.costo_unitario} onChange={e => setHotelForm(p => ({ ...p, costo_unitario: e.target.value }))}
-                                placeholder="0.00"
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo totale</label>
-                              <input type="number" step="0.01" value={hotelForm.costo_totale} onChange={e => setHotelForm(p => ({ ...p, costo_totale: e.target.value }))}
-                                placeholder={hotelForm.costo_unitario && hotelForm.quantita ? `Auto: ${(parseFloat(hotelForm.costo_unitario) * parseInt(hotelForm.quantita || '1')).toFixed(2)}` : ''}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 justify-end">
-                          <button onClick={() => { setShowHotelForm(false); setEditingHotelId(null) }} className="px-4 py-2 rounded-lg text-xs font-medium"
-                            style={{ color: 'var(--muted)' }}>Annulla</button>
-                          <button onClick={saveHotel} className="px-4 py-2 rounded-lg text-xs font-medium"
-                            style={{ background: 'var(--red2)', color: '#fff' }}>
-                            {editingHotelId ? 'Salva' : 'Aggiungi'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {hotelDetails.length === 0 && !showHotelForm && (
-                      <p className="text-xs text-center py-4" style={{ color: 'var(--muted)' }}>
-                        Nessuna voce hotel. Usa i pulsanti sopra per aggiungere servizi.
-                      </p>
-                    )}
-
-                    {/* Hotel items list grouped by section */}
-                    {hotelDetails.length > 0 && (
-                      <div className="space-y-3">
-                        {/* Pernottamento section */}
-                        {hotelDetails.filter(h => h.tipo === 'pernottamento').length > 0 && (
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>
-                              Pernottamento
-                            </p>
-                            {hotelDetails.filter(h => h.tipo === 'pernottamento').map(h => (
-                              <div key={h.id} className="flex items-start gap-3 p-3 rounded-lg mb-1.5" style={{ background: 'var(--panel2)' }}>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--text)' }}>
-                                    <span className="font-medium">IN {h.check_in_date}{h.check_in_time ? ` ${h.check_in_time.slice(0, 5)}` : ''}</span>
-                                    <span style={{ color: 'var(--muted)' }}>→</span>
-                                    <span className="font-medium">OUT {h.check_out_date}{h.check_out_time ? ` ${h.check_out_time.slice(0, 5)}` : ''}</span>
-                                  </div>
-                                  <div className="flex items-center gap-3 mt-1 text-xs flex-wrap" style={{ color: 'var(--muted)' }}>
-                                    {h.quantita && <span>{h.quantita} camere</span>}
-                                    {h.room_type && <span>{h.room_type}</span>}
-                                  </div>
-                                  {h.note && <p className="text-xs mt-1 italic" style={{ color: 'var(--muted)' }}>{h.note}</p>}
-                                </div>
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                  <button onClick={() => openEditHotel(h)} className="p-1.5 rounded hover:bg-white/10">
-                                    <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-                                  </button>
-                                  <button onClick={() => deleteHotel(h.id)} className="p-1.5 rounded hover:bg-white/10">
-                                    <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Meeting section */}
-                        {hotelDetails.filter(h => h.tipo === 'sala_meeting').length > 0 && (
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>
-                              Meeting
-                            </p>
-                            {hotelDetails.filter(h => h.tipo === 'sala_meeting').map(h => (
-                              <div key={h.id} className="flex items-start gap-3 p-3 rounded-lg mb-1.5" style={{ background: 'var(--panel2)' }}>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 text-sm flex-wrap" style={{ color: 'var(--text)' }}>
-                                    <span className="font-medium">{h.data} {h.ora_inizio?.slice(0, 5)} - {h.ora_fine?.slice(0, 5)}</span>
-                                    {h.luogo && <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(208,0,58,0.08)', color: 'var(--red2)' }}>{h.luogo}</span>}
-                                  </div>
-                                  <div className="flex items-center gap-3 mt-1 text-xs flex-wrap" style={{ color: 'var(--muted)' }}>
-                                    {h.meeting_pax && <span>{h.meeting_pax} pax</span>}
-                                    {h.meeting_setup && <span>Setup: {h.meeting_setup}</span>}
-                                    {h.meeting_equipment && <span>{h.meeting_equipment}</span>}
-                                    {h.natural_light && <span>Luce naturale</span>}
-                                  </div>
-                                  {h.note && <p className="text-xs mt-1 italic" style={{ color: 'var(--muted)' }}>{h.note}</p>}
-                                </div>
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                  <button onClick={() => openEditHotel(h)} className="p-1.5 rounded hover:bg-white/10">
-                                    <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-                                  </button>
-                                  <button onClick={() => deleteHotel(h.id)} className="p-1.5 rounded hover:bg-white/10">
-                                    <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* F&B / Other section */}
-                        {hotelDetails.filter(h => h.tipo !== 'pernottamento' && h.tipo !== 'sala_meeting').length > 0 && (
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>
-                              F&B / Servizi
-                            </p>
-                            {hotelDetails.filter(h => h.tipo !== 'pernottamento' && h.tipo !== 'sala_meeting').map(h => {
-                              const tipoLabel = HOTEL_TIPOS.find(t => t.value === h.tipo)?.label ?? h.tipo
-                              return (
-                                <div key={h.id} className="flex items-start gap-3 p-3 rounded-lg mb-1.5" style={{ background: 'var(--panel2)' }}>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text)' }}>
-                                      <span className="font-medium">{tipoLabel}</span>
-                                      {h.data && <span className="text-xs" style={{ color: 'var(--muted)' }}>{h.data} {h.ora_inizio?.slice(0, 5) ?? ''}</span>}
-                                    </div>
-                                    <div className="flex items-center gap-3 mt-1 text-xs flex-wrap" style={{ color: 'var(--muted)' }}>
-                                      {h.luogo && <span>{h.luogo}</span>}
-                                      {h.quantita && <span>{h.quantita} pax</span>}
-                                    </div>
-                                    {h.note && <p className="text-xs mt-1 italic" style={{ color: 'var(--muted)' }}>{h.note}</p>}
-                                  </div>
-                                  <div className="flex items-center gap-1 flex-shrink-0">
-                                    <button onClick={() => openEditHotel(h)} className="p-1.5 rounded hover:bg-white/10">
-                                      <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-                                    </button>
-                                    <button onClick={() => deleteHotel(h.id)} className="p-1.5 rounded hover:bg-white/10">
-                                      <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
-                                    </button>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Restaurant panel */}
-                {isRestaurant && isManaging && (
-                  <div className="px-5 pb-5 pt-2 space-y-5" style={{ borderTop: '1px solid var(--line)' }}>
-                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
-                      Scheda Ristorante
-                    </p>
-
-                    {/* Sezione 1: Informazioni Evento */}
-                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Informazioni Evento</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Data</label>
-                          <input type="date" value={restaurantForm.data} onChange={e => setRestaurantForm(p => ({ ...p, data: e.target.value }))}
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora inizio</label>
-                          <input type="time" value={restaurantForm.ora_inizio} onChange={e => setRestaurantForm(p => ({ ...p, ora_inizio: e.target.value }))}
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora fine</label>
-                          <input type="time" value={restaurantForm.ora_fine} onChange={e => setRestaurantForm(p => ({ ...p, ora_fine: e.target.value }))}
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Pax previsti</label>
-                          <input type="number" value={restaurantForm.pax_previsti} onChange={e => setRestaurantForm(p => ({ ...p, pax_previsti: e.target.value }))}
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Pax confermati</label>
-                          <input type="number" value={restaurantForm.pax_confermati} onChange={e => setRestaurantForm(p => ({ ...p, pax_confermati: e.target.value }))}
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Sezione 2: Tipologia Servizio */}
-                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Tipologia Servizio</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                        {['Pranzo', 'Cena', 'Aperitivo', 'Aperitivo Rinforzato', 'Cena di Gala'].map(tipo => (
-                          <button key={tipo}
-                            onClick={() => setRestaurantForm(p => ({ ...p, tipologia_servizio: tipo }))}
-                            className="px-3 py-2 rounded-lg text-xs font-medium text-center transition-all"
-                            style={{
-                              border: `1px solid ${restaurantForm.tipologia_servizio === tipo ? 'var(--red2)' : 'var(--line)'}`,
-                              background: restaurantForm.tipologia_servizio === tipo ? 'rgba(208,0,58,0.1)' : 'transparent',
-                              color: restaurantForm.tipologia_servizio === tipo ? 'var(--red2)' : 'var(--text)',
-                            }}>
-                            {tipo}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Sezione 3: Menu */}
-                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Menu</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {['2 Portate', '3 Portate', '4 Portate', 'Menu Personalizzato'].map(m => (
-                          <button key={m}
-                            onClick={() => setRestaurantForm(p => ({ ...p, menu_portate: m }))}
-                            className="px-3 py-2 rounded-lg text-xs font-medium text-center transition-all"
-                            style={{
-                              border: `1px solid ${restaurantForm.menu_portate === m ? 'var(--red2)' : 'var(--line)'}`,
-                              background: restaurantForm.menu_portate === m ? 'rgba(208,0,58,0.1)' : 'transparent',
-                              color: restaurantForm.menu_portate === m ? 'var(--red2)' : 'var(--text)',
-                            }}>
-                            {m}
-                          </button>
-                        ))}
-                      </div>
-                      <div>
-                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Descrizione menu</label>
-                        <textarea value={restaurantForm.menu_descrizione} onChange={e => setRestaurantForm(p => ({ ...p, menu_descrizione: e.target.value }))}
-                          rows={3} placeholder="Antipasto, primo, secondo, dessert..."
-                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
-                          style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                      </div>
-                    </div>
-
-                    {/* Sezione 4: Economica */}
-                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Economica</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Venduto /persona</label>
-                          <input type="number" step="0.01" value={restaurantForm.budget_per_persona}
-                            onChange={e => setRestaurantForm(p => ({ ...p, budget_per_persona: e.target.value }))}
-                            placeholder="70.00"
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Venduto totale</label>
-                          <input type="number" step="0.01" value={restaurantForm.budget_totale}
-                            onChange={e => setRestaurantForm(p => ({ ...p, budget_totale: e.target.value }))}
-                            placeholder={restaurantForm.pax_confermati && restaurantForm.budget_per_persona
-                              ? `${(parseInt(restaurantForm.pax_confermati) * parseFloat(restaurantForm.budget_per_persona)).toFixed(2)}`
-                              : 'Pax x Venduto/pax'}
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo /persona</label>
-                          <input type="number" step="0.01" value={restaurantForm.costo_per_persona}
-                            onChange={e => setRestaurantForm(p => ({ ...p, costo_per_persona: e.target.value }))}
-                            placeholder="55.00"
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo totale</label>
-                          <input type="number" step="0.01" value={restaurantForm.costo_totale_reale}
-                            onChange={e => setRestaurantForm(p => ({ ...p, costo_totale_reale: e.target.value }))}
-                            placeholder={restaurantForm.pax_confermati && restaurantForm.costo_per_persona
-                              ? `${(parseInt(restaurantForm.pax_confermati) * parseFloat(restaurantForm.costo_per_persona)).toFixed(2)}`
-                              : 'Pax x Costo/pax'}
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Sezione 5: Privacy e Location */}
-                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Privacy e Location</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={restaurantForm.area_riservata} onChange={e => setRestaurantForm(p => ({ ...p, area_riservata: e.target.checked }))} className="rounded" />
-                          <span className="text-xs" style={{ color: 'var(--text)' }}>Area riservata</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={restaurantForm.sala_privata} onChange={e => setRestaurantForm(p => ({ ...p, sala_privata: e.target.checked }))} className="rounded" />
-                          <span className="text-xs" style={{ color: 'var(--text)' }}>Sala privata</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={restaurantForm.esclusiva_parziale} onChange={e => setRestaurantForm(p => ({ ...p, esclusiva_parziale: e.target.checked }))} className="rounded" />
-                          <span className="text-xs" style={{ color: 'var(--text)' }}>Esclusiva parziale</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={restaurantForm.esclusiva_totale} onChange={e => setRestaurantForm(p => ({ ...p, esclusiva_totale: e.target.checked }))} className="rounded" />
-                          <span className="text-xs" style={{ color: 'var(--text)' }}>Esclusiva totale</span>
-                        </label>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Nome sala</label>
-                          <input type="text" value={restaurantForm.nome_sala} onChange={e => setRestaurantForm(p => ({ ...p, nome_sala: e.target.value }))}
-                            placeholder="Es. Sala degli Specchi"
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Note location</label>
-                          <input type="text" value={restaurantForm.note_location} onChange={e => setRestaurantForm(p => ({ ...p, note_location: e.target.value }))}
-                            placeholder="Piano, accesso, parcheggio..."
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Sezione 6: Esigenze Alimentari */}
-                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Esigenze Alimentari</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>N. Vegetariani</label>
-                          <input type="number" value={restaurantForm.num_vegetariani} onChange={e => setRestaurantForm(p => ({ ...p, num_vegetariani: e.target.value }))}
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>N. Vegani</label>
-                          <input type="number" value={restaurantForm.num_vegani} onChange={e => setRestaurantForm(p => ({ ...p, num_vegani: e.target.value }))}
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Allergie</label>
-                          <input type="text" value={restaurantForm.allergie} onChange={e => setRestaurantForm(p => ({ ...p, allergie: e.target.value }))}
-                            placeholder="Glutine, lattosio..."
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Intolleranze</label>
-                          <input type="text" value={restaurantForm.intolleranze} onChange={e => setRestaurantForm(p => ({ ...p, intolleranze: e.target.value }))}
-                            placeholder="Frutta a guscio..."
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Richieste alimentari particolari</label>
-                        <textarea value={restaurantForm.note_alimentari} onChange={e => setRestaurantForm(p => ({ ...p, note_alimentari: e.target.value }))}
-                          rows={2} placeholder="Esigenze specifiche, menu bambini..."
-                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
-                          style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                      </div>
-                    </div>
-
-                    {/* Sezione 7: Note Operative */}
-                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Note Operative</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Setup tavoli</label>
-                          <input type="text" value={restaurantForm.setup_tavoli} onChange={e => setRestaurantForm(p => ({ ...p, setup_tavoli: e.target.value }))}
-                            placeholder="Tavolo unico, tavoli rotondi..."
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Branding cliente</label>
-                          <input type="text" value={restaurantForm.branding_cliente} onChange={e => setRestaurantForm(p => ({ ...p, branding_cliente: e.target.value }))}
-                            placeholder="Segnaposto, centerpiece..."
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Richieste speciali</label>
-                          <input type="text" value={restaurantForm.richieste_speciali} onChange={e => setRestaurantForm(p => ({ ...p, richieste_speciali: e.target.value }))}
-                            placeholder="Torta, musica, DJ..."
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                        <div>
-                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Note operative</label>
-                          <input type="text" value={restaurantForm.note_operative} onChange={e => setRestaurantForm(p => ({ ...p, note_operative: e.target.value }))}
-                            placeholder="Indicazioni aggiuntive..."
-                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Save button */}
-                    <div className="flex justify-end">
-                      <button onClick={saveRestaurant}
-                        className="px-5 py-2.5 rounded-lg text-sm font-medium transition-all"
-                        style={{ background: 'var(--red2)', color: '#fff' }}>
-                        {restaurantDetail ? 'Salva modifiche' : 'Salva scheda'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Services panel (non-hotel, non-restaurant) */}
-                {!isHotel && !isRestaurant && isManaging && (
-                  <div className="px-5 pb-5 pt-2 space-y-4" style={{ borderTop: '1px solid var(--line)' }}>
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
-                        Servizi operativi ({services.length})
-                      </p>
-                      <button onClick={openNewSvc} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium"
-                        style={{ background: 'var(--red2)', color: '#fff' }}>
-                        <Plus className="w-3 h-3" /> Nuovo servizio
-                      </button>
-                    </div>
-
-                    {showSvcForm && (
-                      <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-                        <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
-                          {editingSvcId ? 'Modifica servizio' : 'Nuovo servizio'}
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div className="sm:col-span-2">
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Titolo *</label>
-                            <input type="text" value={svcForm.titolo} onChange={e => setSvcForm(p => ({ ...p, titolo: e.target.value }))}
-                              placeholder="Es. Transfer Aeroporto → Hotel"
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Categoria</label>
-                            <select value={svcForm.categoria} onChange={e => setSvcForm(p => ({ ...p, categoria: e.target.value }))}
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                              {SVC_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Data</label>
-                            <input type="date" value={svcForm.data} onChange={e => setSvcForm(p => ({ ...p, data: e.target.value }))}
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora inizio</label>
-                            <input type="time" value={svcForm.ora_inizio} onChange={e => setSvcForm(p => ({ ...p, ora_inizio: e.target.value }))}
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora fine</label>
-                            <input type="time" value={svcForm.ora_fine} onChange={e => setSvcForm(p => ({ ...p, ora_fine: e.target.value }))}
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Luogo</label>
-                            <input type="text" value={svcForm.luogo} onChange={e => setSvcForm(p => ({ ...p, luogo: e.target.value }))}
-                              placeholder="Es. Hotel Continental"
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Partenza</label>
-                            <input type="text" value={svcForm.partenza} onChange={e => setSvcForm(p => ({ ...p, partenza: e.target.value }))}
-                              placeholder="Es. Milano Linate"
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                          <div>
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Destinazione</label>
-                            <input type="text" value={svcForm.destinazione} onChange={e => setSvcForm(p => ({ ...p, destinazione: e.target.value }))}
-                              placeholder="Es. Hotel Continental"
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                          <div className="sm:col-span-3">
-                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Note operative</label>
-                            <textarea value={svcForm.note} onChange={e => setSvcForm(p => ({ ...p, note: e.target.value }))}
-                              rows={2} placeholder="Note aggiuntive..."
-                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
-                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                          </div>
-                        </div>
-                        {/* Cost fields */}
-                        <div className="pt-2 space-y-3" style={{ borderTop: '1px solid var(--line)' }}>
-                          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Economica</p>
-                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Quantita</label>
-                              <input type="number" value={svcForm.quantita} onChange={e => setSvcForm(p => ({ ...p, quantita: e.target.value }))}
-                                placeholder="1"
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Venduto unit.</label>
-                              <input type="number" step="0.01" value={svcForm.venduto_unitario} onChange={e => setSvcForm(p => ({ ...p, venduto_unitario: e.target.value }))}
-                                placeholder="0.00"
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Venduto totale</label>
-                              <input type="number" step="0.01" value={svcForm.venduto_totale} onChange={e => setSvcForm(p => ({ ...p, venduto_totale: e.target.value }))}
-                                placeholder={svcForm.venduto_unitario && svcForm.quantita ? `${(parseFloat(svcForm.venduto_unitario) * parseInt(svcForm.quantita || '1')).toFixed(2)}` : ''}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo unit.</label>
-                              <input type="number" step="0.01" value={svcForm.costo_unitario} onChange={e => setSvcForm(p => ({ ...p, costo_unitario: e.target.value }))}
-                                placeholder="0.00"
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                            <div>
-                              <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo totale</label>
-                              <input type="number" step="0.01" value={svcForm.costo_totale} onChange={e => setSvcForm(p => ({ ...p, costo_totale: e.target.value }))}
-                                placeholder={svcForm.costo_unitario && svcForm.quantita ? `${(parseFloat(svcForm.costo_unitario) * parseInt(svcForm.quantita || '1')).toFixed(2)}` : ''}
-                                className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
-                                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 justify-end">
-                          <button onClick={() => { setShowSvcForm(false); setEditingSvcId(null) }} className="px-4 py-2 rounded-lg text-xs font-medium"
-                            style={{ color: 'var(--muted)' }}>Annulla</button>
-                          <button onClick={saveSvc} className="px-4 py-2 rounded-lg text-xs font-medium"
-                            style={{ background: 'var(--red2)', color: '#fff', opacity: !svcForm.titolo.trim() ? 0.5 : 1 }}>
-                            {editingSvcId ? 'Salva' : 'Aggiungi'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {services.length === 0 && !showSvcForm && (
-                      <p className="text-xs text-center py-4" style={{ color: 'var(--muted)' }}>
-                        Nessun servizio operativo. Aggiungi i servizi per questo fornitore.
-                      </p>
-                    )}
-
-                    {services.length > 0 && (
-                      <div className="space-y-2">
-                        {services.map(svc => (
-                          <div key={svc.id} className="flex items-start gap-3 p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{svc.titolo}</span>
-                                <span className="text-xs px-2 py-0.5 rounded-full"
-                                  style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
-                                  {SVC_CATEGORIES.find(c => c.value === svc.categoria)?.label ?? svc.categoria}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
-                                {svc.data && <span>{svc.data} {svc.ora_inizio?.slice(0, 5) ?? ''}{svc.ora_fine ? ` - ${svc.ora_fine.slice(0, 5)}` : ''}</span>}
-                                {svc.partenza && svc.destinazione && <span>{svc.partenza} → {svc.destinazione}</span>}
-                                {svc.luogo && !svc.partenza && <span>{svc.luogo}</span>}
-                              </div>
-                              {svc.note && <p className="text-xs mt-1 italic" style={{ color: 'var(--muted)' }}>{svc.note}</p>}
-                            </div>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              <button onClick={() => openEditSvc(svc)} className="p-1.5 rounded hover:bg-white/10">
-                                <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-                              </button>
-                              <button onClick={() => deleteSvc(svc.id)} className="p-1.5 rounded hover:bg-white/10">
-                                <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                {isManaging && (
+                  <SupplierCategoryPanel event={event} supplierId={sup.id} category={catType} />
                 )}
               </div>
             )
@@ -2809,7 +1633,7 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDeletingId(null)}>
           <div className="panel p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
             <p className="font-semibold mb-2" style={{ color: 'var(--text)' }}>Elimina voce budget</p>
-            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Questa azione elimina il servizio operativo collegato. Il fornitore NON viene eliminato.</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Questa azione elimina la voce collegata. Il fornitore NON viene eliminato.</p>
             <div className="flex gap-3 justify-end">
               <button className="px-4 py-2 rounded-lg text-sm" style={{ background: 'var(--panel2)', color: 'var(--text)' }} onClick={() => setDeletingId(null)}>Annulla</button>
               <button className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--red2)', color: '#fff' }} onClick={() => { const l = lines.find(x => x.id === deletingId); if (l) deleteLine(l) }}>Elimina</button>
@@ -3602,8 +2426,8 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
     return (
       <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
         <Clock className="w-10 h-10 mx-auto mb-3 opacity-30" />
-        <p>Nessun servizio operativo inserito</p>
-        <p className="text-xs mt-1">Vai nel tab Fornitori, collega i fornitori e aggiungi i servizi operativi per generare il programma</p>
+        <p>Nessuna voce inserita</p>
+        <p className="text-xs mt-1">Vai nel tab Fornitori, collega i fornitori e compila le schede per generare il programma</p>
       </div>
     )
   }
@@ -4213,7 +3037,6 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
     { id: 'task', label: `Task${totalTasks > 0 ? ` (${totalTasks})` : ''}` },
     { id: 'team', label: `Team (${event.team.length})` },
     { id: 'fornitori', label: `Fornitori${eventSuppliers.length > 0 ? ` (${eventSuppliers.length})` : ''}` },
-    { id: 'operativo', label: 'Operativo' },
     { id: 'budget', label: 'Budget' },
     { id: 'comunicazioni', label: `Comunicazioni${eventMsg.length > 0 ? ` (${eventMsg.length})` : ''}` },
     { id: 'documenti', label: 'Documenti' },
@@ -4386,7 +3209,6 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         {activeTab === 'task' && <TabTask event={event} />}
         {activeTab === 'team' && <TabTeam event={event} internalUsers={internalUsers} />}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} />}
-        {activeTab === 'operativo' && <TabOperativo event={event} suppliers={suppliers} />}
         {activeTab === 'budget' && <TabBudget event={event} suppliers={suppliers} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} />}

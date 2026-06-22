@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 
 interface Supplier { id: string; nome: string; categoria: string }
 
-type CategoryType = 'hotel' | 'transfer' | 'ristorante' | 'experience' | 'catering' | 'audio_video' | 'allestimenti' | 'staff_interno' | 'staff_esterno' | 'grafica_stampa' | 'varie'
+export type CategoryType = 'hotel' | 'transfer' | 'ristorante' | 'experience' | 'catering' | 'audio_video' | 'allestimenti' | 'staff_interno' | 'staff_esterno' | 'grafica_stampa' | 'varie'
 
 const CATEGORIES: { key: CategoryType; label: string; table: string }[] = [
   { key: 'hotel', label: 'Hotel', table: 'event_hotel_details' },
@@ -42,6 +42,441 @@ export function calcImponibile(totale: number, aliquota: string, ivaInclusa: boo
 
 export function calcIva(imponibile: number, aliquota: string): number {
   return imponibile * getIvaRate(aliquota)
+}
+
+export const CATEGORY_LABELS: Record<CategoryType, string> = {
+  hotel: 'Hotel', transfer: 'Transfer', ristorante: 'Ristorante', experience: 'Location / Experience',
+  catering: 'Catering', audio_video: 'Audio Video', allestimenti: 'Allestimenti',
+  staff_interno: 'Staff Simmetria', staff_esterno: 'Staff Esterno', grafica_stampa: 'Grafica / Stampa', varie: 'Varie',
+}
+
+export function detectSupplierCategory(supplierCategory: string): CategoryType {
+  const c = supplierCategory.toLowerCase()
+  if (c.includes('hotel') || c.includes('albergo')) return 'hotel'
+  if (c.includes('transfer') || c.includes('trasporto') || c.includes('ncc') || c.includes('bus') || c.includes('noleggio')) return 'transfer'
+  if (c.includes('ristorante') || c.includes('ristorazione')) return 'ristorante'
+  if (c.includes('catering')) return 'catering'
+  if (c.includes('experience') || c.includes('location') || c.includes('team building')) return 'experience'
+  if (c.includes('audio') || c.includes('video') || c.includes('luci') || c.includes('tecnic')) return 'audio_video'
+  if (c.includes('allestiment')) return 'allestimenti'
+  if (c.includes('staff') && c.includes('intern')) return 'staff_interno'
+  if (c.includes('staff') || c.includes('hostess') || c.includes('steward') || c.includes('promoter')) return 'staff_esterno'
+  if (c.includes('grafi') || c.includes('stamp') || c.includes('tipografi')) return 'grafica_stampa'
+  return 'varie'
+}
+
+export function SupplierCategoryPanel({ event, supplierId, category }: { event: { id: string }; supplierId: string; category: CategoryType }) {
+  const [items, setItems] = useState<Record<string, unknown>[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState<Record<string, string | number | boolean>>({})
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const catMeta = CATEGORIES.find(c => c.key === category)!
+
+  const loadItems = useCallback(async () => {
+    setLoading(true)
+    let query = supabase.from(catMeta.table).select('*').eq('event_id', event.id).eq('supplier_id', supplierId)
+    if (category === 'transfer') {
+      query = query.eq('categoria', 'transfer')
+    }
+    const { data } = await query.order('created_at', { ascending: true })
+    setItems(data ?? [])
+    setLoading(false)
+  }, [event.id, supplierId, category, catMeta.table])
+
+  useEffect(() => { loadItems() }, [loadItems])
+
+  function resetForm() {
+    const base: Record<string, string | number | boolean> = {
+      aliquota_iva_venduto: '22', iva_inclusa_venduto: false,
+      aliquota_iva_costo: '22', iva_inclusa_costo: false,
+    }
+    if (category === 'hotel') {
+      Object.assign(base, { titolo: '', tipo: 'pernottamento', check_in_date: '', check_in_time: '', check_out_date: '', check_out_time: '', quantita: '1', room_type: '', note: '', data: '', ora_inizio: '', ora_fine: '', meeting_pax: '', meeting_setup: '', meeting_equipment: '', natural_light_preference: false, luogo: '', coffee_break_time: '', coffee_break_notes: '', lunch_time: '', lunch_notes: '', dinner_time: '', dinner_notes: '', coffee_station_notes: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10' })
+    } else if (category === 'transfer') {
+      Object.assign(base, { titolo: '', data: '', ora_inizio: '', ora_fine: '', partenza: '', destinazione: '', quantita: '1', luogo: '', note: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+    } else if (category === 'ristorante') {
+      Object.assign(base, { tipologia_servizio: '', data: '', ora_inizio: '', ora_fine: '', pax_previsti: '', pax_confermati: '', menu_portate: '', menu_descrizione: '', beverage_incluso: false, area_riservata: false, sala_privata: false, esclusiva_parziale: false, esclusiva_totale: false, nome_sala: '', note_location: '', num_vegetariani: '', num_vegani: '', allergie: '', intolleranze: '', richieste_alimentari: '', note_operative: '', budget_per_persona: '', budget_totale: '', costo_per_persona: '', costo_totale_reale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10' })
+    } else if (category === 'experience') {
+      Object.assign(base, { nome_attivita: '', tipologia: '', data: '', ora_inizio: '', ora_fine: '', location: '', pax: '', durata_minuti: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+    } else if (category === 'catering') {
+      Object.assign(base, { tipologia: '', data: '', ora_inizio: '', ora_fine: '', pax: '', note: '', venduto_per_persona: '', venduto_totale: '', costo_per_persona: '', costo_totale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10' })
+    } else if (category === 'audio_video') {
+      Object.assign(base, { tipologia_servizio: '', quantita: '1', data_montaggio: '', ora_montaggio: '', data_prove: '', ora_prove: '', data_evento: '', ora_evento: '', data_smontaggio: '', ora_smontaggio: '', materiale: '', tecnici: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+    } else if (category === 'allestimenti') {
+      Object.assign(base, { descrizione: '', quantita: '1', area_utilizzo: '', data_montaggio: '', ora_montaggio: '', data_smontaggio: '', ora_smontaggio: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+    } else if (category === 'staff_interno') {
+      Object.assign(base, { risorsa: '', ruolo: '', data: '', ora_inizio: '', ora_fine: '', note: '', note_operative: '', venduto_totale: '', costo_giornaliero: '', costo_totale: '' })
+    } else if (category === 'staff_esterno') {
+      Object.assign(base, { ruolo: '', quantita: '1', data: '', ora_inizio: '', ora_fine: '', lingue: '', abbigliamento: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+    } else if (category === 'grafica_stampa') {
+      Object.assign(base, { tipo_materiale: '', quantita: '1', formato: '', data_consegna: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+    } else {
+      Object.assign(base, { descrizione: '', quantita: '1', data: '', ora_inizio: '', note: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+    }
+    setForm(base)
+  }
+
+  function startAdd() { resetForm(); setEditingId(null); setShowForm(true) }
+
+  function startEdit(item: Record<string, unknown>) {
+    setEditingId(item.id as string)
+    const f: Record<string, string | number | boolean> = {}
+    for (const [k, v] of Object.entries(item)) {
+      if (k === 'id' || k === 'event_id' || k === 'supplier_id' || k === 'created_at' || k === 'updated_at') continue
+      f[k] = v == null ? '' : v as string | number | boolean
+    }
+    setForm(f)
+    setShowForm(true)
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const record: Record<string, unknown> = { event_id: event.id, supplier_id: supplierId }
+    const numOrNull = (key: string) => form[key] !== '' && form[key] !== undefined ? Number(form[key]) : null
+    const strOrNull = (key: string) => (form[key] && String(form[key]).trim()) || null
+    const strOrEmpty = (key: string) => String(form[key] ?? '')
+
+    record.aliquota_iva_venduto = strOrEmpty('aliquota_iva_venduto') || '22'
+    record.iva_inclusa_venduto = !!form.iva_inclusa_venduto
+    record.aliquota_iva_costo = strOrEmpty('aliquota_iva_costo') || '22'
+    record.iva_inclusa_costo = !!form.iva_inclusa_costo
+
+    if (category === 'hotel') {
+      Object.assign(record, { titolo: strOrEmpty('titolo'), tipo: strOrEmpty('tipo') || 'pernottamento', check_in_date: strOrNull('check_in_date'), check_in_time: strOrNull('check_in_time'), check_out_date: strOrNull('check_out_date'), check_out_time: strOrNull('check_out_time'), quantita: numOrNull('quantita') ?? 1, room_type: strOrEmpty('room_type'), note: strOrEmpty('note'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), meeting_pax: numOrNull('meeting_pax'), meeting_setup: strOrEmpty('meeting_setup'), meeting_equipment: strOrEmpty('meeting_equipment'), luogo: strOrEmpty('luogo'), natural_light_preference: !!form.natural_light_preference, coffee_break_time: strOrNull('coffee_break_time'), coffee_break_notes: strOrEmpty('coffee_break_notes'), lunch_time: strOrNull('lunch_time'), lunch_notes: strOrEmpty('lunch_notes'), dinner_time: strOrNull('dinner_time'), dinner_notes: strOrEmpty('dinner_notes'), coffee_station_notes: strOrEmpty('coffee_station_notes'), venduto_unitario: numOrNull('venduto_unitario'), venduto_totale: numOrNull('venduto_totale'), costo_unitario: numOrNull('costo_unitario'), costo_totale: numOrNull('costo_totale') })
+    } else if (category === 'transfer') {
+      const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
+      Object.assign(record, { titolo: strOrEmpty('titolo') || 'Transfer', categoria: 'transfer', data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), partenza: strOrEmpty('partenza'), destinazione: strOrEmpty('destinazione'), quantita: qty, luogo: strOrEmpty('luogo'), note: strOrEmpty('note'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
+    } else if (category === 'ristorante') {
+      const paxP = numOrNull('pax_previsti'); const paxC = numOrNull('pax_confermati'); const pax = paxC ?? paxP ?? 1
+      const bpp = numOrNull('budget_per_persona'); const cpp = numOrNull('costo_per_persona')
+      Object.assign(record, { tipologia_servizio: strOrEmpty('tipologia_servizio'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), pax_previsti: paxP, pax_confermati: paxC, menu_portate: strOrEmpty('menu_portate'), menu_descrizione: strOrEmpty('menu_descrizione'), beverage_incluso: !!form.beverage_incluso, area_riservata: !!form.area_riservata, sala_privata: !!form.sala_privata, esclusiva_parziale: !!form.esclusiva_parziale, esclusiva_totale: !!form.esclusiva_totale, nome_sala: strOrEmpty('nome_sala'), note_location: strOrEmpty('note_location'), num_vegetariani: strOrEmpty('num_vegetariani'), num_vegani: strOrEmpty('num_vegani'), allergie: strOrEmpty('allergie'), intolleranze: strOrEmpty('intolleranze'), richieste_alimentari: strOrEmpty('richieste_alimentari'), note_operative: strOrEmpty('note_operative'), budget_per_persona: bpp, budget_totale: numOrNull('budget_totale') ?? (bpp ? bpp * pax : null), costo_per_persona: cpp, costo_totale_reale: numOrNull('costo_totale_reale') ?? (cpp ? cpp * pax : null) })
+    } else if (category === 'experience') {
+      const pax = numOrNull('pax') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
+      Object.assign(record, { nome_attivita: strOrEmpty('nome_attivita'), tipologia: strOrEmpty('tipologia'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), location: strOrEmpty('location'), pax, durata_minuti: numOrNull('durata_minuti'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * pax : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * pax : null) })
+    } else if (category === 'catering') {
+      const pax = numOrNull('pax') ?? 1; const vpp = numOrNull('venduto_per_persona'); const cpp = numOrNull('costo_per_persona')
+      Object.assign(record, { tipologia: strOrEmpty('tipologia'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), pax, note: strOrEmpty('note'), venduto_per_persona: vpp, venduto_totale: numOrNull('venduto_totale') ?? (vpp ? vpp * pax : null), costo_per_persona: cpp, costo_totale: numOrNull('costo_totale') ?? (cpp ? cpp * pax : null) })
+    } else if (category === 'audio_video') {
+      const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
+      Object.assign(record, { tipologia_servizio: strOrEmpty('tipologia_servizio'), quantita: qty, data_montaggio: strOrNull('data_montaggio'), ora_montaggio: strOrNull('ora_montaggio'), data_prove: strOrNull('data_prove'), ora_prove: strOrNull('ora_prove'), data_evento: strOrNull('data_evento'), ora_evento: strOrNull('ora_evento'), data_smontaggio: strOrNull('data_smontaggio'), ora_smontaggio: strOrNull('ora_smontaggio'), materiale: strOrEmpty('materiale'), tecnici: strOrEmpty('tecnici'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
+    } else if (category === 'allestimenti') {
+      const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
+      Object.assign(record, { descrizione: strOrEmpty('descrizione'), quantita: qty, area_utilizzo: strOrEmpty('area_utilizzo'), data_montaggio: strOrNull('data_montaggio'), ora_montaggio: strOrNull('ora_montaggio'), data_smontaggio: strOrNull('data_smontaggio'), ora_smontaggio: strOrNull('ora_smontaggio'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
+    } else if (category === 'staff_interno') {
+      Object.assign(record, { risorsa: strOrEmpty('risorsa'), ruolo: strOrEmpty('ruolo'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), note: strOrEmpty('note'), note_operative: strOrEmpty('note_operative'), venduto_totale: numOrNull('venduto_totale'), costo_giornaliero: numOrNull('costo_giornaliero'), costo_totale: numOrNull('costo_totale') })
+    } else if (category === 'staff_esterno') {
+      const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
+      Object.assign(record, { ruolo: strOrEmpty('ruolo'), quantita: qty, data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), lingue: strOrEmpty('lingue'), abbigliamento: strOrEmpty('abbigliamento'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
+    } else if (category === 'grafica_stampa') {
+      const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
+      Object.assign(record, { tipo_materiale: strOrEmpty('tipo_materiale'), quantita: qty, formato: strOrEmpty('formato'), data_consegna: strOrNull('data_consegna'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
+    } else {
+      const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
+      Object.assign(record, { descrizione: strOrEmpty('descrizione'), quantita: qty, data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), note: strOrEmpty('note'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
+    }
+
+    if (editingId) {
+      await supabase.from(catMeta.table).update(record).eq('id', editingId)
+    } else {
+      record.id = crypto.randomUUID()
+      await supabase.from(catMeta.table).insert(record)
+    }
+    setSaving(false); setShowForm(false); setEditingId(null)
+    await loadItems()
+  }
+
+  async function handleDelete() {
+    if (!deletingId) return
+    await supabase.from(catMeta.table).delete().eq('id', deletingId)
+    setDeletingId(null)
+    await loadItems()
+  }
+
+  function getItemTitle(item: Record<string, unknown>): string {
+    switch (category) {
+      case 'hotel': return (item.titolo as string) || (item.tipo === 'pernottamento' ? 'Pernottamento' : 'Hotel')
+      case 'transfer': return (item.titolo as string) || 'Transfer'
+      case 'ristorante': return (item.tipologia_servizio as string) || 'Ristorante'
+      case 'experience': return (item.nome_attivita as string) || (item.tipologia as string) || 'Experience'
+      case 'catering': return (item.tipologia as string) || 'Catering'
+      case 'audio_video': return (item.tipologia_servizio as string) || 'Audio Video'
+      case 'allestimenti': return (item.descrizione as string) || 'Allestimento'
+      case 'staff_interno': return (item.risorsa as string) || (item.ruolo as string) || 'Staff'
+      case 'staff_esterno': return (item.ruolo as string) || 'Staff esterno'
+      case 'grafica_stampa': return (item.tipo_materiale as string) || 'Grafica'
+      default: return (item.descrizione as string) || 'Voce'
+    }
+  }
+
+  function getItemEcon(item: Record<string, unknown>): { venduto: number; costo: number } {
+    let venduto = 0, costo = 0
+    if (category === 'ristorante') {
+      const pax = (item.pax_confermati as number) ?? (item.pax_previsti as number) ?? 1
+      venduto = (item.budget_totale as number) ?? ((item.budget_per_persona as number) ? (item.budget_per_persona as number) * pax : 0)
+      costo = (item.costo_totale_reale as number) ?? ((item.costo_per_persona as number) ? (item.costo_per_persona as number) * pax : 0)
+    } else if (category === 'catering') {
+      const pax = (item.pax as number) ?? 1
+      venduto = (item.venduto_totale as number) ?? ((item.venduto_per_persona as number) ? (item.venduto_per_persona as number) * pax : 0)
+      costo = (item.costo_totale as number) ?? ((item.costo_per_persona as number) ? (item.costo_per_persona as number) * pax : 0)
+    } else if (category === 'staff_interno') {
+      venduto = (item.venduto_totale as number) ?? 0
+      costo = (item.costo_totale as number) ?? (item.costo_giornaliero as number) ?? 0
+    } else {
+      const qty = (item.quantita as number) ?? (item.pax as number) ?? 1
+      venduto = (item.venduto_totale as number) ?? ((item.venduto_unitario as number) ? (item.venduto_unitario as number) * qty : 0)
+      costo = (item.costo_totale as number) ?? ((item.costo_unitario as number) ? (item.costo_unitario as number) * qty : 0)
+    }
+    return { venduto, costo }
+  }
+
+  const upd = (key: string, val: string | number | boolean) => setForm(prev => ({ ...prev, [key]: val }))
+  const inp = (key: string, label: string, type = 'text') => (
+    <div>
+      <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>{label}</label>
+      <input type={type} value={String(form[key] ?? '')} onChange={e => upd(key, e.target.value)} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+    </div>
+  )
+  const sel = (key: string, label: string, options: string[]) => (
+    <div>
+      <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>{label}</label>
+      <select value={String(form[key] ?? '')} onChange={e => upd(key, e.target.value)} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+        <option value="">-- Seleziona --</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  )
+  const chk = (key: string, label: string) => (
+    <div className="flex items-center gap-2">
+      <input type="checkbox" checked={!!form[key]} onChange={e => upd(key, e.target.checked)} id={`scp_${key}_${supplierId}`} />
+      <label htmlFor={`scp_${key}_${supplierId}`} className="text-xs" style={{ color: 'var(--text)' }}>{label}</label>
+    </div>
+  )
+  const ivaFields = () => (
+    <div className="sm:col-span-3 grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 mt-3" style={{ borderTop: '1px solid var(--line)' }}>
+      {sel('aliquota_iva_venduto', 'IVA Venduto %', IVA_OPTIONS)}
+      {chk('iva_inclusa_venduto', 'IVA inclusa nel venduto')}
+      {sel('aliquota_iva_costo', 'IVA Costo %', IVA_OPTIONS)}
+      {chk('iva_inclusa_costo', 'IVA inclusa nel costo')}
+    </div>
+  )
+
+  const renderForm = () => {
+    if (category === 'hotel') return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {inp('titolo', 'Titolo')}{inp('quantita', 'N. Camere', 'number')}{inp('room_type', 'Tipo camera')}
+        {inp('check_in_date', 'Check-in data', 'date')}{inp('check_in_time', 'Check-in ora', 'time')}
+        {inp('check_out_date', 'Check-out data', 'date')}{inp('check_out_time', 'Check-out ora', 'time')}
+        {inp('data', 'Data meeting', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
+        {inp('luogo', 'Sala')}{inp('meeting_pax', 'Pax meeting', 'number')}{inp('meeting_setup', 'Setup')}
+        {inp('meeting_equipment', 'Attrezzature')}{chk('natural_light_preference', 'Luce naturale')}
+        {inp('venduto_unitario', 'Venduto/camera', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_unitario', 'Costo/camera', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('note', 'Note')}</div>
+        {ivaFields()}
+      </div>
+    )
+    if (category === 'transfer') return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {inp('titolo', 'Titolo corsa')}{inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora', 'time')}
+        {inp('partenza', 'Partenza')}{inp('destinazione', 'Destinazione')}{inp('quantita', 'Pax/Mezzi', 'number')}
+        {inp('venduto_unitario', 'Venduto unit.', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_unitario', 'Costo unit.', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('note', 'Note operative')}</div>
+        {ivaFields()}
+      </div>
+    )
+    if (category === 'ristorante') return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {sel('tipologia_servizio', 'Tipologia', RISTORANTE_TIPOLOGIE)}
+        {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
+        {inp('pax_previsti', 'Pax previsti', 'number')}{inp('pax_confermati', 'Pax confermati', 'number')}
+        {sel('menu_portate', 'Tipo menu', RISTORANTE_MENU_TYPES)}{inp('nome_sala', 'Sala')}{inp('note_location', 'Note location')}
+        {chk('beverage_incluso', 'Beverage incluso')}{chk('area_riservata', 'Area riservata')}{chk('sala_privata', 'Sala privata')}
+        {chk('esclusiva_parziale', 'Esclusiva parziale')}{chk('esclusiva_totale', 'Esclusiva totale')}
+        {inp('num_vegetariani', 'Vegetariani', 'number')}{inp('num_vegani', 'Vegani', 'number')}
+        {inp('allergie', 'Allergie')}{inp('intolleranze', 'Intolleranze')}{inp('richieste_alimentari', 'Richieste alimentari')}
+        {inp('budget_per_persona', 'Venduto/persona', 'number')}{inp('budget_totale', 'Venduto totale', 'number')}
+        {inp('costo_per_persona', 'Costo/persona', 'number')}{inp('costo_totale_reale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('menu_descrizione', 'Descrizione menu')}</div>
+        <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+        {ivaFields()}
+      </div>
+    )
+    if (category === 'experience') return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {inp('nome_attivita', 'Nome attivita')}{sel('tipologia', 'Tipologia', EXPERIENCE_TIPOLOGIE)}
+        {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
+        {inp('location', 'Location')}{inp('pax', 'Pax', 'number')}{inp('durata_minuti', 'Durata (min)', 'number')}
+        {inp('venduto_unitario', 'Venduto/pax', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_unitario', 'Costo/pax', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+        {ivaFields()}
+      </div>
+    )
+    if (category === 'catering') return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {sel('tipologia', 'Tipologia', CATERING_TIPOLOGIE)}
+        {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
+        {inp('pax', 'Pax', 'number')}
+        {inp('venduto_per_persona', 'Venduto/pax', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_per_persona', 'Costo/pax', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('note', 'Note operative')}</div>
+        {ivaFields()}
+      </div>
+    )
+    if (category === 'audio_video') return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {inp('tipologia_servizio', 'Servizio')}{inp('quantita', 'Quantita', 'number')}
+        {inp('data_montaggio', 'Data montaggio', 'date')}{inp('ora_montaggio', 'Ora montaggio', 'time')}
+        {inp('data_prove', 'Data prove', 'date')}{inp('ora_prove', 'Ora prove', 'time')}
+        {inp('data_evento', 'Data evento', 'date')}{inp('ora_evento', 'Ora evento', 'time')}
+        {inp('data_smontaggio', 'Data smontaggio', 'date')}{inp('ora_smontaggio', 'Ora smontaggio', 'time')}
+        {inp('materiale', 'Materiale')}{inp('tecnici', 'Tecnici')}
+        {inp('venduto_unitario', 'Venduto unit.', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_unitario', 'Costo unit.', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+        {ivaFields()}
+      </div>
+    )
+    if (category === 'allestimenti') return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {inp('descrizione', 'Descrizione')}{inp('quantita', 'Quantita', 'number')}{inp('area_utilizzo', 'Area utilizzo')}
+        {inp('data_montaggio', 'Data montaggio', 'date')}{inp('ora_montaggio', 'Ora montaggio', 'time')}
+        {inp('data_smontaggio', 'Data smontaggio', 'date')}{inp('ora_smontaggio', 'Ora smontaggio', 'time')}
+        {inp('venduto_unitario', 'Venduto unit.', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_unitario', 'Costo unit.', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+        {ivaFields()}
+      </div>
+    )
+    if (category === 'staff_interno') return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {inp('risorsa', 'Risorsa (nome)')}{sel('ruolo', 'Ruolo', STAFF_INT_RUOLI)}
+        {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
+        {inp('venduto_totale', 'Venduto cliente', 'number')}{inp('costo_giornaliero', 'Costo giornaliero', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+        {ivaFields()}
+      </div>
+    )
+    if (category === 'staff_esterno') return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {sel('ruolo', 'Ruolo', STAFF_EXT_RUOLI)}{inp('quantita', 'Quantita', 'number')}
+        {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
+        {inp('lingue', 'Lingue')}{inp('abbigliamento', 'Abbigliamento')}
+        {inp('venduto_unitario', 'Venduto/unit.', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_unitario', 'Costo/unit.', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+        {ivaFields()}
+      </div>
+    )
+    if (category === 'grafica_stampa') return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {sel('tipo_materiale', 'Tipo materiale', GRAFICA_TIPI)}{inp('quantita', 'Quantita', 'number')}{inp('formato', 'Formato')}
+        {inp('data_consegna', 'Data consegna', 'date')}
+        {inp('venduto_unitario', 'Venduto unit.', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_unitario', 'Costo unit.', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+        {ivaFields()}
+      </div>
+    )
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {inp('descrizione', 'Descrizione')}{inp('quantita', 'Quantita', 'number')}
+        {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora', 'time')}
+        {inp('venduto_unitario', 'Venduto/unit.', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_unitario', 'Costo/unit.', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('note', 'Note')}</div>
+        {ivaFields()}
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-5 pb-5 pt-2 space-y-4" style={{ borderTop: '1px solid var(--line)' }}>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+          Scheda {CATEGORY_LABELS[category]} ({items.length})
+        </p>
+        <button onClick={startAdd} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: 'var(--red2)', color: '#fff' }}>
+          <Plus className="w-3 h-3" /> Aggiungi
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{editingId ? 'Modifica' : 'Nuova voce'}</p>
+            <button onClick={() => { setShowForm(false); setEditingId(null) }}><X className="w-4 h-4" style={{ color: 'var(--muted)' }} /></button>
+          </div>
+          {renderForm()}
+          <div className="flex items-center gap-2 pt-2 justify-end" style={{ borderTop: '1px solid var(--line)' }}>
+            <button onClick={() => { setShowForm(false); setEditingId(null) }} className="px-4 py-2 rounded-lg text-xs font-medium" style={{ color: 'var(--muted)' }}>Annulla</button>
+            <button disabled={saving} onClick={handleSave} className="px-4 py-2 rounded-lg text-xs font-medium" style={{ background: 'var(--red2)', color: '#fff', opacity: saving ? 0.6 : 1 }}>
+              {saving ? 'Salvataggio...' : editingId ? 'Salva' : 'Aggiungi'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="animate-pulse text-xs text-center py-4" style={{ color: 'var(--muted)' }}>Caricamento...</div>
+      ) : items.length === 0 && !showForm ? (
+        <p className="text-xs text-center py-4" style={{ color: 'var(--muted)' }}>Nessuna voce. Clicca "Aggiungi" per inserire.</p>
+      ) : items.length > 0 ? (
+        <div className="space-y-2">
+          {items.map(item => {
+            const id = item.id as string
+            const econ = getItemEcon(item)
+            const margine = econ.venduto - econ.costo
+            return (
+              <div key={id} className="flex items-start gap-3 p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{getItemTitle(item)}</span>
+                    {(econ.venduto > 0 || econ.costo > 0) && (
+                      <span className="text-xs" style={{ color: margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>
+                        {'\u20AC'}{margine.toLocaleString('it-IT', { minimumFractionDigits: 0 })}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+                    {(item.data as string) && <span>{item.data as string}</span>}
+                    {(item.ora_inizio as string) && <span>{(item.ora_inizio as string).slice(0, 5)}</span>}
+                    {(item.partenza as string) && (item.destinazione as string) && <span>{item.partenza as string} → {item.destinazione as string}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button onClick={() => startEdit(item)} className="p-1.5 rounded hover:bg-white/10">
+                    <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                  </button>
+                  <button onClick={() => setDeletingId(id)} className="p-1.5 rounded hover:bg-white/10">
+                    <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+
+      {deletingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDeletingId(null)}>
+          <div className="panel p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+            <p className="font-semibold mb-2" style={{ color: 'var(--text)' }}>Elimina voce</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Questa azione elimina la voce. Il fornitore NON viene eliminato.</p>
+            <div className="flex gap-3 justify-end">
+              <button className="px-4 py-2 rounded-lg text-sm" style={{ background: 'var(--panel2)', color: 'var(--text)' }} onClick={() => setDeletingId(null)}>Annulla</button>
+              <button className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--red2)', color: '#fff' }} onClick={handleDelete}>Elimina</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function TabOperativo({ event, suppliers }: { event: { id: string }; suppliers: Supplier[] }) {
