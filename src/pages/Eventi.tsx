@@ -48,6 +48,7 @@ import type { Client } from '@/data/clients'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
+import { TabOperativo } from '@/components/TabOperativo'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
@@ -59,7 +60,7 @@ import type { EventoWorkflow } from '@/data/workflow'
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 type StatoEvento = Event['stato']
 
-type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'documenti' | 'programma' | 'timeline' | 'creative' | 'social' | 'presentazioni' | 'pacchetto'
+type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'operativo' | 'budget' | 'comunicazioni' | 'documenti' | 'programma' | 'timeline' | 'creative' | 'social' | 'presentazioni' | 'pacchetto'
 
 function statoColor(stato: string) {
   switch (stato) {
@@ -958,6 +959,8 @@ interface CateringDetail {
   tipologia: string
   data: string | null
   ora: string | null
+  ora_inizio: string | null
+  ora_fine: string | null
   pax: number | null
   note: string
   venduto_per_persona: number | null
@@ -976,6 +979,7 @@ interface StaffInternoDetail {
   ora_inizio: string | null
   ora_fine: string | null
   note: string
+  note_operative: string
   venduto_totale: number | null
   costo_giornaliero: number | null
   costo_totale: number | null
@@ -991,7 +995,9 @@ interface StaffEsternoDetail {
   ora_inizio: string | null
   ora_fine: string | null
   lingue: string
+  abbigliamento: string
   note: string
+  note_operative: string
   venduto_unitario: number | null
   venduto_totale: number | null
   costo_unitario: number | null
@@ -1005,6 +1011,9 @@ interface VarieDetail {
   descrizione: string
   quantita: number
   note: string
+  data: string | null
+  ora_inizio: string | null
+  note_operative: string
   venduto_unitario: number | null
   venduto_totale: number | null
   costo_unitario: number | null
@@ -3262,10 +3271,15 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
 
   useEffect(() => {
     async function load() {
-      const [svcRes, hotelRes, restRes] = await Promise.all([
+      const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes] = await Promise.all([
         supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
         supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
         supabase.from('event_restaurant_details').select('*').eq('event_id', event.id),
+        supabase.from('event_experience_details').select('*').eq('event_id', event.id),
+        supabase.from('event_catering_details').select('*').eq('event_id', event.id),
+        supabase.from('event_staff_interno_details').select('*').eq('event_id', event.id),
+        supabase.from('event_staff_esterno_details').select('*').eq('event_id', event.id),
+        supabase.from('event_varie_details').select('*').eq('event_id', event.id),
       ])
 
       const program: ProgramEntry[] = []
@@ -3388,6 +3402,87 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
             ora_fine: null,
             luogo: r.nome_sala,
             note: '',
+          })
+        }
+      }
+
+      for (const e of (expRes.data ?? []) as ExperienceDetail[]) {
+        if (e.data && e.ora_inizio) {
+          program.push({
+            id: e.id,
+            supplier_id: e.supplier_id ?? '',
+            titolo: e.nome_attivita || 'Experience',
+            categoria: 'Experience',
+            data: e.data,
+            ora_inizio: e.ora_inizio,
+            ora_fine: e.ora_fine,
+            luogo: e.location,
+            note: [e.pax ? `${e.pax} pax` : '', e.durata_minuti ? `${e.durata_minuti} min` : '', e.note_operative].filter(Boolean).join(' | '),
+          })
+        }
+      }
+
+      for (const c of (catRes.data ?? []) as CateringDetail[]) {
+        const ora = c.ora_inizio || c.ora
+        if (c.data && ora) {
+          program.push({
+            id: c.id,
+            supplier_id: c.supplier_id ?? '',
+            titolo: c.tipologia || 'Catering',
+            categoria: 'Catering',
+            data: c.data,
+            ora_inizio: ora,
+            ora_fine: c.ora_fine,
+            luogo: '',
+            note: c.pax ? `${c.pax} pax` : '',
+          })
+        }
+      }
+
+      for (const si of (staffIntRes.data ?? []) as StaffInternoDetail[]) {
+        if (si.data && si.ora_inizio) {
+          program.push({
+            id: si.id,
+            supplier_id: '',
+            titolo: `${si.risorsa || si.ruolo || 'Staff'}${si.ruolo ? ' (' + si.ruolo + ')' : ''}`,
+            categoria: 'Staff Simmetria',
+            data: si.data,
+            ora_inizio: si.ora_inizio,
+            ora_fine: si.ora_fine,
+            luogo: '',
+            note: si.note || '',
+          })
+        }
+      }
+
+      for (const se of (staffExtRes.data ?? []) as StaffEsternoDetail[]) {
+        if (se.data && se.ora_inizio) {
+          program.push({
+            id: se.id,
+            supplier_id: se.supplier_id ?? '',
+            titolo: `${se.ruolo || 'Staff esterno'}${se.quantita > 1 ? ' x' + se.quantita : ''}`,
+            categoria: 'Staff Esterno',
+            data: se.data,
+            ora_inizio: se.ora_inizio,
+            ora_fine: se.ora_fine,
+            luogo: '',
+            note: [se.lingue, se.note].filter(Boolean).join(' | '),
+          })
+        }
+      }
+
+      for (const v of (varieRes.data ?? []) as VarieDetail[]) {
+        if (v.data && v.ora_inizio) {
+          program.push({
+            id: v.id,
+            supplier_id: v.supplier_id ?? '',
+            titolo: v.descrizione || 'Varie',
+            categoria: 'Varie',
+            data: v.data,
+            ora_inizio: v.ora_inizio,
+            ora_fine: null,
+            luogo: '',
+            note: v.note || '',
           })
         }
       }
@@ -4029,6 +4124,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
     { id: 'task', label: `Task${totalTasks > 0 ? ` (${totalTasks})` : ''}` },
     { id: 'team', label: `Team (${event.team.length})` },
     { id: 'fornitori', label: `Fornitori${eventSuppliers.length > 0 ? ` (${eventSuppliers.length})` : ''}` },
+    { id: 'operativo', label: 'Operativo' },
     { id: 'budget', label: 'Budget' },
     { id: 'comunicazioni', label: `Comunicazioni${eventMsg.length > 0 ? ` (${eventMsg.length})` : ''}` },
     { id: 'documenti', label: 'Documenti' },
@@ -4201,6 +4297,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         {activeTab === 'task' && <TabTask event={event} />}
         {activeTab === 'team' && <TabTeam event={event} internalUsers={internalUsers} />}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} />}
+        {activeTab === 'operativo' && <TabOperativo event={event} suppliers={suppliers} />}
         {activeTab === 'budget' && <TabBudget event={event} suppliers={suppliers} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} />}
