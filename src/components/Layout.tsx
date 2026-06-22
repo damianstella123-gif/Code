@@ -92,7 +92,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
         <div className="flex items-center justify-between px-5 py-5 border-b" style={{ borderColor: 'var(--line)' }}>
           <Link to="/dashboard" className="flex flex-col items-center w-full group">
             <img
-              src="/Logo_1.png"
+              src="/logo-synergy.png"
               alt="Simmetria Synergy"
               className="w-36 object-contain transition-all duration-300 group-hover:opacity-90"
             />
