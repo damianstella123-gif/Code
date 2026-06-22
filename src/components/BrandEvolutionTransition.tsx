@@ -52,7 +52,7 @@ export default function BrandEvolutionTransition({ onComplete }: Props) {
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
           >
             <img
-              src="/simmetria-grigio_2023.png"
+              src="/Logo_Simmetria.png"
               alt="Simmetria Immagine e Comunicazione"
               className="h-14 sm:h-16 object-contain"
               style={{ filter: logoFilter }}
