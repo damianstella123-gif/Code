@@ -94,7 +94,7 @@ export default function BrandEvolutionTransition({ onComplete }: Props) {
             className="flex flex-col items-center"
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.50, ease: [0.16, 1, 0.3, 1] }}
           >
             <img
               src="/logo-synergy.png"
@@ -106,7 +106,7 @@ export default function BrandEvolutionTransition({ onComplete }: Props) {
               className="mt-5 text-center"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.15, duration: 0.25 }}
+              transition={{ delay: 0.20, duration: 0.30 }}
             >
               <p className="text-[12px] sm:text-[13px] tracking-wide font-light leading-5" style={{ color: sub }}>
                 Humans are designed to be symmetrical.
