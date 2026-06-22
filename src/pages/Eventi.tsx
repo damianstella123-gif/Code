@@ -28,6 +28,7 @@ import {
   Upload,
   Download,
   Building2,
+  UtensilsCrossed,
   Plus as PlusIcon,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
@@ -777,6 +778,70 @@ function isHotelSupplier(sup: Supplier): boolean {
   return sup.categoria.toLowerCase().includes('hotel') || sup.categoria.toLowerCase().includes('albergo')
 }
 
+function isRestaurantSupplier(sup: Supplier): boolean {
+  const c = sup.categoria.toLowerCase()
+  return c.includes('ristorante') || c.includes('ristorazione') || c.includes('catering')
+}
+
+interface RestaurantDetail {
+  id: string
+  event_id: string
+  supplier_id: string
+  data: string | null
+  ora_inizio: string | null
+  ora_fine: string | null
+  pax_previsti: number | null
+  pax_confermati: number | null
+  tipologia_servizio: string
+  menu_portate: string
+  menu_descrizione: string
+  budget_per_persona: number | null
+  budget_totale: number | null
+  area_riservata: boolean
+  sala_privata: boolean
+  esclusiva_parziale: boolean
+  esclusiva_totale: boolean
+  nome_sala: string
+  note_location: string
+  num_vegetariani: number | null
+  num_vegani: number | null
+  allergie: string
+  intolleranze: string
+  note_alimentari: string
+  setup_tavoli: string
+  branding_cliente: string
+  richieste_speciali: string
+  note_operative: string
+}
+
+const emptyRestaurantForm = {
+  data: '',
+  ora_inizio: '',
+  ora_fine: '',
+  pax_previsti: '',
+  pax_confermati: '',
+  tipologia_servizio: '',
+  menu_portate: '',
+  menu_descrizione: '',
+  budget_per_persona: '',
+  budget_totale: '',
+  area_riservata: false,
+  sala_privata: false,
+  esclusiva_parziale: false,
+  esclusiva_totale: false,
+  nome_sala: '',
+  note_location: '',
+  num_vegetariani: '',
+  num_vegani: '',
+  allergie: '',
+  intolleranze: '',
+  note_alimentari: '',
+  setup_tavoli: '',
+  branding_cliente: '',
+  richieste_speciali: '',
+  note_operative: '',
+}
+
 function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const [links, setLinks] = useState<EventSupplierLink[]>([])
   const [loading, setLoading] = useState(true)
@@ -794,6 +859,9 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   const [editingHotelId, setEditingHotelId] = useState<string | null>(null)
   const [showHotelForm, setShowHotelForm] = useState(false)
   const [hotelFormTipo, setHotelFormTipo] = useState('')
+  const [managingRestaurant, setManagingRestaurant] = useState<string | null>(null)
+  const [restaurantDetail, setRestaurantDetail] = useState<RestaurantDetail | null>(null)
+  const [restaurantForm, setRestaurantForm] = useState(emptyRestaurantForm)
 
   async function loadLinks() {
     const { data } = await supabase
@@ -824,6 +892,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       .eq('event_id', event.id).eq('supplier_id', supplierId)
     await supabase.from('event_hotel_details').delete()
       .eq('event_id', event.id).eq('supplier_id', supplierId)
+    await supabase.from('event_restaurant_details').delete()
+      .eq('event_id', event.id).eq('supplier_id', supplierId)
     const { error } = await supabase
       .from('event_suppliers')
       .delete()
@@ -833,6 +903,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       setLinks(prev => prev.filter(l => l.supplier_id !== supplierId))
       if (managingServices === supplierId) setManagingServices(null)
       if (managingHotel === supplierId) setManagingHotel(null)
+      if (managingRestaurant === supplierId) setManagingRestaurant(null)
     }
   }
 
@@ -990,6 +1061,93 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
     await openHotel(managingHotel)
   }
 
+  async function openRestaurant(supplierId: string) {
+    setManagingRestaurant(supplierId)
+    setManagingServices(null)
+    setManagingHotel(null)
+    const { data } = await supabase
+      .from('event_restaurant_details')
+      .select('*')
+      .eq('event_id', event.id)
+      .eq('supplier_id', supplierId)
+      .maybeSingle()
+    if (data) {
+      setRestaurantDetail(data as RestaurantDetail)
+      setRestaurantForm({
+        data: data.data ?? '',
+        ora_inizio: data.ora_inizio?.slice(0, 5) ?? '',
+        ora_fine: data.ora_fine?.slice(0, 5) ?? '',
+        pax_previsti: data.pax_previsti?.toString() ?? '',
+        pax_confermati: data.pax_confermati?.toString() ?? '',
+        tipologia_servizio: data.tipologia_servizio ?? '',
+        menu_portate: data.menu_portate ?? '',
+        menu_descrizione: data.menu_descrizione ?? '',
+        budget_per_persona: data.budget_per_persona?.toString() ?? '',
+        budget_totale: data.budget_totale?.toString() ?? '',
+        area_riservata: data.area_riservata ?? false,
+        sala_privata: data.sala_privata ?? false,
+        esclusiva_parziale: data.esclusiva_parziale ?? false,
+        esclusiva_totale: data.esclusiva_totale ?? false,
+        nome_sala: data.nome_sala ?? '',
+        note_location: data.note_location ?? '',
+        num_vegetariani: data.num_vegetariani?.toString() ?? '',
+        num_vegani: data.num_vegani?.toString() ?? '',
+        allergie: data.allergie ?? '',
+        intolleranze: data.intolleranze ?? '',
+        note_alimentari: data.note_alimentari ?? '',
+        setup_tavoli: data.setup_tavoli ?? '',
+        branding_cliente: data.branding_cliente ?? '',
+        richieste_speciali: data.richieste_speciali ?? '',
+        note_operative: data.note_operative ?? '',
+      })
+    } else {
+      setRestaurantDetail(null)
+      setRestaurantForm(emptyRestaurantForm)
+    }
+  }
+
+  async function saveRestaurant() {
+    if (!managingRestaurant) return
+    const paxConf = restaurantForm.pax_confermati ? parseInt(restaurantForm.pax_confermati) : null
+    const budgetPP = restaurantForm.budget_per_persona ? parseFloat(restaurantForm.budget_per_persona) : null
+    const autoTotal = paxConf && budgetPP ? paxConf * budgetPP : null
+    const payload = {
+      event_id: event.id,
+      supplier_id: managingRestaurant,
+      data: restaurantForm.data || null,
+      ora_inizio: restaurantForm.ora_inizio || null,
+      ora_fine: restaurantForm.ora_fine || null,
+      pax_previsti: restaurantForm.pax_previsti ? parseInt(restaurantForm.pax_previsti) : null,
+      pax_confermati: paxConf,
+      tipologia_servizio: restaurantForm.tipologia_servizio,
+      menu_portate: restaurantForm.menu_portate,
+      menu_descrizione: restaurantForm.menu_descrizione,
+      budget_per_persona: budgetPP,
+      budget_totale: restaurantForm.budget_totale ? parseFloat(restaurantForm.budget_totale) : autoTotal,
+      area_riservata: restaurantForm.area_riservata,
+      sala_privata: restaurantForm.sala_privata,
+      esclusiva_parziale: restaurantForm.esclusiva_parziale,
+      esclusiva_totale: restaurantForm.esclusiva_totale,
+      nome_sala: restaurantForm.nome_sala,
+      note_location: restaurantForm.note_location,
+      num_vegetariani: restaurantForm.num_vegetariani ? parseInt(restaurantForm.num_vegetariani) : null,
+      num_vegani: restaurantForm.num_vegani ? parseInt(restaurantForm.num_vegani) : null,
+      allergie: restaurantForm.allergie,
+      intolleranze: restaurantForm.intolleranze,
+      note_alimentari: restaurantForm.note_alimentari,
+      setup_tavoli: restaurantForm.setup_tavoli,
+      branding_cliente: restaurantForm.branding_cliente,
+      richieste_speciali: restaurantForm.richieste_speciali,
+      note_operative: restaurantForm.note_operative,
+    }
+    if (restaurantDetail) {
+      await supabase.from('event_restaurant_details').update(payload).eq('id', restaurantDetail.id)
+    } else {
+      await supabase.from('event_restaurant_details').insert(payload)
+    }
+    await openRestaurant(managingRestaurant)
+  }
+
   const linkedSuppliers = suppliers.filter(s => linkedIds.includes(s.id))
   const availableSuppliers = suppliers.filter(s =>
     !linkedIds.includes(s.id) &&
@@ -1059,7 +1217,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
         <div className="space-y-3">
           {linkedSuppliers.map(sup => {
             const isHotel = isHotelSupplier(sup)
-            const isManaging = isHotel ? managingHotel === sup.id : managingServices === sup.id
+            const isRestaurant = !isHotel && isRestaurantSupplier(sup)
+            const isManaging = isHotel ? managingHotel === sup.id : isRestaurant ? managingRestaurant === sup.id : managingServices === sup.id
             return (
               <div key={sup.id} className="panel overflow-hidden" style={{ border: `1px solid ${isManaging ? 'var(--red2)' : 'var(--line)'}` }}>
                 <div className="p-5 flex items-start justify-between gap-4">
@@ -1080,6 +1239,13 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                         style={{ border: '1px solid var(--line)', color: isManaging ? 'var(--red2)' : 'var(--muted)' }}>
                         <Building2 className="w-3.5 h-3.5 inline mr-1" />
                         Scheda Hotel
+                      </button>
+                    ) : isRestaurant ? (
+                      <button onClick={() => isManaging ? setManagingRestaurant(null) : openRestaurant(sup.id)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
+                        style={{ border: '1px solid var(--line)', color: isManaging ? 'var(--red2)' : 'var(--muted)' }}>
+                        <UtensilsCrossed className="w-3.5 h-3.5 inline mr-1" />
+                        Scheda Ristorante
                       </button>
                     ) : (
                       <button onClick={() => isManaging ? setManagingServices(null) : openServices(sup.id)}
@@ -1430,8 +1596,254 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                   </div>
                 )}
 
-                {/* Services panel (non-hotel) */}
-                {!isHotel && isManaging && (
+                {/* Restaurant panel */}
+                {isRestaurant && isManaging && (
+                  <div className="px-5 pb-5 pt-2 space-y-5" style={{ borderTop: '1px solid var(--line)' }}>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+                      Scheda Ristorante
+                    </p>
+
+                    {/* Sezione 1: Informazioni Evento */}
+                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Informazioni Evento</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Data</label>
+                          <input type="date" value={restaurantForm.data} onChange={e => setRestaurantForm(p => ({ ...p, data: e.target.value }))}
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora inizio</label>
+                          <input type="time" value={restaurantForm.ora_inizio} onChange={e => setRestaurantForm(p => ({ ...p, ora_inizio: e.target.value }))}
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Ora fine</label>
+                          <input type="time" value={restaurantForm.ora_fine} onChange={e => setRestaurantForm(p => ({ ...p, ora_fine: e.target.value }))}
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Pax previsti</label>
+                          <input type="number" value={restaurantForm.pax_previsti} onChange={e => setRestaurantForm(p => ({ ...p, pax_previsti: e.target.value }))}
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Pax confermati</label>
+                          <input type="number" value={restaurantForm.pax_confermati} onChange={e => setRestaurantForm(p => ({ ...p, pax_confermati: e.target.value }))}
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sezione 2: Tipologia Servizio */}
+                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Tipologia Servizio</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        {['Pranzo', 'Cena', 'Aperitivo', 'Aperitivo Rinforzato', 'Cena di Gala'].map(tipo => (
+                          <button key={tipo}
+                            onClick={() => setRestaurantForm(p => ({ ...p, tipologia_servizio: tipo }))}
+                            className="px-3 py-2 rounded-lg text-xs font-medium text-center transition-all"
+                            style={{
+                              border: `1px solid ${restaurantForm.tipologia_servizio === tipo ? 'var(--red2)' : 'var(--line)'}`,
+                              background: restaurantForm.tipologia_servizio === tipo ? 'rgba(208,0,58,0.1)' : 'transparent',
+                              color: restaurantForm.tipologia_servizio === tipo ? 'var(--red2)' : 'var(--text)',
+                            }}>
+                            {tipo}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Sezione 3: Menu */}
+                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Menu</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {['2 Portate', '3 Portate', '4 Portate', 'Menu Personalizzato'].map(m => (
+                          <button key={m}
+                            onClick={() => setRestaurantForm(p => ({ ...p, menu_portate: m }))}
+                            className="px-3 py-2 rounded-lg text-xs font-medium text-center transition-all"
+                            style={{
+                              border: `1px solid ${restaurantForm.menu_portate === m ? 'var(--red2)' : 'var(--line)'}`,
+                              background: restaurantForm.menu_portate === m ? 'rgba(208,0,58,0.1)' : 'transparent',
+                              color: restaurantForm.menu_portate === m ? 'var(--red2)' : 'var(--text)',
+                            }}>
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                      <div>
+                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Descrizione menu</label>
+                        <textarea value={restaurantForm.menu_descrizione} onChange={e => setRestaurantForm(p => ({ ...p, menu_descrizione: e.target.value }))}
+                          rows={3} placeholder="Antipasto, primo, secondo, dessert..."
+                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
+                          style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                    </div>
+
+                    {/* Sezione 4: Budget */}
+                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Budget</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Budget per persona</label>
+                          <input type="number" step="0.01" value={restaurantForm.budget_per_persona}
+                            onChange={e => setRestaurantForm(p => ({ ...p, budget_per_persona: e.target.value }))}
+                            placeholder="70.00"
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Budget totale</label>
+                          <input type="number" step="0.01" value={restaurantForm.budget_totale}
+                            onChange={e => setRestaurantForm(p => ({ ...p, budget_totale: e.target.value }))}
+                            placeholder={restaurantForm.pax_confermati && restaurantForm.budget_per_persona
+                              ? `Auto: ${(parseInt(restaurantForm.pax_confermati) * parseFloat(restaurantForm.budget_per_persona)).toFixed(2)}`
+                              : 'Pax × Budget/persona'}
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div className="flex items-end">
+                          {restaurantForm.pax_confermati && restaurantForm.budget_per_persona && (
+                            <p className="text-xs pb-2" style={{ color: 'var(--muted)' }}>
+                              Calcolo: {restaurantForm.pax_confermati} pax × {restaurantForm.budget_per_persona} = {(parseInt(restaurantForm.pax_confermati) * parseFloat(restaurantForm.budget_per_persona)).toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sezione 5: Privacy e Location */}
+                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Privacy e Location</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={restaurantForm.area_riservata} onChange={e => setRestaurantForm(p => ({ ...p, area_riservata: e.target.checked }))} className="rounded" />
+                          <span className="text-xs" style={{ color: 'var(--text)' }}>Area riservata</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={restaurantForm.sala_privata} onChange={e => setRestaurantForm(p => ({ ...p, sala_privata: e.target.checked }))} className="rounded" />
+                          <span className="text-xs" style={{ color: 'var(--text)' }}>Sala privata</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={restaurantForm.esclusiva_parziale} onChange={e => setRestaurantForm(p => ({ ...p, esclusiva_parziale: e.target.checked }))} className="rounded" />
+                          <span className="text-xs" style={{ color: 'var(--text)' }}>Esclusiva parziale</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={restaurantForm.esclusiva_totale} onChange={e => setRestaurantForm(p => ({ ...p, esclusiva_totale: e.target.checked }))} className="rounded" />
+                          <span className="text-xs" style={{ color: 'var(--text)' }}>Esclusiva totale</span>
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Nome sala</label>
+                          <input type="text" value={restaurantForm.nome_sala} onChange={e => setRestaurantForm(p => ({ ...p, nome_sala: e.target.value }))}
+                            placeholder="Es. Sala degli Specchi"
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Note location</label>
+                          <input type="text" value={restaurantForm.note_location} onChange={e => setRestaurantForm(p => ({ ...p, note_location: e.target.value }))}
+                            placeholder="Piano, accesso, parcheggio..."
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sezione 6: Esigenze Alimentari */}
+                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Esigenze Alimentari</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>N. Vegetariani</label>
+                          <input type="number" value={restaurantForm.num_vegetariani} onChange={e => setRestaurantForm(p => ({ ...p, num_vegetariani: e.target.value }))}
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>N. Vegani</label>
+                          <input type="number" value={restaurantForm.num_vegani} onChange={e => setRestaurantForm(p => ({ ...p, num_vegani: e.target.value }))}
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Allergie</label>
+                          <input type="text" value={restaurantForm.allergie} onChange={e => setRestaurantForm(p => ({ ...p, allergie: e.target.value }))}
+                            placeholder="Glutine, lattosio..."
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Intolleranze</label>
+                          <input type="text" value={restaurantForm.intolleranze} onChange={e => setRestaurantForm(p => ({ ...p, intolleranze: e.target.value }))}
+                            placeholder="Frutta a guscio..."
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs" style={{ color: 'var(--muted)' }}>Richieste alimentari particolari</label>
+                        <textarea value={restaurantForm.note_alimentari} onChange={e => setRestaurantForm(p => ({ ...p, note_alimentari: e.target.value }))}
+                          rows={2} placeholder="Esigenze specifiche, menu bambini..."
+                          className="w-full mt-1 px-3 py-2 rounded-lg text-sm resize-none"
+                          style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      </div>
+                    </div>
+
+                    {/* Sezione 7: Note Operative */}
+                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--red2)' }}>Note Operative</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Setup tavoli</label>
+                          <input type="text" value={restaurantForm.setup_tavoli} onChange={e => setRestaurantForm(p => ({ ...p, setup_tavoli: e.target.value }))}
+                            placeholder="Tavolo unico, tavoli rotondi..."
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Branding cliente</label>
+                          <input type="text" value={restaurantForm.branding_cliente} onChange={e => setRestaurantForm(p => ({ ...p, branding_cliente: e.target.value }))}
+                            placeholder="Segnaposto, centerpiece..."
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Richieste speciali</label>
+                          <input type="text" value={restaurantForm.richieste_speciali} onChange={e => setRestaurantForm(p => ({ ...p, richieste_speciali: e.target.value }))}
+                            placeholder="Torta, musica, DJ..."
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-xs" style={{ color: 'var(--muted)' }}>Note operative</label>
+                          <input type="text" value={restaurantForm.note_operative} onChange={e => setRestaurantForm(p => ({ ...p, note_operative: e.target.value }))}
+                            placeholder="Indicazioni aggiuntive..."
+                            className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Save button */}
+                    <div className="flex justify-end">
+                      <button onClick={saveRestaurant}
+                        className="px-5 py-2.5 rounded-lg text-sm font-medium transition-all"
+                        style={{ background: 'var(--red2)', color: '#fff' }}>
+                        {restaurantDetail ? 'Salva modifiche' : 'Salva scheda'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Services panel (non-hotel, non-restaurant) */}
+                {!isHotel && !isRestaurant && isManaging && (
                   <div className="px-5 pb-5 pt-2 space-y-4" style={{ borderTop: '1px solid var(--line)' }}>
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
@@ -2171,9 +2583,10 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
 
   useEffect(() => {
     async function load() {
-      const [svcRes, hotelRes] = await Promise.all([
+      const [svcRes, hotelRes, restRes] = await Promise.all([
         supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
         supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
+        supabase.from('event_restaurant_details').select('*').eq('event_id', event.id),
       ])
 
       const program: ProgramEntry[] = []
@@ -2267,6 +2680,36 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
               note: h.note,
             })
           }
+        }
+      }
+
+      for (const r of (restRes.data ?? []) as RestaurantDetail[]) {
+        if (r.data && r.ora_inizio) {
+          const label = r.tipologia_servizio || 'Servizio ristorante'
+          program.push({
+            id: r.id + '-start',
+            supplier_id: r.supplier_id,
+            titolo: label,
+            categoria: 'Ristorante',
+            data: r.data,
+            ora_inizio: r.ora_inizio,
+            ora_fine: r.ora_fine,
+            luogo: r.nome_sala,
+            note: r.pax_confermati ? `${r.pax_confermati} pax` : '',
+          })
+        }
+        if (r.data && r.ora_fine) {
+          program.push({
+            id: r.id + '-end',
+            supplier_id: r.supplier_id,
+            titolo: 'Fine servizio',
+            categoria: 'Ristorante',
+            data: r.data,
+            ora_inizio: r.ora_fine,
+            ora_fine: null,
+            luogo: r.nome_sala,
+            note: '',
+          })
         }
       }
 
