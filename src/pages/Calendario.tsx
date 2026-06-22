@@ -1036,6 +1036,7 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
         dataFine: dataFine || dataInizio,
         location,
         budget: 0,
+        ricavo_cliente: null,
         stato: 'pianificazione',
         partecipanti: 0,
         responsabile: '',

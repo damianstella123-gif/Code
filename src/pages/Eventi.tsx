@@ -174,6 +174,7 @@ function EventFormModal({ event, internalUsers, allClients, onSave, onCancel }: 
       dataFine: dataFine || dataInizio,
       location: location.trim(),
       budget: parseInt(budget) || 0,
+      ricavo_cliente: event?.ricavo_cliente ?? null,
       stato,
       partecipanti: parseInt(partecipanti) || 0,
       responsabile,
@@ -707,6 +708,9 @@ interface SupplierService {
   partenza: string
   destinazione: string
   note: string
+  costo_unitario: number | null
+  quantita: number | null
+  costo_totale: number | null
 }
 
 const emptySvcForm = {
@@ -719,6 +723,9 @@ const emptySvcForm = {
   partenza: '',
   destinazione: '',
   note: '',
+  costo_unitario: '',
+  quantita: '1',
+  costo_totale: '',
 }
 
 const HOTEL_TIPOS = [
@@ -753,6 +760,8 @@ interface HotelDetail {
   meeting_setup: string
   meeting_equipment: string
   natural_light: boolean
+  costo_unitario: number | null
+  costo_totale: number | null
 }
 
 const emptyHotelForm = {
@@ -772,6 +781,8 @@ const emptyHotelForm = {
   meeting_setup: '',
   meeting_equipment: '',
   natural_light: false,
+  costo_unitario: '',
+  costo_totale: '',
 }
 
 function isHotelSupplier(sup: Supplier): boolean {
@@ -938,6 +949,9 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       partenza: svc.partenza,
       destinazione: svc.destinazione,
       note: svc.note,
+      costo_unitario: svc.costo_unitario?.toString() ?? '',
+      quantita: svc.quantita?.toString() ?? '1',
+      costo_totale: svc.costo_totale?.toString() ?? '',
     })
     setEditingSvcId(svc.id)
     setShowSvcForm(true)
@@ -945,6 +959,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
 
   async function saveSvc() {
     if (!svcForm.titolo.trim() || !managingServices) return
+    const qty = svcForm.quantita ? parseInt(svcForm.quantita) : 1
+    const unitCost = svcForm.costo_unitario ? parseFloat(svcForm.costo_unitario) : null
     const payload = {
       event_id: event.id,
       supplier_id: managingServices,
@@ -957,6 +973,9 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       partenza: svcForm.partenza.trim(),
       destinazione: svcForm.destinazione.trim(),
       note: svcForm.note.trim(),
+      costo_unitario: unitCost,
+      quantita: qty,
+      costo_totale: svcForm.costo_totale ? parseFloat(svcForm.costo_totale) : (unitCost ? unitCost * qty : null),
     }
     if (editingSvcId) {
       await supabase.from('event_supplier_services').update(payload).eq('id', editingSvcId)
@@ -1014,6 +1033,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       meeting_setup: h.meeting_setup ?? '',
       meeting_equipment: h.meeting_equipment ?? '',
       natural_light: h.natural_light ?? false,
+      costo_unitario: h.costo_unitario?.toString() ?? '',
+      costo_totale: h.costo_totale?.toString() ?? '',
     })
     setEditingHotelId(h.id)
     setHotelFormTipo(h.tipo)
@@ -1044,6 +1065,9 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       meeting_setup: isMeeting ? hotelForm.meeting_setup.trim() : '',
       meeting_equipment: isMeeting ? hotelForm.meeting_equipment.trim() : '',
       natural_light: isMeeting ? hotelForm.natural_light : false,
+      costo_unitario: hotelForm.costo_unitario ? parseFloat(hotelForm.costo_unitario) : null,
+      costo_totale: hotelForm.costo_totale ? parseFloat(hotelForm.costo_totale)
+        : (hotelForm.costo_unitario && hotelForm.quantita ? parseFloat(hotelForm.costo_unitario) * parseInt(hotelForm.quantita) : null),
     }
     if (editingHotelId) {
       await supabase.from('event_hotel_details').update(payload).eq('id', editingHotelId)
@@ -1469,6 +1493,31 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                             </div>
                           </div>
                         )}
+
+                        {/* Cost fields */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo unitario</label>
+                            <input type="number" step="0.01" value={hotelForm.costo_unitario} onChange={e => setHotelForm(p => ({ ...p, costo_unitario: e.target.value }))}
+                              placeholder="0.00"
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo totale</label>
+                            <input type="number" step="0.01" value={hotelForm.costo_totale} onChange={e => setHotelForm(p => ({ ...p, costo_totale: e.target.value }))}
+                              placeholder={hotelForm.costo_unitario && hotelForm.quantita ? `Auto: ${(parseFloat(hotelForm.costo_unitario) * parseInt(hotelForm.quantita || '1')).toFixed(2)}` : 'Qty x Costo unit.'}
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          {hotelForm.costo_unitario && hotelForm.quantita && (
+                            <div className="flex items-end pb-2">
+                              <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                                Calc: {hotelForm.quantita} x {hotelForm.costo_unitario} = {(parseFloat(hotelForm.costo_unitario) * parseInt(hotelForm.quantita)).toFixed(2)}
+                              </p>
+                            </div>
+                          )}
+                        </div>
 
                         <div className="flex items-center gap-2 justify-end">
                           <button onClick={() => { setShowHotelForm(false); setEditingHotelId(null) }} className="px-4 py-2 rounded-lg text-xs font-medium"
@@ -1923,6 +1972,30 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                               style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
                           </div>
                         </div>
+                        {/* Cost fields */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo unitario</label>
+                            <input type="number" step="0.01" value={svcForm.costo_unitario} onChange={e => setSvcForm(p => ({ ...p, costo_unitario: e.target.value }))}
+                              placeholder="0.00"
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Quantita</label>
+                            <input type="number" value={svcForm.quantita} onChange={e => setSvcForm(p => ({ ...p, quantita: e.target.value }))}
+                              placeholder="1"
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                          <div>
+                            <label className="text-xs" style={{ color: 'var(--muted)' }}>Costo totale</label>
+                            <input type="number" step="0.01" value={svcForm.costo_totale} onChange={e => setSvcForm(p => ({ ...p, costo_totale: e.target.value }))}
+                              placeholder={svcForm.costo_unitario && svcForm.quantita ? `Auto: ${(parseFloat(svcForm.costo_unitario) * parseInt(svcForm.quantita || '1')).toFixed(2)}` : 'Qty x Unit.'}
+                              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+                              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                          </div>
+                        </div>
                         <div className="flex items-center gap-2 justify-end">
                           <button onClick={() => { setShowSvcForm(false); setEditingSvcId(null) }} className="px-4 py-2 rounded-lg text-xs font-medium"
                             style={{ color: 'var(--muted)' }}>Annulla</button>
@@ -2078,6 +2151,65 @@ function DetailField({ label, value }: { label: string; value: string }) {
 function TabBudget({ event, budgets, suppliers, onRefresh }: { event: Event; budgets: Uscita[]; suppliers: Supplier[]; onRefresh: () => void }) {
   const eventUscite = budgets.filter(u => u.eventoId === event.id)
   const totUscite = eventUscite.reduce((s, u) => s + (u.unitPrice !== null ? u.unitPrice * u.quantity : u.importo), 0)
+  const [realCosts, setRealCosts] = useState<{ categoria: string; items: { titolo: string; fornitore: string; qty: number; unitario: number; totale: number }[] }[]>([])
+  const [realTotal, setRealTotal] = useState(0)
+  const [ricavoCliente, setRicavoCliente] = useState(event.ricavo_cliente?.toString() ?? '')
+  const [savingRicavo, setSavingRicavo] = useState(false)
+
+  useEffect(() => {
+    async function loadRealCosts() {
+      const [svcRes, hotelRes, restRes] = await Promise.all([
+        supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
+        supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
+        supabase.from('event_restaurant_details').select('*').eq('event_id', event.id),
+      ])
+      const grouped: Record<string, { titolo: string; fornitore: string; qty: number; unitario: number; totale: number }[]> = {}
+
+      for (const s of (svcRes.data ?? []) as SupplierService[]) {
+        if (!s.costo_unitario && !s.costo_totale) continue
+        const cat = suppliers.find(sup => sup.id === s.supplier_id)?.categoria ?? 'Altro'
+        const qty = s.quantita ?? 1
+        const unitario = s.costo_unitario ?? 0
+        const totale = s.costo_totale ?? unitario * qty
+        if (!grouped[cat]) grouped[cat] = []
+        grouped[cat].push({ titolo: s.titolo, fornitore: suppliers.find(sup => sup.id === s.supplier_id)?.nome ?? '', qty, unitario, totale })
+      }
+
+      for (const h of (hotelRes.data ?? []) as HotelDetail[]) {
+        if (!h.costo_unitario && !h.costo_totale) continue
+        const cat = 'Hotel'
+        const qty = h.quantita ?? 1
+        const unitario = h.costo_unitario ?? 0
+        const totale = h.costo_totale ?? unitario * qty
+        const label = h.titolo || HOTEL_TIPOS.find(t => t.value === h.tipo)?.label || h.tipo
+        if (!grouped[cat]) grouped[cat] = []
+        grouped[cat].push({ titolo: label, fornitore: suppliers.find(sup => sup.id === h.supplier_id)?.nome ?? '', qty, unitario, totale })
+      }
+
+      for (const r of (restRes.data ?? []) as RestaurantDetail[]) {
+        if (!r.budget_totale && !r.budget_per_persona) continue
+        const cat = 'Ristorante'
+        const pax = r.pax_confermati ?? r.pax_previsti ?? 1
+        const unitario = r.budget_per_persona ? Number(r.budget_per_persona) : 0
+        const totale = r.budget_totale ? Number(r.budget_totale) : unitario * pax
+        const label = r.tipologia_servizio || 'Servizio ristorante'
+        if (!grouped[cat]) grouped[cat] = []
+        grouped[cat].push({ titolo: label, fornitore: suppliers.find(sup => sup.id === r.supplier_id)?.nome ?? '', qty: pax, unitario, totale })
+      }
+
+      const result = Object.entries(grouped).map(([categoria, items]) => ({ categoria, items }))
+      result.sort((a, b) => a.categoria.localeCompare(b.categoria))
+      setRealCosts(result)
+      setRealTotal(result.reduce((sum, g) => sum + g.items.reduce((s, i) => s + i.totale, 0), 0))
+    }
+    loadRealCosts()
+  }, [event.id, suppliers])
+
+  async function saveRicavo() {
+    setSavingRicavo(true)
+    await supabase.from('events').update({ ricavo_cliente: ricavoCliente ? parseFloat(ricavoCliente) : null }).eq('id', event.id)
+    setSavingRicavo(false)
+  }
   const margine = event.budget - totUscite
   const usoPct = event.budget > 0 ? Math.min(Math.round((totUscite / event.budget) * 100), 100) : 0
   const [editing, setEditing] = useState<string | null>(null)
@@ -2193,6 +2325,80 @@ function TabBudget({ event, budgets, suppliers, onRefresh }: { event: Event; bud
         <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
           <div className="h-full rounded-full transition-all"
             style={{ width: `${usoPct}%`, background: usoPct > 90 ? 'var(--red2)' : usoPct > 70 ? 'var(--yellow)' : 'var(--green)' }} />
+        </div>
+      </div>
+
+      {/* Budget Reale - from operational services */}
+      <div className="panel p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>Budget Reale (da servizi operativi)</p>
+          <p className="text-lg font-bold" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{realTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
+        </div>
+
+        {realCosts.length === 0 ? (
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>Nessun costo inserito nei servizi operativi. Aggiungi costi dalla scheda Fornitori.</p>
+        ) : (
+          <div className="space-y-3">
+            {realCosts.map(group => {
+              const catTotal = group.items.reduce((s, i) => s + i.totale, 0)
+              return (
+                <div key={group.categoria}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{group.categoria}</p>
+                    <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>{'\u20AC'}{catTotal.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="rounded-lg overflow-hidden" style={{ border: '1px solid var(--line)' }}>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr style={{ background: 'var(--panel2)' }}>
+                          <th className="text-left px-3 py-2" style={{ color: 'var(--muted)' }}>Servizio</th>
+                          <th className="text-left px-3 py-2" style={{ color: 'var(--muted)' }}>Fornitore</th>
+                          <th className="text-right px-3 py-2" style={{ color: 'var(--muted)' }}>Qty</th>
+                          <th className="text-right px-3 py-2" style={{ color: 'var(--muted)' }}>Unitario</th>
+                          <th className="text-right px-3 py-2" style={{ color: 'var(--muted)' }}>Totale</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.items.map((item, idx) => (
+                          <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid var(--line)' : undefined }}>
+                            <td className="px-3 py-2" style={{ color: 'var(--text)' }}>{item.titolo}</td>
+                            <td className="px-3 py-2" style={{ color: 'var(--muted)' }}>{item.fornitore}</td>
+                            <td className="px-3 py-2 text-right" style={{ color: 'var(--text)' }}>{item.qty}</td>
+                            <td className="px-3 py-2 text-right" style={{ color: 'var(--text)' }}>{'\u20AC'}{item.unitario.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2 text-right font-medium" style={{ color: 'var(--text)' }}>{'\u20AC'}{item.totale.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Ricavo Cliente */}
+        <div className="pt-3 flex items-end gap-3" style={{ borderTop: '1px solid var(--line)' }}>
+          <div className="flex-1">
+            <label className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Ricavo Cliente (fatturato)</label>
+            <input type="number" step="0.01" value={ricavoCliente} onChange={e => setRicavoCliente(e.target.value)}
+              placeholder="Inserisci ricavo cliente"
+              className="w-full mt-1 px-3 py-2 rounded-lg text-sm"
+              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          </div>
+          <button onClick={saveRicavo} disabled={savingRicavo}
+            className="px-4 py-2 rounded-lg text-xs font-medium"
+            style={{ background: 'var(--red2)', color: '#fff' }}>
+            Salva
+          </button>
+          {ricavoCliente && realTotal > 0 && (
+            <div className="text-right">
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>Margine Operativo</p>
+              <p className="text-sm font-bold" style={{ color: parseFloat(ricavoCliente) - realTotal >= 0 ? 'var(--green)' : 'var(--red2)' }}>
+                {'\u20AC'}{(parseFloat(ricavoCliente) - realTotal).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
