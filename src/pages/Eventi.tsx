@@ -377,10 +377,15 @@ function EventEconomicSummary({ event }: { event: Event }) {
 
   useEffect(() => {
     async function load() {
-      const [svcRes, hotelRes, restRes] = await Promise.all([
+      const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes] = await Promise.all([
         supabase.from('event_supplier_services').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
         supabase.from('event_hotel_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
         supabase.from('event_restaurant_details').select('budget_per_persona,budget_totale,costo_per_persona,costo_totale_reale,pax_confermati,pax_previsti').eq('event_id', event.id),
+        supabase.from('event_experience_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,pax').eq('event_id', event.id),
+        supabase.from('event_catering_details').select('venduto_per_persona,venduto_totale,costo_per_persona,costo_totale,pax').eq('event_id', event.id),
+        supabase.from('event_staff_interno_details').select('venduto_totale,costo_giornaliero,costo_totale').eq('event_id', event.id),
+        supabase.from('event_staff_esterno_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
+        supabase.from('event_varie_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
       ])
       let venduto = 0, costo = 0
       for (const s of (svcRes.data ?? [])) {
@@ -397,6 +402,30 @@ function EventEconomicSummary({ event }: { event: Event }) {
         const pax = r.pax_confermati ?? r.pax_previsti ?? 1
         venduto += r.budget_totale ? Number(r.budget_totale) : (r.budget_per_persona ? Number(r.budget_per_persona) * pax : 0)
         costo += r.costo_totale_reale ? Number(r.costo_totale_reale) : (r.costo_per_persona ? Number(r.costo_per_persona) * pax : 0)
+      }
+      for (const e of (expRes.data ?? [])) {
+        const pax = e.pax ?? 1
+        venduto += e.venduto_totale ?? (e.venduto_unitario ? e.venduto_unitario * pax : 0)
+        costo += e.costo_totale ?? (e.costo_unitario ? e.costo_unitario * pax : 0)
+      }
+      for (const c of (catRes.data ?? [])) {
+        const pax = c.pax ?? 1
+        venduto += c.venduto_totale ?? (c.venduto_per_persona ? c.venduto_per_persona * pax : 0)
+        costo += c.costo_totale ?? (c.costo_per_persona ? c.costo_per_persona * pax : 0)
+      }
+      for (const si of (staffIntRes.data ?? [])) {
+        venduto += si.venduto_totale ? Number(si.venduto_totale) : 0
+        costo += si.costo_totale ? Number(si.costo_totale) : (si.costo_giornaliero ? Number(si.costo_giornaliero) : 0)
+      }
+      for (const se of (staffExtRes.data ?? [])) {
+        const qty = se.quantita ?? 1
+        venduto += se.venduto_totale ?? (se.venduto_unitario ? se.venduto_unitario * qty : 0)
+        costo += se.costo_totale ?? (se.costo_unitario ? se.costo_unitario * qty : 0)
+      }
+      for (const v of (varieRes.data ?? [])) {
+        const qty = v.quantita ?? 1
+        venduto += v.venduto_totale ?? (v.venduto_unitario ? v.venduto_unitario * qty : 0)
+        costo += v.costo_totale ?? (v.costo_unitario ? v.costo_unitario * qty : 0)
       }
       const margine = venduto - costo
       const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
@@ -902,6 +931,84 @@ const emptyRestaurantForm = {
   branding_cliente: '',
   richieste_speciali: '',
   note_operative: '',
+}
+
+interface ExperienceDetail {
+  id: string
+  event_id: string
+  supplier_id: string | null
+  nome_attivita: string
+  data: string | null
+  ora_inizio: string | null
+  ora_fine: string | null
+  pax: number | null
+  durata_minuti: number | null
+  location: string
+  note_operative: string
+  venduto_unitario: number | null
+  venduto_totale: number | null
+  costo_unitario: number | null
+  costo_totale: number | null
+}
+
+interface CateringDetail {
+  id: string
+  event_id: string
+  supplier_id: string | null
+  tipologia: string
+  data: string | null
+  ora: string | null
+  pax: number | null
+  note: string
+  venduto_per_persona: number | null
+  venduto_totale: number | null
+  costo_per_persona: number | null
+  costo_totale: number | null
+}
+
+interface StaffInternoDetail {
+  id: string
+  event_id: string
+  profile_id: string | null
+  risorsa: string
+  ruolo: string
+  data: string | null
+  ora_inizio: string | null
+  ora_fine: string | null
+  note: string
+  venduto_totale: number | null
+  costo_giornaliero: number | null
+  costo_totale: number | null
+}
+
+interface StaffEsternoDetail {
+  id: string
+  event_id: string
+  supplier_id: string | null
+  ruolo: string
+  quantita: number
+  data: string | null
+  ora_inizio: string | null
+  ora_fine: string | null
+  lingue: string
+  note: string
+  venduto_unitario: number | null
+  venduto_totale: number | null
+  costo_unitario: number | null
+  costo_totale: number | null
+}
+
+interface VarieDetail {
+  id: string
+  event_id: string
+  supplier_id: string | null
+  descrizione: string
+  quantita: number
+  note: string
+  venduto_unitario: number | null
+  venduto_totale: number | null
+  costo_unitario: number | null
+  costo_totale: number | null
 }
 
 function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
@@ -2253,7 +2360,7 @@ function DetailField({ label, value }: { label: string; value: string }) {
   )
 }
 
-type BudgetLineSource = 'service' | 'hotel' | 'restaurant'
+type BudgetLineSource = 'service' | 'hotel' | 'restaurant' | 'experience' | 'catering' | 'staff_interno' | 'staff_esterno' | 'varie'
 interface BudgetLine {
   id: string
   source: BudgetLineSource
@@ -2266,7 +2373,7 @@ interface BudgetLine {
   costo: number
   margine: number
   marginePct: number
-  raw: SupplierService | HotelDetail | RestaurantDetail
+  raw: SupplierService | HotelDetail | RestaurantDetail | ExperienceDetail | CateringDetail | StaffInternoDetail | StaffEsternoDetail | VarieDetail
 }
 
 function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
@@ -2280,10 +2387,15 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
-    const [svcRes, hotelRes, restRes] = await Promise.all([
+    const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes] = await Promise.all([
       supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
       supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
       supabase.from('event_restaurant_details').select('*').eq('event_id', event.id),
+      supabase.from('event_experience_details').select('*').eq('event_id', event.id),
+      supabase.from('event_catering_details').select('*').eq('event_id', event.id),
+      supabase.from('event_staff_interno_details').select('*').eq('event_id', event.id),
+      supabase.from('event_staff_esterno_details').select('*').eq('event_id', event.id),
+      supabase.from('event_varie_details').select('*').eq('event_id', event.id),
     ])
     const all: BudgetLine[] = []
 
@@ -2322,6 +2434,59 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
       all.push({ id: r.id, source: 'restaurant', categoria: 'Ristorante', titolo: label, fornitore: sup?.nome ?? '', supplierId: r.supplier_id, qty: pax, venduto, costo, margine, marginePct, raw: r })
     }
 
+    for (const e of (expRes.data ?? []) as ExperienceDetail[]) {
+      const pax = e.pax ?? 1
+      const venduto = e.venduto_totale ?? (e.venduto_unitario ? e.venduto_unitario * pax : 0)
+      const costo = e.costo_totale ?? (e.costo_unitario ? e.costo_unitario * pax : 0)
+      if (!venduto && !costo) continue
+      const margine = venduto - costo
+      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+      const sup = e.supplier_id ? suppliers.find(sup => sup.id === e.supplier_id) : null
+      all.push({ id: e.id, source: 'experience', categoria: 'Experience', titolo: e.nome_attivita || 'Experience', fornitore: sup?.nome ?? '', supplierId: e.supplier_id ?? '', qty: pax, venduto, costo, margine, marginePct, raw: e })
+    }
+
+    for (const c of (catRes.data ?? []) as CateringDetail[]) {
+      const pax = c.pax ?? 1
+      const venduto = c.venduto_totale ?? (c.venduto_per_persona ? c.venduto_per_persona * pax : 0)
+      const costo = c.costo_totale ?? (c.costo_per_persona ? c.costo_per_persona * pax : 0)
+      if (!venduto && !costo) continue
+      const margine = venduto - costo
+      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+      const sup = c.supplier_id ? suppliers.find(sup => sup.id === c.supplier_id) : null
+      all.push({ id: c.id, source: 'catering', categoria: 'Catering', titolo: c.tipologia || 'Catering', fornitore: sup?.nome ?? '', supplierId: c.supplier_id ?? '', qty: pax, venduto, costo, margine, marginePct, raw: c })
+    }
+
+    for (const si of (staffIntRes.data ?? []) as StaffInternoDetail[]) {
+      const venduto = si.venduto_totale ? Number(si.venduto_totale) : 0
+      const costo = si.costo_totale ? Number(si.costo_totale) : (si.costo_giornaliero ? Number(si.costo_giornaliero) : 0)
+      if (!venduto && !costo) continue
+      const margine = venduto - costo
+      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+      all.push({ id: si.id, source: 'staff_interno', categoria: 'Staff Simmetria', titolo: si.risorsa || si.ruolo || 'Staff interno', fornitore: 'Simmetria', supplierId: '', qty: 1, venduto, costo, margine, marginePct, raw: si })
+    }
+
+    for (const se of (staffExtRes.data ?? []) as StaffEsternoDetail[]) {
+      const qty = se.quantita ?? 1
+      const venduto = se.venduto_totale ?? (se.venduto_unitario ? se.venduto_unitario * qty : 0)
+      const costo = se.costo_totale ?? (se.costo_unitario ? se.costo_unitario * qty : 0)
+      if (!venduto && !costo) continue
+      const margine = venduto - costo
+      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+      const sup = se.supplier_id ? suppliers.find(sup => sup.id === se.supplier_id) : null
+      all.push({ id: se.id, source: 'staff_esterno', categoria: 'Staff Esterno', titolo: se.ruolo || 'Staff esterno', fornitore: sup?.nome ?? '', supplierId: se.supplier_id ?? '', qty, venduto, costo, margine, marginePct, raw: se })
+    }
+
+    for (const v of (varieRes.data ?? []) as VarieDetail[]) {
+      const qty = v.quantita ?? 1
+      const venduto = v.venduto_totale ?? (v.venduto_unitario ? v.venduto_unitario * qty : 0)
+      const costo = v.costo_totale ?? (v.costo_unitario ? v.costo_unitario * qty : 0)
+      if (!venduto && !costo) continue
+      const margine = venduto - costo
+      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
+      const sup = v.supplier_id ? suppliers.find(sup => sup.id === v.supplier_id) : null
+      all.push({ id: v.id, source: 'varie', categoria: 'Varie', titolo: v.descrizione || 'Voce varia', fornitore: sup?.nome ?? '', supplierId: v.supplier_id ?? '', qty, venduto, costo, margine, marginePct, raw: v })
+    }
+
     all.sort((a, b) => a.categoria.localeCompare(b.categoria) || a.titolo.localeCompare(b.titolo))
     setLines(all)
 
@@ -2343,15 +2508,35 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
     } else if (line.source === 'hotel') {
       const h = line.raw as HotelDetail
       setEditForm({ titolo: h.titolo, quantita: h.quantita ?? 1, venduto_unitario: h.venduto_unitario ?? '', venduto_totale: h.venduto_totale ?? '', costo_unitario: h.costo_unitario ?? '', costo_totale: h.costo_totale ?? '', check_in_date: h.check_in_date ?? '', check_in_time: h.check_in_time ?? '', check_out_date: h.check_out_date ?? '', check_out_time: h.check_out_time ?? '', room_type: h.room_type ?? '', note: h.note ?? '' })
-    } else {
+    } else if (line.source === 'restaurant') {
       const r = line.raw as RestaurantDetail
       setEditForm({ tipologia_servizio: r.tipologia_servizio ?? '', pax_previsti: r.pax_previsti ?? '', pax_confermati: r.pax_confermati ?? '', budget_per_persona: r.budget_per_persona ?? '', budget_totale: r.budget_totale ?? '', costo_per_persona: r.costo_per_persona ?? '', costo_totale_reale: r.costo_totale_reale ?? '', menu_portate: r.menu_portate ?? '', menu_descrizione: r.menu_descrizione ?? '', area_riservata: r.area_riservata ?? false, allergie: r.allergie ?? '', intolleranze: r.intolleranze ?? '', note_operative: r.note_operative ?? '', data: r.data ?? '', ora_inizio: r.ora_inizio ?? '', ora_fine: r.ora_fine ?? '' })
+    } else if (line.source === 'experience') {
+      const e = line.raw as ExperienceDetail
+      setEditForm({ nome_attivita: e.nome_attivita ?? '', pax: e.pax ?? '', durata_minuti: e.durata_minuti ?? '', location: e.location ?? '', data: e.data ?? '', ora_inizio: e.ora_inizio ?? '', ora_fine: e.ora_fine ?? '', venduto_unitario: e.venduto_unitario ?? '', venduto_totale: e.venduto_totale ?? '', costo_unitario: e.costo_unitario ?? '', costo_totale: e.costo_totale ?? '', note_operative: e.note_operative ?? '' })
+    } else if (line.source === 'catering') {
+      const c = line.raw as CateringDetail
+      setEditForm({ tipologia: c.tipologia ?? '', pax: c.pax ?? '', data: c.data ?? '', ora: c.ora ?? '', venduto_per_persona: c.venduto_per_persona ?? '', venduto_totale: c.venduto_totale ?? '', costo_per_persona: c.costo_per_persona ?? '', costo_totale: c.costo_totale ?? '', note: c.note ?? '' })
+    } else if (line.source === 'staff_interno') {
+      const si = line.raw as StaffInternoDetail
+      setEditForm({ risorsa: si.risorsa ?? '', ruolo: si.ruolo ?? '', data: si.data ?? '', ora_inizio: si.ora_inizio ?? '', ora_fine: si.ora_fine ?? '', venduto_totale: si.venduto_totale ?? '', costo_giornaliero: si.costo_giornaliero ?? '', costo_totale: si.costo_totale ?? '', note: si.note ?? '' })
+    } else if (line.source === 'staff_esterno') {
+      const se = line.raw as StaffEsternoDetail
+      setEditForm({ ruolo: se.ruolo ?? '', quantita: se.quantita ?? 1, data: se.data ?? '', ora_inizio: se.ora_inizio ?? '', ora_fine: se.ora_fine ?? '', lingue: se.lingue ?? '', venduto_unitario: se.venduto_unitario ?? '', venduto_totale: se.venduto_totale ?? '', costo_unitario: se.costo_unitario ?? '', costo_totale: se.costo_totale ?? '', note: se.note ?? '' })
+    } else {
+      const v = line.raw as VarieDetail
+      setEditForm({ descrizione: v.descrizione ?? '', quantita: v.quantita ?? 1, venduto_unitario: v.venduto_unitario ?? '', venduto_totale: v.venduto_totale ?? '', costo_unitario: v.costo_unitario ?? '', costo_totale: v.costo_totale ?? '', note: v.note ?? '' })
     }
   }
 
   async function saveEdit(line: BudgetLine) {
     setSaving(true)
-    const table = line.source === 'service' ? 'event_supplier_services' : line.source === 'hotel' ? 'event_hotel_details' : 'event_restaurant_details'
+    const tableMap: Record<BudgetLineSource, string> = {
+      service: 'event_supplier_services', hotel: 'event_hotel_details', restaurant: 'event_restaurant_details',
+      experience: 'event_experience_details', catering: 'event_catering_details',
+      staff_interno: 'event_staff_interno_details', staff_esterno: 'event_staff_esterno_details', varie: 'event_varie_details',
+    }
+    const table = tableMap[line.source]
 
     let patch: Record<string, unknown> = {}
     if (line.source === 'service') {
@@ -2368,7 +2553,7 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
       const cu = editForm.costo_unitario !== '' ? Number(editForm.costo_unitario) : null
       const ct = editForm.costo_totale !== '' ? Number(editForm.costo_totale) : (cu ? cu * qty : null)
       patch = { titolo: editForm.titolo, quantita: qty, venduto_unitario: vu, venduto_totale: vt, costo_unitario: cu, costo_totale: ct, check_in_date: editForm.check_in_date || null, check_in_time: editForm.check_in_time || null, check_out_date: editForm.check_out_date || null, check_out_time: editForm.check_out_time || null, room_type: editForm.room_type || '', note: editForm.note || '' }
-    } else {
+    } else if (line.source === 'restaurant') {
       const paxP = editForm.pax_previsti !== '' ? Number(editForm.pax_previsti) : null
       const paxC = editForm.pax_confermati !== '' ? Number(editForm.pax_confermati) : null
       const pax = paxC ?? paxP ?? 1
@@ -2377,6 +2562,36 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
       const cpp = editForm.costo_per_persona !== '' ? Number(editForm.costo_per_persona) : null
       const ctr = editForm.costo_totale_reale !== '' ? Number(editForm.costo_totale_reale) : (cpp ? cpp * pax : null)
       patch = { tipologia_servizio: editForm.tipologia_servizio || '', pax_previsti: paxP, pax_confermati: paxC, budget_per_persona: bpp, budget_totale: bt, costo_per_persona: cpp, costo_totale_reale: ctr, menu_portate: editForm.menu_portate || '', menu_descrizione: editForm.menu_descrizione || '', area_riservata: editForm.area_riservata ?? false, allergie: editForm.allergie || '', intolleranze: editForm.intolleranze || '', note_operative: editForm.note_operative || '', data: editForm.data || null, ora_inizio: editForm.ora_inizio || null, ora_fine: editForm.ora_fine || null }
+    } else if (line.source === 'experience') {
+      const pax = editForm.pax !== '' ? Number(editForm.pax) : null
+      const vu = editForm.venduto_unitario !== '' ? Number(editForm.venduto_unitario) : null
+      const vt = editForm.venduto_totale !== '' ? Number(editForm.venduto_totale) : (vu && pax ? vu * pax : null)
+      const cu = editForm.costo_unitario !== '' ? Number(editForm.costo_unitario) : null
+      const ct = editForm.costo_totale !== '' ? Number(editForm.costo_totale) : (cu && pax ? cu * pax : null)
+      patch = { nome_attivita: editForm.nome_attivita || '', pax, durata_minuti: editForm.durata_minuti !== '' ? Number(editForm.durata_minuti) : null, location: editForm.location || '', data: editForm.data || null, ora_inizio: editForm.ora_inizio || null, ora_fine: editForm.ora_fine || null, venduto_unitario: vu, venduto_totale: vt, costo_unitario: cu, costo_totale: ct, note_operative: editForm.note_operative || '' }
+    } else if (line.source === 'catering') {
+      const pax = editForm.pax !== '' ? Number(editForm.pax) : null
+      const vpp = editForm.venduto_per_persona !== '' ? Number(editForm.venduto_per_persona) : null
+      const vt = editForm.venduto_totale !== '' ? Number(editForm.venduto_totale) : (vpp && pax ? vpp * pax : null)
+      const cpp = editForm.costo_per_persona !== '' ? Number(editForm.costo_per_persona) : null
+      const ct = editForm.costo_totale !== '' ? Number(editForm.costo_totale) : (cpp && pax ? cpp * pax : null)
+      patch = { tipologia: editForm.tipologia || '', pax, data: editForm.data || null, ora: editForm.ora || null, venduto_per_persona: vpp, venduto_totale: vt, costo_per_persona: cpp, costo_totale: ct, note: editForm.note || '' }
+    } else if (line.source === 'staff_interno') {
+      patch = { risorsa: editForm.risorsa || '', ruolo: editForm.ruolo || '', data: editForm.data || null, ora_inizio: editForm.ora_inizio || null, ora_fine: editForm.ora_fine || null, venduto_totale: editForm.venduto_totale !== '' ? Number(editForm.venduto_totale) : null, costo_giornaliero: editForm.costo_giornaliero !== '' ? Number(editForm.costo_giornaliero) : null, costo_totale: editForm.costo_totale !== '' ? Number(editForm.costo_totale) : null, note: editForm.note || '' }
+    } else if (line.source === 'staff_esterno') {
+      const qty = Number(editForm.quantita) || 1
+      const vu = editForm.venduto_unitario !== '' ? Number(editForm.venduto_unitario) : null
+      const vt = editForm.venduto_totale !== '' ? Number(editForm.venduto_totale) : (vu ? vu * qty : null)
+      const cu = editForm.costo_unitario !== '' ? Number(editForm.costo_unitario) : null
+      const ct = editForm.costo_totale !== '' ? Number(editForm.costo_totale) : (cu ? cu * qty : null)
+      patch = { ruolo: editForm.ruolo || '', quantita: qty, data: editForm.data || null, ora_inizio: editForm.ora_inizio || null, ora_fine: editForm.ora_fine || null, lingue: editForm.lingue || '', venduto_unitario: vu, venduto_totale: vt, costo_unitario: cu, costo_totale: ct, note: editForm.note || '' }
+    } else {
+      const qty = Number(editForm.quantita) || 1
+      const vu = editForm.venduto_unitario !== '' ? Number(editForm.venduto_unitario) : null
+      const vt = editForm.venduto_totale !== '' ? Number(editForm.venduto_totale) : (vu ? vu * qty : null)
+      const cu = editForm.costo_unitario !== '' ? Number(editForm.costo_unitario) : null
+      const ct = editForm.costo_totale !== '' ? Number(editForm.costo_totale) : (cu ? cu * qty : null)
+      patch = { descrizione: editForm.descrizione || '', quantita: qty, venduto_unitario: vu, venduto_totale: vt, costo_unitario: cu, costo_totale: ct, note: editForm.note || '' }
     }
 
     await supabase.from(table).update(patch).eq('id', line.id)
@@ -2386,8 +2601,12 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
   }
 
   async function deleteLine(line: BudgetLine) {
-    const table = line.source === 'service' ? 'event_supplier_services' : line.source === 'hotel' ? 'event_hotel_details' : 'event_restaurant_details'
-    await supabase.from(table).delete().eq('id', line.id)
+    const tableMap: Record<BudgetLineSource, string> = {
+      service: 'event_supplier_services', hotel: 'event_hotel_details', restaurant: 'event_restaurant_details',
+      experience: 'event_experience_details', catering: 'event_catering_details',
+      staff_interno: 'event_staff_interno_details', staff_esterno: 'event_staff_esterno_details', varie: 'event_varie_details',
+    }
+    await supabase.from(tableMap[line.source]).delete().eq('id', line.id)
     setDeletingId(null)
     setExpandedId(null)
     await loadData()
@@ -2539,6 +2758,7 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
 
 function BudgetLineDetail({ line, onEdit, onDelete }: { line: BudgetLine; onEdit: () => void; onDelete: () => void }) {
   const detailFields: { label: string; value: string }[] = []
+  const sourceLabels: Record<BudgetLineSource, string> = { service: 'Servizio', hotel: 'Hotel', restaurant: 'Ristorante', experience: 'Experience', catering: 'Catering', staff_interno: 'Staff Simmetria', staff_esterno: 'Staff Esterno', varie: 'Varie' }
 
   if (line.source === 'service') {
     const s = line.raw as SupplierService
@@ -2564,7 +2784,7 @@ function BudgetLineDetail({ line, onEdit, onDelete }: { line: BudgetLine; onEdit
     if (h.costo_unitario) detailFields.push({ label: 'Costo/camera', value: `\u20AC${Number(h.costo_unitario).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
     detailFields.push({ label: 'Costo totale', value: `\u20AC${line.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
     if (h.note) detailFields.push({ label: 'Note', value: h.note })
-  } else {
+  } else if (line.source === 'restaurant') {
     const r = line.raw as RestaurantDetail
     if (r.data) detailFields.push({ label: 'Data', value: r.data })
     if (r.ora_inizio) detailFields.push({ label: 'Orario', value: `${r.ora_inizio}${r.ora_fine ? ' - ' + r.ora_fine : ''}` })
@@ -2580,13 +2800,67 @@ function BudgetLineDetail({ line, onEdit, onDelete }: { line: BudgetLine; onEdit
     if (r.allergie) detailFields.push({ label: 'Allergie', value: r.allergie })
     if (r.intolleranze) detailFields.push({ label: 'Intolleranze', value: r.intolleranze })
     if (r.note_operative) detailFields.push({ label: 'Note operative', value: r.note_operative })
+  } else if (line.source === 'experience') {
+    const e = line.raw as ExperienceDetail
+    if (e.data) detailFields.push({ label: 'Data', value: e.data })
+    if (e.ora_inizio) detailFields.push({ label: 'Orario', value: `${e.ora_inizio}${e.ora_fine ? ' - ' + e.ora_fine : ''}` })
+    if (e.pax) detailFields.push({ label: 'Pax', value: String(e.pax) })
+    if (e.durata_minuti) detailFields.push({ label: 'Durata', value: `${e.durata_minuti} min` })
+    if (e.location) detailFields.push({ label: 'Location', value: e.location })
+    if (e.venduto_unitario) detailFields.push({ label: 'Venduto/pax', value: `\u20AC${Number(e.venduto_unitario).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Venduto totale', value: `\u20AC${line.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (e.costo_unitario) detailFields.push({ label: 'Costo/pax', value: `\u20AC${Number(e.costo_unitario).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Costo totale', value: `\u20AC${line.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (e.note_operative) detailFields.push({ label: 'Note operative', value: e.note_operative })
+  } else if (line.source === 'catering') {
+    const c = line.raw as CateringDetail
+    if (c.tipologia) detailFields.push({ label: 'Tipologia', value: c.tipologia })
+    if (c.data) detailFields.push({ label: 'Data', value: c.data })
+    if (c.ora) detailFields.push({ label: 'Ora', value: c.ora })
+    if (c.pax) detailFields.push({ label: 'Pax', value: String(c.pax) })
+    if (c.venduto_per_persona) detailFields.push({ label: 'Venduto/persona', value: `\u20AC${Number(c.venduto_per_persona).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Venduto totale', value: `\u20AC${line.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (c.costo_per_persona) detailFields.push({ label: 'Costo/persona', value: `\u20AC${Number(c.costo_per_persona).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Costo totale', value: `\u20AC${line.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (c.note) detailFields.push({ label: 'Note', value: c.note })
+  } else if (line.source === 'staff_interno') {
+    const si = line.raw as StaffInternoDetail
+    if (si.risorsa) detailFields.push({ label: 'Risorsa', value: si.risorsa })
+    if (si.ruolo) detailFields.push({ label: 'Ruolo', value: si.ruolo })
+    if (si.data) detailFields.push({ label: 'Data', value: si.data })
+    if (si.ora_inizio) detailFields.push({ label: 'Orario', value: `${si.ora_inizio}${si.ora_fine ? ' - ' + si.ora_fine : ''}` })
+    if (si.venduto_totale) detailFields.push({ label: 'Venduto', value: `\u20AC${Number(si.venduto_totale).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (si.costo_giornaliero) detailFields.push({ label: 'Costo giornaliero', value: `\u20AC${Number(si.costo_giornaliero).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Costo totale', value: `\u20AC${line.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (si.note) detailFields.push({ label: 'Note', value: si.note })
+  } else if (line.source === 'staff_esterno') {
+    const se = line.raw as StaffEsternoDetail
+    if (se.ruolo) detailFields.push({ label: 'Ruolo', value: se.ruolo })
+    detailFields.push({ label: 'Quantita', value: String(se.quantita) })
+    if (se.data) detailFields.push({ label: 'Data', value: se.data })
+    if (se.ora_inizio) detailFields.push({ label: 'Orario', value: `${se.ora_inizio}${se.ora_fine ? ' - ' + se.ora_fine : ''}` })
+    if (se.lingue) detailFields.push({ label: 'Lingue', value: se.lingue })
+    if (se.venduto_unitario) detailFields.push({ label: 'Venduto/unit.', value: `\u20AC${Number(se.venduto_unitario).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Venduto totale', value: `\u20AC${line.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (se.costo_unitario) detailFields.push({ label: 'Costo/unit.', value: `\u20AC${Number(se.costo_unitario).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Costo totale', value: `\u20AC${line.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (se.note) detailFields.push({ label: 'Note', value: se.note })
+  } else {
+    const v = line.raw as VarieDetail
+    if (v.descrizione) detailFields.push({ label: 'Descrizione', value: v.descrizione })
+    detailFields.push({ label: 'Quantita', value: String(v.quantita) })
+    if (v.venduto_unitario) detailFields.push({ label: 'Venduto/unit.', value: `\u20AC${Number(v.venduto_unitario).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Venduto totale', value: `\u20AC${line.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (v.costo_unitario) detailFields.push({ label: 'Costo/unit.', value: `\u20AC${Number(v.costo_unitario).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    detailFields.push({ label: 'Costo totale', value: `\u20AC${line.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` })
+    if (v.note) detailFields.push({ label: 'Note', value: v.note })
   }
 
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs font-medium px-2 py-0.5 rounded" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>{line.source === 'service' ? 'Servizio' : line.source === 'hotel' ? 'Hotel' : 'Ristorante'}</span>
-        <span className="text-xs" style={{ color: 'var(--muted)' }}>Fornitore: <strong style={{ color: 'var(--text)' }}>{line.fornitore}</strong></span>
+        <span className="text-xs font-medium px-2 py-0.5 rounded" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>{sourceLabels[line.source]}</span>
+        {line.fornitore && <span className="text-xs" style={{ color: 'var(--muted)' }}>Fornitore: <strong style={{ color: 'var(--text)' }}>{line.fornitore}</strong></span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 mb-4">
         {detailFields.map(f => (
@@ -2610,8 +2884,8 @@ function BudgetLineDetail({ line, onEdit, onDelete }: { line: BudgetLine; onEdit
 
 function BudgetLineEditForm({ source, form, setForm, onSave, onCancel, saving }: { source: BudgetLineSource; form: Record<string, string | number | boolean>; setForm: (f: Record<string, string | number | boolean>) => void; onSave: () => void; onCancel: () => void; saving: boolean }) {
   const upd = (key: string, val: string | number | boolean) => setForm({ ...form, [key]: val })
-  const inp = (key: string, label: string, type: string = 'text', opts?: { half?: boolean }) => (
-    <div className={opts?.half ? '' : ''}>
+  const inp = (key: string, label: string, type: string = 'text') => (
+    <div>
       <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>{label}</label>
       <input type={type} value={String(form[key] ?? '')} onChange={e => upd(key, e.target.value)} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }} />
     </div>
@@ -2633,9 +2907,7 @@ function BudgetLineEditForm({ source, form, setForm, onSave, onCancel, saving }:
           {inp('venduto_totale', 'Venduto totale', 'number')}
           {inp('costo_unitario', 'Costo unit.', 'number')}
           {inp('costo_totale', 'Costo totale', 'number')}
-          <div className="sm:col-span-3">
-            {inp('note', 'Note')}
-          </div>
+          <div className="sm:col-span-3">{inp('note', 'Note')}</div>
         </div>
       )}
       {source === 'hotel' && (
@@ -2651,9 +2923,7 @@ function BudgetLineEditForm({ source, form, setForm, onSave, onCancel, saving }:
           {inp('venduto_totale', 'Venduto totale', 'number')}
           {inp('costo_unitario', 'Costo/camera', 'number')}
           {inp('costo_totale', 'Costo totale', 'number')}
-          <div className="sm:col-span-3">
-            {inp('note', 'Note')}
-          </div>
+          <div className="sm:col-span-3">{inp('note', 'Note')}</div>
         </div>
       )}
       {source === 'restaurant' && (
@@ -2671,16 +2941,80 @@ function BudgetLineEditForm({ source, form, setForm, onSave, onCancel, saving }:
           {inp('costo_totale_reale', 'Costo totale', 'number')}
           {inp('allergie', 'Allergie')}
           {inp('intolleranze', 'Intolleranze')}
-          <div className="sm:col-span-3">
-            {inp('menu_descrizione', 'Descrizione menu')}
-          </div>
-          <div className="sm:col-span-3">
-            {inp('note_operative', 'Note operative')}
-          </div>
+          <div className="sm:col-span-3">{inp('menu_descrizione', 'Descrizione menu')}</div>
+          <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
           <div className="flex items-center gap-2 sm:col-span-3">
             <input type="checkbox" checked={!!form.area_riservata} onChange={e => upd('area_riservata', e.target.checked)} id="budget_area_ris" />
             <label htmlFor="budget_area_ris" className="text-xs" style={{ color: 'var(--text)' }}>Area riservata</label>
           </div>
+        </div>
+      )}
+      {source === 'experience' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+          {inp('nome_attivita', 'Nome attivita')}
+          {inp('pax', 'Pax', 'number')}
+          {inp('durata_minuti', 'Durata (min)', 'number')}
+          {inp('location', 'Location')}
+          {inp('data', 'Data', 'date')}
+          {inp('ora_inizio', 'Ora inizio', 'time')}
+          {inp('ora_fine', 'Ora fine', 'time')}
+          {inp('venduto_unitario', 'Venduto/pax', 'number')}
+          {inp('venduto_totale', 'Venduto totale', 'number')}
+          {inp('costo_unitario', 'Costo/pax', 'number')}
+          {inp('costo_totale', 'Costo totale', 'number')}
+          <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+        </div>
+      )}
+      {source === 'catering' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+          {inp('tipologia', 'Tipologia')}
+          {inp('pax', 'Pax', 'number')}
+          {inp('data', 'Data', 'date')}
+          {inp('ora', 'Ora', 'time')}
+          {inp('venduto_per_persona', 'Venduto/persona', 'number')}
+          {inp('venduto_totale', 'Venduto totale', 'number')}
+          {inp('costo_per_persona', 'Costo/persona', 'number')}
+          {inp('costo_totale', 'Costo totale', 'number')}
+          <div className="sm:col-span-3">{inp('note', 'Note')}</div>
+        </div>
+      )}
+      {source === 'staff_interno' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+          {inp('risorsa', 'Risorsa')}
+          {inp('ruolo', 'Ruolo')}
+          {inp('data', 'Data', 'date')}
+          {inp('ora_inizio', 'Ora inizio', 'time')}
+          {inp('ora_fine', 'Ora fine', 'time')}
+          {inp('venduto_totale', 'Venduto', 'number')}
+          {inp('costo_giornaliero', 'Costo giornaliero', 'number')}
+          {inp('costo_totale', 'Costo totale', 'number')}
+          <div className="sm:col-span-3">{inp('note', 'Note')}</div>
+        </div>
+      )}
+      {source === 'staff_esterno' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+          {inp('ruolo', 'Ruolo')}
+          {inp('quantita', 'Quantita', 'number')}
+          {inp('data', 'Data', 'date')}
+          {inp('ora_inizio', 'Ora inizio', 'time')}
+          {inp('ora_fine', 'Ora fine', 'time')}
+          {inp('lingue', 'Lingue')}
+          {inp('venduto_unitario', 'Venduto/unit.', 'number')}
+          {inp('venduto_totale', 'Venduto totale', 'number')}
+          {inp('costo_unitario', 'Costo/unit.', 'number')}
+          {inp('costo_totale', 'Costo totale', 'number')}
+          <div className="sm:col-span-3">{inp('note', 'Note')}</div>
+        </div>
+      )}
+      {source === 'varie' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+          {inp('descrizione', 'Descrizione')}
+          {inp('quantita', 'Quantita', 'number')}
+          {inp('venduto_unitario', 'Venduto/unit.', 'number')}
+          {inp('venduto_totale', 'Venduto totale', 'number')}
+          {inp('costo_unitario', 'Costo/unit.', 'number')}
+          {inp('costo_totale', 'Costo totale', 'number')}
+          <div className="sm:col-span-3">{inp('note', 'Note')}</div>
         </div>
       )}
       <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
