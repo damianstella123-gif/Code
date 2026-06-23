@@ -43,7 +43,7 @@ import type { Client } from '@/data/clients'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
-import { SupplierCategoryPanel, detectSupplierCategory, CATEGORY_LABELS } from '@/components/TabOperativo'
+import { SupplierCategoryPanel, detectSupplierCategory, CATEGORY_LABELS, type CategoryType } from '@/components/TabOperativo'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import TabBudget from '@/components/TabBudget'
 import { setFlyContext } from '@/lib/fly'
@@ -962,6 +962,20 @@ interface VarieDetail {
   costo_totale: number | null
 }
 
+const LINK_CATEGORIES: { value: CategoryType; label: string }[] = [
+  { value: 'hotel', label: 'Hotel' },
+  { value: 'transfer', label: 'Transfer' },
+  { value: 'ristorante', label: 'Ristorante' },
+  { value: 'experience', label: 'Location / Attivita' },
+  { value: 'catering', label: 'Catering' },
+  { value: 'audio_video', label: 'Audio Video' },
+  { value: 'allestimenti', label: 'Allestimenti' },
+  { value: 'staff_interno', label: 'Staff Simmetria' },
+  { value: 'staff_esterno', label: 'Staff Esterno' },
+  { value: 'grafica_stampa', label: 'Grafica / Stampa' },
+  { value: 'varie', label: 'Varie' },
+]
+
 function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const [links, setLinks] = useState<EventSupplierLink[]>([])
   const [loading, setLoading] = useState(true)
@@ -972,6 +986,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   const [confirmUnlink, setConfirmUnlink] = useState<string | null>(null)
   const [toast, setToast] = useState<{ supplierId: string; nome: string } | null>(null)
   const [toastTimer, setToastTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const [pendingLink, setPendingLink] = useState<string | null>(null)
+  const [linkCategory, setLinkCategory] = useState<CategoryType | ''>('')
 
   async function loadLinks() {
     const { data } = await supabase
@@ -986,13 +1002,21 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
 
   const linkedIds = links.map(l => l.supplier_id)
 
-  async function handleLink(supplierId: string) {
+  function beginLink(supplierId: string) {
+    setPendingLink(supplierId)
+    setLinkCategory('')
+  }
+
+  async function confirmLink() {
+    if (!pendingLink || !linkCategory) return
     const { error } = await supabase
       .from('event_suppliers')
-      .insert({ event_id: event.id, supplier_id: supplierId })
+      .insert({ event_id: event.id, supplier_id: pendingLink, service_category: linkCategory })
     if (!error) {
       setAdding(false)
       setSearch('')
+      setPendingLink(null)
+      setLinkCategory('')
       await loadLinks()
     }
   }
@@ -1071,7 +1095,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                 {suppliers.length === 0 ? 'Nessun fornitore nel sistema' : 'Nessun fornitore trovato'}
               </p>
             ) : availableSuppliers.slice(0, 10).map(s => (
-              <button key={s.id} onClick={() => handleLink(s.id)}
+              <button key={s.id} onClick={() => beginLink(s.id)}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all hover:bg-white/5"
                 style={{ border: '1px solid var(--line)' }}>
                 <Truck className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--red2)' }} />
@@ -1085,6 +1109,36 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
         </div>
       )}
 
+      {pendingLink && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPendingLink(null)}>
+          <div className="panel p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+            <p className="font-semibold mb-1" style={{ color: 'var(--text)' }}>Seleziona categoria</p>
+            <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
+              Come verra utilizzato questo fornitore in questo evento?
+            </p>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {LINK_CATEGORIES.map(cat => (
+                <button key={cat.value} onClick={() => setLinkCategory(cat.value)}
+                  className="px-3 py-2 rounded-lg text-xs font-medium text-left transition-all"
+                  style={{
+                    background: linkCategory === cat.value ? 'rgba(208,0,58,0.15)' : 'var(--panel2)',
+                    border: `1px solid ${linkCategory === cat.value ? 'var(--red2)' : 'var(--line)'}`,
+                    color: linkCategory === cat.value ? 'var(--red2)' : 'var(--text)',
+                  }}>
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button className="px-4 py-2 rounded-lg text-sm" style={{ background: 'var(--panel2)', color: 'var(--text)' }} onClick={() => setPendingLink(null)}>Annulla</button>
+              <button disabled={!linkCategory} onClick={confirmLink}
+                className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-40"
+                style={{ background: 'var(--red2)', color: '#fff' }}>Conferma</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {linkedSuppliers.length === 0 && !adding ? (
         <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <Truck className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -1094,7 +1148,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       ) : (
         <div className="space-y-3">
           {linkedSuppliers.map(sup => {
-            const catType = detectSupplierCategory(sup.categoria)
+            const link = links.find(l => l.supplier_id === sup.id)
+            const catType = (link?.service_category as CategoryType) || detectSupplierCategory(sup.categoria)
             const catLabel = CATEGORY_LABELS[catType]
             const isManaging = managingCategory === sup.id
             return (

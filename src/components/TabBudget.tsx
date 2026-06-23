@@ -16,6 +16,20 @@ const CATEGORY_ORDER = [
   'GRAFICA', 'VARIE',
 ] as const
 
+const SERVICE_CAT_TO_BUDGET: Record<string, string> = {
+  hotel: 'HOTEL',
+  transfer: 'TRANSFER',
+  ristorante: 'RISTORANTE',
+  experience: 'LOCATION / EXPERIENCE',
+  catering: 'CATERING',
+  audio_video: 'AUDIO VIDEO',
+  allestimenti: 'ALLESTIMENTI',
+  staff_interno: 'STAFF',
+  staff_esterno: 'STAFF',
+  grafica_stampa: 'GRAFICA',
+  varie: 'VARIE',
+}
+
 const SOTTO_LABELS: Record<string, string> = {
   camere: 'Camere', city_tax: 'City Tax', parcheggi: 'Parcheggi',
   meeting_room: 'Meeting Room', coffee_break: 'Coffee Break',
@@ -75,7 +89,8 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   }
 
   const loadData = useCallback(async () => {
-    const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes] = await Promise.all([
+    const [linksRes, svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes] = await Promise.all([
+      supabase.from('event_suppliers').select('supplier_id, service_category').eq('event_id', event.id),
       supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
       supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
       supabase.from('event_restaurant_details').select('*').eq('event_id', event.id),
@@ -88,6 +103,19 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       supabase.from('event_allestimenti_details').select('*').eq('event_id', event.id),
       supabase.from('event_grafica_stampa_details').select('*').eq('event_id', event.id),
     ])
+
+    // Build supplier_id -> budget category map from user's choice
+    const catMap: Record<string, string> = {}
+    for (const link of (linksRes.data ?? []) as { supplier_id: string; service_category: string }[]) {
+      if (link.service_category) {
+        catMap[link.supplier_id] = SERVICE_CAT_TO_BUDGET[link.service_category] || 'VARIE'
+      }
+    }
+
+    function resolveCat(supplierId: string | null | undefined, fallback: string): string {
+      if (supplierId && catMap[supplierId]) return catMap[supplierId]
+      return fallback
+    }
 
     const all: BudgetLine[] = []
 
@@ -126,7 +154,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const venduto = (s.venduto_totale as number) ?? ((s.venduto_unitario as number) ? (s.venduto_unitario as number) * qty : 0)
       const costo = (s.costo_totale as number) ?? ((s.costo_unitario as number) ? (s.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
-      pushLine(s, 'TRANSFER', 'event_supplier_services', {
+      pushLine(s, resolveCat(s.supplier_id as string, 'TRANSFER'), 'event_supplier_services', {
         descrizione: (s.titolo as string) || 'Transfer',
         qty, venduto, costo,
       })
@@ -138,7 +166,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const venduto = (h.venduto_totale as number) ?? ((h.venduto_unitario as number) ? (h.venduto_unitario as number) * qty : 0)
       const costo = (h.costo_totale as number) ?? ((h.costo_unitario as number) ? (h.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
-      pushLine(h, 'HOTEL', 'event_hotel_details', {
+      pushLine(h, resolveCat(h.supplier_id as string, 'HOTEL'), 'event_hotel_details', {
         descrizione: (h.titolo as string) || (h.tipo as string) || 'Hotel',
         qty, venduto, costo,
       })
@@ -150,7 +178,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const venduto = (r.budget_totale as number) ?? ((r.budget_per_persona as number) ? (r.budget_per_persona as number) * pax : 0)
       const costo = (r.costo_totale_reale as number) ?? ((r.costo_per_persona as number) ? (r.costo_per_persona as number) * pax : 0)
       if (!venduto && !costo) continue
-      pushLine(r, 'RISTORANTE', 'event_restaurant_details', {
+      pushLine(r, resolveCat(r.supplier_id as string, 'RISTORANTE'), 'event_restaurant_details', {
         descrizione: (r.tipologia_servizio as string) || 'Ristorante',
         qty: pax, venduto, costo,
       })
@@ -162,7 +190,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const venduto = (e.venduto_totale as number) ?? ((e.venduto_unitario as number) ? (e.venduto_unitario as number) * pax : 0)
       const costo = (e.costo_totale as number) ?? ((e.costo_unitario as number) ? (e.costo_unitario as number) * pax : 0)
       if (!venduto && !costo) continue
-      pushLine(e, 'LOCATION / EXPERIENCE', 'event_experience_details', {
+      pushLine(e, resolveCat(e.supplier_id as string, 'LOCATION / EXPERIENCE'), 'event_experience_details', {
         descrizione: (e.nome_attivita as string) || 'Experience',
         qty: pax, venduto, costo,
       })
@@ -174,7 +202,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const venduto = (c.venduto_totale as number) ?? ((c.venduto_per_persona as number) ? (c.venduto_per_persona as number) * pax : 0)
       const costo = (c.costo_totale as number) ?? ((c.costo_per_persona as number) ? (c.costo_per_persona as number) * pax : 0)
       if (!venduto && !costo) continue
-      pushLine(c, 'CATERING', 'event_catering_details', {
+      pushLine(c, resolveCat(c.supplier_id as string, 'CATERING'), 'event_catering_details', {
         descrizione: (c.tipologia as string) || 'Catering',
         qty: pax, venduto, costo,
       })
@@ -187,7 +215,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const costo = (si.costo_totale as number) ?? (si.costo_giornaliero as number) ?? ((si.costo_unitario as number) ? (si.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
       const nome = [(si.nome as string), (si.cognome as string)].filter(Boolean).join(' ') || (si.risorsa as string)
-      pushLine(si, 'STAFF', 'event_staff_interno_details', {
+      pushLine(si, resolveCat(si.supplier_id as string, 'STAFF'), 'event_staff_interno_details', {
         descrizione: nome ? `${nome} - ${(si.ruolo as string) || 'Staff'}` : (si.ruolo as string) || 'Staff Simmetria',
         qty, venduto, costo,
         sotto: 'staff_simmetria',
@@ -201,7 +229,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const costo = (se.costo_totale as number) ?? ((se.costo_unitario as number) ? (se.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
       const nome = [(se.nome as string), (se.cognome as string)].filter(Boolean).join(' ')
-      pushLine(se, 'STAFF', 'event_staff_esterno_details', {
+      pushLine(se, resolveCat(se.supplier_id as string, 'STAFF'), 'event_staff_esterno_details', {
         descrizione: nome ? `${nome} - ${(se.ruolo as string) || 'Staff'}` : (se.ruolo as string) || 'Staff Esterno',
         qty, venduto, costo,
         sotto: 'staff_esterno',
@@ -214,7 +242,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const venduto = (av.venduto_totale as number) ?? ((av.venduto_unitario as number) ? (av.venduto_unitario as number) * qty : 0)
       const costo = (av.costo_totale as number) ?? ((av.costo_unitario as number) ? (av.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
-      pushLine(av, 'AUDIO VIDEO', 'event_audio_video_details', {
+      pushLine(av, resolveCat(av.supplier_id as string, 'AUDIO VIDEO'), 'event_audio_video_details', {
         descrizione: (av.tipologia_servizio as string) || (av.descrizione as string) || 'Audio Video',
         qty, venduto, costo,
       })
@@ -226,7 +254,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const venduto = (al.venduto_totale as number) ?? ((al.venduto_unitario as number) ? (al.venduto_unitario as number) * qty : 0)
       const costo = (al.costo_totale as number) ?? ((al.costo_unitario as number) ? (al.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
-      pushLine(al, 'ALLESTIMENTI', 'event_allestimenti_details', {
+      pushLine(al, resolveCat(al.supplier_id as string, 'ALLESTIMENTI'), 'event_allestimenti_details', {
         descrizione: (al.descrizione as string) || 'Allestimento',
         qty, venduto, costo,
       })
@@ -238,7 +266,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const venduto = (g.venduto_totale as number) ?? ((g.venduto_unitario as number) ? (g.venduto_unitario as number) * qty : 0)
       const costo = (g.costo_totale as number) ?? ((g.costo_unitario as number) ? (g.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
-      pushLine(g, 'GRAFICA', 'event_grafica_stampa_details', {
+      pushLine(g, resolveCat(g.supplier_id as string, 'GRAFICA'), 'event_grafica_stampa_details', {
         descrizione: (g.tipo_materiale as string) || (g.descrizione as string) || 'Grafica',
         qty, venduto, costo,
       })
@@ -250,7 +278,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const venduto = (v.venduto_totale as number) ?? ((v.venduto_unitario as number) ? (v.venduto_unitario as number) * qty : 0)
       const costo = (v.costo_totale as number) ?? ((v.costo_unitario as number) ? (v.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
-      pushLine(v, 'VARIE', 'event_varie_details', {
+      pushLine(v, resolveCat(v.supplier_id as string, 'VARIE'), 'event_varie_details', {
         descrizione: (v.descrizione as string) || 'Voce varia',
         qty, venduto, costo,
       })
