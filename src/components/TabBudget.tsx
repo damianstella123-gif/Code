@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ChevronDown, Edit3, Save, Euro } from 'lucide-react'
+import { ChevronDown, Edit3, Save, Euro, Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import type { Event } from '@/data/events'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 interface Supplier {
   id: string
@@ -367,6 +369,183 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   }
 
   const fmt = (n: number) => '\u20AC' + n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
+  const fmtN = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
+
+  function sanitizeFilename(name: string): string {
+    return name.replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_')
+  }
+
+  function exportPdfInterno() {
+    const doc = new jsPDF({ orientation: 'landscape' })
+    const evName = event.nome || 'Evento'
+    const clientName = event.cliente || ''
+
+    doc.setFontSize(16)
+    doc.text('BUDGET INTERNO', 14, 18)
+    doc.setFontSize(10)
+    doc.text(`Evento: ${evName}`, 14, 26)
+    if (clientName) doc.text(`Cliente: ${clientName}`, 14, 32)
+    doc.text(`Data: ${new Date().toLocaleDateString('it-IT')}`, 14, clientName ? 38 : 32)
+
+    let startY = clientName ? 44 : 38
+
+    for (const cat of grouped) {
+      const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
+      const catC = cat.items.reduce((s, i) => s + i.costo, 0)
+      const catM = catV - catC
+      const catMp = catV > 0 ? (catM / catV * 100).toFixed(1) : '0.0'
+
+      const body: (string | { content: string; styles: { fontStyle: string } })[][] = cat.items.map(item => [
+        item.descrizione,
+        item.fornitore || '-',
+        String(item.qty),
+        fmtN(item.venduto),
+        `${item.aliquota_iva_venduto}%`,
+        fmtN(item.costo),
+        `${item.aliquota_iva_costo}%`,
+        fmtN(item.margine),
+        `${item.marginePct.toFixed(1)}%`,
+      ])
+
+      body.push([
+        { content: `TOTALE ${cat.label}`, styles: { fontStyle: 'bold' } },
+        '', '',
+        { content: fmtN(catV), styles: { fontStyle: 'bold' } },
+        '',
+        { content: fmtN(catC), styles: { fontStyle: 'bold' } },
+        '',
+        { content: fmtN(catM), styles: { fontStyle: 'bold' } },
+        { content: `${catMp}%`, styles: { fontStyle: 'bold' } },
+      ])
+
+      autoTable(doc, {
+        startY,
+        head: [[cat.label, 'Fornitore', 'Qty', 'Venduto', 'IVA V.', 'Costo', 'IVA C.', 'Margine', 'M%']],
+        body: body as unknown as string[][],
+        theme: 'grid',
+        headStyles: { fillColor: [30, 30, 30], textColor: 255, fontSize: 8 },
+        bodyStyles: { fontSize: 7 },
+        columnStyles: {
+          0: { cellWidth: 60 },
+          2: { halign: 'right', cellWidth: 15 },
+          3: { halign: 'right', cellWidth: 28 },
+          4: { halign: 'right', cellWidth: 18 },
+          5: { halign: 'right', cellWidth: 28 },
+          6: { halign: 'right', cellWidth: 18 },
+          7: { halign: 'right', cellWidth: 28 },
+          8: { halign: 'right', cellWidth: 18 },
+        },
+        margin: { left: 14, right: 14 },
+      })
+      startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
+    }
+
+    // Grand totals
+    autoTable(doc, {
+      startY,
+      head: [['', 'Venduto Servizi', 'Fee Simmetria', 'Totale Ricavi', 'Totale Costi', 'Margine Netto', 'Margine %']],
+      body: [[
+        'TOTALE EVENTO',
+        fmtN(totals.venduto),
+        `${fmtN(totals.fee)} (${feePct}%)`,
+        fmtN(totals.ricavi),
+        fmtN(totals.costo),
+        fmtN(totals.margine),
+        `${totals.marginePct.toFixed(1)}%`,
+      ]],
+      theme: 'grid',
+      headStyles: { fillColor: [180, 0, 40], textColor: 255, fontSize: 9 },
+      bodyStyles: { fontSize: 9, fontStyle: 'bold' },
+      columnStyles: {
+        1: { halign: 'right' },
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+        6: { halign: 'right' },
+      },
+      margin: { left: 14, right: 14 },
+    })
+
+    const filename = `${sanitizeFilename(evName)}_${sanitizeFilename(clientName)}_Budget_Interno.pdf`
+    doc.save(filename)
+  }
+
+  function exportPdfCliente() {
+    const doc = new jsPDF()
+    const evName = event.nome || 'Evento'
+    const clientName = event.cliente || ''
+
+    doc.setFontSize(18)
+    doc.text('PREVENTIVO', 14, 22)
+    doc.setFontSize(11)
+    doc.text(`Evento: ${evName}`, 14, 32)
+    if (clientName) doc.text(`Cliente: ${clientName}`, 14, 39)
+    doc.setFontSize(9)
+    doc.text(`Data: ${new Date().toLocaleDateString('it-IT')}`, 14, clientName ? 47 : 39)
+
+    let startY = clientName ? 54 : 46
+
+    for (const cat of grouped) {
+      const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
+
+      const body: (string | { content: string; styles: { fontStyle: string } })[][] = cat.items.map(item => {
+        const unitario = item.qty > 0 ? item.venduto / item.qty : item.venduto
+        return [
+          item.descrizione,
+          String(item.qty),
+          fmtN(unitario),
+          fmtN(item.venduto),
+          `${item.aliquota_iva_venduto}%`,
+        ]
+      })
+
+      body.push([
+        { content: `Totale ${cat.label}`, styles: { fontStyle: 'bold' } },
+        '', '',
+        { content: fmtN(catV), styles: { fontStyle: 'bold' } },
+        '',
+      ])
+
+      autoTable(doc, {
+        startY,
+        head: [[cat.label, 'Qty', 'Prezzo Unit.', 'Totale', 'IVA']],
+        body: body as unknown as string[][],
+        theme: 'striped',
+        headStyles: { fillColor: [30, 30, 30], textColor: 255, fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: 75 },
+          1: { halign: 'right', cellWidth: 18 },
+          2: { halign: 'right', cellWidth: 30 },
+          3: { halign: 'right', cellWidth: 30 },
+          4: { halign: 'right', cellWidth: 20 },
+        },
+        margin: { left: 14, right: 14 },
+      })
+      startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
+    }
+
+    // Grand total for client
+    autoTable(doc, {
+      startY,
+      body: [[
+        { content: 'TOTALE PREVENTIVO', styles: { fontStyle: 'bold', fontSize: 11 } },
+        { content: `EUR ${fmtN(totals.venduto)}`, styles: { fontStyle: 'bold', fontSize: 11, halign: 'right' } },
+      ]],
+      theme: 'plain',
+      columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 70 } },
+      margin: { left: 14, right: 14 },
+    })
+
+    startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
+    doc.setFontSize(8)
+    doc.setTextColor(100)
+    doc.text('I prezzi indicati sono da intendersi IVA esclusa salvo diversa indicazione.', 14, startY)
+
+    const filename = `${sanitizeFilename(evName)}_${sanitizeFilename(clientName)}_Budget_Cliente.pdf`
+    doc.save(filename)
+  }
 
   function renderBudgetLine(item: BudgetLine) {
     const isExpanded = expandedId === item.id
@@ -537,6 +716,22 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
               background: totals.marginePct >= 20 ? 'var(--green)' : totals.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)',
             }} />
           </div>
+        </div>
+      )}
+
+      {/* PDF Export buttons */}
+      {lines.length > 0 && (
+        <div className="flex items-center gap-3">
+          <button onClick={exportPdfInterno}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+            style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+            <Download className="w-3.5 h-3.5" /> Scarica Budget Interno
+          </button>
+          <button onClick={exportPdfCliente}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+            style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: '#fff' }}>
+            <Download className="w-3.5 h-3.5" /> Scarica Budget Cliente
+          </button>
         </div>
       )}
 
