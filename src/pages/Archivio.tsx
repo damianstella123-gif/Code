@@ -1,256 +1,177 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import {
-  Search, Plus, Folder, FileText, Trash2, Pencil, X, Upload,
-  Download, Star, MapPin, Calendar, Filter, ChevronDown, Eye,
+  Search, Plus, FileText, Trash2, X, Upload,
+  Download, Filter, ChevronDown,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { useRealtimeTable } from '@/lib/use-realtime'
 
-type FolderRow = {
+interface Document {
   id: string
-  name: string
-  description: string | null
-}
-
-type ArchiveItem = {
-  id: string
-  folder_id: string | null
-  title: string
-  category: string
-  description: string | null
-  tags: string[] | null
-  file_url: string | null
-  file_name: string | null
-  city: string | null
-  country: string | null
-  content_type: string | null
-  budget_min: number | null
-  budget_max: number | null
-  capacity_min: number | null
-  capacity_max: number | null
-  season: string | null
-  rating: number | null
-  reusable: boolean | null
-  internal_notes: string | null
+  nome: string
+  categoria: string
+  cliente_id: string | null
+  event_id: string | null
+  supplier_id: string | null
+  file_path: string
+  file_name: string
+  file_size: number
+  file_type: string
+  uploaded_by: string
   created_at: string
 }
 
-const CONTENT_TYPES = ['Venue', 'Catering', 'Entertainment', 'Allestimento', 'Tecnica', 'Location', 'Template', 'Documento', 'Altro']
-const SEASONS = ['Primavera', 'Estate', 'Autunno', 'Inverno', 'Tutto l\'anno']
-const ALLOWED_EXTENSIONS = ['.pdf', '.pptx', '.docx', '.png', '.jpg', '.jpeg']
+interface SelectOption { id: string; label: string }
 
-function fileIcon(name: string | null) {
-  if (!name) return 'var(--muted)'
+const CATEGORIE = ['Budget', 'Preventivi', 'Contratti', 'Presentazioni', 'Rooming List', 'Materiali Evento', 'Fatture', 'Altro']
+const ALLOWED_EXTENSIONS = ['.pdf', '.xlsx', '.xls', '.docx', '.doc', '.pptx', '.ppt', '.jpg', '.jpeg', '.png']
+
+function fileColor(name: string) {
   const ext = name.split('.').pop()?.toLowerCase()
   switch (ext) {
     case 'pdf': return '#ef4444'
-    case 'pptx': return '#f97316'
-    case 'docx': return '#3b82f6'
-    case 'png': case 'jpg': case 'jpeg': return '#22c55e'
+    case 'xlsx': case 'xls': return '#22c55e'
+    case 'docx': case 'doc': return '#3b82f6'
+    case 'pptx': case 'ppt': return '#f97316'
+    case 'png': case 'jpg': case 'jpeg': return '#a855f7'
     default: return 'var(--muted)'
   }
 }
 
-function fileExtLabel(name: string | null) {
-  if (!name) return ''
+function fileExt(name: string) {
   return name.split('.').pop()?.toUpperCase() ?? ''
 }
 
+function formatSize(bytes: number) {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1048576) return (bytes / 1024).toFixed(0) + ' KB'
+  return (bytes / 1048576).toFixed(1) + ' MB'
+}
+
 export default function Archivio() {
-  const [folders, setFolders] = useState<FolderRow[]>([])
-  const [items, setItems] = useState<ArchiveItem[]>([])
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [docs, setDocs] = useState<Document[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterCategoria, setFilterCategoria] = useState('')
+  const [filterCliente, setFilterCliente] = useState('')
+  const [filterEvento, setFilterEvento] = useState('')
+  const [filterFornitore, setFilterFornitore] = useState('')
   const [showFilters, setShowFilters] = useState(false)
-  const [filterContentType, setFilterContentType] = useState('')
-  const [filterSeason, setFilterSeason] = useState('')
-  const [filterReusable, setFilterReusable] = useState<'' | 'true' | 'false'>('')
-  const [filterRating, setFilterRating] = useState(0)
 
-  // Form state
+  const [clients, setClients] = useState<SelectOption[]>([])
+  const [events, setEvents] = useState<SelectOption[]>([])
+  const [suppliers, setSuppliers] = useState<SelectOption[]>([])
+
+  // Upload form
   const [formOpen, setFormOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<ArchiveItem | null>(null)
-  const [formTitle, setFormTitle] = useState('')
-  const [formDescription, setFormDescription] = useState('')
-  const [formTags, setFormTags] = useState('')
-  const [formCity, setFormCity] = useState('')
-  const [formCountry, setFormCountry] = useState('')
-  const [formContentType, setFormContentType] = useState('')
-  const [formBudgetMin, setFormBudgetMin] = useState('')
-  const [formBudgetMax, setFormBudgetMax] = useState('')
-  const [formCapacityMin, setFormCapacityMin] = useState('')
-  const [formCapacityMax, setFormCapacityMax] = useState('')
-  const [formSeason, setFormSeason] = useState('')
-  const [formRating, setFormRating] = useState(0)
-  const [formReusable, setFormReusable] = useState(true)
-  const [formInternalNotes, setFormInternalNotes] = useState('')
+  const [formNome, setFormNome] = useState('')
+  const [formCategoria, setFormCategoria] = useState('Altro')
+  const [formCliente, setFormCliente] = useState('')
+  const [formEvento, setFormEvento] = useState('')
+  const [formFornitore, setFormFornitore] = useState('')
   const [uploading, setUploading] = useState(false)
-  const [uploadedFileUrl, setUploadedFileUrl] = useState('')
-  const [uploadedFileName, setUploadedFileName] = useState('')
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
 
-  // Detail view
-  const [detailItem, setDetailItem] = useState<ArchiveItem | null>(null)
+  // Delete confirm
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
-    const { data: f } = await supabase.from('archive_folders').select('*').order('name')
-    const { data: i } = await supabase.from('archive_items').select('*').order('created_at', { ascending: false })
-    setFolders(f ?? [])
-    setItems(i ?? [])
-    if (!selectedFolder && f && f.length > 0) setSelectedFolder(f[0].id)
-  }, [selectedFolder])
+    setLoading(true)
+    const [docsRes, clientsRes, eventsRes, suppRes] = await Promise.all([
+      supabase.from('documents').select('*').order('created_at', { ascending: false }),
+      supabase.from('clients').select('id, nome'),
+      supabase.from('events').select('id, nome'),
+      supabase.from('suppliers').select('id, nome'),
+    ])
+    setDocs((docsRes.data ?? []) as Document[])
+    setClients((clientsRes.data ?? []).map((c: { id: string; nome: string }) => ({ id: c.id, label: c.nome })))
+    setEvents((eventsRes.data ?? []).map((e: { id: string; nome: string }) => ({ id: e.id, label: e.nome })))
+    setSuppliers((suppRes.data ?? []).map((s: { id: string; nome: string }) => ({ id: s.id, label: s.nome })))
+    setLoading(false)
+  }, [])
 
-  useEffect(() => { loadData() }, [])
-  useRealtimeTable('archive_items', loadData)
+  useEffect(() => { loadData() }, [loadData])
 
-  const filteredItems = useMemo(() => {
-    return items.filter(item => {
-      const inFolder = selectedFolder ? item.folder_id === selectedFolder : true
+  const filtered = useMemo(() => {
+    return docs.filter(d => {
       const q = search.toLowerCase()
-      const matchSearch =
-        !q ||
-        item.title.toLowerCase().includes(q) ||
-        item.category.toLowerCase().includes(q) ||
-        (item.description ?? '').toLowerCase().includes(q) ||
-        (item.tags ?? []).some(t => t.toLowerCase().includes(q)) ||
-        (item.city ?? '').toLowerCase().includes(q) ||
-        (item.country ?? '').toLowerCase().includes(q) ||
-        (item.content_type ?? '').toLowerCase().includes(q)
-
-      const matchContentType = !filterContentType || item.content_type === filterContentType
-      const matchSeason = !filterSeason || item.season === filterSeason
-      const matchReusable = !filterReusable || String(item.reusable) === filterReusable
-      const matchRating = !filterRating || (item.rating ?? 0) >= filterRating
-
-      return inFolder && matchSearch && matchContentType && matchSeason && matchReusable && matchRating
+      const matchSearch = !q || d.nome.toLowerCase().includes(q) || d.file_name.toLowerCase().includes(q) || d.categoria.toLowerCase().includes(q)
+      const matchCat = !filterCategoria || d.categoria === filterCategoria
+      const matchClient = !filterCliente || d.cliente_id === filterCliente
+      const matchEvent = !filterEvento || d.event_id === filterEvento
+      const matchSupplier = !filterFornitore || d.supplier_id === filterFornitore
+      return matchSearch && matchCat && matchClient && matchEvent && matchSupplier
     })
-  }, [items, selectedFolder, search, filterContentType, filterSeason, filterReusable, filterRating])
+  }, [docs, search, filterCategoria, filterCliente, filterEvento, filterFornitore])
 
-  const selectedFolderName = folders.find(f => f.id === selectedFolder)?.name ?? 'Archivio'
-  const activeFilters = [filterContentType, filterSeason, filterReusable, filterRating > 0 ? 'r' : ''].filter(Boolean).length
+  const activeFilters = [filterCategoria, filterCliente, filterEvento, filterFornitore].filter(Boolean).length
+
+  function getLabel(id: string | null, list: SelectOption[]) {
+    if (!id) return '-'
+    return list.find(o => o.id === id)?.label ?? '-'
+  }
 
   function resetForm() {
-    setFormTitle('')
-    setFormDescription('')
-    setFormTags('')
-    setFormCity('')
-    setFormCountry('')
-    setFormContentType('')
-    setFormBudgetMin('')
-    setFormBudgetMax('')
-    setFormCapacityMin('')
-    setFormCapacityMax('')
-    setFormSeason('')
-    setFormRating(0)
-    setFormReusable(true)
-    setFormInternalNotes('')
-    setUploadedFileUrl('')
-    setUploadedFileName('')
-    setEditingItem(null)
+    setFormNome('')
+    setFormCategoria('Altro')
+    setFormCliente('')
+    setFormEvento('')
+    setFormFornitore('')
+    setUploadFile(null)
   }
 
-  function openCreate() {
-    resetForm()
-    setFormOpen(true)
-  }
-
-  function openEdit(item: ArchiveItem) {
-    setEditingItem(item)
-    setFormTitle(item.title)
-    setFormDescription(item.description ?? '')
-    setFormTags((item.tags ?? []).join(', '))
-    setFormCity(item.city ?? '')
-    setFormCountry(item.country ?? '')
-    setFormContentType(item.content_type ?? '')
-    setFormBudgetMin(item.budget_min?.toString() ?? '')
-    setFormBudgetMax(item.budget_max?.toString() ?? '')
-    setFormCapacityMin(item.capacity_min?.toString() ?? '')
-    setFormCapacityMax(item.capacity_max?.toString() ?? '')
-    setFormSeason(item.season ?? '')
-    setFormRating(item.rating ?? 0)
-    setFormReusable(item.reusable ?? true)
-    setFormInternalNotes(item.internal_notes ?? '')
-    setUploadedFileUrl(item.file_url ?? '')
-    setUploadedFileName(item.file_name ?? '')
-    setFormOpen(true)
-  }
-
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-
     const ext = '.' + file.name.split('.').pop()?.toLowerCase()
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       alert(`Formato non supportato. Formati ammessi: ${ALLOWED_EXTENSIONS.join(', ')}`)
       return
     }
+    setUploadFile(file)
+    if (!formNome) setFormNome(file.name.replace(/\.[^/.]+$/, ''))
+  }
+
+  async function handleUpload() {
+    if (!uploadFile) return alert('Seleziona un file')
+    if (!formNome.trim()) return alert('Inserisci un nome')
 
     setUploading(true)
-    const filePath = `${crypto.randomUUID()}/${file.name}`
-    const { error } = await supabase.storage.from('archive-files').upload(filePath, file)
+    const filePath = `${crypto.randomUUID()}/${uploadFile.name}`
+    const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, uploadFile)
 
-    if (error) {
-      alert('Errore upload: ' + error.message)
+    if (uploadError) {
+      alert('Errore upload: ' + uploadError.message)
       setUploading(false)
       return
     }
 
-    setUploadedFileUrl(filePath)
-    setUploadedFileName(file.name)
+    const { error: dbError } = await supabase.from('documents').insert({
+      nome: formNome.trim(),
+      categoria: formCategoria,
+      cliente_id: formCliente || null,
+      event_id: formEvento || null,
+      supplier_id: formFornitore || null,
+      file_path: filePath,
+      file_name: uploadFile.name,
+      file_size: uploadFile.size,
+      file_type: uploadFile.type,
+      uploaded_by: '',
+    })
+
+    if (dbError) {
+      alert('Errore salvataggio: ' + dbError.message)
+      setUploading(false)
+      return
+    }
+
     setUploading(false)
-  }
-
-  async function saveItem() {
-    if (!formTitle.trim()) return alert('Inserisci un titolo')
-
-    const payload = {
-      folder_id: selectedFolder,
-      title: formTitle.trim(),
-      category: selectedFolderName,
-      description: formDescription.trim() || null,
-      tags: formTags.split(',').map(t => t.trim()).filter(Boolean),
-      file_url: uploadedFileUrl || null,
-      file_name: uploadedFileName || null,
-      city: formCity.trim() || null,
-      country: formCountry.trim() || null,
-      content_type: formContentType || null,
-      budget_min: formBudgetMin ? Number(formBudgetMin) : null,
-      budget_max: formBudgetMax ? Number(formBudgetMax) : null,
-      capacity_min: formCapacityMin ? Number(formCapacityMin) : null,
-      capacity_max: formCapacityMax ? Number(formCapacityMax) : null,
-      season: formSeason || null,
-      rating: formRating || null,
-      reusable: formReusable,
-      internal_notes: formInternalNotes.trim() || null,
-    }
-
-    if (editingItem) {
-      const { error } = await supabase.from('archive_items').update(payload).eq('id', editingItem.id)
-      if (error) { alert(error.message); return }
-    } else {
-      const { error } = await supabase.from('archive_items').insert(payload)
-      if (error) { alert(error.message); return }
-    }
-
     setFormOpen(false)
     resetForm()
     loadData()
   }
 
-  async function deleteItem(id: string) {
-    if (!confirm('Eliminare questo elemento?')) return
-    const item = items.find(i => i.id === id)
-    if (item?.file_url) {
-      const path = item.file_url.includes('/archive-files/') ? decodeURIComponent(item.file_url.split('/archive-files/')[1]) : item.file_url
-      await supabase.storage.from('archive-files').remove([path])
-    }
-    await supabase.from('archive_items').delete().eq('id', id)
-    loadData()
-  }
-
-  async function downloadFile(item: ArchiveItem) {
-    if (!item.file_url) return
-    const path = item.file_url.includes('/archive-files/') ? decodeURIComponent(item.file_url.split('/archive-files/')[1]) : item.file_url
-    const { data, error } = await supabase.storage.from('archive-files').download(path)
+  async function handleDownload(doc: Document) {
+    const { data, error } = await supabase.storage.from('documents').download(doc.file_path)
     if (error || !data) {
       alert('Errore download: ' + (error?.message ?? 'file non trovato'))
       return
@@ -258,511 +179,262 @@ export default function Archivio() {
     const url = URL.createObjectURL(data)
     const a = document.createElement('a')
     a.href = url
-    a.download = item.file_name ?? 'file'
+    a.download = doc.file_name
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  // Detail modal
-  if (detailItem) {
+  async function handleDelete(id: string) {
+    const doc = docs.find(d => d.id === id)
+    if (!doc) return
+    await supabase.storage.from('documents').remove([doc.file_path])
+    await supabase.from('documents').delete().eq('id', id)
+    setDeletingId(null)
+    loadData()
+  }
+
+  if (loading) {
     return (
-      <div className="space-y-6 animate-fade-in">
-        <button
-          onClick={() => setDetailItem(null)}
-          className="flex items-center gap-2 text-sm transition-all hover:opacity-80"
-          style={{ color: 'var(--muted)' }}
-        >
-          <X className="w-4 h-4" /> Chiudi dettaglio
-        </button>
-
-        <div className="panel p-6 space-y-5">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <h2 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{detailItem.title}</h2>
-              <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>{detailItem.category}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {detailItem.rating && (
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map(s => (
-                    <Star key={s} className="w-4 h-4" style={{ color: s <= detailItem.rating! ? 'var(--yellow)' : 'var(--line)' }} fill={s <= detailItem.rating! ? 'var(--yellow)' : 'none'} />
-                  ))}
-                </div>
-              )}
-              {detailItem.reusable && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--green)' }}>Riutilizzabile</span>
-              )}
-            </div>
-          </div>
-
-          {detailItem.description && <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{detailItem.description}</p>}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {detailItem.content_type && (
-              <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-                <span className="text-xs" style={{ color: 'var(--muted)' }}>Tipo contenuto</span>
-                <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--text)' }}>{detailItem.content_type}</p>
-              </div>
-            )}
-            {(detailItem.city || detailItem.country) && (
-              <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-                <span className="text-xs" style={{ color: 'var(--muted)' }}>Localita</span>
-                <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--text)' }}>
-                  {[detailItem.city, detailItem.country].filter(Boolean).join(', ')}
-                </p>
-              </div>
-            )}
-            {detailItem.season && (
-              <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-                <span className="text-xs" style={{ color: 'var(--muted)' }}>Stagione</span>
-                <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--text)' }}>{detailItem.season}</p>
-              </div>
-            )}
-            {(detailItem.budget_min || detailItem.budget_max) && (
-              <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-                <span className="text-xs" style={{ color: 'var(--muted)' }}>Budget range</span>
-                <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--text)' }}>
-                  {detailItem.budget_min ? `€${Number(detailItem.budget_min).toLocaleString('it-IT')}` : '—'} – {detailItem.budget_max ? `€${Number(detailItem.budget_max).toLocaleString('it-IT')}` : '—'}
-                </p>
-              </div>
-            )}
-            {(detailItem.capacity_min || detailItem.capacity_max) && (
-              <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-                <span className="text-xs" style={{ color: 'var(--muted)' }}>Capacita</span>
-                <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--text)' }}>
-                  {detailItem.capacity_min ?? '—'} – {detailItem.capacity_max ?? '—'} persone
-                </p>
-              </div>
-            )}
-          </div>
-
-          {(detailItem.tags ?? []).length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {(detailItem.tags ?? []).map((tag, i) => (
-                <span key={i} className="text-xs px-2.5 py-1 rounded-full" style={{ background: 'var(--panel2)', color: 'var(--text)' }}>
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {detailItem.internal_notes && (
-            <div className="p-4 rounded-xl" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)' }}>
-              <span className="text-xs font-medium" style={{ color: 'var(--yellow)' }}>Note interne</span>
-              <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>{detailItem.internal_notes}</p>
-            </div>
-          )}
-
-          {detailItem.file_url && (
-            <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold"
-                style={{ background: `${fileIcon(detailItem.file_name)}18`, color: fileIcon(detailItem.file_name) }}>
-                {fileExtLabel(detailItem.file_name)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{detailItem.file_name}</p>
-              </div>
-              <button onClick={() => downloadFile(detailItem)} className="p-2 rounded-lg hover:bg-white/10">
-                <Download className="w-4 h-4" style={{ color: 'var(--blue)' }} />
-              </button>
-            </div>
-          )}
-
-          <div className="flex gap-2 pt-3" style={{ borderTop: '1px solid var(--line)' }}>
-            <button
-              onClick={() => { setDetailItem(null); openEdit(detailItem) }}
-              className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
-              style={{ border: '1px solid var(--line)', color: 'var(--text)' }}
-            >
-              <Pencil className="w-3.5 h-3.5" /> Modifica
-            </button>
-            <button
-              onClick={() => { deleteItem(detailItem.id); setDetailItem(null) }}
-              className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
-              style={{ border: '1px solid var(--line)', color: 'var(--red2)' }}
-            >
-              <Trash2 className="w-3.5 h-3.5" /> Elimina
-            </button>
-          </div>
-        </div>
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Archivio Documenti</h1>
+        <div className="panel p-12 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</div></div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Archivio</h1>
-        <p className="mt-1" style={{ color: 'var(--muted)' }}>Knowledge Library di Simmetria Synergy.</p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Archivio Documenti</h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{docs.length} documenti caricati</p>
+        </div>
+        <button onClick={() => { resetForm(); setFormOpen(true) }}
+          className="px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 text-white"
+          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
+          <Plus className="w-4 h-4" /> Carica Documento
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-        {/* Sidebar - Folders */}
-        <div className="panel p-4 space-y-1 lg:col-span-1">
-          <p className="text-xs uppercase tracking-wide mb-3 px-2" style={{ color: 'var(--muted)' }}>Cartelle</p>
-          <button
-            onClick={() => setSelectedFolder(null)}
-            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-left transition-all"
-            style={{
-              background: !selectedFolder ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'transparent',
-              color: !selectedFolder ? 'white' : 'var(--text)',
-            }}
-          >
-            <Folder className="w-4 h-4" />
-            Tutte
-            <span className="ml-auto text-xs opacity-70">{items.length}</span>
-          </button>
-          {folders.map(folder => {
-            const count = items.filter(i => i.folder_id === folder.id).length
-            return (
-              <button
-                key={folder.id}
-                onClick={() => setSelectedFolder(folder.id)}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-left transition-all"
-                style={{
-                  background: selectedFolder === folder.id ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'transparent',
-                  color: selectedFolder === folder.id ? 'white' : 'var(--text)',
-                }}
-              >
-                <Folder className="w-4 h-4" />
-                {folder.name}
-                <span className="ml-auto text-xs opacity-70">{count}</span>
-              </button>
-            )
-          })}
+      {/* Search + Filters */}
+      <div className="flex gap-3 flex-wrap">
+        <div className="panel flex-1 min-w-[200px] flex items-center gap-2 px-3 py-2.5">
+          <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Cerca per nome, file, categoria..."
+            className="flex-1 bg-transparent outline-none text-sm" style={{ color: 'var(--text)' }} />
+          {search && <button onClick={() => setSearch('')} className="p-0.5"><X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} /></button>}
         </div>
+        <button onClick={() => setShowFilters(!showFilters)}
+          className="px-3 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-all"
+          style={{ background: activeFilters > 0 ? 'rgba(208,0,58,0.1)' : 'var(--panel)', border: '1px solid var(--line)', color: activeFilters > 0 ? 'var(--red2)' : 'var(--text)' }}>
+          <Filter className="w-4 h-4" />
+          Filtri{activeFilters > 0 && ` (${activeFilters})`}
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
 
-        {/* Main content */}
-        <div className="lg:col-span-4 space-y-4">
-          {/* Search + Actions */}
-          <div className="flex gap-3 flex-wrap">
-            <div className="panel flex-1 min-w-[200px] flex items-center gap-2 px-3 py-2.5">
-              <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Cerca per titolo, tag, citta, tipo..."
-                className="flex-1 bg-transparent outline-none text-sm"
-                style={{ color: 'var(--text)' }}
-              />
-              {search && (
-                <button onClick={() => setSearch('')} className="p-0.5"><X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} /></button>
-              )}
-            </div>
-
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="px-3 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-all"
-              style={{ background: showFilters || activeFilters > 0 ? 'rgba(208,0,58,0.1)' : 'var(--panel)', border: '1px solid var(--line)', color: activeFilters > 0 ? 'var(--red2)' : 'var(--text)' }}
-            >
-              <Filter className="w-4 h-4" />
-              Filtri{activeFilters > 0 && ` (${activeFilters})`}
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-            </button>
-
-            <button
-              onClick={openCreate}
-              className="px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 text-white"
-              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
-            >
-              <Plus className="w-4 h-4" /> Nuovo
-            </button>
+      {showFilters && (
+        <div className="panel p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Categoria</label>
+            <select value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
+              <option value="">Tutte</option>
+              {CATEGORIE.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
-
-          {/* Filters panel */}
-          {showFilters && (
-            <div className="panel p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 animate-fade-in">
-              <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Tipo contenuto</label>
-                <select value={filterContentType} onChange={e => setFilterContentType(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
-                  <option value="">Tutti</option>
-                  {CONTENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Stagione</label>
-                <select value={filterSeason} onChange={e => setFilterSeason(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
-                  <option value="">Tutte</option>
-                  {SEASONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Riutilizzabile</label>
-                <select value={filterReusable} onChange={e => setFilterReusable(e.target.value as '' | 'true' | 'false')}
-                  className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
-                  <option value="">Tutti</option>
-                  <option value="true">Si</option>
-                  <option value="false">No</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Rating min.</label>
-                <div className="flex items-center gap-1 pt-1">
-                  {[1, 2, 3, 4, 5].map(s => (
-                    <button key={s} onClick={() => setFilterRating(filterRating === s ? 0 : s)}>
-                      <Star className="w-5 h-5" style={{ color: s <= filterRating ? 'var(--yellow)' : 'var(--line)' }} fill={s <= filterRating ? 'var(--yellow)' : 'none'} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {activeFilters > 0 && (
-                <button
-                  onClick={() => { setFilterContentType(''); setFilterSeason(''); setFilterReusable(''); setFilterRating(0) }}
-                  className="text-xs underline sm:col-span-2 md:col-span-4" style={{ color: 'var(--red2)' }}
-                >
-                  Rimuovi filtri
-                </button>
-              )}
-            </div>
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Cliente</label>
+            <select value={filterCliente} onChange={e => setFilterCliente(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
+              <option value="">Tutti</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Evento</label>
+            <select value={filterEvento} onChange={e => setFilterEvento(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
+              <option value="">Tutti</option>
+              {events.map(e => <option key={e.id} value={e.id}>{e.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Fornitore</label>
+            <select value={filterFornitore} onChange={e => setFilterFornitore(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
+              <option value="">Tutti</option>
+              {suppliers.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </div>
+          {activeFilters > 0 && (
+            <button onClick={() => { setFilterCategoria(''); setFilterCliente(''); setFilterEvento(''); setFilterFornitore('') }}
+              className="text-xs underline sm:col-span-2 md:col-span-4" style={{ color: 'var(--red2)' }}>
+              Rimuovi filtri
+            </button>
           )}
-
-          {/* Items list */}
-          <div className="space-y-2">
-            {filteredItems.map(item => (
-              <div key={item.id} className="panel p-4 flex items-start gap-4 group hover:border-opacity-60 transition-all cursor-pointer"
-                onClick={() => setDetailItem(item)}>
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-[10px] font-bold"
-                  style={{ background: `${fileIcon(item.file_name)}15`, color: fileIcon(item.file_name) }}>
-                  {item.file_name ? fileExtLabel(item.file_name) : <FileText className="w-5 h-5" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{item.title}</p>
-                    {item.content_type && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>{item.content_type}</span>
-                    )}
-                    {item.reusable && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--green)' }}>Riutilizzabile</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    {item.category && <span className="text-xs" style={{ color: 'var(--muted)' }}>{item.category}</span>}
-                    {(item.city || item.country) && (
-                      <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-                        <MapPin className="w-3 h-3" /> {[item.city, item.country].filter(Boolean).join(', ')}
-                      </span>
-                    )}
-                    {item.season && (
-                      <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-                        <Calendar className="w-3 h-3" /> {item.season}
-                      </span>
-                    )}
-                  </div>
-                  {(item.tags ?? []).length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      {(item.tags ?? []).slice(0, 4).map((tag, i) => (
-                        <span key={i} className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>{tag}</span>
-                      ))}
-                      {(item.tags ?? []).length > 4 && <span className="text-[10px]" style={{ color: 'var(--muted)' }}>+{(item.tags ?? []).length - 4}</span>}
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {item.rating && (
-                    <div className="flex items-center gap-0.5">
-                      {[1, 2, 3, 4, 5].map(s => (
-                        <Star key={s} className="w-3 h-3" style={{ color: s <= item.rating! ? 'var(--yellow)' : 'var(--line)' }} fill={s <= item.rating! ? 'var(--yellow)' : 'none'} />
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={e => { e.stopPropagation(); setDetailItem(item) }} className="p-1.5 rounded-lg hover:bg-white/10" title="Visualizza">
-                      <Eye className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-                    </button>
-                    <button onClick={e => { e.stopPropagation(); openEdit(item) }} className="p-1.5 rounded-lg hover:bg-white/10" title="Modifica">
-                      <Pencil className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-                    </button>
-                    <button onClick={e => { e.stopPropagation(); deleteItem(item.id) }} className="p-1.5 rounded-lg hover:bg-white/10" title="Elimina">
-                      <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {filteredItems.length === 0 && (
-              <div className="panel p-12 text-center" style={{ color: 'var(--muted)' }}>
-                <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="font-medium">Nessun elemento trovato</p>
-                <p className="text-sm mt-1">Prova a cambiare i filtri o la cartella selezionata.</p>
-              </div>
-            )}
-          </div>
         </div>
+      )}
+
+      {/* Documents list */}
+      <div className="space-y-2">
+        {filtered.length === 0 ? (
+          <div className="panel p-12 text-center" style={{ color: 'var(--muted)' }}>
+            <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className="font-medium">Nessun documento trovato</p>
+            <p className="text-sm mt-1">Carica un documento o modifica i filtri.</p>
+          </div>
+        ) : (
+          filtered.map(doc => (
+            <div key={doc.id} className="panel p-4 flex items-center gap-4 group hover:border-opacity-60 transition-all">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-[10px] font-bold"
+                style={{ background: `${fileColor(doc.file_name)}15`, color: fileColor(doc.file_name) }}>
+                {fileExt(doc.file_name)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{doc.nome}</p>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                    style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>{doc.categoria}</span>
+                </div>
+                <div className="flex items-center gap-3 mt-1 flex-wrap text-xs" style={{ color: 'var(--muted)' }}>
+                  <span>{doc.file_name}</span>
+                  <span>{formatSize(doc.file_size)}</span>
+                  {doc.cliente_id && <span>Cliente: {getLabel(doc.cliente_id, clients)}</span>}
+                  {doc.event_id && <span>Evento: {getLabel(doc.event_id, events)}</span>}
+                  {doc.supplier_id && <span>Fornitore: {getLabel(doc.supplier_id, suppliers)}</span>}
+                  <span>{new Date(doc.created_at).toLocaleDateString('it-IT')}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button onClick={() => handleDownload(doc)}
+                  className="p-2 rounded-lg hover:bg-white/10 transition-all" title="Scarica">
+                  <Download className="w-4 h-4" style={{ color: 'var(--blue)' }} />
+                </button>
+                <button onClick={() => setDeletingId(doc.id)}
+                  className="p-2 rounded-lg hover:bg-white/10 transition-all" title="Elimina">
+                  <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
-      {/* Create/Edit Modal */}
+      {/* Upload Modal */}
       {formOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}
           onClick={() => { setFormOpen(false); resetForm() }}>
-          <div className="w-full max-w-2xl rounded-2xl overflow-hidden max-h-[90vh] flex flex-col"
+          <div className="w-full max-w-lg rounded-2xl overflow-hidden"
             style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
             onClick={e => e.stopPropagation()}>
-            <div className="p-5 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid var(--line)' }}>
-              <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>
-                {editingItem ? 'Modifica Elemento' : 'Nuovo Elemento'}
-              </h3>
+            <div className="p-5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--line)' }}>
+              <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Carica Documento</h3>
               <button onClick={() => { setFormOpen(false); resetForm() }} className="p-1.5 rounded-lg hover:bg-white/10">
                 <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
               </button>
             </div>
 
-            <div className="p-5 space-y-4 overflow-y-auto flex-1">
-              {/* Title + Type */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Titolo *</label>
-                  <input type="text" value={formTitle} onChange={e => setFormTitle(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}
-                    placeholder="Nome dell'elemento" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Tipo contenuto</label>
-                  <select value={formContentType} onChange={e => setFormContentType(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
-                    <option value="">— Seleziona —</option>
-                    {CONTENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {/* Description */}
+            <div className="p-5 space-y-4">
+              {/* File */}
               <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Descrizione</label>
-                <textarea value={formDescription} onChange={e => setFormDescription(e.target.value)} rows={3}
-                  className="w-full px-3 py-2 rounded-lg text-sm bg-transparent resize-none" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}
-                  placeholder="Descrizione dettagliata..." />
-              </div>
-
-              {/* Location */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Citta</label>
-                  <input type="text" value={formCity} onChange={e => setFormCity(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }} />
-                </div>
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Nazione</label>
-                  <input type="text" value={formCountry} onChange={e => setFormCountry(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}
-                    placeholder="Italia" />
-                </div>
-              </div>
-
-              {/* Budget + Capacity */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Budget min</label>
-                  <input type="number" value={formBudgetMin} onChange={e => setFormBudgetMin(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}
-                    placeholder="€" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Budget max</label>
-                  <input type="number" value={formBudgetMax} onChange={e => setFormBudgetMax(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}
-                    placeholder="€" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Capacita min</label>
-                  <input type="number" value={formCapacityMin} onChange={e => setFormCapacityMin(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}
-                    placeholder="Persone" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Capacita max</label>
-                  <input type="number" value={formCapacityMax} onChange={e => setFormCapacityMax(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}
-                    placeholder="Persone" />
-                </div>
-              </div>
-
-              {/* Season + Rating + Reusable */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Stagione</label>
-                  <select value={formSeason} onChange={e => setFormSeason(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
-                    <option value="">— Nessuna —</option>
-                    {SEASONS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Rating</label>
-                  <div className="flex items-center gap-1 pt-1">
-                    {[1, 2, 3, 4, 5].map(s => (
-                      <button key={s} type="button" onClick={() => setFormRating(formRating === s ? 0 : s)}>
-                        <Star className="w-5 h-5" style={{ color: s <= formRating ? 'var(--yellow)' : 'var(--line)' }} fill={s <= formRating ? 'var(--yellow)' : 'none'} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex items-end pb-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={formReusable} onChange={e => setFormReusable(e.target.checked)} className="rounded" />
-                    <span className="text-sm" style={{ color: 'var(--text)' }}>Riutilizzabile</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Tag (separati da virgola)</label>
-                <input type="text" value={formTags} onChange={e => setFormTags(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}
-                  placeholder="es: lusso, outdoor, 500pax" />
-              </div>
-
-              {/* Internal Notes */}
-              <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--yellow)' }}>Note interne</label>
-                <textarea value={formInternalNotes} onChange={e => setFormInternalNotes(e.target.value)} rows={2}
-                  className="w-full px-3 py-2 rounded-lg text-sm bg-transparent resize-none" style={{ border: '1px solid rgba(234,179,8,0.3)', color: 'var(--text)' }}
-                  placeholder="Visibili solo al team..." />
-              </div>
-
-              {/* File upload */}
-              <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>
-                  File allegato (PDF, PPTX, DOCX, PNG, JPG)
-                </label>
-                {uploadedFileName ? (
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>File *</label>
+                {uploadFile ? (
                   <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
                     <div className="w-8 h-8 rounded flex items-center justify-center text-[10px] font-bold"
-                      style={{ background: `${fileIcon(uploadedFileName)}18`, color: fileIcon(uploadedFileName) }}>
-                      {fileExtLabel(uploadedFileName)}
+                      style={{ background: `${fileColor(uploadFile.name)}18`, color: fileColor(uploadFile.name) }}>
+                      {fileExt(uploadFile.name)}
                     </div>
-                    <span className="text-sm flex-1 truncate" style={{ color: 'var(--text)' }}>{uploadedFileName}</span>
-                    <button onClick={() => { setUploadedFileUrl(''); setUploadedFileName('') }}
-                      className="p-1 rounded hover:bg-white/10">
+                    <span className="text-sm flex-1 truncate" style={{ color: 'var(--text)' }}>{uploadFile.name}</span>
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>{formatSize(uploadFile.size)}</span>
+                    <button onClick={() => setUploadFile(null)} className="p-1 rounded hover:bg-white/10">
                       <X className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
                     </button>
                   </div>
                 ) : (
-                  <label className="flex items-center justify-center gap-2 p-4 rounded-lg cursor-pointer transition-all hover:bg-white/5"
+                  <label className="flex items-center justify-center gap-2 p-5 rounded-lg cursor-pointer transition-all hover:bg-white/5"
                     style={{ border: '1px dashed var(--line)', color: 'var(--muted)' }}>
                     <Upload className="w-4 h-4" />
-                    <span className="text-sm">{uploading ? 'Caricamento...' : 'Clicca per caricare un file'}</span>
-                    <input type="file" className="hidden" accept=".pdf,.pptx,.docx,.png,.jpg,.jpeg"
-                      onChange={handleFileUpload} disabled={uploading} />
+                    <span className="text-sm">PDF, XLSX, DOCX, PPTX, JPG, PNG</span>
+                    <input type="file" className="hidden" accept=".pdf,.xlsx,.xls,.docx,.doc,.pptx,.ppt,.jpg,.jpeg,.png"
+                      onChange={handleFileSelect} />
                   </label>
                 )}
               </div>
+
+              {/* Nome + Categoria */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Nome documento *</label>
+                  <input type="text" value={formNome} onChange={e => setFormNome(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Categoria</label>
+                  <select value={formCategoria} onChange={e => setFormCategoria(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
+                    {CATEGORIE.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Links */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Cliente</label>
+                  <select value={formCliente} onChange={e => setFormCliente(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
+                    <option value="">-- Nessuno --</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Evento</label>
+                  <select value={formEvento} onChange={e => setFormEvento(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
+                    <option value="">-- Nessuno --</option>
+                    {events.map(e => <option key={e.id} value={e.id}>{e.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Fornitore</label>
+                  <select value={formFornitore} onChange={e => setFormFornitore(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg text-sm bg-transparent" style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>
+                    <option value="">-- Nessuno --</option>
+                    {suppliers.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  </select>
+                </div>
+              </div>
             </div>
 
-            <div className="p-5 flex justify-end gap-3 flex-shrink-0" style={{ borderTop: '1px solid var(--line)' }}>
+            <div className="p-5 flex justify-end gap-3" style={{ borderTop: '1px solid var(--line)' }}>
               <button onClick={() => { setFormOpen(false); resetForm() }}
                 className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>
                 Annulla
               </button>
-              <button onClick={saveItem} disabled={uploading}
+              <button onClick={handleUpload} disabled={uploading || !uploadFile}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
                 style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
-                {editingItem ? 'Aggiorna' : 'Crea'}
+                {uploading ? 'Caricamento...' : 'Carica'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      {deletingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDeletingId(null)}>
+          <div className="panel p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+            <p className="font-semibold mb-2" style={{ color: 'var(--text)' }}>Eliminare documento?</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
+              Il file verra eliminato definitivamente dallo storage.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button className="px-4 py-2 rounded-lg text-sm" style={{ background: 'var(--panel2)', color: 'var(--text)' }} onClick={() => setDeletingId(null)}>Annulla</button>
+              <button className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--red2)', color: '#fff' }} onClick={() => handleDelete(deletingId)}>Elimina</button>
             </div>
           </div>
         </div>

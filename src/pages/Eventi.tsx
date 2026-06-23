@@ -1379,26 +1379,28 @@ function TabComunicazioni({ event, comunicazioni }: { event: Event; comunicazion
 
 interface EventDocument {
   id: string
-  event_id: string
+  nome: string
+  categoria: string
+  event_id: string | null
+  file_path: string
   file_name: string
   file_type: string
   file_size: number
-  storage_path: string
   uploaded_by: string
-  uploaded_by_name: string
   created_at: string
 }
 
-const FILE_ICONS: Record<string, string> = {
-  'application/pdf': 'PDF',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
-  'application/vnd.ms-excel': 'XLS',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PPTX',
-  'application/vnd.ms-powerpoint': 'PPT',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
-}
+const DOC_CATEGORIE = ['Budget', 'Preventivi', 'Contratti', 'Presentazioni', 'Rooming List', 'Materiali Evento', 'Fatture', 'Altro']
 
 function getFileLabel(mimeType: string): string {
+  const FILE_ICONS: Record<string, string> = {
+    'application/pdf': 'PDF',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
+    'application/vnd.ms-excel': 'XLS',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PPTX',
+    'application/vnd.ms-powerpoint': 'PPT',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+  }
   if (FILE_ICONS[mimeType]) return FILE_ICONS[mimeType]
   if (mimeType.startsWith('image/')) return 'IMG'
   return 'FILE'
@@ -1414,10 +1416,12 @@ function TabDocumenti({ event }: { event: Event }) {
   const [docs, setDocs] = useState<EventDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [docCategoria, setDocCategoria] = useState('Materiali Evento')
+  const [deletingDoc, setDeletingDoc] = useState<string | null>(null)
 
   async function loadDocs() {
     const { data } = await supabase
-      .from('event_documents')
+      .from('documents')
       .select('*')
       .eq('event_id', event.id)
       .order('created_at', { ascending: false })
@@ -1431,15 +1435,12 @@ function TabDocumenti({ event }: { event: Event }) {
     const files = e.target.files
     if (!files || files.length === 0) return
     setUploading(true)
-    const currentUser = loadUser()
-    const userName = currentUser?.nome ?? 'Utente'
 
     for (const file of Array.from(files)) {
-      const ext = file.name.split('.').pop() ?? ''
       const storagePath = `${event.id}/${Date.now()}_${file.name}`
 
       const { error: uploadError } = await supabase.storage
-        .from('event-documents')
+        .from('documents')
         .upload(storagePath, file)
 
       if (uploadError) {
@@ -1447,14 +1448,15 @@ function TabDocumenti({ event }: { event: Event }) {
         continue
       }
 
-      await supabase.from('event_documents').insert({
+      await supabase.from('documents').insert({
+        nome: file.name.replace(/\.[^/.]+$/, ''),
+        categoria: docCategoria,
         event_id: event.id,
+        file_path: storagePath,
         file_name: file.name,
-        file_type: file.type || `application/${ext}`,
         file_size: file.size,
-        storage_path: storagePath,
-        uploaded_by: currentUser?.id ?? '',
-        uploaded_by_name: userName,
+        file_type: file.type || 'application/octet-stream',
+        uploaded_by: '',
       })
     }
 
@@ -1464,18 +1466,28 @@ function TabDocumenti({ event }: { event: Event }) {
   }
 
   async function handleDownload(doc: EventDocument) {
-    const { data } = await supabase.storage
-      .from('event-documents')
-      .createSignedUrl(doc.storage_path, 60)
-    if (data?.signedUrl) {
-      window.open(data.signedUrl, '_blank')
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .download(doc.file_path)
+    if (error || !data) {
+      alert('Errore download: ' + (error?.message ?? 'file non trovato'))
+      return
     }
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = doc.file_name
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
-  async function handleDelete(doc: EventDocument) {
-    await supabase.storage.from('event-documents').remove([doc.storage_path])
-    await supabase.from('event_documents').delete().eq('id', doc.id)
-    setDocs(prev => prev.filter(d => d.id !== doc.id))
+  async function handleDelete(id: string) {
+    const doc = docs.find(d => d.id === id)
+    if (!doc) return
+    await supabase.storage.from('documents').remove([doc.file_path])
+    await supabase.from('documents').delete().eq('id', id)
+    setDeletingDoc(null)
+    setDocs(prev => prev.filter(d => d.id !== id))
   }
 
   if (loading) {
@@ -1484,17 +1496,23 @@ function TabDocumenti({ event }: { event: Event }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
-          Documenti ({docs.length})
+          Documenti Evento ({docs.length})
         </p>
-        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer"
-          style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.35)' }}>
-          <Upload className="w-3.5 h-3.5" />
-          {uploading ? 'Caricamento...' : 'Carica documento'}
-          <input type="file" className="hidden" onChange={handleUpload} multiple disabled={uploading}
-            accept=".pdf,.xlsx,.xls,.pptx,.ppt,.docx,.jpg,.jpeg,.png,.gif,.webp" />
-        </label>
+        <div className="flex items-center gap-2">
+          <select value={docCategoria} onChange={e => setDocCategoria(e.target.value)}
+            className="px-2 py-1.5 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+            {DOC_CATEGORIE.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer"
+            style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.35)' }}>
+            <Upload className="w-3.5 h-3.5" />
+            {uploading ? 'Caricamento...' : 'Carica'}
+            <input type="file" className="hidden" onChange={handleUpload} multiple disabled={uploading}
+              accept=".pdf,.xlsx,.xls,.pptx,.ppt,.docx,.jpg,.jpeg,.png" />
+          </label>
+        </div>
       </div>
 
       {docs.length === 0 ? (
@@ -1515,9 +1533,9 @@ function TabDocumenti({ event }: { event: Event }) {
                   {label}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{doc.file_name}</p>
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{doc.nome || doc.file_name}</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                    {formatFileSize(doc.file_size)} · {doc.uploaded_by_name || 'Utente'} · {new Date(doc.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    {doc.categoria} · {formatFileSize(doc.file_size)} · {new Date(doc.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -1525,7 +1543,7 @@ function TabDocumenti({ event }: { event: Event }) {
                     className="p-2 rounded-lg transition-all hover:bg-white/10">
                     <Download className="w-4 h-4" style={{ color: 'var(--blue)' }} />
                   </button>
-                  <button onClick={() => handleDelete(doc)} title="Elimina"
+                  <button onClick={() => setDeletingDoc(doc.id)} title="Elimina"
                     className="p-2 rounded-lg transition-all hover:bg-white/10">
                     <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
                   </button>
@@ -1533,6 +1551,19 @@ function TabDocumenti({ event }: { event: Event }) {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {deletingDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDeletingDoc(null)}>
+          <div className="panel p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+            <p className="font-semibold mb-2" style={{ color: 'var(--text)' }}>Eliminare documento?</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Il file verra eliminato definitivamente.</p>
+            <div className="flex gap-3 justify-end">
+              <button className="px-4 py-2 rounded-lg text-sm" style={{ background: 'var(--panel2)', color: 'var(--text)' }} onClick={() => setDeletingDoc(null)}>Annulla</button>
+              <button className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--red2)', color: '#fff' }} onClick={() => handleDelete(deletingDoc)}>Elimina</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
