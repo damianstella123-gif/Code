@@ -43,7 +43,7 @@ import type { Client } from '@/data/clients'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
-import { SupplierCategoryPanel, detectSupplierCategory, CATEGORY_LABELS, type CategoryType } from '@/components/TabOperativo'
+import { SupplierCategoryPanel, detectSupplierCategory, type CategoryType } from '@/components/TabOperativo'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import TabBudget from '@/components/TabBudget'
 import { setFlyContext } from '@/lib/fly'
@@ -1150,8 +1150,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
           {linkedSuppliers.map(sup => {
             const link = links.find(l => l.supplier_id === sup.id)
             const catType = (link?.service_category as CategoryType) || detectSupplierCategory(sup.categoria)
-            const catLabel = CATEGORY_LABELS[catType]
             const isManaging = managingCategory === sup.id
+            const hasStoredCat = !!(link?.service_category)
             return (
               <AnimatedLaserBorder key={sup.id} active={isManaging}>
               <div className="panel overflow-hidden" style={{ border: `1px solid ${isManaging ? 'var(--red2)' : 'var(--line)'}` }}>
@@ -1167,11 +1167,23 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    <select value={catType}
+                      onChange={async (e) => {
+                        const newCat = e.target.value as CategoryType
+                        if (link) {
+                          await supabase.from('event_suppliers').update({ service_category: newCat }).eq('id', link.id)
+                          await loadLinks()
+                        }
+                      }}
+                      className="px-2 py-1.5 rounded-lg text-xs font-medium"
+                      style={{ background: 'var(--panel2)', border: `1px solid ${hasStoredCat ? 'var(--line)' : 'var(--yellow)'}`, color: 'var(--text)', maxWidth: '130px' }}>
+                      {LINK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
                     <button onClick={() => setManagingCategory(isManaging ? null : sup.id)}
                       className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
                       style={{ border: '1px solid var(--line)', color: isManaging ? 'var(--red2)' : 'var(--muted)' }}>
                       <Zap className="w-3.5 h-3.5 inline mr-1" />
-                      Scheda {catLabel}
+                      Scheda
                     </button>
                     <button onClick={() => setConfirmUnlink(sup.id)}
                       className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi fornitore dall'evento">
