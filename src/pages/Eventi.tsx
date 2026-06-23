@@ -47,6 +47,7 @@ import { fetchAllProfiles } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { SupplierCategoryPanel, detectSupplierCategory, CATEGORY_LABELS } from '@/components/TabOperativo'
+import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
@@ -1097,7 +1098,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
             const catLabel = CATEGORY_LABELS[catType]
             const isManaging = managingCategory === sup.id
             return (
-              <div key={sup.id} className="panel overflow-hidden" style={{ border: `1px solid ${isManaging ? 'var(--red2)' : 'var(--line)'}` }}>
+              <AnimatedLaserBorder key={sup.id} active={isManaging}>
+              <div className="panel overflow-hidden" style={{ border: `1px solid ${isManaging ? 'var(--red2)' : 'var(--line)'}` }}>
                 <div className="p-5 flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4 cursor-pointer" onClick={() => setViewingSupplier(sup)}>
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -1127,6 +1129,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                   <SupplierCategoryPanel event={event} supplierId={sup.id} category={catType} />
                 )}
               </div>
+              </AnimatedLaserBorder>
             )
           })}
         </div>
@@ -1558,6 +1561,7 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
   return (
     <div className="space-y-5">
       {/* Summary cards */}
+      <AnimatedLaserBorder loading={saving}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="panel p-4 text-center">
           <p className="text-xs" style={{ color: 'var(--muted)' }}>Venduto Cliente</p>
@@ -1576,6 +1580,7 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
           <p className="text-xl font-bold mt-1" style={{ color: totals.marginePct >= 20 ? 'var(--green)' : totals.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{totals.marginePct.toFixed(1)}%</p>
         </div>
       </div>
+      </AnimatedLaserBorder>
 
       {/* Margin bar */}
       {totals.venduto > 0 && (
@@ -3570,7 +3575,8 @@ export default function Eventi() {
             const isOver = daysLeft(event.dataFine) < 0
 
             return (
-              <div key={event.id}
+              <AnimatedLaserBorder key={event.id} active={event.stato === 'in_corso'}>
+              <div
                 className="panel hover-card p-5 cursor-pointer animate-fade-in"
                 style={{ animationDelay: `${i * 60}ms` }}
                 onClick={() => setSelectedEvent(event)}>
@@ -3656,6 +3662,7 @@ export default function Eventi() {
                   </div>
                 </div>
               </div>
+              </AnimatedLaserBorder>
             )
           })}
         </div>

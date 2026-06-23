@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { X, Send, Trash2, Zap, ChevronDown } from 'lucide-react'
 import { suppliers } from '@/data/suppliers'
 import { loadUser } from '@/lib/auth'
+import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import type { Task } from '@/data/tasks'
 import type { Event } from '@/data/events'
 import type { Entrata, Uscita } from '@/data/amministrazione'
@@ -613,16 +614,9 @@ export default function FlyAssistant() {
 
       {/* Chat panel */}
       {open && (
+        <AnimatedLaserBorder loading={typing} className="fly-panel-in" style={{ position: 'fixed', bottom: '96px', right: '16px', left: '16px', zIndex: 999, maxWidth: '360px', marginLeft: 'auto', borderRadius: '20px' }}>
         <div
-          className="fly-panel-in"
           style={{
-            position: 'fixed',
-            bottom: '96px',
-            right: '16px',
-            left: '16px',
-            zIndex: 999,
-            maxWidth: '360px',
-            marginLeft: 'auto',
             maxHeight: '70vh',
             display: 'flex',
             flexDirection: 'column',
@@ -885,6 +879,7 @@ export default function FlyAssistant() {
             </div>
           </div>
         </div>
+        </AnimatedLaserBorder>
       )}
 
       {/* Floating button */}

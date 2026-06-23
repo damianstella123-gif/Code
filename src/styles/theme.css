@@ -704,3 +704,93 @@ textarea::placeholder {
 
 .fly-img-success-ring { border: 2px solid #38d27d; }
 .fly-img-error-ring { border: 2px solid #ff315f; }
+
+/* ─── ANIMATED LASER BORDER ───────────────────────────────────────────────── */
+
+@property --laser-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.laser-border-wrapper {
+  position: relative;
+  border-radius: var(--radius-lg);
+}
+
+.laser-border-wrapper.laser-active::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--laser-angle, 0deg),
+    transparent 0%,
+    transparent 25%,
+    #d0003a 35%,
+    #ff315f 45%,
+    #4d7aff 50%,
+    #d0003a 55%,
+    transparent 65%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  padding: 1.5px;
+  animation: laser-spin 2.5s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.laser-border-wrapper.laser-loading::before {
+  animation: laser-spin 1.4s linear infinite;
+  background: conic-gradient(
+    from var(--laser-angle, 0deg),
+    transparent 0%,
+    transparent 20%,
+    #d0003a 30%,
+    #ff315f 40%,
+    #6b8aff 48%,
+    #ff315f 56%,
+    #d0003a 64%,
+    transparent 74%,
+    transparent 100%
+  );
+}
+
+.laser-border-wrapper.laser-active::after {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--laser-angle, 0deg),
+    transparent 0%,
+    transparent 25%,
+    rgba(208, 0, 58, 0.3) 35%,
+    rgba(255, 49, 95, 0.2) 45%,
+    rgba(77, 122, 255, 0.12) 50%,
+    rgba(208, 0, 58, 0.3) 55%,
+    transparent 65%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  padding: 1.5px;
+  animation: laser-spin 2.5s linear infinite;
+  filter: blur(4px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.laser-border-wrapper.laser-loading::after {
+  animation: laser-spin 1.4s linear infinite;
+}
+
+@keyframes laser-spin {
+  to { --laser-angle: 360deg; }
+}
