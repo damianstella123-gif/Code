@@ -968,6 +968,9 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   const [search, setSearch] = useState('')
   const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null)
   const [managingCategory, setManagingCategory] = useState<string | null>(null)
+  const [confirmUnlink, setConfirmUnlink] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ supplierId: string; nome: string } | null>(null)
+  const [toastTimer, setToastTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
 
   async function loadLinks() {
     const { data } = await supabase
@@ -994,6 +997,9 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   }
 
   async function handleUnlink(supplierId: string) {
+    const sup = suppliers.find(s => s.id === supplierId)
+    setConfirmUnlink(null)
+
     const tables = [
       'event_supplier_services', 'event_hotel_details', 'event_restaurant_details',
       'event_experience_details', 'event_catering_details', 'event_audio_video_details',
@@ -1005,7 +1011,18 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
     if (!error) {
       setLinks(prev => prev.filter(l => l.supplier_id !== supplierId))
       if (managingCategory === supplierId) setManagingCategory(null)
+      if (toastTimer) clearTimeout(toastTimer)
+      setToast({ supplierId, nome: sup?.nome ?? '' })
+      const timer = setTimeout(() => setToast(null), 5000)
+      setToastTimer(timer)
     }
+  }
+
+  async function handleUndoUnlink(supplierId: string) {
+    if (toastTimer) clearTimeout(toastTimer)
+    setToast(null)
+    await supabase.from('event_suppliers').insert({ event_id: event.id, supplier_id: supplierId })
+    await loadLinks()
   }
 
   const linkedSuppliers = suppliers.filter(s => linkedIds.includes(s.id))
@@ -1099,9 +1116,9 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                       <Zap className="w-3.5 h-3.5 inline mr-1" />
                       Scheda {catLabel}
                     </button>
-                    <button onClick={() => handleUnlink(sup.id)}
-                      className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi collegamento">
-                      <X className="w-4 h-4" style={{ color: 'var(--red2)' }} />
+                    <button onClick={() => setConfirmUnlink(sup.id)}
+                      className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi fornitore dall'evento">
+                      <Trash2 className="w-4 h-4" style={{ color: 'var(--muted)' }} />
                     </button>
                   </div>
                 </div>
@@ -1117,6 +1134,30 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
 
       {viewingSupplier && (
         <SupplierDetailModal supplier={viewingSupplier} onClose={() => setViewingSupplier(null)} />
+      )}
+
+      {confirmUnlink && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setConfirmUnlink(null)}>
+          <div className="panel p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+            <p className="font-semibold mb-2" style={{ color: 'var(--text)' }}>Rimuovere fornitore dall'evento?</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
+              Stai per rimuovere questo fornitore dall'evento.<br />
+              Il fornitore NON verra eliminato dall'anagrafica fornitori.<br />
+              Verra rimosso solamente da questo evento.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button className="px-4 py-2 rounded-lg text-sm" style={{ background: 'var(--panel2)', color: 'var(--text)' }} onClick={() => setConfirmUnlink(null)}>Annulla</button>
+              <button className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--red2)', color: '#fff' }} onClick={() => handleUnlink(confirmUnlink)}>Elimina fornitore</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-lg" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+          <p className="text-sm" style={{ color: 'var(--text)' }}>Fornitore rimosso dall'evento</p>
+          <button onClick={() => handleUndoUnlink(toast.supplierId)} className="text-sm font-medium px-2 py-1 rounded-lg hover:opacity-80" style={{ color: 'var(--blue)' }}>Annulla</button>
+        </div>
       )}
     </div>
   )
