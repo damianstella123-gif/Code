@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { X, Send, Trash2, Zap, ChevronDown } from 'lucide-react'
 import { suppliers } from '@/data/suppliers'
-import { loadUser } from '@/lib/auth'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
+import { flyOrchestrate, getAgentLabel } from '@/lib/fly'
+import type { AgentId } from '@/lib/fly'
 import type { Task } from '@/data/tasks'
 import type { Event } from '@/data/events'
 import type { Entrata, Uscita } from '@/data/amministrazione'
@@ -13,7 +14,6 @@ import {
   loadWorkflowsFromStorage,
   loadEntrateFromStorage,
   loadUsciteFromStorage,
-  loadClientsFromStorage,
 } from '@/lib/storage'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -24,6 +24,7 @@ interface FlyMessage {
   text: string
   time: string
   chips?: string[]
+  agent?: AgentId
 }
 
 interface FlyNotif {
@@ -95,263 +96,6 @@ function analyzeContext() {
     contrattiScadenza, pagamentiScaduti, usciteScadute,
     totEntrate, totUscite, margine,
     wfBloccati, wfAvanzamenti, wfInRitardo,
-  }
-}
-
-// ─── Response engine ──────────────────────────────────────────────────────────
-
-function flyRespond(input: string): { text: string; chips?: string[] } {
-  const q = input.toLowerCase().trim()
-  const ctx = analyzeContext()
-  const user = loadUser()
-  const firstName = user?.nome.split(' ')[0] ?? 'capo'
-
-  // Greetings
-  if (/^(ciao|hey|salve|hello|hi|buon|come stai|chi sei)/.test(q)) {
-    const greets = [
-      `Woof! Ehi ${firstName}! Sono Fly, il tuo fedele assistente a 4 zampe. Ho il naso dentro tutti i dati — dimmi cosa devo fiutare!`,
-      `Ciao ${firstName}! *scodinzola* Fly qui, pronto a scavare nei numeri. Ho già annusato qualche novita per te!`,
-      `Bau! ${firstName}! Sono operativo al 100% — coda dritta, orecchie dritte, dati sotto controllo. Cosa posso fare?`,
-    ]
-    return {
-      text: greets[Math.floor(Math.random() * greets.length)],
-      chips: ['Situazione generale', 'Task urgenti', 'Budget oggi'],
-    }
-  }
-
-  // Task
-  if (/task|compiti|attivit|todo|da fare|urgente/.test(q)) {
-    const allT = loadTasksFromStorage()
-    const alta = allT.filter(t => t.priorita === 'alta' && t.stato !== 'completato')
-    const bloccati = allT.filter(t => t.stato === 'da_fare' && t.priorita === 'alta')
-    if (alta.length === 0) {
-      return { text: `Tutto pulito sui task alta priorità. 🟢 Nessun incendio in corso. Puoi respirare.`, chips: ['Task in corso', 'Situazione eventi'] }
-    }
-    const list = alta.slice(0, 3).map(t => `• ${t.titolo} (${t.priorita})`).join('\n')
-    return {
-      text: `⚠️ Ho trovato ${alta.length} task ad alta priorità aperti:\n\n${list}\n\n${bloccati.length > 0 ? `Di questi, ${bloccati.length} non sono ancora stati avviati. Vuoi che mando un reminder al team?` : 'Tutti in corso, ma tienili d\'occhio.'}`,
-      chips: ['Manda reminder team', 'Chi è in ritardo?', 'Mostra tutti i task'],
-    }
-  }
-
-  // Events
-  if (/event|evento|fiera|conferenz|summit|festival|lancio/.test(q)) {
-    const allEv = loadEventsFromStorage()
-    const inCorso = allEv.filter(e => e.stato === 'in_corso')
-    const piano = allEv.filter(e => e.stato === 'pianificazione')
-    if (inCorso.length === 0 && piano.length === 0) {
-      return { text: `Per ora non ci sono eventi attivi o in pianificazione. 💤 Momento di calma prima della prossima ondata.`, chips: ['Storico eventi', 'Situazione generale'] }
-    }
-    const lines = [...inCorso.map(e => `🔴 ${e.nome} — IN CORSO`), ...piano.slice(0, 2).map(e => `🔵 ${e.nome} — pianificazione`)].join('\n')
-    return {
-      text: `${inCorso.length} evento${inCorso.length !== 1 ? 'i' : ''} in corso, ${piano.length} in pianificazione:\n\n${lines}`,
-      chips: ['Dettaglio Corporate Summit', 'Task collegati', 'Budget eventi'],
-    }
-  }
-
-  // Budget / Finance
-  if (/budget|soldi|finanz|margine|costi|entrate|uscite|pagament/.test(q)) {
-    const marginePerc = ctx.totEntrate > 0 ? Math.round((ctx.margine / ctx.totEntrate) * 100) : 0
-    const alert = ctx.pagamentiScaduti.length > 0
-      ? `\n\n🚨 ${ctx.pagamentiScaduti.length} pagamento${ctx.pagamentiScaduti.length !== 1 ? 'i' : ''} scaduto${ctx.pagamentiScaduti.length !== 1 ? 'i' : ''} da riscuotere — vai in Amministrazione.`
-      : ''
-    return {
-      text: `💶 Situazione economica:\n\nEntrate previste: €${(ctx.totEntrate / 1000).toFixed(0)}K\nUscite stimate: €${(ctx.totUscite / 1000).toFixed(0)}K\nMargine: €${(ctx.margine / 1000).toFixed(0)}K (${marginePerc}%)${alert}`,
-      chips: ['Pagamenti scaduti', 'Fatture in sospeso', 'Fornitori'],
-    }
-  }
-
-  // Suppliers
-  if (/fornitore|fornitori|contratto|contratti/.test(q)) {
-    const scad = ctx.contrattiScadenza
-    const inattivi = suppliers.filter(s => s.stato === 'inattivo')
-    if (scad.length === 0) {
-      return { text: `Fornitori tutti in ordine. ✅ Nessun contratto in scadenza imminente. ${inattivi.length > 0 ? `(${inattivi.length} inattivo${inattivi.length !== 1 ? 'i' : ''})` : ''}`, chips: ['Lista fornitori', 'Costi fornitori'] }
-    }
-    const list = scad.map(s => `• ${s.nome} — ${s.statoContratto === 'scaduto' ? '🔴 SCADUTO' : '🟡 in scadenza'}`).join('\n')
-    return {
-      text: `Attenzione contratti:\n\n${list}\n\nVuoi che preparo un promemoria per i rinnovi?`,
-      chips: ['Rinnova contratti', 'Lista fornitori', 'Budget fornitori'],
-    }
-  }
-
-  // Clients / CRM
-  if (/client|crm|trattativa|prospect|vip/.test(q)) {
-    const clients = loadClientsFromStorage()
-    const vip = clients.filter(c => c.stato === 'vip')
-    const prospect = clients.filter(c => c.stato === 'prospect')
-    const persi = clients.filter(c => c.stato === 'perso')
-    return {
-      text: `📊 Situazione CRM:\n\n🌟 VIP: ${vip.length} (${vip.map(c => c.nome.split(' ')[0]).join(', ')})\n🔵 Prospect: ${prospect.length} da convertire\n❌ Persi: ${persi.length} — possibile recupero Q3\n\nIl cliente con più fatturato è ${[...clients].sort((a,b) => b.fatturato - a.fatturato)[0]?.nome}.`,
-      chips: ['Chi seguo domani?', 'Prospect prioritari', 'Fatturato top clienti'],
-    }
-  }
-
-  // Workflow
-  if (/workflow|processo|automaz|flusso|fase|avanzamento|ritardo workflow/.test(q)) {
-    const { wfBloccati, wfAvanzamenti, wfInRitardo } = ctx
-    const lines = wfAvanzamenti.map(w => `${w.pct >= 80 ? '🟢' : w.pct >= 50 ? '🔵' : '🟡'} ${w.nome} — ${w.pct}%`).join('\n')
-
-    if (wfBloccati.length > 0 || wfInRitardo.length > 0) {
-      const allEvs = loadEventsFromStorage()
-      const bloccoTxt = wfBloccati.length > 0
-        ? `\n\n🔴 Bloccati (task critici aperti):\n${wfBloccati.map(w => `• ${allEvs.find(e => e.id === w.eventoId)?.nome ?? w.eventoId}`).join('\n')}`
-        : ''
-      const ritardoTxt = wfInRitardo.length > 0
-        ? `\n\n⏰ Workflow sotto 50%:\n${wfInRitardo.map(w => `• ${w.nome} — solo ${w.pct}%`).join('\n')}`
-        : ''
-      return {
-        text: `Situazione workflow:\n\n${lines}${bloccoTxt}${ritardoTxt}\n\nVuoi che avviso il team responsabile?`,
-        chips: ['Avvisa team', 'Task bloccanti', 'Situazione generale'],
-      }
-    }
-    return {
-      text: `⚡ Workflow tutti operativi:\n\n${lines}\n\nNessun blocco critico rilevato. 🟢`,
-      chips: ['Task urgenti', 'Budget eventi', 'Situazione generale'],
-    }
-  }
-
-  // Fase workflow specifica
-  if (/fase|milestone|blocco|bloccato|avanzare|avanza/.test(q)) {
-    const { wfBloccati } = ctx
-    if (wfBloccati.length === 0) {
-      return { text: `Nessun workflow bloccato in questo momento. Tutte le fasi attive sono sbloccate. ✅`, chips: ['Workflow status', 'Task urgenti'] }
-    }
-    const allEvs2 = loadEventsFromStorage()
-    const allTsks2 = loadTasksFromStorage()
-    const details = wfBloccati.map(w => {
-      const fase = w.fasi.find(f => f.ordine === w.faseCorrenteOrdine)
-      const ev = allEvs2.find(e => e.id === w.eventoId)
-      const blkTasks = fase?.taskCriticiIds
-        .map(tid => allTsks2.find(t => t.id === tid))
-        .filter(t => t && t.stato !== 'completato')
-        .map(t => t!.titolo) ?? []
-      return `• ${ev?.nome ?? w.eventoId} fermo in "${fase?.nome}" — mancano: ${blkTasks.join(', ')}`
-    }).join('\n')
-    return {
-      text: `⚠️ ${wfBloccati.length} workflow bloccati da task critici incompleti:\n\n${details}\n\nVuoi mandare un reminder diretto ai responsabili?`,
-      chips: ['Manda reminder', 'Task urgenti', 'Workflow status'],
-    }
-  }
-
-  // Situation general
-  if (/situazione|status|panoramica|riepilogo|tutto|generale|oggi|report/.test(q)) {
-    const issues: string[] = []
-    if (ctx.taskBlocked.length > 0) issues.push(`⚠️ ${ctx.taskBlocked.length} task alta priorità non avviati`)
-    if (ctx.taskScaduti.length > 0) issues.push(`🔴 ${ctx.taskScaduti.length} task scaduti`)
-    if (ctx.eventiRitardo.length > 0) issues.push(`🕐 ${ctx.eventiRitardo.length} eventi con avanzamento sotto 50%`)
-    if (ctx.contrattiScadenza.length > 0) issues.push(`📄 ${ctx.contrattiScadenza.length} contratti fornitori in scadenza`)
-    if (ctx.pagamentiScaduti.length > 0) issues.push(`💸 ${ctx.pagamentiScaduti.length} pagamenti scaduti da incassare`)
-    if (ctx.wfBloccati.length > 0) issues.push(`🔴 ${ctx.wfBloccati.length} workflow bloccati da task critici`)
-    if (ctx.wfInRitardo.length > 0) issues.push(`🕐 ${ctx.wfInRitardo.length} workflow sotto 50% avanzamento`)
-
-    if (issues.length === 0) {
-      return {
-        text: `Tutto verde, ${firstName}. 🟢 Nessuna criticità rilevata in questo momento. Simmetria Hub gira come un orologio svizzero.`,
-        chips: ['Prossimi eventi', 'Task di oggi', 'Budget'],
-      }
-    }
-    return {
-      text: `Situazione attuale di Simmetria Hub:\n\n${issues.join('\n')}\n\nDimmi su quale problema vuoi che mi concentri.`,
-      chips: ['Task urgenti', 'Problemi budget', 'Fornitori'],
-    }
-  }
-
-  // Search tip
-  if (/cerca|ricerca|trovare|find|search/.test(q)) {
-    return {
-      text: `🔍 Usa la barra di ricerca in alto (⌘K) per cercare tutto in Simmetria Hub:\n\n• Eventi, task, clienti\n• Fornitori, utenti\n• Comunicazioni, workflow\n\nI risultati rispettano i tuoi permessi e vengono evidenziati in tempo reale. Puoi navigare con ↑↓ e aprire con Invio.`,
-      chips: ['Situazione generale', 'Task urgenti', 'Workflow status'],
-    }
-  }
-
-  // Calendar / scadenze
-  if (/calendario|scadenz|questa settimana|oggi|prossim|agenda|conflict|sovrapposti/.test(q)) {
-    const today = new Date(); today.setHours(0,0,0,0)
-    const addD = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
-    const next7 = addD(today, 7)
-    const allEv2 = loadEventsFromStorage()
-    const allT2 = loadTasksFromStorage()
-
-    const eventsThisWeek = allEv2.filter(e => {
-      const d = new Date(e.dataInizio)
-      return d >= today && d <= next7
-    })
-    const tasksThisWeek = allT2.filter(t => {
-      const d = new Date(t.scadenza)
-      return d >= today && d <= next7 && t.stato !== 'completato'
-    })
-    const urgentThisWeek = tasksThisWeek.filter(t => t.priorita === 'alta')
-    const overdueTasks = allT2.filter(t => new Date(t.scadenza) < today && t.stato !== 'completato')
-
-    const lines: string[] = []
-    if (eventsThisWeek.length > 0) {
-      lines.push(`📅 ${eventsThisWeek.length} evento${eventsThisWeek.length !== 1 ? 'i' : ''} questa settimana:`)
-      eventsThisWeek.slice(0, 3).forEach(e => lines.push(`  • ${e.nome} — ${new Date(e.dataInizio).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}`))
-    }
-    if (urgentThisWeek.length > 0) lines.push(`\n⚠️ ${urgentThisWeek.length} task urgenti in scadenza entro 7 giorni`)
-    if (overdueTasks.length > 0) lines.push(`\n🔴 ${overdueTasks.length} task già scaduti senza completamento`)
-    if (lines.length === 0) lines.push('Settimana tranquilla! Nessuna urgenza imminente. 🟢')
-
-    return {
-      text: `Situazione calendario:\n\n${lines.join('\n')}`,
-      chips: ['Scadenze oggi', 'Task urgenti', 'Agenda prossima settimana'],
-    }
-  }
-
-  // Conflitti o eventi sovrapposti
-  if (/conflitto|overlap|sovrapposti/.test(q)) {
-    const eventsInCorso = loadEventsFromStorage().filter(e => e.stato === 'in_corso')
-    if (eventsInCorso.length > 1) {
-      return {
-        text: `⚠️ Ho trovato ${eventsInCorso.length} eventi contemporaneamente in corso:\n\n${eventsInCorso.map(e => `• ${e.nome}`).join('\n')}\n\nVerifica la disponibilità del team nei Workflow e nel Calendario.`,
-        chips: ['Workflow status', 'Team disponibilità', 'Situazione generale'],
-      }
-    }
-    return { text: `Nessun conflitto rilevato nel calendario. 🟢 Un solo evento in corso per volta.`, chips: ['Calendario', 'Workflow status'] }
-  }
-
-  // Reminder
-  if (/reminder|promemoria|notifica|ricorda|avvisa|manda/.test(q)) {
-    return {
-      text: `📣 Reminder simulato inviato al team! (demo mode)\n\nIn produzione, Fly può inviare notifiche push, email digest e messaggi Slack ai membri del team con task in ritardo.`,
-      chips: ['Task urgenti', 'Chi è in ritardo?'],
-    }
-  }
-
-  // Help
-  if (/aiuto|help|cosa sai|cosa puoi|funzioni/.test(q)) {
-    return {
-      text: `Ecco cosa so fare:\n\n📋 Task — urgenti, scaduti, assegnati\n📅 Calendario — scadenze, conflitti, agenda\n⚡ Workflow — fasi, avanzamento, blocchi\n🗓️ Eventi — status, team, avanzamento\n💶 Budget — margini, pagamenti, fatture\n🏢 Fornitori — contratti, rating, costi\n👥 CRM — clienti, trattative, pipeline\n🔍 Ricerca — usa la barra in alto (⌘K) per cercare tutto\n🚨 Alert — problemi e criticità\n\nDimmi solo di cosa hai bisogno!`,
-      chips: ['Situazione generale', 'Task urgenti', 'Workflow bloccati'],
-    }
-  }
-
-  // Chi sono in ritardo
-  if (/ritardo|in ritardo|chi è|chi sono|chi non/.test(q)) {
-    const overdueTaskers = loadTasksFromStorage()
-      .filter(t => {
-        const days = Math.ceil((new Date(t.scadenza).getTime() - Date.now()) / 86400000)
-        return t.stato !== 'completato' && days < 0
-      })
-    if (overdueTaskers.length === 0) {
-      return { text: `Nessuno in ritardo! 🎉 Il team è in pari. Complimenti.`, chips: ['Task urgenti', 'Prossime scadenze'] }
-    }
-    return {
-      text: `${overdueTaskers.length} task scaduti senza completamento:\n\n${overdueTaskers.slice(0, 4).map(t => `• ${t.titolo}`).join('\n')}\n\nVuoi che mando un reminder diretto?`,
-      chips: ['Manda reminder', 'Vedi tutti i task'],
-    }
-  }
-
-  // Default
-  const fallbacks = [
-    `*inclina la testa* Non ho capito bene... Prova con: "task urgenti", "budget", "eventi in corso" o "situazione generale".`,
-    `Hmm, questa mi fa drizzare le orecchie ma non so come rispondere. Dimmi qualcosa di piu operativo!`,
-    `*annusa confuso* Ottima domanda ma fuori dal mio territorio. Prova "situazione generale" per un riepilogo completo.`,
-  ]
-  return {
-    text: fallbacks[Math.floor(Math.random() * fallbacks.length)],
-    chips: ['Situazione generale', 'Task urgenti', 'Budget'],
   }
 }
 
@@ -574,12 +318,13 @@ export default function FlyAssistant() {
     setInput('')
     setTyping(true)
 
-    const delay = 800 + Math.random() * 700
-    setTimeout(() => {
+    flyOrchestrate(text.trim()).then(response => {
       setTyping(false)
-      const response = flyRespond(text)
-      addMessage({ from: 'fly', text: response.text, chips: response.chips })
-    }, delay)
+      addMessage({ from: 'fly', text: response.text, chips: response.chips, agent: response.agent })
+    }).catch(() => {
+      setTyping(false)
+      addMessage({ from: 'fly', text: 'Errore di comunicazione. Riprova.', chips: ['Riprova'] })
+    })
   }, [addMessage])
 
   const handleChip = (chip: string) => sendMessage(chip)
@@ -745,6 +490,12 @@ export default function FlyAssistant() {
                         whiteSpace: 'pre-line',
                       }}
                     >
+                      {msg.agent && (
+                        <span style={{ display: 'inline-block', fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em', padding: '1px 5px', borderRadius: '4px', background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                          {getAgentLabel(msg.agent)}
+                        </span>
+                      )}
+                      {msg.agent && <br />}
                       {msg.text}
                     </div>
                   </div>

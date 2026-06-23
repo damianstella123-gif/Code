@@ -48,6 +48,7 @@ import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { SupplierCategoryPanel, detectSupplierCategory, CATEGORY_LABELS } from '@/components/TabOperativo'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
+import { setFlyContext } from '@/lib/fly'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
@@ -3396,6 +3397,16 @@ export default function Eventi() {
   useRealtimeTable('events', () => {
     fetchEvents().then(remote => { setEventList(remote); cacheEventsSnapshot(remote) })
   })
+
+  // Set Fly AI context
+  useEffect(() => {
+    setFlyContext({
+      page: 'eventi',
+      eventId: selectedEvent?.id ?? undefined,
+      clientId: selectedEvent?.cliente ?? undefined,
+    })
+    return () => { setFlyContext({ page: 'eventi', eventId: undefined, clientId: undefined }) }
+  }, [selectedEvent])
 
   // Load budgets, suppliers, communications, clients
   useEffect(() => {

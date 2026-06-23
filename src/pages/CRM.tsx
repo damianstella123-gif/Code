@@ -15,6 +15,7 @@ import {
 import type { Client } from '@/data/clients'
 import { fetchClients, updateClient, uploadCompanyLogo, setCompanyLogo } from '@/lib/clients-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
+import { setFlyContext } from '@/lib/fly'
 
 type FilterStato = 'Tutti' | 'attivo' | 'vip' | 'prospect' | 'perso'
 
@@ -401,6 +402,16 @@ export default function CRM() {
     if (!selectedName) return null
     return groups.find(g => g.companyName.toUpperCase() === selectedName.toUpperCase()) ?? null
   }, [groups, selectedName])
+
+  // Set Fly AI context
+  useEffect(() => {
+    setFlyContext({
+      page: 'crm',
+      clientId: selectedGroup?.rows[0]?.id ?? undefined,
+      eventId: undefined,
+    })
+    return () => { setFlyContext({ page: 'crm', clientId: undefined }) }
+  }, [selectedGroup])
 
   const filtered = useMemo(() => {
     return groups.filter(g => {
