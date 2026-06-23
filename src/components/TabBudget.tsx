@@ -12,8 +12,8 @@ interface Supplier {
 
 const CATEGORY_ORDER = [
   'HOTEL', 'TRANSFER', 'RISTORANTE', 'LOCATION / EXPERIENCE',
-  'CATERING', 'AUDIO VIDEO', 'ALLESTIMENTI', 'STAFF SIMMETRIA',
-  'STAFF ESTERNO', 'GRAFICA', 'VARIE',
+  'CATERING', 'AUDIO VIDEO', 'ALLESTIMENTI', 'STAFF',
+  'GRAFICA', 'VARIE',
 ] as const
 
 const SOTTO_LABELS: Record<string, string> = {
@@ -24,6 +24,7 @@ const SOTTO_LABELS: Record<string, string> = {
   pranzo: 'Pranzo', cena: 'Cena', aperitivo: 'Aperitivo',
   aperitivo_rinforzato: 'Aperitivo Rinforzato', area_riservata: 'Area Riservata',
   esclusiva: 'Esclusiva',
+  staff_simmetria: 'Staff Simmetria', staff_esterno: 'Staff Esterno',
 }
 
 interface BudgetLine {
@@ -181,13 +182,15 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
     // STAFF SIMMETRIA
     for (const si of (staffIntRes.data ?? []) as Record<string, unknown>[]) {
-      const venduto = (si.venduto_totale as number) ?? 0
-      const costo = (si.costo_totale as number) ?? (si.costo_giornaliero as number) ?? 0
+      const qty = (si.quantita as number) ?? 1
+      const venduto = (si.venduto_totale as number) ?? ((si.venduto_unitario as number) ? (si.venduto_unitario as number) * qty : 0)
+      const costo = (si.costo_totale as number) ?? (si.costo_giornaliero as number) ?? ((si.costo_unitario as number) ? (si.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
-      pushLine(si, 'STAFF SIMMETRIA', 'event_staff_interno_details', {
-        descrizione: (si.risorsa as string) || (si.ruolo as string) || 'Staff',
-        qty: 1, venduto, costo,
-        sotto: '',
+      const nome = [(si.nome as string), (si.cognome as string)].filter(Boolean).join(' ') || (si.risorsa as string)
+      pushLine(si, 'STAFF', 'event_staff_interno_details', {
+        descrizione: nome ? `${nome} - ${(si.ruolo as string) || 'Staff'}` : (si.ruolo as string) || 'Staff Simmetria',
+        qty, venduto, costo,
+        sotto: 'staff_simmetria',
       })
     }
 
@@ -197,9 +200,11 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const venduto = (se.venduto_totale as number) ?? ((se.venduto_unitario as number) ? (se.venduto_unitario as number) * qty : 0)
       const costo = (se.costo_totale as number) ?? ((se.costo_unitario as number) ? (se.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
-      pushLine(se, 'STAFF ESTERNO', 'event_staff_esterno_details', {
-        descrizione: (se.ruolo as string) || 'Staff esterno',
+      const nome = [(se.nome as string), (se.cognome as string)].filter(Boolean).join(' ')
+      pushLine(se, 'STAFF', 'event_staff_esterno_details', {
+        descrizione: nome ? `${nome} - ${(se.ruolo as string) || 'Staff'}` : (se.ruolo as string) || 'Staff Esterno',
         qty, venduto, costo,
+        sotto: 'staff_esterno',
       })
     }
 
@@ -335,6 +340,111 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
   const fmt = (n: number) => '\u20AC' + n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
 
+  function renderBudgetLine(item: BudgetLine) {
+    const isExpanded = expandedId === item.id
+    const isEditing = editingId === item.id
+    return (
+      <div key={item.id} style={{ borderBottom: '1px solid var(--line)' }}>
+        <button
+          className="w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.02] transition-colors"
+          onClick={() => setExpandedId(isExpanded ? null : item.id)}
+        >
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform flex-shrink-0 ${isExpanded ? '' : '-rotate-90'}`} style={{ color: 'var(--muted)' }} />
+          <span className="flex-1 text-xs font-medium truncate" style={{ color: 'var(--text)' }}>{item.descrizione}</span>
+          <span className="w-24 text-xs truncate hidden md:block" style={{ color: 'var(--muted)' }}>
+            {SOTTO_LABELS[item.sotto_categoria] || item.sotto_categoria || '-'}
+          </span>
+          <span className="w-24 text-xs truncate hidden md:block" style={{ color: 'var(--muted)' }}>{item.fornitore || '-'}</span>
+          <span className="w-10 text-xs text-right" style={{ color: 'var(--text)' }}>{item.qty}</span>
+          <span className="w-20 text-xs text-right" style={{ color: 'var(--text)' }}>{fmt(item.venduto)}</span>
+          <span className="w-20 text-xs text-right" style={{ color: 'var(--yellow)' }}>{fmt(item.costo)}</span>
+          <span className="w-14 text-xs text-right hidden md:block" style={{ color: 'var(--muted)' }}>{item.aliquota_iva_venduto}%</span>
+          <span className="w-20 text-xs text-right font-medium" style={{ color: item.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmt(item.margine)}</span>
+          <span className="w-10 text-xs text-right font-medium" style={{ color: item.marginePct >= 20 ? 'var(--green)' : item.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{item.marginePct.toFixed(0)}%</span>
+        </button>
+        {isExpanded && (
+          <div className="px-4 pb-4 pt-2" style={{ background: 'var(--bg)' }}>
+            {isEditing ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <Field label="Venduto cliente" value={editVenduto} onChange={setEditVenduto} type="number" />
+                  <Field label="Costo reale" value={editCosto} onChange={setEditCosto} type="number" />
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>IVA Venduto</label>
+                    <div className="flex gap-1">
+                      <select value={editIvaVenduto} onChange={e => setEditIvaVenduto(e.target.value)}
+                        className="flex-1 px-2 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                        {['0','4','5','10','22'].map(v => <option key={v} value={v}>{v}%</option>)}
+                      </select>
+                      <select value={editIvaInclVenduto ? 'i' : 'e'} onChange={e => setEditIvaInclVenduto(e.target.value === 'i')}
+                        className="w-16 px-1 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                        <option value="e">Escl</option>
+                        <option value="i">Incl</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>IVA Costo</label>
+                    <div className="flex gap-1">
+                      <select value={editIvaCosto} onChange={e => setEditIvaCosto(e.target.value)}
+                        className="flex-1 px-2 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                        {['0','4','5','10','22'].map(v => <option key={v} value={v}>{v}%</option>)}
+                      </select>
+                      <select value={editIvaInclCosto ? 'i' : 'e'} onChange={e => setEditIvaInclCosto(e.target.value === 'i')}
+                        className="w-16 px-1 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                        <option value="e">Escl</option>
+                        <option value="i">Incl</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)' }}>
+                  {(() => {
+                    const v = Number(editVenduto) || 0; const c = Number(editCosto) || 0
+                    const m = v - c; const mp = v > 0 ? (m / v) * 100 : 0
+                    return <span style={{ color: 'var(--muted)' }}>Margine: <strong style={{ color: m >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmt(m)} ({mp.toFixed(1)}%)</strong></span>
+                  })()}
+                </div>
+                <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
+                  <button disabled={saving} onClick={() => saveEdit(item)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium"
+                    style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: '#fff', opacity: saving ? 0.6 : 1 }}>
+                    <Save className="w-3 h-3" /> {saving ? 'Salvataggio...' : 'Salva'}
+                  </button>
+                  <button onClick={() => setEditingId(null)} className="px-4 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>Annulla</button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 mb-3">
+                  <Detail label="Descrizione" value={item.descrizione} />
+                  {item.sotto_categoria && item.sotto_categoria !== 'staff_simmetria' && item.sotto_categoria !== 'staff_esterno' && (
+                    <Detail label="Sotto-categoria" value={SOTTO_LABELS[item.sotto_categoria] || item.sotto_categoria} />
+                  )}
+                  {item.fornitore && <Detail label="Fornitore" value={item.fornitore} />}
+                  <Detail label="Quantita" value={String(item.qty)} />
+                  <Detail label="Venduto cliente" value={fmt(item.venduto)} />
+                  <Detail label="Costo reale" value={fmt(item.costo)} />
+                  <Detail label="IVA Venduto" value={`${item.aliquota_iva_venduto}% ${item.iva_inclusa_venduto ? '(inclusa)' : '(esclusa)'}`} />
+                  <Detail label="IVA Costo" value={`${item.aliquota_iva_costo}% ${item.iva_inclusa_costo ? '(inclusa)' : '(esclusa)'}`} />
+                  <Detail label="Margine" value={fmt(item.margine)} />
+                  <Detail label="Margine %" value={`${item.marginePct.toFixed(1)}%`} />
+                </div>
+                <div className="pt-2" style={{ borderTop: '1px solid var(--line)' }}>
+                  <button onClick={() => startEdit(item)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80"
+                    style={{ background: 'var(--panel2)', color: 'var(--blue)' }}>
+                    <Edit3 className="w-3 h-3" /> Modifica venduto/costo
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   if (loading) {
     return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento budget...</div></div>
   }
@@ -443,115 +553,35 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
                   <span className="w-10 text-right">M%</span>
                 </div>
 
-                {/* Lines */}
-                {cat.items.map(item => {
-                  const isExpanded = expandedId === item.id
-                  const isEditing = editingId === item.id
-                  return (
-                    <div key={item.id} style={{ borderBottom: '1px solid var(--line)' }}>
-                      <button
-                        className="w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.02] transition-colors"
-                        onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                      >
-                        <ChevronDown className={`w-3.5 h-3.5 transition-transform flex-shrink-0 ${isExpanded ? '' : '-rotate-90'}`} style={{ color: 'var(--muted)' }} />
-                        <span className="flex-1 text-xs font-medium truncate" style={{ color: 'var(--text)' }}>{item.descrizione}</span>
-                        <span className="w-24 text-xs truncate hidden md:block" style={{ color: 'var(--muted)' }}>
-                          {SOTTO_LABELS[item.sotto_categoria] || item.sotto_categoria || '-'}
-                        </span>
-                        <span className="w-24 text-xs truncate hidden md:block" style={{ color: 'var(--muted)' }}>{item.fornitore || '-'}</span>
-                        <span className="w-10 text-xs text-right" style={{ color: 'var(--text)' }}>{item.qty}</span>
-                        <span className="w-20 text-xs text-right" style={{ color: 'var(--text)' }}>{fmt(item.venduto)}</span>
-                        <span className="w-20 text-xs text-right" style={{ color: 'var(--yellow)' }}>{fmt(item.costo)}</span>
-                        <span className="w-14 text-xs text-right hidden md:block" style={{ color: 'var(--muted)' }}>
-                          {item.aliquota_iva_venduto}%
-                        </span>
-                        <span className="w-20 text-xs text-right font-medium" style={{ color: item.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmt(item.margine)}</span>
-                        <span className="w-10 text-xs text-right font-medium" style={{ color: item.marginePct >= 20 ? 'var(--green)' : item.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{item.marginePct.toFixed(0)}%</span>
-                      </button>
-
-                      {isExpanded && (
-                        <div className="px-4 pb-4 pt-2" style={{ background: 'var(--bg)' }}>
-                          {isEditing ? (
-                            <div className="space-y-3">
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                <Field label="Venduto cliente" value={editVenduto} onChange={setEditVenduto} type="number" />
-                                <Field label="Costo reale" value={editCosto} onChange={setEditCosto} type="number" />
-                                <div>
-                                  <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>IVA Venduto</label>
-                                  <div className="flex gap-1">
-                                    <select value={editIvaVenduto} onChange={e => setEditIvaVenduto(e.target.value)}
-                                      className="flex-1 px-2 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                                      {['0','4','5','10','22'].map(v => <option key={v} value={v}>{v}%</option>)}
-                                    </select>
-                                    <select value={editIvaInclVenduto ? 'i' : 'e'} onChange={e => setEditIvaInclVenduto(e.target.value === 'i')}
-                                      className="w-16 px-1 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                                      <option value="e">Escl</option>
-                                      <option value="i">Incl</option>
-                                    </select>
-                                  </div>
-                                </div>
-                                <div>
-                                  <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>IVA Costo</label>
-                                  <div className="flex gap-1">
-                                    <select value={editIvaCosto} onChange={e => setEditIvaCosto(e.target.value)}
-                                      className="flex-1 px-2 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                                      {['0','4','5','10','22'].map(v => <option key={v} value={v}>{v}%</option>)}
-                                    </select>
-                                    <select value={editIvaInclCosto ? 'i' : 'e'} onChange={e => setEditIvaInclCosto(e.target.value === 'i')}
-                                      className="w-16 px-1 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                                      <option value="e">Escl</option>
-                                      <option value="i">Incl</option>
-                                    </select>
-                                  </div>
-                                </div>
-                              </div>
-                              {/* Margin preview */}
-                              <div className="flex items-center gap-4 px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)' }}>
-                                {(() => {
-                                  const v = Number(editVenduto) || 0
-                                  const c = Number(editCosto) || 0
-                                  const m = v - c
-                                  const mp = v > 0 ? (m / v) * 100 : 0
-                                  return <span style={{ color: 'var(--muted)' }}>Margine: <strong style={{ color: m >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmt(m)} ({mp.toFixed(1)}%)</strong></span>
-                                })()}
-                              </div>
-                              <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
-                                <button disabled={saving} onClick={() => saveEdit(item)}
-                                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium"
-                                  style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: '#fff', opacity: saving ? 0.6 : 1 }}>
-                                  <Save className="w-3 h-3" /> {saving ? 'Salvataggio...' : 'Salva'}
-                                </button>
-                                <button onClick={() => setEditingId(null)} className="px-4 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>Annulla</button>
-                              </div>
+                {/* Lines - with sub-group support for STAFF */}
+                {cat.label === 'STAFF' ? (
+                  <>
+                    {(['staff_simmetria', 'staff_esterno'] as const).map(subGroup => {
+                      const subItems = cat.items.filter(i => i.sotto_categoria === subGroup)
+                      if (subItems.length === 0) return null
+                      const subV = subItems.reduce((s, i) => s + i.venduto, 0)
+                      const subC = subItems.reduce((s, i) => s + i.costo, 0)
+                      const subM = subV - subC
+                      const subMp = subV > 0 ? (subM / subV) * 100 : 0
+                      const subLabel = subGroup === 'staff_simmetria' ? 'Staff Simmetria' : 'Staff Esterno'
+                      return (
+                        <div key={subGroup}>
+                          <div className="px-4 py-2 flex items-center justify-between" style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--line)' }}>
+                            <p className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>{subLabel}</p>
+                            <div className="flex items-center gap-3 text-[10px]">
+                              <span style={{ color: 'var(--muted)' }}>V: <strong style={{ color: 'var(--text)' }}>{fmt(subV)}</strong></span>
+                              <span style={{ color: 'var(--muted)' }}>C: <strong style={{ color: 'var(--yellow)' }}>{fmt(subC)}</strong></span>
+                              <span style={{ color: 'var(--muted)' }}>M: <strong style={{ color: subM >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmt(subM)} ({subMp.toFixed(0)}%)</strong></span>
                             </div>
-                          ) : (
-                            <div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 mb-3">
-                                <Detail label="Descrizione" value={item.descrizione} />
-                                {item.sotto_categoria && <Detail label="Sotto-categoria" value={SOTTO_LABELS[item.sotto_categoria] || item.sotto_categoria} />}
-                                {item.fornitore && <Detail label="Fornitore" value={item.fornitore} />}
-                                <Detail label="Quantita" value={String(item.qty)} />
-                                <Detail label="Venduto cliente" value={fmt(item.venduto)} />
-                                <Detail label="Costo reale" value={fmt(item.costo)} />
-                                <Detail label="IVA Venduto" value={`${item.aliquota_iva_venduto}% ${item.iva_inclusa_venduto ? '(inclusa)' : '(esclusa)'}`} />
-                                <Detail label="IVA Costo" value={`${item.aliquota_iva_costo}% ${item.iva_inclusa_costo ? '(inclusa)' : '(esclusa)'}`} />
-                                <Detail label="Margine" value={fmt(item.margine)} />
-                                <Detail label="Margine %" value={`${item.marginePct.toFixed(1)}%`} />
-                              </div>
-                              <div className="pt-2" style={{ borderTop: '1px solid var(--line)' }}>
-                                <button onClick={() => startEdit(item)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80"
-                                  style={{ background: 'var(--panel2)', color: 'var(--blue)' }}>
-                                  <Edit3 className="w-3 h-3" /> Modifica venduto/costo
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                          </div>
+                          {subItems.map(item => renderBudgetLine(item))}
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
+                      )
+                    })}
+                  </>
+                ) : (
+                  cat.items.map(item => renderBudgetLine(item))
+                )}
               </div>
             )
           })}

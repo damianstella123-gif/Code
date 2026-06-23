@@ -1663,10 +1663,12 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
 
       for (const si of (staffIntRes.data ?? []) as StaffInternoDetail[]) {
         if (si.data && si.ora_inizio) {
+          const nome = [(si as any).nome, (si as any).cognome].filter(Boolean).join(' ') || si.risorsa || ''
+          const label = si.ruolo ? (nome ? `${si.ruolo} - ${nome}` : si.ruolo) : (nome || 'Staff Simmetria')
           program.push({
             id: si.id,
             supplier_id: '',
-            titolo: `${si.risorsa || si.ruolo || 'Staff'}${si.ruolo ? ' (' + si.ruolo + ')' : ''}`,
+            titolo: label,
             categoria: 'Staff Simmetria',
             data: si.data,
             ora_inizio: si.ora_inizio,
@@ -1679,10 +1681,12 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
 
       for (const se of (staffExtRes.data ?? []) as StaffEsternoDetail[]) {
         if (se.data && se.ora_inizio) {
+          const nome = [(se as any).nome, (se as any).cognome].filter(Boolean).join(' ')
+          const label = se.ruolo ? (nome ? `${se.ruolo} - ${nome}` : `${se.ruolo}${se.quantita > 1 ? ' x' + se.quantita : ''}`) : (nome || 'Staff Esterno')
           program.push({
             id: se.id,
             supplier_id: se.supplier_id ?? '',
-            titolo: `${se.ruolo || 'Staff esterno'}${se.quantita > 1 ? ' x' + se.quantita : ''}`,
+            titolo: label,
             categoria: 'Staff Esterno',
             data: se.data,
             ora_inizio: se.ora_inizio,

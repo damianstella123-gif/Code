@@ -23,8 +23,8 @@ const CATEGORIES: { key: CategoryType; label: string; table: string }[] = [
 const IVA_OPTIONS = ['22', '10', '5', '4', '0', 'Esente', 'Fuori campo']
 const EXPERIENCE_TIPOLOGIE = ['Location', 'Driving Experience', 'Simulatore', 'Team Building', 'Cooking Class', 'Visita Guidata', 'Attivita Speciale']
 const CATERING_TIPOLOGIE = ['Welcome Coffee', 'Coffee Break', 'Lunch', 'Dinner', 'Cocktail']
-const STAFF_INT_RUOLI = ['Project Manager', 'Account', 'Responsabile Evento', 'Regia', 'Supporto Operativo', 'Altro']
-const STAFF_EXT_RUOLI = ['Hostess', 'Steward', 'Tour Leader', 'Promoter', 'Guardaroba', 'Altro']
+const STAFF_INT_RUOLI = ['Project Manager', 'Account', 'Responsabile Evento', 'Tour Leader', 'Regia', 'Supporto Operativo', 'Altro']
+const STAFF_EXT_RUOLI = ['Hostess', 'Steward', 'Tour Leader', 'Promoter', 'Guardaroba', 'Interprete', 'Traduttore', 'Altro']
 const RISTORANTE_TIPOLOGIE = ['Pranzo', 'Cena', 'Aperitivo', 'Aperitivo Rinforzato', 'Cena di Gala']
 const RISTORANTE_MENU_TYPES = ['2 Portate', '3 Portate', '4 Portate', 'Menu Personalizzato']
 const GRAFICA_TIPI = ['Badge', 'Menu', 'Cartelli', 'Segnaletica', 'Materiale Stampato', 'Altro']
@@ -109,9 +109,9 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
     } else if (category === 'allestimenti') {
       Object.assign(base, { descrizione: '', quantita: '1', area_utilizzo: '', data_montaggio: '', ora_montaggio: '', data_smontaggio: '', ora_smontaggio: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else if (category === 'staff_interno') {
-      Object.assign(base, { risorsa: '', ruolo: '', data: '', ora_inizio: '', ora_fine: '', note: '', note_operative: '', venduto_totale: '', costo_giornaliero: '', costo_totale: '' })
+      Object.assign(base, { nome: '', cognome: '', ruolo: '', data: '', ora_inizio: '', ora_fine: '', quantita: '1', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_giornaliero: '', costo_totale: '' })
     } else if (category === 'staff_esterno') {
-      Object.assign(base, { ruolo: '', quantita: '1', data: '', ora_inizio: '', ora_fine: '', lingue: '', abbigliamento: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+      Object.assign(base, { nome: '', cognome: '', ruolo: '', quantita: '1', data: '', ora_inizio: '', ora_fine: '', lingue: '', abbigliamento: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else if (category === 'grafica_stampa') {
       Object.assign(base, { tipo_materiale: '', quantita: '1', formato: '', data_consegna: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else {
@@ -167,10 +167,11 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
       const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
       Object.assign(record, { descrizione: strOrEmpty('descrizione'), quantita: qty, area_utilizzo: strOrEmpty('area_utilizzo'), data_montaggio: strOrNull('data_montaggio'), ora_montaggio: strOrNull('ora_montaggio'), data_smontaggio: strOrNull('data_smontaggio'), ora_smontaggio: strOrNull('ora_smontaggio'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
     } else if (category === 'staff_interno') {
-      Object.assign(record, { risorsa: strOrEmpty('risorsa'), ruolo: strOrEmpty('ruolo'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), note: strOrEmpty('note'), note_operative: strOrEmpty('note_operative'), venduto_totale: numOrNull('venduto_totale'), costo_giornaliero: numOrNull('costo_giornaliero'), costo_totale: numOrNull('costo_totale') })
+      const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
+      Object.assign(record, { nome: strOrEmpty('nome'), cognome: strOrEmpty('cognome'), risorsa: `${strOrEmpty('nome')} ${strOrEmpty('cognome')}`.trim(), ruolo: strOrEmpty('ruolo'), quantita: qty, data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), note: strOrEmpty('note_operative'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_giornaliero: numOrNull('costo_giornaliero'), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
     } else if (category === 'staff_esterno') {
       const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
-      Object.assign(record, { ruolo: strOrEmpty('ruolo'), quantita: qty, data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), lingue: strOrEmpty('lingue'), abbigliamento: strOrEmpty('abbigliamento'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
+      Object.assign(record, { nome: strOrEmpty('nome'), cognome: strOrEmpty('cognome'), ruolo: strOrEmpty('ruolo'), quantita: qty, data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), lingue: strOrEmpty('lingue'), abbigliamento: strOrEmpty('abbigliamento'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
     } else if (category === 'grafica_stampa') {
       const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
       Object.assign(record, { tipo_materiale: strOrEmpty('tipo_materiale'), quantita: qty, formato: strOrEmpty('formato'), data_consegna: strOrNull('data_consegna'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
@@ -205,8 +206,8 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
       case 'catering': return (item.tipologia as string) || 'Catering'
       case 'audio_video': return (item.tipologia_servizio as string) || 'Audio Video'
       case 'allestimenti': return (item.descrizione as string) || 'Allestimento'
-      case 'staff_interno': return (item.risorsa as string) || (item.ruolo as string) || 'Staff'
-      case 'staff_esterno': return (item.ruolo as string) || 'Staff esterno'
+      case 'staff_interno': { const sn = [(item.nome as string), (item.cognome as string)].filter(Boolean).join(' ') || (item.risorsa as string); return sn ? `${sn} - ${(item.ruolo as string) || 'Staff'}` : (item.ruolo as string) || 'Staff Simmetria' }
+      case 'staff_esterno': { const sn = [(item.nome as string), (item.cognome as string)].filter(Boolean).join(' '); return sn ? `${sn} - ${(item.ruolo as string) || 'Staff'}` : (item.ruolo as string) || 'Staff Esterno' }
       case 'grafica_stampa': return (item.tipo_materiale as string) || 'Grafica'
       default: return (item.descrizione as string) || 'Voce'
     }
@@ -355,16 +356,19 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
     )
     if (category === 'staff_interno') return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {inp('risorsa', 'Risorsa (nome)')}{sel('ruolo', 'Ruolo', STAFF_INT_RUOLI)}
+        {inp('nome', 'Nome')}{inp('cognome', 'Cognome')}{sel('ruolo', 'Ruolo', STAFF_INT_RUOLI)}
         {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
-        {inp('venduto_totale', 'Venduto cliente', 'number')}{inp('costo_giornaliero', 'Costo giornaliero', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        {inp('quantita', 'Quantita', 'number')}
+        {inp('venduto_unitario', 'Venduto/unit.', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_unitario', 'Costo/unit.', 'number')}{inp('costo_giornaliero', 'Costo giornaliero', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
         <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
         {ivaFields()}
       </div>
     )
     if (category === 'staff_esterno') return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {sel('ruolo', 'Ruolo', STAFF_EXT_RUOLI)}{inp('quantita', 'Quantita', 'number')}
+        {inp('nome', 'Nome')}{inp('cognome', 'Cognome')}{sel('ruolo', 'Ruolo', STAFF_EXT_RUOLI)}
+        {inp('quantita', 'Quantita', 'number')}
         {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
         {inp('lingue', 'Lingue')}{inp('abbigliamento', 'Abbigliamento')}
         {inp('venduto_unitario', 'Venduto/unit.', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
@@ -526,9 +530,9 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
     } else if (activeCategory === 'allestimenti') {
       Object.assign(base, { descrizione: '', quantita: '1', area_utilizzo: '', data_montaggio: '', ora_montaggio: '', data_smontaggio: '', ora_smontaggio: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else if (activeCategory === 'staff_interno') {
-      Object.assign(base, { risorsa: '', ruolo: '', data: '', ora_inizio: '', ora_fine: '', note: '', note_operative: '', venduto_totale: '', costo_giornaliero: '', costo_totale: '' })
+      Object.assign(base, { nome: '', cognome: '', ruolo: '', data: '', ora_inizio: '', ora_fine: '', quantita: '1', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_giornaliero: '', costo_totale: '' })
     } else if (activeCategory === 'staff_esterno') {
-      Object.assign(base, { ruolo: '', quantita: '1', data: '', ora_inizio: '', ora_fine: '', lingue: '', abbigliamento: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+      Object.assign(base, { nome: '', cognome: '', ruolo: '', quantita: '1', data: '', ora_inizio: '', ora_fine: '', lingue: '', abbigliamento: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else if (activeCategory === 'grafica_stampa') {
       Object.assign(base, { tipo_materiale: '', quantita: '1', formato: '', data_consegna: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else {
@@ -664,18 +668,25 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
         costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null),
       })
     } else if (activeCategory === 'staff_interno') {
+      const qty = numOrNull('quantita') ?? 1
+      const vu = numOrNull('venduto_unitario')
+      const cu = numOrNull('costo_unitario')
       Object.assign(record, {
-        risorsa: strOrEmpty('risorsa'), ruolo: strOrEmpty('ruolo'),
+        nome: strOrEmpty('nome'), cognome: strOrEmpty('cognome'),
+        risorsa: `${strOrEmpty('nome')} ${strOrEmpty('cognome')}`.trim(),
+        ruolo: strOrEmpty('ruolo'), quantita: qty,
         data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'),
-        note: strOrEmpty('note'), note_operative: strOrEmpty('note_operative'),
-        venduto_totale: numOrNull('venduto_totale'),
-        costo_giornaliero: numOrNull('costo_giornaliero'), costo_totale: numOrNull('costo_totale'),
+        note: strOrEmpty('note_operative'), note_operative: strOrEmpty('note_operative'),
+        venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null),
+        costo_giornaliero: numOrNull('costo_giornaliero'),
+        costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null),
       })
     } else if (activeCategory === 'staff_esterno') {
       const qty = numOrNull('quantita') ?? 1
       const vu = numOrNull('venduto_unitario')
       const cu = numOrNull('costo_unitario')
       Object.assign(record, {
+        nome: strOrEmpty('nome'), cognome: strOrEmpty('cognome'),
         ruolo: strOrEmpty('ruolo'), quantita: qty,
         data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'),
         lingue: strOrEmpty('lingue'), abbigliamento: strOrEmpty('abbigliamento'), note_operative: strOrEmpty('note_operative'),
@@ -731,8 +742,8 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
       case 'catering': return (item.tipologia as string) || 'Catering'
       case 'audio_video': return (item.tipologia_servizio as string) || 'Audio Video'
       case 'allestimenti': return (item.descrizione as string) || 'Allestimento'
-      case 'staff_interno': return (item.risorsa as string) || (item.ruolo as string) || 'Staff'
-      case 'staff_esterno': return (item.ruolo as string) || 'Staff esterno'
+      case 'staff_interno': { const sn = [(item.nome as string), (item.cognome as string)].filter(Boolean).join(' ') || (item.risorsa as string); return sn ? `${sn} - ${(item.ruolo as string) || 'Staff'}` : (item.ruolo as string) || 'Staff Simmetria' }
+      case 'staff_esterno': { const sn = [(item.nome as string), (item.cognome as string)].filter(Boolean).join(' '); return sn ? `${sn} - ${(item.ruolo as string) || 'Staff'}` : (item.ruolo as string) || 'Staff Esterno' }
       case 'grafica_stampa': return (item.tipo_materiale as string) || 'Grafica'
       default: return (item.descrizione as string) || 'Voce'
     }
@@ -749,8 +760,9 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
       venduto = (item.venduto_totale as number) ?? ((item.venduto_per_persona as number) ? (item.venduto_per_persona as number) * pax : 0)
       costo = (item.costo_totale as number) ?? ((item.costo_per_persona as number) ? (item.costo_per_persona as number) * pax : 0)
     } else if (activeCategory === 'staff_interno') {
-      venduto = (item.venduto_totale as number) ?? 0
-      costo = (item.costo_totale as number) ?? (item.costo_giornaliero as number) ?? 0
+      const qty = (item.quantita as number) ?? 1
+      venduto = (item.venduto_totale as number) ?? ((item.venduto_unitario as number) ? (item.venduto_unitario as number) * qty : 0)
+      costo = (item.costo_totale as number) ?? (item.costo_giornaliero as number) ?? ((item.costo_unitario as number) ? (item.costo_unitario as number) * qty : 0)
     } else {
       const qty = (item.quantita as number) ?? (item.pax as number) ?? 1
       venduto = (item.venduto_totale as number) ?? ((item.venduto_unitario as number) ? (item.venduto_unitario as number) * qty : 0)
@@ -960,12 +972,16 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
     )
     if (activeCategory === 'staff_interno') return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {inp('risorsa', 'Risorsa (nome)')}
+        {inp('nome', 'Nome')}
+        {inp('cognome', 'Cognome')}
         {sel('ruolo', 'Ruolo', STAFF_INT_RUOLI)}
         {inp('data', 'Data', 'date')}
         {inp('ora_inizio', 'Ora inizio', 'time')}
         {inp('ora_fine', 'Ora fine', 'time')}
-        {inp('venduto_totale', 'Venduto cliente', 'number')}
+        {inp('quantita', 'Quantita', 'number')}
+        {inp('venduto_unitario', 'Venduto/unit.', 'number')}
+        {inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_unitario', 'Costo/unit.', 'number')}
         {inp('costo_giornaliero', 'Costo giornaliero', 'number')}
         {inp('costo_totale', 'Costo totale', 'number')}
         <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
@@ -974,6 +990,8 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
     )
     if (activeCategory === 'staff_esterno') return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {inp('nome', 'Nome')}
+        {inp('cognome', 'Cognome')}
         {sel('ruolo', 'Ruolo', STAFF_EXT_RUOLI)}
         {inp('quantita', 'Quantita', 'number')}
         {inp('data', 'Data', 'date')}
