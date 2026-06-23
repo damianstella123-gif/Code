@@ -267,17 +267,50 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
 
   const renderForm = () => {
     if (category === 'hotel') return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {inp('titolo', 'Titolo')}{inp('quantita', 'N. Camere', 'number')}{inp('room_type', 'Tipo camera')}
-        {inp('check_in_date', 'Check-in data', 'date')}{inp('check_in_time', 'Check-in ora', 'time')}
-        {inp('check_out_date', 'Check-out data', 'date')}{inp('check_out_time', 'Check-out ora', 'time')}
-        {inp('data', 'Data meeting', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
-        {inp('luogo', 'Sala')}{inp('meeting_pax', 'Pax meeting', 'number')}{inp('meeting_setup', 'Setup')}
-        {inp('meeting_equipment', 'Attrezzature')}{chk('natural_light_preference', 'Luce naturale')}
-        {inp('venduto_unitario', 'Venduto/camera', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
-        {inp('costo_unitario', 'Costo/camera', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
-        <div className="sm:col-span-3">{inp('note', 'Note')}</div>
-        {ivaFields()}
+      <div className="space-y-5">
+        {/* PERNOTTAMENTI */}
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--red2)' }}>Pernottamenti</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {inp('titolo', 'Titolo / Nome hotel')}
+            {inp('check_in_date', 'Check-in data', 'date')}{inp('check_in_time', 'Check-in ora', 'time')}
+            {inp('check_out_date', 'Check-out data', 'date')}{inp('check_out_time', 'Check-out ora', 'time')}
+            {inp('quantita', 'N. Camere', 'number')}{inp('room_type', 'Tipologia camere')}
+            <div className="sm:col-span-3">{inp('note', 'Note camere / Rooming list')}</div>
+          </div>
+        </div>
+
+        {/* MEETING */}
+        <div style={{ borderTop: '1px solid var(--line)', paddingTop: '16px' }}>
+          <p className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--red2)' }}>Meeting</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {inp('data', 'Data meeting', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
+            {inp('luogo', 'Nome sala')}{inp('meeting_pax', 'Pax', 'number')}{inp('meeting_setup', 'Disposizione sala')}
+            {inp('meeting_equipment', 'Attrezzature')}
+            {chk('natural_light_preference', 'Preferenza luce naturale')}
+          </div>
+        </div>
+
+        {/* F&B HOTEL */}
+        <div style={{ borderTop: '1px solid var(--line)', paddingTop: '16px' }}>
+          <p className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--red2)' }}>F&B Hotel</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {inp('coffee_station_notes', 'Coffee station (note)')}
+            {inp('coffee_break_time', 'Coffee break ora', 'time')}{inp('coffee_break_notes', 'Coffee break note')}
+            {inp('lunch_time', 'Lunch ora', 'time')}{inp('lunch_notes', 'Lunch note')}
+            {inp('dinner_time', 'Dinner ora', 'time')}{inp('dinner_notes', 'Dinner note')}
+          </div>
+        </div>
+
+        {/* ECONOMICO */}
+        <div style={{ borderTop: '1px solid var(--line)', paddingTop: '16px' }}>
+          <p className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>Economico</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {inp('venduto_unitario', 'Venduto/camera', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+            {inp('costo_unitario', 'Costo/camera', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+          </div>
+          {ivaFields()}
+        </div>
       </div>
     )
     if (category === 'transfer') return (
