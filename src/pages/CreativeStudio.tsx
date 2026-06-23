@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Plus, X, Palette, Upload, Trash2, Edit3, Filter,
   Calendar, User, Tag, CheckCircle, Clock, Eye, Download,
+  Presentation, Share2, Image, Briefcase, Film,
 } from 'lucide-react'
 import {
   fetchCreativeProjects, upsertCreativeProject, updateCreativeProject, deleteCreativeProject,
@@ -30,6 +32,7 @@ function formatDate(d: string | null) {
 }
 
 export default function CreativeStudio() {
+  const navigate = useNavigate()
   const [projects, setProjects] = useState<CreativeProject[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [clients, setClients] = useState<Client[]>([])
@@ -94,6 +97,37 @@ export default function CreativeStudio() {
           style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
           <Plus className="w-4 h-4" /> Nuovo Progetto
         </button>
+      </div>
+
+      {/* Sub-sections */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {[
+          { label: 'Presentazioni', icon: Presentation, href: '/presentazioni', color: '#4db4ff' },
+          { label: 'Social Media', icon: Share2, href: '/social-studio', color: '#f97066' },
+          { label: 'Grafiche', icon: Image, href: '/creative-studio', color: '#38d27d', disabled: true },
+          { label: 'Asset Brand', icon: Briefcase, href: '/creative-studio', color: '#ffc24b', disabled: true },
+          { label: 'Media Library', icon: Film, href: '/creative-studio', color: '#a78bfa', disabled: true },
+        ].map((section) => (
+          <button
+            key={section.label}
+            onClick={() => !section.disabled && navigate(section.href)}
+            className="panel p-4 rounded-2xl flex flex-col items-center gap-2 transition-all hover:shadow-lg group"
+            style={{ opacity: section.disabled ? 0.5 : 1, cursor: section.disabled ? 'default' : 'pointer' }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
+              style={{ background: `${section.color}18` }}
+            >
+              <section.icon className="w-5 h-5" style={{ color: section.color }} />
+            </div>
+            <span className="text-xs font-medium text-center" style={{ color: 'var(--text)' }}>{section.label}</span>
+            {section.disabled && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--line)', color: 'var(--muted)' }}>
+                Prossimamente
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* KPIs */}

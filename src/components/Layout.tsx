@@ -21,8 +21,6 @@ import {
   SlidersHorizontal,
   FileText,
   Palette,
-  Share2,
-  Presentation,
   MessageCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -45,8 +43,6 @@ const iconMap: Record<string, React.ElementType> = {
   '/fornitori': Truck,
   '/amministrazione': Settings,
   '/creative-studio': Palette,
-  '/social-studio': Share2,
-  '/presentazioni': Presentation,
   '/comunicazioni': MessageSquare,
   '/workflow': GitBranch,
   '/pratiche': FileText,
