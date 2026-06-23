@@ -12,6 +12,7 @@ interface EventRow {
   status: Event['stato']
   budget: number | string
   ricavo_cliente: number | null
+  fee_agenzia_pct: number | null
   attendees: number
   project_manager_id: string
   team_member_ids: string[]
@@ -30,6 +31,7 @@ function rowToEvent(r: EventRow): Event {
     location: r.location ?? '',
     budget: typeof r.budget === 'string' ? Number(r.budget) : r.budget,
     ricavo_cliente: r.ricavo_cliente ?? null,
+    fee_agenzia_pct: r.fee_agenzia_pct ?? 6,
     stato: r.status,
     partecipanti: r.attendees ?? 0,
     responsabile: r.project_manager_id ?? '',
@@ -49,6 +51,7 @@ function eventToRow(e: Event): Omit<EventRow, 'created_at' | 'updated_at'> {
     status: e.stato,
     budget: e.budget,
     ricavo_cliente: e.ricavo_cliente ?? null,
+    fee_agenzia_pct: e.fee_agenzia_pct ?? 6,
     attendees: e.partecipanti ?? 0,
     project_manager_id: e.responsabile ?? '',
     team_member_ids: e.team ?? [],
@@ -107,6 +110,7 @@ export async function updateEvent(id: string, patch: Partial<Event>): Promise<Ev
   if (patch.stato !== undefined) dbPatch.status = patch.stato
   if (patch.budget !== undefined) dbPatch.budget = patch.budget
   if (patch.ricavo_cliente !== undefined) dbPatch.ricavo_cliente = patch.ricavo_cliente
+  if (patch.fee_agenzia_pct !== undefined) dbPatch.fee_agenzia_pct = patch.fee_agenzia_pct
   if (patch.partecipanti !== undefined) dbPatch.attendees = patch.partecipanti
   if (patch.responsabile !== undefined) dbPatch.project_manager_id = patch.responsabile
   if (patch.team !== undefined) dbPatch.team_member_ids = patch.team

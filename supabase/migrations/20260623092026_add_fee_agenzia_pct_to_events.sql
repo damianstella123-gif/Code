@@ -1,0 +1,1 @@
+ALTER TABLE events ADD COLUMN IF NOT EXISTS fee_agenzia_pct numeric DEFAULT 6;

@@ -8,6 +8,7 @@ export interface Event {
   location: string
   budget: number
   ricavo_cliente: number | null
+  fee_agenzia_pct: number
   stato: 'bozza' | 'pianificazione' | 'in_corso' | 'completato'
   partecipanti: number
   responsabile: string
@@ -25,6 +26,7 @@ export const events: Event[] = [
     location: 'MiCo Milano Convention Center',
     budget: 150000,
     ricavo_cliente: null,
+    fee_agenzia_pct: 6,
     stato: 'in_corso',
     partecipanti: 520,
     responsabile: 'usr_003',
@@ -40,6 +42,7 @@ export const events: Event[] = [
     location: 'Spazio A3, Roma',
     budget: 45000,
     ricavo_cliente: null,
+    fee_agenzia_pct: 6,
     stato: 'pianificazione',
     partecipanti: 150,
     responsabile: 'usr_002',
@@ -55,6 +58,7 @@ export const events: Event[] = [
     location: 'Villa Reale, Monza',
     budget: 85000,
     ricavo_cliente: null,
+    fee_agenzia_pct: 6,
     stato: 'pianificazione',
     partecipanti: 2000,
     responsabile: 'usr_003',
@@ -70,6 +74,7 @@ export const events: Event[] = [
     location: 'Parco Naturale Laghi, Varese',
     budget: 22000,
     ricavo_cliente: null,
+    fee_agenzia_pct: 6,
     stato: 'completato',
     partecipanti: 85,
     responsabile: 'usr_012',
@@ -85,6 +90,7 @@ export const events: Event[] = [
     location: 'Palazzo delle Stelline, Milano',
     budget: 120000,
     ricavo_cliente: null,
+    fee_agenzia_pct: 6,
     stato: 'bozza',
     partecipanti: 300,
     responsabile: 'usr_002',

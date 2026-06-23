@@ -177,6 +177,7 @@ function EventFormModal({ event, internalUsers, allClients, onSave, onCancel }: 
       location: location.trim(),
       budget: parseInt(budget) || 0,
       ricavo_cliente: event?.ricavo_cliente ?? null,
+      fee_agenzia_pct: event?.fee_agenzia_pct ?? 6,
       stato,
       partecipanti: parseInt(partecipanti) || 0,
       responsabile,
@@ -1280,6 +1281,15 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
   const [editForm, setEditForm] = useState<Record<string, string | number | boolean>>({})
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [feePct, setFeePct] = useState(event.fee_agenzia_pct ?? 6)
+  const [editingFee, setEditingFee] = useState(false)
+  const [feeInput, setFeeInput] = useState(String(event.fee_agenzia_pct ?? 6))
+
+  async function saveFee(newPct: number) {
+    setFeePct(newPct)
+    setEditingFee(false)
+    await updateEventRemote(event.id, { fee_agenzia_pct: newPct })
+  }
 
   const loadData = useCallback(async () => {
     const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes] = await Promise.all([
@@ -1562,22 +1572,71 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
     <div className="space-y-5">
       {/* Summary cards */}
       <AnimatedLaserBorder loading={saving}>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="panel p-4 text-center">
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Venduto Cliente</p>
-          <p className="text-xl font-bold mt-1" style={{ color: 'var(--text)' }}>{'\u20AC'}{totals.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
+      <div className="panel p-5 space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="text-center">
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Totale Venduto Servizi</p>
+            <p className="text-xl font-bold mt-1" style={{ color: 'var(--text)' }}>{'\u20AC'}{totals.venduto.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs flex items-center justify-center gap-1" style={{ color: 'var(--muted)' }}>
+              Fee Agenzia
+              {!editingFee && (
+                <button onClick={() => { setEditingFee(true); setFeeInput(String(feePct)) }}
+                  className="opacity-60 hover:opacity-100 transition-opacity">
+                  <Edit3 className="w-3 h-3" />
+                </button>
+              )}
+            </p>
+            {editingFee ? (
+              <div className="flex items-center justify-center gap-1 mt-1">
+                <input type="number" step="0.5" min="0" max="100" value={feeInput}
+                  onChange={e => setFeeInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveFee(Number(feeInput) || 0); if (e.key === 'Escape') setEditingFee(false) }}
+                  className="w-16 px-2 py-1 text-center text-sm rounded-lg"
+                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                  autoFocus
+                />
+                <span className="text-sm" style={{ color: 'var(--muted)' }}>%</span>
+                <button onClick={() => saveFee(Number(feeInput) || 0)}
+                  className="p-1 rounded-lg hover:bg-white/10"
+                  style={{ color: 'var(--green)' }}>
+                  <Save className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <p className="text-xl font-bold mt-1" style={{ color: 'var(--blue)' }}>
+                {'\u20AC'}{(totals.venduto * feePct / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                <span className="text-xs font-normal ml-1" style={{ color: 'var(--muted)' }}>({feePct}%)</span>
+              </p>
+            )}
+          </div>
+          <div className="text-center">
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Totale Ricavi</p>
+            <p className="text-xl font-bold mt-1" style={{ color: 'var(--text)' }}>{'\u20AC'}{(totals.venduto + totals.venduto * feePct / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
+          </div>
         </div>
-        <div className="panel p-4 text-center">
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Costi Reali</p>
-          <p className="text-xl font-bold mt-1" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{totals.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
-        </div>
-        <div className="panel p-4 text-center">
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Margine</p>
-          <p className="text-xl font-bold mt-1" style={{ color: totals.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{totals.margine.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
-        </div>
-        <div className="panel p-4 text-center">
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Margine %</p>
-          <p className="text-xl font-bold mt-1" style={{ color: totals.marginePct >= 20 ? 'var(--green)' : totals.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{totals.marginePct.toFixed(1)}%</p>
+        <div className="h-px" style={{ background: 'var(--line)' }} />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="text-center">
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Totale Costi</p>
+            <p className="text-xl font-bold mt-1" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{totals.costo.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Margine</p>
+            <p className="text-xl font-bold mt-1" style={{ color: (totals.venduto + totals.venduto * feePct / 100 - totals.costo) >= 0 ? 'var(--green)' : 'var(--red2)' }}>
+              {'\u20AC'}{(totals.venduto + totals.venduto * feePct / 100 - totals.costo).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Margine %</p>
+            {(() => {
+              const totalRicavi = totals.venduto + totals.venduto * feePct / 100
+              const margine = totalRicavi - totals.costo
+              const marginePct = totalRicavi > 0 ? (margine / totalRicavi) * 100 : 0
+              return <p className="text-xl font-bold mt-1" style={{ color: marginePct >= 20 ? 'var(--green)' : marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{marginePct.toFixed(1)}%</p>
+            })()}
+          </div>
         </div>
       </div>
       </AnimatedLaserBorder>
@@ -1586,12 +1645,20 @@ function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }
       {totals.venduto > 0 && (
         <div className="panel p-5">
           <div className="flex justify-between text-xs mb-2">
-            <span style={{ color: 'var(--muted)' }}>Margine operativo</span>
-            <span style={{ color: totals.marginePct >= 20 ? 'var(--green)' : 'var(--yellow)' }}>{totals.marginePct.toFixed(1)}%</span>
+            <span style={{ color: 'var(--muted)' }}>Margine operativo (incl. fee)</span>
+            {(() => {
+              const totalRicavi = totals.venduto + totals.venduto * feePct / 100
+              const marginePct = totalRicavi > 0 ? ((totalRicavi - totals.costo) / totalRicavi) * 100 : 0
+              return <span style={{ color: marginePct >= 20 ? 'var(--green)' : 'var(--yellow)' }}>{marginePct.toFixed(1)}%</span>
+            })()}
           </div>
           <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
-            <div className="h-full rounded-full transition-all"
-              style={{ width: `${Math.min(Math.max(totals.marginePct, 0), 100)}%`, background: totals.marginePct >= 20 ? 'var(--green)' : totals.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }} />
+            {(() => {
+              const totalRicavi = totals.venduto + totals.venduto * feePct / 100
+              const marginePct = totalRicavi > 0 ? ((totalRicavi - totals.costo) / totalRicavi) * 100 : 0
+              return <div className="h-full rounded-full transition-all"
+                style={{ width: `${Math.min(Math.max(marginePct, 0), 100)}%`, background: marginePct >= 20 ? 'var(--green)' : marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }} />
+            })()}
           </div>
         </div>
       )}
