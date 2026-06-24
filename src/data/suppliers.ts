@@ -1,5 +1,11 @@
 export type StatoContratto = 'attivo' | 'in_scadenza' | 'scaduto' | 'in_rinnovo' | 'sospeso'
 
+export type SupplierCategory = 'Hotel' | 'Ristoranti' | 'Location' | 'Attività' | 'Trasporti' | 'Catering' | 'Audio Video' | 'Allestimenti' | 'Staff' | 'Varie'
+
+export const SUPPLIER_CATEGORIES: SupplierCategory[] = [
+  'Hotel', 'Ristoranti', 'Location', 'Attività', 'Trasporti', 'Catering', 'Audio Video', 'Allestimenti', 'Staff', 'Varie',
+]
+
 export interface Documento {
   id: string
   nome: string
@@ -15,6 +21,27 @@ export interface Recensione {
   voto: number
   testo: string
   data: string
+}
+
+export interface SupplierDetails {
+  citta?: string
+  catena?: string
+  numero_camere?: number
+  numero_sale_meeting?: number
+  capienza_sale?: number
+  ristorante_interno?: boolean
+  parcheggio?: boolean
+  tipologia_cucina?: string
+  indoor?: boolean
+  dehor?: boolean
+  terrazza?: boolean
+  sala_privata?: boolean
+  esclusiva?: boolean
+  coperti_totali?: number
+  outdoor?: boolean
+  capienza?: number
+  tipologia_attivita?: string
+  durata?: string
 }
 
 export interface Supplier {
@@ -40,6 +67,8 @@ export interface Supplier {
   documenti: Documento[]
   recensioni: Recensione[]
   piva: string
+  logoUrl?: string
+  details?: SupplierDetails
 }
 
 export const suppliers: Supplier[] = [

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import {
   Search, Plus, FileText, Trash2, X, Upload,
-  Download, FolderOpen, Building2,
+  Download, FolderOpen, Building2, Eye,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -181,6 +181,28 @@ export default function Archivio() {
     URL.revokeObjectURL(url)
   }
 
+  const [previewDoc, setPreviewDoc] = useState<Document | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  async function handlePreview(doc: Document) {
+    const ext = doc.file_name.split('.').pop()?.toLowerCase() ?? ''
+    const previewable = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp']
+    if (!previewable.includes(ext)) {
+      handleDownload(doc)
+      return
+    }
+    const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path)
+    if (data?.publicUrl) {
+      setPreviewUrl(data.publicUrl)
+      setPreviewDoc(doc)
+    } else {
+      const { data: blob, error } = await supabase.storage.from('documents').download(doc.file_path)
+      if (error || !blob) { handleDownload(doc); return }
+      setPreviewUrl(URL.createObjectURL(blob))
+      setPreviewDoc(doc)
+    }
+  }
+
   async function handleDelete(id: string) {
     const doc = docs.find(d => d.id === id)
     if (!doc) return
@@ -285,6 +307,10 @@ export default function Archivio() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
+                      <button onClick={() => handlePreview(doc)}
+                        className="p-2 rounded-lg transition-all hover:bg-white/10" title="Apri">
+                        <Eye className="w-4 h-4" style={{ color: 'var(--blue)' }} />
+                      </button>
                       <button onClick={() => handleDownload(doc)}
                         className="p-2 rounded-lg transition-all hover:bg-white/10" title="Scarica">
                         <Download className="w-4 h-4" style={{ color: 'var(--muted)' }} />
@@ -366,6 +392,38 @@ export default function Archivio() {
               <button onClick={() => handleDelete(deletingId)} className="flex-1 py-2.5 rounded-xl text-sm text-white"
                 style={{ background: 'var(--red2)' }}>Elimina</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Modal */}
+      {previewDoc && previewUrl && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(0,0,0,0.85)' }}>
+          <div className="flex items-center justify-between px-4 py-3" style={{ background: 'var(--panel)', borderBottom: '1px solid var(--line)' }}>
+            <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{previewDoc.nome}</p>
+            <div className="flex items-center gap-2">
+              <button onClick={() => handleDownload(previewDoc)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+                style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>
+                <Download className="w-3.5 h-3.5" /> Scarica
+              </button>
+              <button onClick={() => { setPreviewDoc(null); setPreviewUrl(null) }}
+                className="p-2 rounded-lg hover:bg-white/10">
+                <X className="w-5 h-5" style={{ color: 'var(--muted)' }} />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+            {(() => {
+              const ext = previewDoc.file_name.split('.').pop()?.toLowerCase() ?? ''
+              if (ext === 'pdf') {
+                return <iframe src={previewUrl} className="w-full h-full rounded-lg" style={{ maxWidth: 900, minHeight: '80vh' }} />
+              }
+              if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+                return <img src={previewUrl} alt={previewDoc.nome} className="max-w-full max-h-[85vh] rounded-lg object-contain" />
+              }
+              return <p className="text-sm" style={{ color: 'var(--muted)' }}>Anteprima non disponibile per questo formato.</p>
+            })()}
           </div>
         </div>
       )}

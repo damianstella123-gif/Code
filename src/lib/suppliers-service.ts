@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { Supplier, StatoContratto, Documento, Recensione } from '@/data/suppliers'
+import type { Supplier, StatoContratto, Documento, Recensione, SupplierDetails } from '@/data/suppliers'
 
 interface SupplierRow {
   id: string
@@ -24,6 +24,9 @@ interface SupplierRow {
   max_cost: number | string
   documents: Documento[]
   reviews: Recensione[]
+  logo_url: string | null
+  details: SupplierDetails | null
+  note_operative: string | null
   created_at: string
   updated_at: string
 }
@@ -52,11 +55,13 @@ function rowToSupplier(r: SupplierRow): Supplier {
     costoMedioPerEvento: num(r.avg_cost_per_event),
     costoMinimo: num(r.min_cost),
     costoMassimo: num(r.max_cost),
-    noteOperative: r.notes ?? '',
+    noteOperative: r.note_operative ?? r.notes ?? '',
     eventiId: r.event_ids ?? [],
     documenti: (r.documents as Documento[]) ?? [],
     recensioni: (r.reviews as Recensione[]) ?? [],
     piva: r.vat_number ?? '',
+    logoUrl: r.logo_url ?? undefined,
+    details: (r.details as SupplierDetails) ?? undefined,
   }
 }
 
@@ -70,6 +75,7 @@ function supplierToRow(s: Supplier): Omit<SupplierRow, 'created_at' | 'updated_a
     phone: s.telefono ?? '',
     rating: s.rating ?? 0,
     notes: s.noteOperative ?? '',
+    note_operative: s.noteOperative ?? '',
     contact_phone: s.referenteTelefono ?? '',
     location: s.location ?? '',
     website: s.sito ?? '',
@@ -84,6 +90,8 @@ function supplierToRow(s: Supplier): Omit<SupplierRow, 'created_at' | 'updated_a
     max_cost: s.costoMassimo ?? 0,
     documents: s.documenti ?? [],
     reviews: s.recensioni ?? [],
+    logo_url: s.logoUrl ?? null,
+    details: s.details ?? null,
   }
 }
 
@@ -136,6 +144,9 @@ export async function updateSupplier(id: string, patch: Partial<Supplier>): Prom
   if (patch.costoMassimo !== undefined) dbPatch.max_cost = patch.costoMassimo
   if (patch.documenti !== undefined) dbPatch.documents = patch.documenti
   if (patch.recensioni !== undefined) dbPatch.reviews = patch.recensioni
+  if ((patch as Record<string, unknown>).logoUrl !== undefined) (dbPatch as Record<string, unknown>).logo_url = (patch as Record<string, unknown>).logoUrl ?? null
+  if ((patch as Record<string, unknown>).details !== undefined) (dbPatch as Record<string, unknown>).details = (patch as Record<string, unknown>).details ?? null
+  if (patch.noteOperative !== undefined) (dbPatch as Record<string, unknown>).note_operative = patch.noteOperative
 
   const { data, error } = await supabase
     .from('suppliers')
