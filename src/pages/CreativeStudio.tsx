@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Plus, X, Palette, Upload, Trash2, Edit3, Filter,
   Calendar, User, Tag, CheckCircle, Clock, Eye, Download,
-  Presentation, Share2, Image, Briefcase, Film,
+  Presentation, Share2, Image, Briefcase, Film, FileText,
 } from 'lucide-react'
 import {
   fetchCreativeProjects, upsertCreativeProject, updateCreativeProject, deleteCreativeProject,
@@ -13,9 +12,33 @@ import {
 import { fetchEvents } from '@/lib/events-service'
 import { fetchClients } from '@/lib/clients-service'
 import { fetchAllProfiles, type Profile } from '@/lib/profiles'
+import { supabase } from '@/lib/supabase'
 import type { Event } from '@/data/events'
 
 interface Client { id: string; nome: string }
+
+type StudioSection = 'all' | 'presentazioni' | 'social' | 'grafiche' | 'foto_video' | 'media'
+
+const SECTIONS: { id: StudioSection; label: string; icon: React.ElementType; color: string }[] = [
+  { id: 'presentazioni', label: 'Presentazioni', icon: Presentation, color: '#4db4ff' },
+  { id: 'social', label: 'Social Media', icon: Share2, color: '#f97066' },
+  { id: 'grafiche', label: 'Grafiche', icon: Image, color: '#38d27d' },
+  { id: 'foto_video', label: 'Foto / Video', icon: Film, color: '#a78bfa' },
+  { id: 'media', label: 'Media Library', icon: Briefcase, color: '#ffc24b' },
+]
+
+const TYPE_TO_SECTION: Record<string, StudioSection> = {
+  presentazione: 'presentazioni',
+  menu_a6: 'grafiche',
+  menu_a5: 'grafiche',
+  badge: 'grafiche',
+  cartellonistica: 'grafiche',
+  invito: 'grafiche',
+  programma: 'grafiche',
+  materiale_sponsor: 'grafiche',
+  brochure: 'grafiche',
+  welcome_sign: 'grafiche',
+}
 
 function statusColor(s: string) {
   return CREATIVE_STATUSES.find(x => x.id === s)?.color ?? '#9ba3aa'
@@ -32,7 +55,6 @@ function formatDate(d: string | null) {
 }
 
 export default function CreativeStudio() {
-  const navigate = useNavigate()
   const [projects, setProjects] = useState<CreativeProject[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [clients, setClients] = useState<Client[]>([])
@@ -40,15 +62,27 @@ export default function CreativeStudio() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<CreativeProject | null>(null)
-  const [filterType, setFilterType] = useState('')
+  const [activeSection, setActiveSection] = useState<StudioSection>('all')
   const [filterStatus, setFilterStatus] = useState('')
+  const [mediaDocs, setMediaDocs] = useState<{ id: string; nome: string; file_name: string; file_path: string; file_size: number; categoria: string; created_at: string }[]>([])
 
   const refresh = useCallback(async () => {
-    const [p, e, c, pr] = await Promise.all([fetchCreativeProjects(), fetchEvents(), fetchClients(), fetchAllProfiles()])
+    const [p, e, c, pr, mediaRes] = await Promise.all([
+      fetchCreativeProjects(),
+      fetchEvents(),
+      fetchClients(),
+      fetchAllProfiles(),
+      supabase.from('documents').select('id, nome, file_name, file_path, file_size, categoria, created_at')
+        .in('categoria', ['Foto / Video', 'Presentazioni', 'Materiali Evento'])
+        .eq('scope', 'project')
+        .order('created_at', { ascending: false })
+        .limit(50),
+    ])
     setProjects(p)
     setEvents(e)
     setClients(c as Client[])
     setProfiles(pr)
+    setMediaDocs(mediaRes.data ?? [])
     setLoading(false)
   }, [])
 
@@ -56,10 +90,14 @@ export default function CreativeStudio() {
 
   const filtered = useMemo(() => {
     let list = projects
-    if (filterType) list = list.filter(p => p.type === filterType)
+    if (activeSection !== 'all') {
+      if (activeSection === 'presentazioni') list = list.filter(p => p.type === 'presentazione')
+      else if (activeSection === 'grafiche') list = list.filter(p => TYPE_TO_SECTION[p.type] === 'grafiche')
+      else if (activeSection === 'social') list = list.filter(p => p.type === 'social' || p.type === 'materiale_sponsor')
+    }
     if (filterStatus) list = list.filter(p => p.status === filterStatus)
     return list
-  }, [projects, filterType, filterStatus])
+  }, [projects, activeSection, filterStatus])
 
   const stats = useMemo(() => ({
     total: projects.length,
@@ -89,7 +127,7 @@ export default function CreativeStudio() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Creative Studio</h1>
-          <p className="mt-1" style={{ color: 'var(--muted)' }}>Gestione materiali creativi per eventi</p>
+          <p className="mt-1" style={{ color: 'var(--muted)' }}>Presentazioni, grafiche, social media e media library</p>
         </div>
         <button
           onClick={() => { setEditing(null); setShowForm(true) }}
@@ -99,20 +137,14 @@ export default function CreativeStudio() {
         </button>
       </div>
 
-      {/* Sub-sections */}
+      {/* Sub-sections navigation */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {[
-          { label: 'Presentazioni', icon: Presentation, href: '/presentazioni', color: '#4db4ff' },
-          { label: 'Social Media', icon: Share2, href: '/social-studio', color: '#f97066' },
-          { label: 'Grafiche', icon: Image, href: '/creative-studio', color: '#38d27d', disabled: true },
-          { label: 'Asset Brand', icon: Briefcase, href: '/creative-studio', color: '#ffc24b', disabled: true },
-          { label: 'Media Library', icon: Film, href: '/creative-studio', color: '#a78bfa', disabled: true },
-        ].map((section) => (
+        {SECTIONS.map(section => (
           <button
-            key={section.label}
-            onClick={() => !section.disabled && navigate(section.href)}
+            key={section.id}
+            onClick={() => setActiveSection(activeSection === section.id ? 'all' : section.id)}
             className="panel p-4 rounded-2xl flex flex-col items-center gap-2 transition-all hover:shadow-lg group"
-            style={{ opacity: section.disabled ? 0.5 : 1, cursor: section.disabled ? 'default' : 'pointer' }}
+            style={{ border: activeSection === section.id ? `1px solid ${section.color}` : '1px solid var(--line)' }}
           >
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
@@ -121,14 +153,34 @@ export default function CreativeStudio() {
               <section.icon className="w-5 h-5" style={{ color: section.color }} />
             </div>
             <span className="text-xs font-medium text-center" style={{ color: 'var(--text)' }}>{section.label}</span>
-            {section.disabled && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--line)', color: 'var(--muted)' }}>
-                Prossimamente
-              </span>
-            )}
           </button>
         ))}
       </div>
+
+      {/* Show media library if that section is active */}
+      {(activeSection === 'foto_video' || activeSection === 'media') && (
+        <div className="panel p-5">
+          <p className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>
+            {activeSection === 'foto_video' ? 'Foto / Video dai documenti evento' : 'Media Library'}
+          </p>
+          {mediaDocs.length === 0 ? (
+            <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun media caricato negli eventi</p>
+          ) : (
+            <div className="space-y-2">
+              {mediaDocs.filter(d => activeSection === 'foto_video' ? d.categoria === 'Foto / Video' : true).map(doc => (
+                <div key={doc.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/[0.02]">
+                  <FileText className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm truncate" style={{ color: 'var(--text)' }}>{doc.nome}</p>
+                    <p className="text-xs" style={{ color: 'var(--muted)' }}>{doc.file_name}</p>
+                  </div>
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>{doc.categoria}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -150,48 +202,46 @@ export default function CreativeStudio() {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <Filter className="w-4 h-4" style={{ color: 'var(--muted)' }} />
-        <select value={filterType} onChange={e => setFilterType(e.target.value)}
-          className="px-3 py-1.5 rounded-lg text-sm"
-          style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-          <option value="">Tutti i tipi</option>
-          {CREATIVE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-        </select>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          className="px-3 py-1.5 rounded-lg text-sm"
-          style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-          <option value="">Tutti gli stati</option>
-          {CREATIVE_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-        </select>
-        {(filterType || filterStatus) && (
-          <button onClick={() => { setFilterType(''); setFilterStatus('') }}
-            className="text-xs px-2 py-1 rounded-lg" style={{ color: 'var(--red2)' }}>
-            Resetta
-          </button>
-        )}
-      </div>
+      {/* Status filter */}
+      {activeSection !== 'foto_video' && activeSection !== 'media' && (
+        <div className="flex flex-wrap gap-2 items-center">
+          <Filter className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+            className="px-3 py-1.5 rounded-lg text-sm"
+            style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+            <option value="">Tutti gli stati</option>
+            {CREATIVE_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+          {filterStatus && (
+            <button onClick={() => setFilterStatus('')}
+              className="text-xs px-2 py-1 rounded-lg" style={{ color: 'var(--red2)' }}>
+              Resetta
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Projects Grid */}
-      {loading ? (
-        <div className="text-center py-12" style={{ color: 'var(--muted)' }}>Caricamento...</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-12 panel rounded-2xl">
-          <Palette className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--muted)' }} />
-          <p style={{ color: 'var(--muted)' }}>Nessun progetto creativo</p>
-          <button onClick={() => { setEditing(null); setShowForm(true) }}
-            className="mt-3 text-sm font-medium" style={{ color: 'var(--red2)' }}>
-            Crea il primo progetto
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(p => (
-            <ProjectCard key={p.id} project={p} events={events} clients={clients} profiles={profiles}
-              onEdit={handleEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} />
-          ))}
-        </div>
+      {activeSection !== 'foto_video' && activeSection !== 'media' && (
+        loading ? (
+          <div className="text-center py-12" style={{ color: 'var(--muted)' }}>Caricamento...</div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-12 panel rounded-2xl">
+            <Palette className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--muted)' }} />
+            <p style={{ color: 'var(--muted)' }}>Nessun progetto creativo</p>
+            <button onClick={() => { setEditing(null); setShowForm(true) }}
+              className="mt-3 text-sm font-medium" style={{ color: 'var(--red2)' }}>
+              Crea il primo progetto
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map(p => (
+              <ProjectCard key={p.id} project={p} events={events} clients={clients} profiles={profiles}
+                onEdit={handleEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} />
+            ))}
+          </div>
+        )
       )}
 
       {/* Form Modal */}

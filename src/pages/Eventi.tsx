@@ -1390,7 +1390,11 @@ interface EventDocument {
   created_at: string
 }
 
-const DOC_CATEGORIE = ['Budget', 'Preventivi', 'Contratti', 'Presentazioni', 'Rooming List', 'Materiali Evento', 'Fatture', 'Altro']
+const DOC_CATEGORIE = [
+  'Budget', 'Contratti', 'Preventivi', 'Hotel', 'Transfer', 'Ristoranti',
+  'Fornitori', 'Rooming List', 'Presentazioni', 'Materiali Evento',
+  'Foto / Video', 'Fatture', 'Varie',
+]
 
 function getFileLabel(mimeType: string): string {
   const FILE_ICONS: Record<string, string> = {
@@ -2483,9 +2487,6 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
     { id: 'documenti', label: 'Documenti' },
     { id: 'programma', label: 'Programma' },
     { id: 'timeline', label: 'Timeline' },
-    { id: 'creative', label: 'Creative Studio' },
-    { id: 'social', label: 'Social' },
-    { id: 'presentazioni', label: 'Presentazioni' },
     { id: 'pacchetto', label: 'Pacchetto' },
   ]
 

@@ -10,9 +10,6 @@ import {
   CalendarDays,
   Truck,
   Settings,
-  MessageSquare,
-  GitBranch,
-  UserCog,
   Menu,
   X,
   Bell,
@@ -22,6 +19,10 @@ import {
   FileText,
   Palette,
   MessageCircle,
+  MessageSquare,
+  GitBranch,
+  UserCog,
+  BookOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { loadUser, getAllowedNavForRole, signOutEverywhere } from '@/lib/auth'
@@ -49,6 +50,7 @@ const iconMap: Record<string, React.ElementType> = {
   '/utenti': UserCog,
   '/impostazioni': SlidersHorizontal,
   '/feedback-beta': MessageCircle,
+  '/archivio': BookOpen,
 }
 
 interface SidebarProps {
