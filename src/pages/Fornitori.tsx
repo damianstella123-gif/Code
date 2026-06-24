@@ -9,11 +9,9 @@ import { fetchSuppliers, upsertSupplier, deleteSupplier as deleteSupplierRemote,
 import { fetchEvents } from '@/lib/events-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { supabase } from '@/lib/supabase'
-import type { Supplier, SupplierDetails, SupplierCategory } from '@/data/suppliers'
+import type { Supplier, SupplierDetails } from '@/data/suppliers'
 import { SUPPLIER_CATEGORIES } from '@/data/suppliers'
 import type { Event } from '@/data/events'
-
-const ALL_FILTER = 'Tutte'
 
 function InteractiveStars({ rating, onChange, size = 'sm' }: { rating: number; onChange?: (v: number) => void; size?: 'sm' | 'lg' }) {
   const w = size === 'lg' ? 'w-5 h-5' : 'w-3.5 h-3.5'
@@ -505,6 +503,19 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
   )
 }
 
+// ─── Category Icons ──────────────────────────────────────────────────────────
+
+import {
+  Hotel, UtensilsCrossed, MapPinned, Sparkles, Bus, CookingPot,
+  Speaker, PaintBucket, Users, MoreHorizontal, Filter,
+} from 'lucide-react'
+
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  Hotel, Ristoranti: UtensilsCrossed, Location: MapPinned,
+  'Attività': Sparkles, Trasporti: Bus, Catering: CookingPot,
+  'Audio Video': Speaker, Allestimenti: PaintBucket, Staff: Users, Varie: MoreHorizontal,
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function Fornitori() {
@@ -514,10 +525,15 @@ export default function Fornitori() {
   const [eventsList, setEventsList] = useState<Event[]>([])
   const [selected, setSelected] = useState<Supplier | null>(null)
   const [search, setSearch] = useState('')
-  const [filterCategoria, setFilterCategoria] = useState(ALL_FILTER)
+  const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<Supplier | undefined>(undefined)
   const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [filterCity, setFilterCity] = useState('')
+  const [filterMinRating, setFilterMinRating] = useState(0)
+  const [filterMinCapacity, setFilterMinCapacity] = useState('')
+  const [filterMinRooms, setFilterMinRooms] = useState('')
 
   const loadData = useCallback(async () => {
     const [sups, evs] = await Promise.all([fetchSuppliers(), fetchEvents()])
@@ -532,7 +548,7 @@ export default function Fornitori() {
     const id = searchParams.get('id')
     if (id && supplierList.length > 0) {
       const found = supplierList.find(s => s.id === id)
-      if (found) setSelected(found)
+      if (found) { setSelected(found); setActiveCategory(found.categoria) }
       setSearchParams({}, { replace: true })
     }
   }, [searchParams, supplierList, setSearchParams])
@@ -553,28 +569,6 @@ export default function Fornitori() {
     setDeletingSupplier(null)
   }
 
-  const categories = useMemo(() => {
-    const cats = new Set(supplierList.map(s => s.categoria).filter(Boolean))
-    return [ALL_FILTER, ...SUPPLIER_CATEGORIES.filter(c => cats.has(c)), ...[...cats].filter(c => !SUPPLIER_CATEGORIES.includes(c as SupplierCategory))]
-  }, [supplierList])
-
-  const filtered = useMemo(() => {
-    let list = supplierList
-    if (filterCategoria !== ALL_FILTER) {
-      list = list.filter(s => s.categoria === filterCategoria)
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(s =>
-        s.nome.toLowerCase().includes(q) ||
-        s.categoria.toLowerCase().includes(q) ||
-        s.location.toLowerCase().includes(q) ||
-        s.referente.toLowerCase().includes(q)
-      )
-    }
-    return list
-  }, [supplierList, filterCategoria, search])
-
   const categoryCounts = useMemo(() => {
     const map: Record<string, number> = {}
     for (const s of supplierList) {
@@ -584,6 +578,35 @@ export default function Fornitori() {
     return map
   }, [supplierList])
 
+  const filtered = useMemo(() => {
+    let list = supplierList
+    if (activeCategory) list = list.filter(s => s.categoria === activeCategory)
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(s =>
+        s.nome.toLowerCase().includes(q) ||
+        s.location.toLowerCase().includes(q) ||
+        s.referente.toLowerCase().includes(q) ||
+        (s.details?.citta ?? '').toLowerCase().includes(q)
+      )
+    }
+    if (filterCity.trim()) {
+      const c = filterCity.toLowerCase()
+      list = list.filter(s => s.location.toLowerCase().includes(c) || (s.details?.citta ?? '').toLowerCase().includes(c))
+    }
+    if (filterMinRating > 0) list = list.filter(s => s.rating >= filterMinRating)
+    if (filterMinCapacity) {
+      const min = parseInt(filterMinCapacity)
+      if (min > 0) list = list.filter(s => (s.details?.capienza ?? 0) >= min || (s.details?.coperti_totali ?? 0) >= min || (s.details?.capienza_sale ?? 0) >= min)
+    }
+    if (filterMinRooms) {
+      const min = parseInt(filterMinRooms)
+      if (min > 0) list = list.filter(s => (s.details?.numero_camere ?? 0) >= min)
+    }
+    return list
+  }, [supplierList, activeCategory, search, filterCity, filterMinRating, filterMinCapacity, filterMinRooms])
+
+  // ─── Detail View ─────────────────────────────────────────────────────────────
   if (selected) {
     const live = supplierList.find(s => s.id === selected.id) ?? selected
     return (
@@ -598,53 +621,132 @@ export default function Fornitori() {
     )
   }
 
+  // ─── Category Tiles View (landing) ───────────────────────────────────────────
+  if (!activeCategory) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Fornitori</h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
+              {supplierList.length} fornitori · Seleziona una categoria
+            </p>
+          </div>
+          <button onClick={() => { setEditingSupplier(undefined); setShowForm(true) }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
+            style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
+            <Plus className="w-4 h-4" /> Nuovo Fornitore
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {SUPPLIER_CATEGORIES.map(cat => {
+            const Icon = CATEGORY_ICONS[cat] ?? MoreHorizontal
+            const count = categoryCounts[cat] ?? 0
+            return (
+              <button key={cat} onClick={() => setActiveCategory(cat)}
+                className="panel p-5 text-center transition-all hover:shadow-lg hover:-translate-y-0.5"
+                style={{ border: '1px solid var(--line)' }}>
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
+                  style={{ background: 'rgba(208,0,58,0.08)' }}>
+                  <Icon className="w-6 h-6" style={{ color: 'var(--red2)' }} />
+                </div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{cat}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
+                  {count} {count === 1 ? 'fornitore' : 'fornitori'}
+                </p>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Quick search across all */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
+          <input type="text" value={search} onChange={e => { setSearch(e.target.value); if (e.target.value) setActiveCategory('__all__') }}
+            placeholder="Cerca in tutti i fornitori..."
+            className="w-full pl-10 pr-4 py-3 rounded-xl text-sm focus:outline-none"
+            style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+        </div>
+
+        {showForm && <SupplierFormModal supplier={editingSupplier} onSave={handleSave} onCancel={() => { setShowForm(false); setEditingSupplier(undefined) }} />}
+      </div>
+    )
+  }
+
+  // ─── Supplier List View (category selected) ─────────────────────────────────
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-5">
+      {/* Header with back */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Fornitori</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-            {supplierList.length} fornitori · Knowledge Base aziendale
-          </p>
+        <div className="flex items-center gap-3">
+          <button onClick={() => { setActiveCategory(null); setSearch(''); setFilterCity(''); setFilterMinRating(0); setFilterMinCapacity(''); setFilterMinRooms('') }}
+            className="p-2 rounded-lg transition-all hover:bg-white/5"
+            style={{ border: '1px solid var(--line)' }}>
+            <ArrowLeft className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
+              {activeCategory === '__all__' ? 'Tutti i Fornitori' : activeCategory}
+            </h1>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>{filtered.length} risultati</p>
+          </div>
         </div>
         <button onClick={() => { setEditingSupplier(undefined); setShowForm(true) }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
           style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
-          <Plus className="w-4 h-4" /> Nuovo Fornitore
+          <Plus className="w-4 h-4" /> Nuovo
         </button>
       </div>
 
-      {/* Category navigation */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {categories.map(cat => (
-          <button key={cat} onClick={() => setFilterCategoria(cat)}
-            className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap"
-            style={{
-              background: filterCategoria === cat ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'var(--panel)',
-              color: filterCategoria === cat ? 'white' : 'var(--muted)',
-              border: `1px solid ${filterCategoria === cat ? 'transparent' : 'var(--line)'}`,
-            }}>
-            {cat} {cat !== ALL_FILTER && categoryCounts[cat] ? `(${categoryCounts[cat]})` : cat === ALL_FILTER ? `(${supplierList.length})` : ''}
+      {/* Search + Advanced */}
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Cerca nome, citta, referente..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none"
+              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          </div>
+          <button onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-medium"
+            style={{ background: showAdvanced ? 'rgba(208,0,58,0.1)' : 'var(--panel)', color: showAdvanced ? 'var(--red2)' : 'var(--muted)', border: '1px solid var(--line)' }}>
+            <Filter className="w-3.5 h-3.5" /> Filtri
           </button>
-        ))}
-      </div>
-
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
-        <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Cerca fornitore..."
-          className="w-full pl-10 pr-4 py-3 rounded-xl text-sm focus:outline-none"
-          style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
-        {search && (
-          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-            <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
-          </button>
+        </div>
+        {showAdvanced && (
+          <div className="panel p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-in">
+            <div>
+              <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Citta</label>
+              <input type="text" value={filterCity} onChange={e => setFilterCity(e.target.value)} placeholder="Es. Roma"
+                className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Rating min.</label>
+              <select value={filterMinRating} onChange={e => setFilterMinRating(parseInt(e.target.value))}
+                className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+                <option value="0">Tutti</option>
+                <option value="3">3+</option>
+                <option value="4">4+</option>
+                <option value="5">5</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Capienza min.</label>
+              <input type="number" value={filterMinCapacity} onChange={e => setFilterMinCapacity(e.target.value)} placeholder="Es. 100"
+                className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Camere min.</label>
+              <input type="number" value={filterMinRooms} onChange={e => setFilterMinRooms(e.target.value)} placeholder="Es. 50"
+                className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Supplier Grid */}
+      {/* Grid */}
       {filtered.length === 0 ? (
         <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -660,7 +762,9 @@ export default function Fornitori() {
                 <SupplierLogo supplier={sup} size={40} />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{sup.nome}</p>
-                  <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{sup.categoria}</p>
+                  <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
+                    {sup.details?.citta || sup.location || sup.categoria}
+                  </p>
                 </div>
                 {sup.stato === 'inattivo' && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(255,49,95,0.1)', color: 'var(--red2)' }}>Inattivo</span>
@@ -668,7 +772,9 @@ export default function Fornitori() {
               </div>
               <div className="flex items-center justify-between">
                 <InteractiveStars rating={sup.rating} size="sm" />
-                <span className="text-xs" style={{ color: 'var(--muted)' }}>{sup.location}</span>
+                {sup.details?.numero_camere && <span className="text-[10px]" style={{ color: 'var(--muted)' }}>{sup.details.numero_camere} camere</span>}
+                {sup.details?.capienza && <span className="text-[10px]" style={{ color: 'var(--muted)' }}>cap. {sup.details.capienza}</span>}
+                {sup.details?.coperti_totali && <span className="text-[10px]" style={{ color: 'var(--muted)' }}>{sup.details.coperti_totali} coperti</span>}
               </div>
               {sup.servizi.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
@@ -676,9 +782,7 @@ export default function Fornitori() {
                     <span key={s} className="text-[10px] px-2 py-0.5 rounded-full"
                       style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>{s}</span>
                   ))}
-                  {sup.servizi.length > 3 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>+{sup.servizi.length - 3}</span>
-                  )}
+                  {sup.servizi.length > 3 && <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>+{sup.servizi.length - 3}</span>}
                 </div>
               )}
             </div>
@@ -687,9 +791,7 @@ export default function Fornitori() {
       )}
 
       {/* Modals */}
-      {showForm && (
-        <SupplierFormModal supplier={editingSupplier} onSave={handleSave} onCancel={() => { setShowForm(false); setEditingSupplier(undefined) }} />
-      )}
+      {showForm && <SupplierFormModal supplier={editingSupplier} onSave={handleSave} onCancel={() => { setShowForm(false); setEditingSupplier(undefined) }} />}
       {deletingSupplier && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
           <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>

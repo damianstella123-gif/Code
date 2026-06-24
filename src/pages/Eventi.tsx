@@ -26,6 +26,7 @@ import {
   Package,
   Upload,
   Download,
+  Eye,
   Plus as PlusIcon,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
@@ -1157,10 +1158,14 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
               <div className="panel overflow-hidden" style={{ border: `1px solid ${isManaging ? 'var(--red2)' : 'var(--line)'}` }}>
                 <div className="p-4 sm:p-5 space-y-3 sm:space-y-0 sm:flex sm:items-start sm:justify-between sm:gap-4">
                   <div className="flex items-start gap-3 cursor-pointer min-w-0" onClick={() => setViewingSupplier(sup)}>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: 'rgba(208,0,58,0.1)' }}>
-                      <Truck className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: 'var(--red2)' }} />
-                    </div>
+                    {sup.logoUrl ? (
+                      <img src={sup.logoUrl} alt={sup.nome} className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold text-sm"
+                        style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
+                        {sup.nome.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <p className="font-semibold truncate" style={{ color: 'var(--text)' }}>{sup.nome}</p>
                       <p className="text-sm truncate" style={{ color: 'var(--muted)' }}>{sup.categoria} · {sup.location}</p>
@@ -1242,10 +1247,14 @@ function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier; onClos
         onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(208,0,58,0.1)' }}>
-              <Truck className="w-7 h-7" style={{ color: 'var(--red2)' }} />
-            </div>
+            {supplier.logoUrl ? (
+              <img src={supplier.logoUrl} alt={supplier.nome} className="w-14 h-14 rounded-xl object-cover" />
+            ) : (
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg"
+                style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
+                {supplier.nome.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
+            )}
             <div>
               <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{supplier.nome}</h2>
               <p className="text-sm" style={{ color: 'var(--muted)' }}>{supplier.categoria}</p>
@@ -1485,6 +1494,17 @@ function TabDocumenti({ event }: { event: Event }) {
     URL.revokeObjectURL(url)
   }
 
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewName, setPreviewName] = useState('')
+
+  function handlePreview(doc: EventDocument) {
+    const ext = doc.file_name.split('.').pop()?.toLowerCase() ?? ''
+    const previewable = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp']
+    if (!previewable.includes(ext)) { handleDownload(doc); return }
+    const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path)
+    if (data?.publicUrl) { setPreviewUrl(data.publicUrl); setPreviewName(doc.nome || doc.file_name) }
+  }
+
   async function handleDelete(id: string) {
     const doc = docs.find(d => d.id === id)
     if (!doc) return
@@ -1543,6 +1563,10 @@ function TabDocumenti({ event }: { event: Event }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button onClick={() => handlePreview(doc)} title="Apri"
+                    className="p-2 rounded-lg transition-all hover:bg-white/10">
+                    <Eye className="w-4 h-4" style={{ color: 'var(--green)' }} />
+                  </button>
                   <button onClick={() => handleDownload(doc)} title="Scarica"
                     className="p-2 rounded-lg transition-all hover:bg-white/10">
                     <Download className="w-4 h-4" style={{ color: 'var(--blue)' }} />
@@ -1567,6 +1591,24 @@ function TabDocumenti({ event }: { event: Event }) {
               <button className="px-4 py-2 rounded-lg text-sm" style={{ background: 'var(--panel2)', color: 'var(--text)' }} onClick={() => setDeletingDoc(null)}>Annulla</button>
               <button className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--red2)', color: '#fff' }} onClick={() => handleDelete(deletingDoc)}>Elimina</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {previewUrl && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(0,0,0,0.85)' }}>
+          <div className="flex items-center justify-between px-4 py-3" style={{ background: 'var(--panel)', borderBottom: '1px solid var(--line)' }}>
+            <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{previewName}</p>
+            <button onClick={() => { setPreviewUrl(null); setPreviewName('') }}
+              className="p-2 rounded-lg hover:bg-white/10">
+              <X className="w-5 h-5" style={{ color: 'var(--muted)' }} />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+            {previewUrl.match(/\.(jpg|jpeg|png|gif|webp)/i)
+              ? <img src={previewUrl} alt={previewName} className="max-w-full max-h-[85vh] rounded-lg object-contain" />
+              : <iframe src={previewUrl} className="w-full h-full rounded-lg" style={{ maxWidth: 900, minHeight: '80vh' }} />
+            }
           </div>
         </div>
       )}
