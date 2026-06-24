@@ -218,7 +218,7 @@ function EventFormModal({ event, internalUsers, allClients, onSave, onCancel }: 
               style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Data inizio *</label>
               <input type="date" value={dataInizio} onChange={e => setDataInizio(e.target.value)} required
@@ -233,7 +233,7 @@ function EventFormModal({ event, internalUsers, allClients, onSave, onCancel }: 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Location *</label>
               <input type="text" value={location} onChange={e => setLocation(e.target.value)} required
@@ -249,7 +249,7 @@ function EventFormModal({ event, internalUsers, allClients, onSave, onCancel }: 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Azienda / Cliente</label>
               <select value={selectedCompany} onChange={e => handleCompanyChange(e.target.value)}
@@ -1155,18 +1155,18 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
             return (
               <AnimatedLaserBorder key={sup.id} active={isManaging}>
               <div className="panel overflow-hidden" style={{ border: `1px solid ${isManaging ? 'var(--red2)' : 'var(--line)'}` }}>
-                <div className="p-5 flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-4 cursor-pointer" onClick={() => setViewingSupplier(sup)}>
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                <div className="p-4 sm:p-5 space-y-3 sm:space-y-0 sm:flex sm:items-start sm:justify-between sm:gap-4">
+                  <div className="flex items-start gap-3 cursor-pointer min-w-0" onClick={() => setViewingSupplier(sup)}>
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                       style={{ background: 'rgba(208,0,58,0.1)' }}>
-                      <Truck className="w-6 h-6" style={{ color: 'var(--red2)' }} />
+                      <Truck className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: 'var(--red2)' }} />
                     </div>
-                    <div>
-                      <p className="font-semibold" style={{ color: 'var(--text)' }}>{sup.nome}</p>
-                      <p className="text-sm" style={{ color: 'var(--muted)' }}>{sup.categoria} · {sup.location}</p>
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate" style={{ color: 'var(--text)' }}>{sup.nome}</p>
+                      <p className="text-sm truncate" style={{ color: 'var(--muted)' }}>{sup.categoria} · {sup.location}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:flex-shrink-0">
                     <select value={catType}
                       onChange={async (e) => {
                         const newCat = e.target.value as CategoryType
@@ -1175,8 +1175,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                           await loadLinks()
                         }
                       }}
-                      className="px-2 py-1.5 rounded-lg text-xs font-medium"
-                      style={{ background: 'var(--panel2)', border: `1px solid ${hasStoredCat ? 'var(--line)' : 'var(--yellow)'}`, color: 'var(--text)', maxWidth: '130px' }}>
+                      className="px-2 py-1.5 rounded-lg text-xs font-medium flex-1 sm:flex-none"
+                      style={{ background: 'var(--panel2)', border: `1px solid ${hasStoredCat ? 'var(--line)' : 'var(--yellow)'}`, color: 'var(--text)', maxWidth: '140px' }}>
                       {LINK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                     </select>
                     <button onClick={() => setManagingCategory(isManaging ? null : sup.id)}
@@ -2567,7 +2567,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
                 </div>
               </div>
             </div>
-            <div className="flex flex-col gap-2 min-w-[160px]">
+            <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[160px]">
               <div className="px-4 py-3 rounded-xl text-center" style={{ background: 'var(--panel2)' }}>
                 <p className="text-xs" style={{ color: 'var(--muted)' }}>Budget</p>
                 <p className="text-xl font-bold mt-0.5" style={{ color: 'var(--green)' }}>
@@ -2589,10 +2589,10 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
           {/* Status change strip */}
           <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--line)' }}>
             <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>Avanzamento stato</p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto">
               {statiSequenza.map((s, i) => (
                 <button key={s} onClick={() => onStatusChange(event, s)}
-                  className="flex-1 py-2 rounded-lg text-xs font-medium transition-all"
+                  className="flex-1 min-w-[70px] py-2 rounded-lg text-[11px] font-medium transition-all"
                   style={{
                     background: i <= currentIdx
                       ? `${statoColor(s)}20`

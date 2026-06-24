@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ChevronDown, Edit3, Save, Euro, Download } from 'lucide-react'
+import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import type { Event } from '@/data/events'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 
 interface Supplier {
   id: string
@@ -371,132 +372,97 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   const fmt = (n: number) => '\u20AC' + n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
   const fmtN = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
 
+  const EXPORT_LABELS: Record<string, string> = {
+    'HOTEL': 'HOTEL',
+    'TRANSFER': 'TRASPORTI',
+    'RISTORANTE': 'RISTORANTI',
+    'LOCATION / EXPERIENCE': 'ATTIVITA\' / LOCATION',
+    'CATERING': 'CATERING',
+    'AUDIO VIDEO': 'AUDIO VIDEO',
+    'ALLESTIMENTI': 'ALLESTIMENTI',
+    'STAFF': 'STAFF',
+    'GRAFICA': 'GRAFICA / STAMPA',
+    'VARIE': 'VARIE + EXTRA',
+  }
+
   function sanitizeFilename(name: string): string {
     return name.replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_')
   }
 
+  function getClientName(): string {
+    return event.cliente || ''
+  }
+
+  function getExportLabel(cat: string): string {
+    return EXPORT_LABELS[cat] || cat
+  }
+
+  // Split STAFF into STAFF SIMMETRIA + STAFF ESTERNO for exports
+  function getExportGroups() {
+    const result: { label: string; items: BudgetLine[] }[] = []
+    for (const cat of grouped) {
+      if (cat.label === 'STAFF') {
+        const interni = cat.items.filter(i => i.sotto_categoria === 'staff_simmetria')
+        const esterni = cat.items.filter(i => i.sotto_categoria === 'staff_esterno')
+        if (interni.length > 0) result.push({ label: 'STAFF SIMMETRIA', items: interni })
+        if (esterni.length > 0) result.push({ label: 'STAFF ESTERNO', items: esterni })
+      } else {
+        result.push({ label: getExportLabel(cat.label), items: cat.items })
+      }
+    }
+    return result
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PDF INTERNO
+  // ═══════════════════════════════════════════════════════════
   function exportPdfInterno() {
     const doc = new jsPDF({ orientation: 'landscape' })
     const evName = event.nome || 'Evento'
-    const clientName = event.cliente || ''
+    const clientName = getClientName()
+    const exportGroups = getExportGroups()
 
-    doc.setFontSize(16)
-    doc.text('BUDGET INTERNO', 14, 18)
-    doc.setFontSize(10)
-    doc.text(`Evento: ${evName}`, 14, 26)
-    if (clientName) doc.text(`Cliente: ${clientName}`, 14, 32)
-    doc.text(`Data: ${new Date().toLocaleDateString('it-IT')}`, 14, clientName ? 38 : 32)
+    // Header
+    doc.setFontSize(9)
+    doc.setTextColor(100)
+    doc.text('Simmetria Immagine e Comunicazione Srl', 250, 10, { align: 'right' })
+    doc.text('Viale Egeo 8 | 00144 Roma', 250, 14, { align: 'right' })
 
-    let startY = clientName ? 44 : 38
+    doc.setFontSize(14)
+    doc.setTextColor(208, 0, 58)
+    doc.text('BUDGET INTERNO', 14, 16)
+    doc.setFontSize(11)
+    doc.setTextColor(0)
+    doc.text(evName, 14, 24)
+    doc.setFontSize(9)
+    doc.setTextColor(80)
+    if (clientName) doc.text(`Cliente: ${clientName}`, 14, 30)
+    doc.text(`Preventivo al ${new Date().toLocaleDateString('it-IT')}`, 14, clientName ? 36 : 30)
 
-    for (const cat of grouped) {
+    let startY = clientName ? 42 : 36
+
+    for (const cat of exportGroups) {
       const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
       const catC = cat.items.reduce((s, i) => s + i.costo, 0)
-      const catM = catV - catC
-      const catMp = catV > 0 ? (catM / catV * 100).toFixed(1) : '0.0'
+      const catFee = catV * feePct / 100
+      const catM = catV + catFee - catC
+      const catMp = (catV + catFee) > 0 ? (catM / (catV + catFee) * 100).toFixed(1) : '0.0'
 
-      const body: (string | { content: string; styles: { fontStyle: string } })[][] = cat.items.map(item => [
-        item.descrizione,
-        item.fornitore || '-',
-        String(item.qty),
-        fmtN(item.venduto),
-        `${item.aliquota_iva_venduto}%`,
-        fmtN(item.costo),
-        `${item.aliquota_iva_costo}%`,
-        fmtN(item.margine),
-        `${item.marginePct.toFixed(1)}%`,
-      ])
-
-      body.push([
-        { content: `TOTALE ${cat.label}`, styles: { fontStyle: 'bold' } },
-        '', '',
-        { content: fmtN(catV), styles: { fontStyle: 'bold' } },
-        '',
-        { content: fmtN(catC), styles: { fontStyle: 'bold' } },
-        '',
-        { content: fmtN(catM), styles: { fontStyle: 'bold' } },
-        { content: `${catMp}%`, styles: { fontStyle: 'bold' } },
-      ])
-
-      autoTable(doc, {
-        startY,
-        head: [[cat.label, 'Fornitore', 'Qty', 'Venduto', 'IVA V.', 'Costo', 'IVA C.', 'Margine', 'M%']],
-        body: body as unknown as string[][],
-        theme: 'grid',
-        headStyles: { fillColor: [30, 30, 30], textColor: 255, fontSize: 8 },
-        bodyStyles: { fontSize: 7 },
-        columnStyles: {
-          0: { cellWidth: 60 },
-          2: { halign: 'right', cellWidth: 15 },
-          3: { halign: 'right', cellWidth: 28 },
-          4: { halign: 'right', cellWidth: 18 },
-          5: { halign: 'right', cellWidth: 28 },
-          6: { halign: 'right', cellWidth: 18 },
-          7: { halign: 'right', cellWidth: 28 },
-          8: { halign: 'right', cellWidth: 18 },
-        },
-        margin: { left: 14, right: 14 },
-      })
-      startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
-    }
-
-    // Grand totals
-    autoTable(doc, {
-      startY,
-      head: [['', 'Venduto Servizi', 'Fee Simmetria', 'Totale Ricavi', 'Totale Costi', 'Margine Netto', 'Margine %']],
-      body: [[
-        'TOTALE EVENTO',
-        fmtN(totals.venduto),
-        `${fmtN(totals.fee)} (${feePct}%)`,
-        fmtN(totals.ricavi),
-        fmtN(totals.costo),
-        fmtN(totals.margine),
-        `${totals.marginePct.toFixed(1)}%`,
-      ]],
-      theme: 'grid',
-      headStyles: { fillColor: [180, 0, 40], textColor: 255, fontSize: 9 },
-      bodyStyles: { fontSize: 9, fontStyle: 'bold' },
-      columnStyles: {
-        1: { halign: 'right' },
-        2: { halign: 'right' },
-        3: { halign: 'right' },
-        4: { halign: 'right' },
-        5: { halign: 'right' },
-        6: { halign: 'right' },
-      },
-      margin: { left: 14, right: 14 },
-    })
-
-    const filename = `${sanitizeFilename(evName)}_${sanitizeFilename(clientName)}_Budget_Interno.pdf`
-    doc.save(filename)
-  }
-
-  function exportPdfCliente() {
-    const doc = new jsPDF()
-    const evName = event.nome || 'Evento'
-    const clientName = event.cliente || ''
-
-    doc.setFontSize(18)
-    doc.text('PREVENTIVO', 14, 22)
-    doc.setFontSize(11)
-    doc.text(`Evento: ${evName}`, 14, 32)
-    if (clientName) doc.text(`Cliente: ${clientName}`, 14, 39)
-    doc.setFontSize(9)
-    doc.text(`Data: ${new Date().toLocaleDateString('it-IT')}`, 14, clientName ? 47 : 39)
-
-    let startY = clientName ? 54 : 46
-
-    for (const cat of grouped) {
-      const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
-
-      const body: (string | { content: string; styles: { fontStyle: string } })[][] = cat.items.map(item => {
-        const unitario = item.qty > 0 ? item.venduto / item.qty : item.venduto
+      const body: unknown[][] = cat.items.map(item => {
+        const itemFee = item.venduto * feePct / 100
+        const itemMargine = item.venduto + itemFee - item.costo
+        const itemMp = (item.venduto + itemFee) > 0 ? ((itemMargine / (item.venduto + itemFee)) * 100).toFixed(1) : '0.0'
         return [
           item.descrizione,
+          item.fornitore || '-',
           String(item.qty),
-          fmtN(unitario),
           fmtN(item.venduto),
           `${item.aliquota_iva_venduto}%`,
+          fmtN(item.costo),
+          `${item.aliquota_iva_costo}%`,
+          fmtN(itemFee),
+          fmtN(itemMargine),
+          `${itemMp}%`,
         ]
       })
 
@@ -505,46 +471,320 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         '', '',
         { content: fmtN(catV), styles: { fontStyle: 'bold' } },
         '',
+        { content: fmtN(catC), styles: { fontStyle: 'bold' } },
+        '',
+        { content: fmtN(catFee), styles: { fontStyle: 'bold' } },
+        { content: fmtN(catM), styles: { fontStyle: 'bold' } },
+        { content: `${catMp}%`, styles: { fontStyle: 'bold' } },
       ])
 
       autoTable(doc, {
         startY,
-        head: [[cat.label, 'Qty', 'Prezzo Unit.', 'Totale', 'IVA']],
-        body: body as unknown as string[][],
-        theme: 'striped',
-        headStyles: { fillColor: [30, 30, 30], textColor: 255, fontSize: 9 },
-        bodyStyles: { fontSize: 8 },
+        head: [[cat.label, 'Fornitore', 'Qty', 'Venduto', 'IVA V.', 'Costo', 'IVA C.', `Fee ${feePct}%`, 'Margine', 'M%']],
+        body: body as string[][],
+        theme: 'grid',
+        headStyles: { fillColor: [208, 0, 58], textColor: 255, fontSize: 7.5, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7 },
         columnStyles: {
-          0: { cellWidth: 75 },
-          1: { halign: 'right', cellWidth: 18 },
-          2: { halign: 'right', cellWidth: 30 },
-          3: { halign: 'right', cellWidth: 30 },
-          4: { halign: 'right', cellWidth: 20 },
+          0: { cellWidth: 55 },
+          1: { cellWidth: 35 },
+          2: { halign: 'right', cellWidth: 12 },
+          3: { halign: 'right', cellWidth: 25 },
+          4: { halign: 'right', cellWidth: 16 },
+          5: { halign: 'right', cellWidth: 25 },
+          6: { halign: 'right', cellWidth: 16 },
+          7: { halign: 'right', cellWidth: 22 },
+          8: { halign: 'right', cellWidth: 25 },
+          9: { halign: 'right', cellWidth: 16 },
         },
         margin: { left: 14, right: 14 },
       })
-      startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
+      startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
     }
 
-    // Grand total for client
+    // RIEPILOGO DEI SERVIZI
+    const riepilogoHead = [['RIEPILOGO DEI SERVIZI', 'Totale Venduto', 'Totale Costi', 'Fee', 'Margine']]
+    const riepilogoBody: unknown[][] = exportGroups.map(cat => {
+      const cv = cat.items.reduce((s, i) => s + i.venduto, 0)
+      const cc = cat.items.reduce((s, i) => s + i.costo, 0)
+      const cf = cv * feePct / 100
+      const cm = cv + cf - cc
+      return [cat.label, fmtN(cv), fmtN(cc), fmtN(cf), fmtN(cm)]
+    })
+    riepilogoBody.push([
+      { content: 'TOTALE EVENTO', styles: { fontStyle: 'bold' } },
+      { content: fmtN(totals.venduto), styles: { fontStyle: 'bold' } },
+      { content: fmtN(totals.costo), styles: { fontStyle: 'bold' } },
+      { content: fmtN(totals.fee), styles: { fontStyle: 'bold' } },
+      { content: fmtN(totals.margine), styles: { fontStyle: 'bold' } },
+    ])
+
     autoTable(doc, {
-      startY,
-      body: [[
-        { content: 'TOTALE PREVENTIVO', styles: { fontStyle: 'bold', fontSize: 11 } },
-        { content: `EUR ${fmtN(totals.venduto)}`, styles: { fontStyle: 'bold', fontSize: 11, halign: 'right' } },
-      ]],
-      theme: 'plain',
-      columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 70 } },
+      startY: startY + 4,
+      head: riepilogoHead,
+      body: riepilogoBody as string[][],
+      theme: 'grid',
+      headStyles: { fillColor: [208, 0, 58], textColor: 255, fontSize: 8.5, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        1: { halign: 'right' },
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+        4: { halign: 'right' },
+      },
       margin: { left: 14, right: 14 },
     })
 
-    startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
+    const filename = `${sanitizeFilename(evName)}_${sanitizeFilename(clientName)}_Budget_Interno.pdf`
+    doc.save(filename)
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PDF CLIENTE
+  // ═══════════════════════════════════════════════════════════
+  function exportPdfCliente() {
+    const doc = new jsPDF()
+    const evName = event.nome || 'Evento'
+    const clientName = getClientName()
+    const exportGroups = getExportGroups()
+
+    // Header
+    doc.setFontSize(9)
+    doc.setTextColor(100)
+    doc.text('Simmetria Immagine e Comunicazione Srl', 196, 10, { align: 'right' })
+    doc.text('Viale Egeo 8 | 00144 Roma', 196, 14, { align: 'right' })
+
+    doc.setFontSize(14)
+    doc.setTextColor(208, 0, 58)
+    doc.text(evName.toUpperCase(), 14, 20)
+
+    doc.setFontSize(9)
+    doc.setTextColor(80)
+    if (clientName) doc.text(`Cliente: ${clientName}`, 14, 28)
+    doc.text(`Preventivo al ${new Date().toLocaleDateString('it-IT')}`, 14, clientName ? 34 : 28)
+
+    let startY = clientName ? 40 : 34
+
+    for (const cat of exportGroups) {
+      const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
+
+      const body: unknown[][] = cat.items.map(item => {
+        const unitario = item.qty > 0 ? item.venduto / item.qty : item.venduto
+        return [
+          item.descrizione,
+          String(item.qty),
+          `\u20AC ${fmtN(unitario)}`,
+          `\u20AC ${fmtN(item.venduto)}`,
+        ]
+      })
+
+      body.push([
+        { content: `Totale ${cat.label}`, styles: { fontStyle: 'bold' } },
+        '', '',
+        { content: `\u20AC ${fmtN(catV)}`, styles: { fontStyle: 'bold' } },
+      ])
+
+      autoTable(doc, {
+        startY,
+        head: [[cat.label, 'Nr/Qty', 'Costo Unitario', 'Totale']],
+        body: body as string[][],
+        theme: 'grid',
+        headStyles: { fillColor: [208, 0, 58], textColor: 255, fontSize: 9, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 8.5 },
+        columnStyles: {
+          0: { cellWidth: 85 },
+          1: { halign: 'center', cellWidth: 20 },
+          2: { halign: 'right', cellWidth: 35 },
+          3: { halign: 'right', cellWidth: 35 },
+        },
+        margin: { left: 14, right: 14 },
+      })
+      startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
+    }
+
+    // RIEPILOGO DEI SERVIZI
+    const riepilogoBody: unknown[][] = exportGroups.map(cat => {
+      const cv = cat.items.reduce((s, i) => s + i.venduto, 0)
+      return [cat.label, `\u20AC ${fmtN(cv)}`]
+    })
+    riepilogoBody.push([
+      { content: 'TOTALE', styles: { fontStyle: 'bold' } },
+      { content: `\u20AC ${fmtN(totals.venduto)}`, styles: { fontStyle: 'bold' } },
+    ])
+
+    autoTable(doc, {
+      startY: startY + 4,
+      head: [['RIEPILOGO DEI SERVIZI', 'Totale']],
+      body: riepilogoBody as string[][],
+      theme: 'grid',
+      headStyles: { fillColor: [208, 0, 58], textColor: 255, fontSize: 9, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 100 },
+        1: { halign: 'right', cellWidth: 45 },
+      },
+      margin: { left: 14, right: 14 },
+    })
+
+    startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
     doc.setFontSize(8)
     doc.setTextColor(100)
     doc.text('I prezzi indicati sono da intendersi IVA esclusa salvo diversa indicazione.', 14, startY)
 
     const filename = `${sanitizeFilename(evName)}_${sanitizeFilename(clientName)}_Budget_Cliente.pdf`
     doc.save(filename)
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // EXCEL INTERNO
+  // ═══════════════════════════════════════════════════════════
+  function exportExcelInterno() {
+    const evName = event.nome || 'Evento'
+    const clientName = getClientName()
+    const exportGroups = getExportGroups()
+
+    const rows: (string | number | null)[][] = []
+
+    // Header rows
+    rows.push(['Simmetria Immagine e Comunicazione Srl'])
+    rows.push(['Viale Egeo 8 | 00144 Roma'])
+    rows.push([])
+    rows.push([evName.toUpperCase()])
+    if (clientName) rows.push([`Cliente: ${clientName}`])
+    rows.push([`Preventivo al ${new Date().toLocaleDateString('it-IT')}`])
+    rows.push([])
+    rows.push([])
+
+    // Column headers
+    rows.push(['CATEGORIA', 'DESCRIZIONE', 'FORNITORE', 'QTY', 'VENDUTO CLIENTE', 'IVA V.%', 'COSTO REALE', 'IVA C.%', `FEE ${feePct}%`, 'MARGINE NETTO', 'MARGINE %'])
+
+    for (const cat of exportGroups) {
+      // Category header row
+      rows.push([cat.label, '', '', '', '', '', '', '', '', '', ''])
+
+      for (const item of cat.items) {
+        const itemFee = item.venduto * feePct / 100
+        const itemMargine = item.venduto + itemFee - item.costo
+        const itemMp = (item.venduto + itemFee) > 0 ? ((itemMargine / (item.venduto + itemFee)) * 100) : 0
+        rows.push([
+          '',
+          item.descrizione,
+          item.fornitore || '',
+          item.qty,
+          item.venduto,
+          Number(item.aliquota_iva_venduto) / 100,
+          item.costo,
+          Number(item.aliquota_iva_costo) / 100,
+          itemFee,
+          itemMargine,
+          itemMp / 100,
+        ])
+      }
+
+      // Subtotal
+      const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
+      const catC = cat.items.reduce((s, i) => s + i.costo, 0)
+      const catFee = catV * feePct / 100
+      const catM = catV + catFee - catC
+      const catMp = (catV + catFee) > 0 ? catM / (catV + catFee) : 0
+      rows.push(['', `Totale ${cat.label}`, '', '', catV, '', catC, '', catFee, catM, catMp])
+      rows.push([])
+    }
+
+    // Riepilogo
+    rows.push([])
+    rows.push(['RIEPILOGO DEI SERVIZI', '', '', '', 'VENDUTO', '', 'COSTI', '', 'FEE', 'MARGINE', ''])
+    for (const cat of exportGroups) {
+      const cv = cat.items.reduce((s, i) => s + i.venduto, 0)
+      const cc = cat.items.reduce((s, i) => s + i.costo, 0)
+      const cf = cv * feePct / 100
+      const cm = cv + cf - cc
+      rows.push([cat.label, '', '', '', cv, '', cc, '', cf, cm, ''])
+    }
+    rows.push(['TOTALE EVENTO', '', '', '', totals.venduto, '', totals.costo, '', totals.fee, totals.margine, totals.marginePct / 100])
+
+    const ws = XLSX.utils.aoa_to_sheet(rows)
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: 22 }, { wch: 40 }, { wch: 20 }, { wch: 8 },
+      { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 10 },
+      { wch: 14 }, { wch: 16 }, { wch: 12 },
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Budget Interno')
+
+    const filename = `${sanitizeFilename(evName)}_${sanitizeFilename(clientName)}_Budget_Interno.xlsx`
+    XLSX.writeFile(wb, filename)
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // EXCEL CLIENTE
+  // ═══════════════════════════════════════════════════════════
+  function exportExcelCliente() {
+    const evName = event.nome || 'Evento'
+    const clientName = getClientName()
+    const exportGroups = getExportGroups()
+
+    const rows: (string | number | null)[][] = []
+
+    // Header
+    rows.push(['Simmetria Immagine e Comunicazione Srl'])
+    rows.push(['Viale Egeo 8 | 00144 Roma'])
+    rows.push([])
+    rows.push([evName.toUpperCase()])
+    if (clientName) rows.push([`Cliente: ${clientName}`])
+    rows.push([`Preventivo al ${new Date().toLocaleDateString('it-IT')}`])
+    rows.push([])
+    rows.push([])
+
+    // Column headers
+    rows.push(['CATEGORIA', 'DESCRIZIONE', 'Nr/Qty', 'COSTO UNITARIO', 'TOTALE'])
+
+    for (const cat of exportGroups) {
+      // Category header
+      rows.push([cat.label, '', '', '', ''])
+
+      for (const item of cat.items) {
+        const unitario = item.qty > 0 ? item.venduto / item.qty : item.venduto
+        rows.push([
+          '',
+          item.descrizione,
+          item.qty,
+          unitario,
+          item.venduto,
+        ])
+      }
+
+      // Subtotal
+      const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
+      rows.push(['', `Totale ${cat.label}`, '', '', catV])
+      rows.push([])
+    }
+
+    // Riepilogo
+    rows.push([])
+    rows.push(['RIEPILOGO DEI SERVIZI', '', '', '', 'TOTALE'])
+    for (const cat of exportGroups) {
+      const cv = cat.items.reduce((s, i) => s + i.venduto, 0)
+      rows.push([cat.label, '', '', '', cv])
+    }
+    rows.push(['TOTALE', '', '', '', totals.venduto])
+    rows.push([])
+    rows.push(['I prezzi indicati sono da intendersi IVA esclusa salvo diversa indicazione.'])
+
+    const ws = XLSX.utils.aoa_to_sheet(rows)
+
+    ws['!cols'] = [
+      { wch: 24 }, { wch: 50 }, { wch: 10 }, { wch: 18 }, { wch: 18 },
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Preventivo Cliente')
+
+    const filename = `${sanitizeFilename(evName)}_${sanitizeFilename(clientName)}_Budget_Cliente.xlsx`
+    XLSX.writeFile(wb, filename)
   }
 
   function renderBudgetLine(item: BudgetLine) {
@@ -719,19 +959,32 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         </div>
       )}
 
-      {/* PDF Export buttons */}
+      {/* Export buttons */}
       {lines.length > 0 && (
-        <div className="flex items-center gap-3">
-          <button onClick={exportPdfInterno}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all hover:opacity-80"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-            <Download className="w-3.5 h-3.5" /> Scarica Budget Interno
-          </button>
-          <button onClick={exportPdfCliente}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all hover:opacity-80"
-            style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: '#fff' }}>
-            <Download className="w-3.5 h-3.5" /> Scarica Budget Cliente
-          </button>
+        <div className="panel p-4">
+          <p className="text-[10px] uppercase tracking-wider font-semibold mb-3" style={{ color: 'var(--muted)' }}>Esporta Budget</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button onClick={exportPdfInterno}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+              <Download className="w-3.5 h-3.5" /> PDF Interno
+            </button>
+            <button onClick={exportExcelInterno}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Excel Interno
+            </button>
+            <button onClick={exportPdfCliente}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: '#fff' }}>
+              <Download className="w-3.5 h-3.5" /> PDF Cliente
+            </button>
+            <button onClick={exportExcelCliente}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: '#fff' }}>
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Excel Cliente
+            </button>
+          </div>
         </div>
       )}
 
