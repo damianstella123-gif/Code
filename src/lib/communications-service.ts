@@ -64,7 +64,7 @@ export async function fetchCommunications(): Promise<Messaggio[]> {
     .from('communications')
     .select('*')
     .order('sent_at', { ascending: false })
-    .limit(500)
+    .limit(1000)
   if (error) {
     console.error('fetchCommunications error:', error.message)
     return []

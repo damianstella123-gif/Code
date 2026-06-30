@@ -44,7 +44,7 @@ export async function fetchCreativeProjects(): Promise<CreativeProject[]> {
     .from('creative_projects')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(500)
+    .limit(1000)
   if (error) {
     console.error('fetchCreativeProjects error:', error.message)
     return []

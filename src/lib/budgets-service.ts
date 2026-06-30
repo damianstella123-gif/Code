@@ -73,7 +73,7 @@ export async function fetchBudgets(): Promise<Uscita[]> {
     .from('budgets')
     .select('*')
     .order('due_date', { ascending: true })
-    .limit(500)
+    .limit(1000)
   if (error) {
     console.error('fetchBudgets error:', error.message)
     return []
