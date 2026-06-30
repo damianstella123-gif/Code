@@ -53,7 +53,7 @@ async function verifyPartner(
     return json({ error: "Profilo non trovato" }, 403);
   }
 
-  const ADMIN_ROLES = ["Partner", "Project Manager"];
+  const ADMIN_ROLES = ["Super Admin", "Admin"];
   if (!ADMIN_ROLES.includes(profile.role)) {
     return json({ error: "Accesso negato: ruolo insufficiente (" + profile.role + ")" }, 403);
   }

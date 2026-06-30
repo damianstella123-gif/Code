@@ -23,7 +23,7 @@ import {
   Trash2,
   Download,
 } from 'lucide-react'
-import { loadUser, isPartnerUser } from '@/lib/auth'
+import { loadUser, canAccessSystemSettings } from '@/lib/auth'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -889,7 +889,7 @@ export default function Impostazioni() {
 
   // Admin-only guard
   useEffect(() => {
-    if (!isPartnerUser(currentUser) && currentUser?.ruolo !== 'Admin') navigate('/dashboard', { replace: true })
+    if (!canAccessSystemSettings(currentUser)) navigate('/dashboard', { replace: true })
   }, [currentUser, navigate])
 
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
@@ -914,7 +914,7 @@ export default function Impostazioni() {
     setDirty(false)
   }
 
-  if (!isPartnerUser(currentUser) && currentUser?.ruolo !== 'Admin') return null
+  if (!canAccessSystemSettings(currentUser)) return null
 
   return (
     <div className="space-y-0 -mt-1">

@@ -15,7 +15,7 @@ import {
   Users,
   Filter,
 } from 'lucide-react'
-import { loadUser } from '@/lib/auth'
+import { loadUser, canManageUsers, canResetOtherPasswords, canChangeRoles } from '@/lib/auth'
 import type { AppRole } from '@/lib/database.types'
 import { APP_ROLES } from '@/lib/database.types'
 import type { Profile } from '@/lib/profiles'
@@ -30,6 +30,8 @@ import {
 
 function roleColor(role: string) {
   switch (role) {
+    case 'Super Admin': return 'var(--red2)'
+    case 'Admin': return '#e67e22'
     case 'Partner': return 'var(--red2)'
     case 'Project Manager': return 'var(--blue)'
     case 'Event Coordinator': return '#38d27d'
@@ -38,6 +40,7 @@ function roleColor(role: string) {
     case 'Amministrazione': return '#38d27d'
     case 'Production Manager': return 'var(--blue)'
     case 'Digital Strategist': return 'var(--yellow)'
+    case 'User': return 'var(--muted)'
     default: return 'var(--muted)'
   }
 }
@@ -97,7 +100,9 @@ export default function Utenti() {
   const [submitting, setSubmitting] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null)
 
-  const isPartner = currentUser?.role === 'Partner' || currentUser?.role === 'Project Manager'
+  const isPartner = canManageUsers(currentUser)
+  const canEditRoles = canChangeRoles(currentUser)
+  const canResetPasswords = canResetOtherPasswords(currentUser)
 
   const refresh = useCallback(async () => {
     try {
@@ -401,6 +406,7 @@ export default function Utenti() {
               key={u.id}
               user={u}
               isPartner={isPartner}
+              canResetPw={canResetPasswords}
               isSelf={u.id === currentUser?.id}
               delay={i * 40}
               onEdit={() => openEdit(u)}
@@ -471,7 +477,9 @@ export default function Utenti() {
               </div>
             )}
 
-            <RoleSelect value={editForm.role} onChange={v => setEditForm(p => ({ ...p, role: v }))} />
+            {canEditRoles && (
+              <RoleSelect value={editForm.role} onChange={v => setEditForm(p => ({ ...p, role: v }))} />
+            )}
 
             {editingUser.id !== currentUser?.id && (
               <div className="flex items-center justify-between px-4 py-3.5 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
@@ -559,9 +567,10 @@ export default function Utenti() {
 
 // ─── USER CARD COMPONENT ──────────────────────────────────────────────────────
 
-function UserCard({ user, isPartner, isSelf, delay, onEdit, onToggleActive, onResetPassword }: {
+function UserCard({ user, isPartner, canResetPw, isSelf, delay, onEdit, onToggleActive, onResetPassword }: {
   user: Profile
   isPartner: boolean
+  canResetPw: boolean
   isSelf: boolean
   delay: number
   onEdit: () => void
@@ -627,7 +636,7 @@ function UserCard({ user, isPartner, isSelf, delay, onEdit, onToggleActive, onRe
         </span>
       </div>
 
-      {/* Partner-only actions */}
+      {/* Admin actions */}
       {isPartner && (
         <div
           className="flex items-center gap-1 mt-4 pt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
@@ -637,10 +646,12 @@ function UserCard({ user, isPartner, isSelf, delay, onEdit, onToggleActive, onRe
             <Edit3 className="w-3.5 h-3.5" />
             Modifica
           </button>
-          <button onClick={onResetPassword} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/[0.06]" style={{ color: 'var(--yellow)' }}>
-            <Key className="w-3.5 h-3.5" />
-            Password
-          </button>
+          {canResetPw && !isSelf && (
+            <button onClick={onResetPassword} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/[0.06]" style={{ color: 'var(--yellow)' }}>
+              <Key className="w-3.5 h-3.5" />
+              Password
+            </button>
+          )}
           {!isSelf && (
             <button onClick={onToggleActive} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/[0.06] ml-auto" style={{ color: user.is_active ? 'var(--red2)' : 'var(--green)' }}>
               {user.is_active ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}

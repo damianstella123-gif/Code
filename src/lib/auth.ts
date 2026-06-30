@@ -43,8 +43,37 @@ export async function signOutEverywhere(): Promise<void> {
   await supabase.auth.signOut()
 }
 
+export function isSuperAdmin(user: AuthUser | null): boolean {
+  return user?.role === 'Super Admin'
+}
+
+export function isAdmin(user: AuthUser | null): boolean {
+  return user?.role === 'Super Admin' || user?.role === 'Admin'
+}
+
+export function isManager(user: AuthUser | null): boolean {
+  return user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Project Manager'
+}
+
+export function canManageUsers(user: AuthUser | null): boolean {
+  return user?.role === 'Super Admin' || user?.role === 'Admin'
+}
+
+export function canResetOtherPasswords(user: AuthUser | null): boolean {
+  return user?.role === 'Super Admin' || user?.role === 'Admin'
+}
+
+export function canChangeRoles(user: AuthUser | null): boolean {
+  return user?.role === 'Super Admin'
+}
+
+export function canAccessSystemSettings(user: AuthUser | null): boolean {
+  return user?.role === 'Super Admin'
+}
+
+// Legacy compat - used by Amministrazione page
 export function isPartnerUser(user: AuthUser | null): boolean {
-  return user?.role === 'Partner' || user?.role === 'Project Manager'
+  return isManager(user)
 }
 
 export type NavItem = {
@@ -70,17 +99,24 @@ const ALL_NAV: NavItem[] = [
   { name: 'Feedback Beta', href: '/feedback-beta' },
 ]
 
-const ADMIN_ROLES: string[] = ['Partner', 'Project Manager']
 const ADMIN_ONLY_PATHS = ['/utenti', '/impostazioni']
 const FINANCE_PATHS = ['/amministrazione']
-const FINANCE_ROLES: string[] = ['Partner', 'Project Manager', 'Amministrazione']
 
 export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
-  if (ADMIN_ROLES.includes(role)) return ALL_NAV
+  if (role === 'Super Admin') return ALL_NAV
 
+  if (role === 'Admin') {
+    return ALL_NAV.filter(item => item.href !== '/impostazioni')
+  }
+
+  if (role === 'Project Manager') {
+    return ALL_NAV.filter(item => !ADMIN_ONLY_PATHS.includes(item.href))
+  }
+
+  // User / any other role: basic access (no admin, no finance, no user mgmt)
   return ALL_NAV.filter(item => {
     if (ADMIN_ONLY_PATHS.includes(item.href)) return false
-    if (FINANCE_PATHS.includes(item.href) && !FINANCE_ROLES.includes(role)) return false
+    if (FINANCE_PATHS.includes(item.href)) return false
     return true
   })
 }

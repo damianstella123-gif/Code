@@ -1,4 +1,6 @@
 export type AppRole =
+  | 'Super Admin'
+  | 'Admin'
   | 'Partner'
   | 'Project Manager'
   | 'Event Coordinator'
@@ -7,9 +9,11 @@ export type AppRole =
   | 'Amministrazione'
   | 'Production Manager'
   | 'Digital Strategist'
+  | 'User'
 
 export const APP_ROLES: AppRole[] = [
-  'Partner',
+  'Super Admin',
+  'Admin',
   'Project Manager',
   'Event Coordinator',
   'Event Assistant',
@@ -17,4 +21,5 @@ export const APP_ROLES: AppRole[] = [
   'Amministrazione',
   'Production Manager',
   'Digital Strategist',
+  'User',
 ]
