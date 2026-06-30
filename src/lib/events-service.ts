@@ -62,7 +62,7 @@ export async function fetchEvents(): Promise<Event[]> {
   const { data, error } = await supabase
     .from('events')
     .select('*')
-    .order('start_date', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(500)
   if (error) {
     console.error('fetchEvents error:', error.message)

@@ -2,19 +2,20 @@ import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Calendar, CheckSquare, Users, Clock, ArrowRight, Zap, MessageSquare,
-  FileText, AlertTriangle, BarChart3, TrendingUp, Archive,
+  FileText, AlertTriangle, BarChart3, TrendingUp, Archive, Database,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
-import { getVisibleEvents, getVisibleTasks } from '@/lib/permissions'
 import { daysLeft, fmtShort, eventColorByStato, eventLabelByStato, taskPriColor } from '@/lib/format'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchClients } from '@/lib/clients-service'
+import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchCommunications } from '@/lib/communications-service'
 import { supabase } from '@/lib/supabase'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Client } from '@/data/clients'
+import type { Supplier } from '@/data/suppliers'
 import type { Messaggio } from '@/data/comunicazioni'
 
 function getGreeting(): string {
@@ -93,23 +94,34 @@ export default function Dashboard() {
   const [liveTasks, setLiveTasks] = useState<Task[]>([])
   const [liveEvents, setLiveEvents] = useState<Event[]>([])
   const [liveClients, setLiveClients] = useState<Client[]>([])
+  const [liveSuppliers, setLiveSuppliers] = useState<Supplier[]>([])
   const [liveCommunications, setLiveCommunications] = useState<Messaggio[]>([])
   const [archiveCount, setArchiveCount] = useState(0)
   const [recentReferenti, setRecentReferenti] = useState<Referente[]>([])
   const [loading, setLoading] = useState(true)
+  const [diagErrors, setDiagErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     async function load() {
-      const [ev, tk, cl, cm] = await Promise.all([
+      const errors: Record<string, string> = {}
+
+      const [ev, tk, cl, sp, cm] = await Promise.all([
         fetchEvents(),
         fetchTasks(),
         fetchClients(),
+        fetchSuppliers(),
         fetchCommunications(),
       ])
       setLiveEvents(ev)
       setLiveTasks(tk)
       setLiveClients(cl)
+      setLiveSuppliers(sp)
       setLiveCommunications(cm)
+
+      if (ev.length === 0) errors.events = 'Nessun evento restituito da Supabase'
+      if (cl.length === 0) errors.clients = 'Nessun cliente restituito da Supabase'
+      if (sp.length === 0) errors.suppliers = 'Nessun fornitore restituito da Supabase'
+      setDiagErrors(errors)
 
       const { count } = await supabase.from('archive_items').select('*', { count: 'exact', head: true })
       setArchiveCount(count ?? 0)
@@ -134,8 +146,8 @@ export default function Dashboard() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const myEvents = useMemo(() => getVisibleEvents(ruolo, userId, liveEvents), [ruolo, userId, liveEvents])
-  const myTasks = useMemo(() => getVisibleTasks(ruolo, userId, liveTasks), [ruolo, userId, liveTasks])
+  const myEvents = liveEvents
+  const myTasks = liveTasks
 
   const kpi = useMemo(() => {
     const taskAperti = myTasks.filter(t => t.stato !== 'completato').length
@@ -214,6 +226,35 @@ export default function Dashboard() {
           icon={Users} color="#8b5cf6" delay={200} onClick={() => navigate('/crm')} />
         <KpiCard label="Documenti" value={archiveCount} sub="archivio aziendale"
           icon={Archive} color="var(--yellow)" delay={250} onClick={() => navigate('/archivio')} />
+      </div>
+
+      {/* Diagnostic counters */}
+      <div className="panel p-4 animate-fade-in" style={{ border: '1px solid var(--line)' }}>
+        <div className="flex items-center gap-2 mb-3">
+          <Database className="w-4 h-4" style={{ color: 'var(--blue)' }} />
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Diagnostica Supabase</h3>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+            <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Suppliers caricati</p>
+            <p className="text-xl font-bold" style={{ color: liveSuppliers.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveSuppliers.length}</p>
+            {diagErrors.suppliers && <p className="text-[10px] mt-1" style={{ color: 'var(--red2)' }}>{diagErrors.suppliers}</p>}
+          </div>
+          <div className="p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+            <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Events caricati</p>
+            <p className="text-xl font-bold" style={{ color: liveEvents.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveEvents.length}</p>
+            {diagErrors.events && <p className="text-[10px] mt-1" style={{ color: 'var(--red2)' }}>{diagErrors.events}</p>}
+          </div>
+          <div className="p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+            <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Clients caricati</p>
+            <p className="text-xl font-bold" style={{ color: liveClients.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveClients.length}</p>
+            {diagErrors.clients && <p className="text-[10px] mt-1" style={{ color: 'var(--red2)' }}>{diagErrors.clients}</p>}
+          </div>
+          <div className="p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+            <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>CRM (Referenti)</p>
+            <p className="text-xl font-bold" style={{ color: recentReferenti.length > 0 ? 'var(--green)' : 'var(--muted)' }}>{recentReferenti.length}</p>
+          </div>
+        </div>
       </div>
 
       {/* Main grid */}

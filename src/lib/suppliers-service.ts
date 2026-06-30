@@ -120,7 +120,7 @@ export async function fetchSuppliers(): Promise<Supplier[]> {
   const { data, error } = await supabase
     .from('suppliers')
     .select('*')
-    .order('name', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(1500)
   if (error) {
     console.error('fetchSuppliers error:', error.message)

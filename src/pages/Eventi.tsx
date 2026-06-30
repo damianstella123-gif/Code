@@ -81,19 +81,8 @@ function statoLabel(stato: string) {
   }
 }
 
-function getVisibleEvents(ruolo: string, userId: string, eventList: Event[]): Event[] {
-  switch (ruolo) {
-    case 'Admin':
-    case 'Partner':
-    case 'Finance':
-    case 'Commerciale':
-      return eventList
-    case 'Manager':
-    case 'Operativo':
-    case 'Fornitore':
-    default:
-      return eventList.filter(e => e.team.includes(userId) || e.responsabile === userId)
-  }
+function getVisibleEvents(_ruolo: string, _userId: string, eventList: Event[]): Event[] {
+  return eventList
 }
 
 function getTimeline(event: Event) {
