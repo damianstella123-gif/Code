@@ -1,0 +1,1 @@
+import{a8 as t}from"./index-C-i2Q4jG.js";async function o(){const{data:r,error:e}=await t.from("social_contents").select("*").order("created_at",{ascending:!1}).limit(500);return e?(console.error("fetchSocialContents error:",e.message),[]):r??[]}export{o as f};
