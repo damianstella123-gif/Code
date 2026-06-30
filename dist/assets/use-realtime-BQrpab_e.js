@@ -1,0 +1,1 @@
+import{a1 as c,a4 as a}from"./index-CZ4PfG-D.js";let u=0;function l(e,n){const s=c.useRef(n);s.current=n,c.useEffect(()=>{const r=++u,t=a.channel(`realtime-${e}-${r}`).on("postgres_changes",{event:"*",schema:"public",table:e},()=>{s.current()}).subscribe();return()=>{a.removeChannel(t)}},[e])}export{l as u};
