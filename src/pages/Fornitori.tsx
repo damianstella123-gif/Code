@@ -845,6 +845,7 @@ export default function Fornitori() {
   const [showForm, setShowForm] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<Supplier | undefined>(undefined)
   const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Mode: 'navigate' or 'search'
   const [mode, setMode] = useState<'navigate' | 'search'>('navigate')
@@ -877,12 +878,19 @@ export default function Fornitori() {
   }, [searchParams, supplierList, setSearchParams])
 
   async function handleSave(s: Supplier) {
+    setSaveError(null)
     if (editingSupplier) {
-      console.log('EDIT SUPPLIER', { id: s.id, name: s.nome })
       const result = await updateSupplier(s.id, s)
-      if (!result) console.error('SUPABASE UPDATE ERROR', { id: s.id, name: s.nome })
+      if (!result) {
+        setSaveError('Errore durante il salvataggio del fornitore. Riprova.')
+        return
+      }
     } else {
-      await upsertSupplier(s)
+      const result = await upsertSupplier(s)
+      if (!result) {
+        setSaveError('Errore durante la creazione del fornitore. Riprova.')
+        return
+      }
     }
     await loadData()
     if (selected?.id === s.id) {
@@ -1046,6 +1054,13 @@ export default function Fornitori() {
           onDelete={() => setDeletingSupplier(live)}
         />
         {showForm && <SupplierFormModal supplier={editingSupplier} onSave={handleSave} onCancel={() => { setShowForm(false); setEditingSupplier(undefined) }} />}
+        {saveError && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl text-sm font-medium animate-fade-in flex items-center gap-3"
+            style={{ background: 'rgba(208,0,58,0.95)', color: 'white', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+            <span>{saveError}</span>
+            <button onClick={() => setSaveError(null)} className="ml-2 text-white/70 hover:text-white">✕</button>
+          </div>
+        )}
         {deletingSupplier && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
             <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
