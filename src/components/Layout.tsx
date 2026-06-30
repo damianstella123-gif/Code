@@ -146,7 +146,7 @@ style={{
                 className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-sm font-bold text-white"
                 style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
               >
-                {user.first_name.charAt(0)}{user.last_name.charAt(0)}
+                {(user.first_name || '').charAt(0)}{(user.last_name || '').charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
@@ -409,7 +409,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
                   style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
                 >
-                  {user.first_name.charAt(0)}{user.last_name.charAt(0)}
+                  {(user.first_name || '').charAt(0)}{(user.last_name || '').charAt(0)}
                 </div>
                 <div className="hidden sm:block text-left">
                   <p className="text-xs font-medium leading-none" style={{ color: 'var(--text)' }}>
@@ -440,7 +440,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                         className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold text-white"
                         style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
                       >
-                        {user.first_name.charAt(0)}{user.last_name.charAt(0)}
+                        {(user.first_name || '').charAt(0)}{(user.last_name || '').charAt(0)}
                       </div>
                       <div>
                         <p className="font-semibold" style={{ color: 'var(--text)' }}>

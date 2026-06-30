@@ -509,7 +509,7 @@ export default function CRM() {
                 <div className="absolute right-4 top-[50%] -translate-y-1/2 pointer-events-none select-none"
                   style={{ opacity: 0.06 }}>
                   <span className="text-7xl font-black" style={{ color: statoColor(group.status) }}>
-                    {group.companyName.charAt(0).toUpperCase()}
+                    {(group.companyName || '?').charAt(0).toUpperCase()}
                   </span>
                 </div>
               )}

@@ -351,7 +351,7 @@ function TaskCard({ task, onClick, onQuickMove, events }: {
           )}
           {task.assegnatario ? (
             <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-semibold" style={{ background: 'var(--panel2)', color: 'var(--text)' }} title={task.assegnatario}>
-              {task.assegnatario.charAt(0).toUpperCase()}
+              {(task.assegnatario || '?').charAt(0).toUpperCase()}
             </div>
           ) : (
             <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: 'var(--panel2)' }}>

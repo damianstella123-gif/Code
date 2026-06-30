@@ -486,7 +486,7 @@ function DetailView({ pratica, onBack, onEdit, onDelete, allEvents, allUsers }: 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <InfoCard icon={Tag} label="Categoria" value={catLabel(pratica.categoria)} color={catColor(pratica.categoria)} />
         <InfoCard icon={CheckCircle} label="Stato" value={statoLabel(pratica.stato)} color={statoColor(pratica.stato)} />
-        <InfoCard icon={AlertTriangle} label="Priorita" value={pratica.priorita.charAt(0).toUpperCase() + pratica.priorita.slice(1)} color={priColor(pratica.priorita)} />
+        <InfoCard icon={AlertTriangle} label="Priorita" value={(pratica.priorita || '').charAt(0).toUpperCase() + (pratica.priorita || '').slice(1)} color={priColor(pratica.priorita)} />
         <InfoCard icon={Calendar} label="Creazione" value={fmtShort(pratica.creatoIl)} color="var(--muted)" />
         <InfoCard icon={Clock} label="Scadenza" value={`${fmtShort(pratica.scadenza)} (${overdue ? `${Math.abs(dl)}g fa` : dl === 0 ? 'Oggi' : `tra ${dl}g`})`} color={overdue ? 'var(--red2)' : dl <= 7 ? 'var(--yellow)' : 'var(--muted)'} />
         {pratica.importo && (

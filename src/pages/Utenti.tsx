@@ -444,7 +444,7 @@ export default function Utenti() {
               >
                 {editForm.avatar_url
                   ? <img src={editForm.avatar_url} alt="" className="w-full h-full rounded-xl object-cover" />
-                  : <>{editForm.first_name.charAt(0) || '?'}{editForm.last_name.charAt(0) || '?'}</>
+                  : <>{(editForm.first_name || '?').charAt(0)}{(editForm.last_name || '?').charAt(0)}</>
                 }
               </div>
               <div className="min-w-0 flex-1">
@@ -510,7 +510,7 @@ export default function Utenti() {
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
               <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{ background: `linear-gradient(135deg, ${roleColor(resetUser.role)} 0%, ${roleColor(resetUser.role)}88 100%)` }}>
-                {resetUser.first_name.charAt(0)}{resetUser.last_name.charAt(0)}
+                {(resetUser.first_name || '').charAt(0)}{(resetUser.last_name || '').charAt(0)}
               </div>
               <div>
                 <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{resetUser.first_name} {resetUser.last_name}</p>
@@ -595,7 +595,7 @@ function UserCard({ user, isPartner, isSelf, delay, onEdit, onToggleActive, onRe
           {user.avatar_url ? (
             <img src={user.avatar_url} alt="" className="w-full h-full rounded-xl object-cover" />
           ) : (
-            <>{user.first_name.charAt(0)}{user.last_name.charAt(0)}</>
+            <>{(user.first_name || '').charAt(0)}{(user.last_name || '').charAt(0)}</>
           )}
         </div>
         <div className="min-w-0 flex-1">

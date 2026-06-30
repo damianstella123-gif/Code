@@ -374,7 +374,7 @@ export default function Dashboard() {
                         style={{ background: 'var(--panel2)', border: unread ? '1px solid rgba(77,180,255,0.2)' : '1px solid transparent' }}>
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold"
                           style={{ background: 'rgba(77,180,255,0.1)', color: 'var(--blue)' }}>
-                          {m.mittente.charAt(0).toUpperCase()}
+                          {(m.mittente || '?').charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm truncate" style={{ color: unread ? 'var(--text)' : 'var(--muted)', fontWeight: unread ? 600 : 400 }}>
@@ -450,7 +450,7 @@ export default function Dashboard() {
                     style={{ background: 'var(--panel2)' }}>
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold"
                       style={{ background: c.stato === 'vip' ? 'rgba(255,194,75,0.15)' : 'rgba(56,210,125,0.1)', color: c.stato === 'vip' ? 'var(--yellow)' : 'var(--green)' }}>
-                      {c.nome.charAt(0)}
+                      {(c.nome || '?').charAt(0)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate" style={{ color: 'var(--text)' }}>{c.nome}</p>
@@ -474,7 +474,7 @@ export default function Dashboard() {
                     style={{ background: 'var(--panel2)' }}>
                     <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold"
                       style={{ background: r.is_principale ? 'rgba(34,197,94,0.12)' : 'var(--line)', color: r.is_principale ? 'var(--green)' : 'var(--muted)' }}>
-                      {r.nome.charAt(0)}{r.cognome.charAt(0)}
+                      {(r.nome || '').charAt(0)}{(r.cognome || '').charAt(0)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate" style={{ color: 'var(--text)' }}>

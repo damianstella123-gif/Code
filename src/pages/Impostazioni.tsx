@@ -379,7 +379,7 @@ function Branding({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSettings>) =
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg flex items-center justify-center"
             style={{ background: `linear-gradient(135deg, ${s.coloreAccento} 0%, ${s.coloreSecondario} 100%)`, boxShadow: `0 4px 16px ${s.coloreAccento}40` }}>
-            <span className="text-white font-bold text-sm">{s.logoTestuale.charAt(0)}</span>
+            <span className="text-white font-bold text-sm">{(s.logoTestuale || 'S').charAt(0)}</span>
           </div>
           <span className="text-lg font-bold tracking-tight" style={{ color: 'var(--text)' }}>
             {s.logoTestuale.split(' ')[0]}
