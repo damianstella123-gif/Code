@@ -27,6 +27,13 @@ interface SupplierRow {
   logo_url: string | null
   details: SupplierDetails | null
   note_operative: string | null
+  country: string
+  region: string
+  province: string
+  city: string
+  address: string
+  latitude: number | null
+  longitude: number | null
   created_at: string
   updated_at: string
 }
@@ -62,6 +69,13 @@ function rowToSupplier(r: SupplierRow): Supplier {
     piva: r.vat_number ?? '',
     logoUrl: r.logo_url ?? undefined,
     details: (r.details as SupplierDetails) ?? undefined,
+    country: r.country ?? '',
+    region: r.region ?? '',
+    province: r.province ?? '',
+    city: r.city ?? '',
+    address: r.address ?? '',
+    latitude: r.latitude ?? undefined,
+    longitude: r.longitude ?? undefined,
   }
 }
 
@@ -92,6 +106,13 @@ function supplierToRow(s: Supplier): Omit<SupplierRow, 'created_at' | 'updated_a
     reviews: s.recensioni ?? [],
     logo_url: s.logoUrl ?? null,
     details: s.details ?? null,
+    country: s.country ?? '',
+    region: s.region ?? '',
+    province: s.province ?? '',
+    city: s.city ?? '',
+    address: s.address ?? '',
+    latitude: s.latitude ?? null,
+    longitude: s.longitude ?? null,
   }
 }
 

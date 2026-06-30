@@ -1,9 +1,9 @@
 export type StatoContratto = 'attivo' | 'in_scadenza' | 'scaduto' | 'in_rinnovo' | 'sospeso'
 
-export type SupplierCategory = 'Hotel' | 'Ristoranti' | 'Location' | 'Attività' | 'Trasporti' | 'Catering' | 'Audio Video' | 'Allestimenti' | 'Staff' | 'Varie'
+export type SupplierCategory = 'Hotel' | 'Ristorante' | 'Location' | 'Attività' | 'Trasporti' | 'Catering' | 'Audio Video' | 'Allestimenti' | 'Hostess' | 'Entertainment' | 'Fotografia' | 'Video' | 'Sicurezza' | 'Altro'
 
 export const SUPPLIER_CATEGORIES: SupplierCategory[] = [
-  'Hotel', 'Ristoranti', 'Location', 'Attività', 'Trasporti', 'Catering', 'Audio Video', 'Allestimenti', 'Staff', 'Varie',
+  'Hotel', 'Ristorante', 'Audio Video', 'Catering', 'Location', 'Trasporti', 'Allestimenti', 'Hostess', 'Entertainment', 'Fotografia', 'Video', 'Sicurezza', 'Altro',
 ]
 
 export interface Documento {
@@ -23,25 +23,135 @@ export interface Recensione {
   data: string
 }
 
+export interface SalaMeeting {
+  nome?: string
+  mq?: number
+  altezza?: number
+  teatro?: number
+  scuola?: number
+  ferro_di_cavallo?: number
+  cabaret?: number
+  banchetto?: number
+  cocktail?: number
+  boardroom?: number
+  luce_naturale?: boolean
+  modulare?: boolean
+  divisibile?: boolean
+}
+
 export interface SupplierDetails {
+  // Hotel MICE
   citta?: string
   catena?: string
+  stelle?: number
   numero_camere?: number
   numero_sale_meeting?: number
-  capienza_sale?: number
+  capienza_sala_massima?: number
+  capienza_totale_meeting?: number
   ristorante_interno?: boolean
   parcheggio?: boolean
-  tipologia_cucina?: string
-  indoor?: boolean
-  dehor?: boolean
+  parcheggio_bus?: boolean
+  servizi_hotel?: {
+    wifi?: boolean
+    spa?: boolean
+    piscina?: boolean
+    palestra?: boolean
+    business_center?: boolean
+    navetta_aeroporto?: boolean
+    colonnine_elettriche?: boolean
+    pet_friendly?: boolean
+  }
+  sale_meeting?: SalaMeeting[]
+  contatti?: {
+    referente_eventi?: string
+    ruolo?: string
+    email_eventi?: string
+    telefono_eventi?: string
+    cellulare_eventi?: string
+    sito_eventi?: string
+    referente_tecnico?: string
+    email_tecnica?: string
+    telefono_tecnico?: string
+  }
+  documenti?: { nome?: string; tipo?: string; url?: string }[]
+
+  // Ristorante
+  tipo_cucina?: string
+  numero_sale?: number
+  capienza_interna?: number
+  capienza_esterna?: number
+  capienza_totale?: number
+  dehors?: boolean
   terrazza?: boolean
+  menu_eventi?: boolean
+  menu_pdf_url?: string
+  adatto_gruppi?: boolean
+  adatto_cene_aziendali?: boolean
+  adatto_gala?: boolean
+  accessibile_disabili?: boolean
+
+  // Audio Video
+  audio?: boolean
+  video?: boolean
+  luci?: boolean
+  ledwall?: boolean
+  streaming?: boolean
+  regia?: boolean
+  traduzione_simultanea?: boolean
+  palco?: boolean
+  microfoni?: boolean
+  videoproiettori?: boolean
+  tecnici_inclusi?: boolean
+  sopralluogo?: boolean
+  area_copertura?: string
+  magazzino_citta?: string
+  disponibilita_nazionale?: boolean
+  certificazioni?: string
+  note_tecniche?: string
+
+  // Location
+  tipo_location?: string
+  capienza_massima?: number
+  capienza_cena?: number
+  capienza_cocktail?: number
+  spazi_interni?: boolean
+  spazi_esterni?: boolean
+  mq_totali?: number
+  catering_interno?: boolean
+  catering_esclusivo?: boolean
+  vincoli_musica?: string
+  orario_limite?: string
+  planimetrie?: string
+
+  // Catering
+  tipologia_servizi?: string
+  coffee_break?: boolean
+  light_lunch?: boolean
+  cena_servita?: boolean
+  buffet?: boolean
+  cocktail?: boolean
+  banqueting?: boolean
+  numero_massimo_ospiti?: number
+  cucina_interna?: boolean
+  attrezzature_incluse?: boolean
+  personale_incluso?: boolean
+  intolleranze?: boolean
+  vegano?: boolean
+  vegetariano?: boolean
+  kosher?: boolean
+  halal?: boolean
+
+  // Generic
+  indoor?: boolean
+  outdoor?: boolean
   sala_privata?: boolean
   esclusiva?: boolean
-  coperti_totali?: number
-  outdoor?: boolean
   capienza?: number
+  coperti_totali?: number
   tipologia_attivita?: string
   durata?: string
+  dehor?: boolean
+  [key: string]: unknown
 }
 
 export interface Supplier {
@@ -69,6 +179,14 @@ export interface Supplier {
   piva: string
   logoUrl?: string
   details?: SupplierDetails
+  // Geo
+  country?: string
+  region?: string
+  province?: string
+  city?: string
+  address?: string
+  latitude?: number
+  longitude?: number
 }
 
 export const suppliers: Supplier[] = [

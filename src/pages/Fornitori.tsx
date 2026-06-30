@@ -2,16 +2,65 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Phone, Mail, MapPin, Globe, Star, FileText, Euro,
-  Search, X, Plus, Edit3, Trash2, Save, Upload, Building2,
+  Search, X, Plus, Edit3, Trash2, Save, Upload, Building2, Filter,
+  Hotel, UtensilsCrossed, MapPinned, Sparkles, Bus, CookingPot,
+  Speaker, PaintBucket, Users, MoreHorizontal, Camera, Video, Shield,
+  Music, ChevronDown,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { fetchSuppliers, upsertSupplier, deleteSupplier as deleteSupplierRemote, updateSupplier } from '@/lib/suppliers-service'
 import { fetchEvents } from '@/lib/events-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { supabase } from '@/lib/supabase'
-import type { Supplier, SupplierDetails } from '@/data/suppliers'
+import type { Supplier, SupplierDetails, SalaMeeting } from '@/data/suppliers'
 import { SUPPLIER_CATEGORIES } from '@/data/suppliers'
 import type { Event } from '@/data/events'
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function matchesCategory(supplierCat: string, filterCat: string): boolean {
+  const a = (supplierCat || '').toLowerCase().trim()
+  const b = (filterCat || '').toLowerCase().trim()
+  if (a === b) return true
+  const aliases: Record<string, string[]> = {
+    'hotel': ['hotel', 'hotels'],
+    'ristorante': ['ristorante', 'ristoranti', 'ristorazione'],
+    'audio video': ['audio video', 'audio/video', 'audiovideo', 'av'],
+    'location': ['location', 'locations', 'venue'],
+    'attività': ['attività', 'attivita', 'attività', 'team building', 'activities'],
+    'trasporti': ['trasporti', 'trasporto', 'transfer', 'transport'],
+    'catering': ['catering'],
+    'allestimenti': ['allestimenti', 'allestimento', 'scenografia'],
+    'hostess': ['hostess', 'staff', 'personale'],
+    'entertainment': ['entertainment', 'intrattenimento', 'spettacolo'],
+    'fotografia': ['fotografia', 'foto', 'photographer'],
+    'video': ['video', 'videomaking', 'video making'],
+    'sicurezza': ['sicurezza', 'security'],
+    'altro': ['altro', 'varie', 'tecnologia', 'other'],
+  }
+  for (const [, vals] of Object.entries(aliases)) {
+    if (vals.includes(a) && vals.includes(b)) return true
+  }
+  return false
+}
+
+function normalizeCategory(cat: string): string {
+  if (!cat || !cat.trim()) return 'Altro'
+  for (const c of SUPPLIER_CATEGORIES) {
+    if (matchesCategory(cat, c)) return c
+  }
+  return 'Altro'
+}
+
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  Hotel, Ristorante: UtensilsCrossed, Location: MapPinned,
+  'Attività': Sparkles, Trasporti: Bus, Catering: CookingPot,
+  'Audio Video': Speaker, Allestimenti: PaintBucket, Hostess: Users,
+  Entertainment: Music, Fotografia: Camera, Video: Video, Sicurezza: Shield,
+  Altro: MoreHorizontal,
+}
+
+// ─── Shared UI ───────────────────────────────────────────────────────────────
 
 function InteractiveStars({ rating, onChange, size = 'sm' }: { rating: number; onChange?: (v: number) => void; size?: 'sm' | 'lg' }) {
   const w = size === 'lg' ? 'w-5 h-5' : 'w-3.5 h-3.5'
@@ -30,10 +79,7 @@ function InteractiveStars({ rating, onChange, size = 'sm' }: { rating: number; o
 function SupplierLogo({ supplier, size = 48 }: { supplier: Supplier; size?: number }) {
   const initials = supplier.nome.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
   if (supplier.logoUrl) {
-    return (
-      <img src={supplier.logoUrl} alt={supplier.nome}
-        className="rounded-xl object-cover" style={{ width: size, height: size }} />
-    )
+    return <img src={supplier.logoUrl} alt={supplier.nome} className="rounded-xl object-cover" style={{ width: size, height: size }} />
   }
   return (
     <div className="rounded-xl flex items-center justify-center text-white font-bold"
@@ -43,65 +89,362 @@ function SupplierLogo({ supplier, size = 48 }: { supplier: Supplier; size?: numb
   )
 }
 
-// ─── Category Detail Forms ───────────────────────────────────────────────────
-
-function HotelFields({ details, onChange }: { details: SupplierDetails; onChange: (d: SupplierDetails) => void }) {
-  const upd = (k: keyof SupplierDetails, v: unknown) => onChange({ ...details, [k]: v })
+function MiniCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      <Field label="Citta" value={details.citta ?? ''} onChange={v => upd('citta', v)} />
-      <Field label="Catena" value={details.catena ?? ''} onChange={v => upd('catena', v)} />
-      <Field label="N. Camere" value={String(details.numero_camere ?? '')} onChange={v => upd('numero_camere', parseInt(v) || undefined)} type="number" />
-      <Field label="N. Sale meeting" value={String(details.numero_sale_meeting ?? '')} onChange={v => upd('numero_sale_meeting', parseInt(v) || undefined)} type="number" />
-      <Field label="Capienza sale" value={String(details.capienza_sale ?? '')} onChange={v => upd('capienza_sale', parseInt(v) || undefined)} type="number" />
-      <Check label="Ristorante interno" checked={!!details.ristorante_interno} onChange={v => upd('ristorante_interno', v)} />
-      <Check label="Parcheggio" checked={!!details.parcheggio} onChange={v => upd('parcheggio', v)} />
+    <div className="panel p-4 flex items-center gap-3">
+      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(208,0,58,0.08)' }}>
+        <Icon className="w-4 h-4" style={{ color: 'var(--red2)' }} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{label}</p>
+        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>{value}</p>
+      </div>
     </div>
   )
 }
 
-function RistorantiFields({ details, onChange }: { details: SupplierDetails; onChange: (d: SupplierDetails) => void }) {
-  const upd = (k: keyof SupplierDetails, v: unknown) => onChange({ ...details, [k]: v })
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="panel p-5">
+      <p className="text-sm font-bold mb-4" style={{ color: 'var(--text)' }}>{title}</p>
+      {children}
+    </div>
+  )
+}
+
+function InfoGrid({ items }: { items: { label: string; value: string | number | undefined }[] }) {
+  const valid = items.filter(i => i.value !== undefined && i.value !== '' && i.value !== 0)
+  if (!valid.length) return null
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      {valid.map(i => (
+        <div key={i.label}>
+          <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{i.label}</p>
+          <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text)' }}>{i.value}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function BoolGrid({ items }: { items: { label: string; value: boolean | undefined }[] }) {
+  const valid = items.filter(i => i.value)
+  if (!valid.length) return null
+  return (
+    <div className="flex flex-wrap gap-2 mt-3">
+      {valid.map(i => (
+        <span key={i.label} className="px-2.5 py-1 rounded-full text-[11px] font-medium"
+          style={{ background: 'rgba(34,197,94,0.1)', color: '#16a34a' }}>{i.label}</span>
+      ))}
+    </div>
+  )
+}
+
+// ─── Category Detail Cards (Read-only) ───────────────────────────────────────
+
+function HotelCard({ d }: { d: SupplierDetails }) {
+  const sale = (d.sale_meeting ?? []) as SalaMeeting[]
+  return (
+    <div className="space-y-4">
+      <InfoGrid items={[
+        { label: 'Catena', value: d.catena },
+        { label: 'Stelle', value: d.stelle ? `${d.stelle} stelle` : undefined },
+        { label: 'Camere', value: d.numero_camere },
+        { label: 'N. Sale Meeting', value: d.numero_sale_meeting },
+        { label: 'Cap. sala max', value: d.capienza_sala_massima },
+        { label: 'Cap. totale meeting', value: d.capienza_totale_meeting },
+      ]} />
+      <BoolGrid items={[
+        { label: 'Ristorante interno', value: d.ristorante_interno },
+        { label: 'Parcheggio', value: d.parcheggio },
+        { label: 'Parcheggio bus', value: d.parcheggio_bus },
+        { label: 'WiFi', value: d.servizi_hotel?.wifi },
+        { label: 'Spa', value: d.servizi_hotel?.spa },
+        { label: 'Piscina', value: d.servizi_hotel?.piscina },
+        { label: 'Palestra', value: d.servizi_hotel?.palestra },
+        { label: 'Business Center', value: d.servizi_hotel?.business_center },
+        { label: 'Navetta aeroporto', value: d.servizi_hotel?.navetta_aeroporto },
+        { label: 'Colonnine EV', value: d.servizi_hotel?.colonnine_elettriche },
+        { label: 'Pet friendly', value: d.servizi_hotel?.pet_friendly },
+      ]} />
+      {sale.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text)' }}>Sale Meeting</p>
+          <div className="overflow-x-auto rounded-lg" style={{ border: '1px solid var(--line)' }}>
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr style={{ background: 'var(--panel2)' }}>
+                  <th className="text-left px-3 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Sala</th>
+                  <th className="text-center px-2 py-2 font-semibold" style={{ color: 'var(--muted)' }}>mq</th>
+                  <th className="text-center px-2 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Teatro</th>
+                  <th className="text-center px-2 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Scuola</th>
+                  <th className="text-center px-2 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Cabaret</th>
+                  <th className="text-center px-2 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Banchetto</th>
+                  <th className="text-center px-2 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Cocktail</th>
+                  <th className="text-center px-2 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Board</th>
+                  <th className="text-center px-2 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Luce nat.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sale.map((s, i) => (
+                  <tr key={i} style={{ borderTop: '1px solid var(--line)' }}>
+                    <td className="px-3 py-2 font-medium" style={{ color: 'var(--text)' }}>{s.nome || `Sala ${i + 1}`}</td>
+                    <td className="text-center px-2 py-2" style={{ color: 'var(--text)' }}>{s.mq ?? '-'}</td>
+                    <td className="text-center px-2 py-2" style={{ color: 'var(--text)' }}>{s.teatro ?? '-'}</td>
+                    <td className="text-center px-2 py-2" style={{ color: 'var(--text)' }}>{s.scuola ?? '-'}</td>
+                    <td className="text-center px-2 py-2" style={{ color: 'var(--text)' }}>{s.cabaret ?? '-'}</td>
+                    <td className="text-center px-2 py-2" style={{ color: 'var(--text)' }}>{s.banchetto ?? '-'}</td>
+                    <td className="text-center px-2 py-2" style={{ color: 'var(--text)' }}>{s.cocktail ?? '-'}</td>
+                    <td className="text-center px-2 py-2" style={{ color: 'var(--text)' }}>{s.boardroom ?? '-'}</td>
+                    <td className="text-center px-2 py-2" style={{ color: 'var(--text)' }}>{s.luce_naturale ? 'Si' : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {d.contatti && (
+        <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--line)' }}>
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text)' }}>Contatti eventi</p>
+          <InfoGrid items={[
+            { label: 'Referente eventi', value: d.contatti.referente_eventi },
+            { label: 'Ruolo', value: d.contatti.ruolo },
+            { label: 'Email eventi', value: d.contatti.email_eventi },
+            { label: 'Tel. eventi', value: d.contatti.telefono_eventi },
+            { label: 'Cell. eventi', value: d.contatti.cellulare_eventi },
+            { label: 'Ref. tecnico', value: d.contatti.referente_tecnico },
+            { label: 'Email tecnica', value: d.contatti.email_tecnica },
+          ]} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RistoranteCard({ d }: { d: SupplierDetails }) {
+  return (
+    <div className="space-y-3">
+      <InfoGrid items={[
+        { label: 'Tipo cucina', value: d.tipo_cucina },
+        { label: 'N. sale', value: d.numero_sale },
+        { label: 'Capienza interna', value: d.capienza_interna },
+        { label: 'Capienza esterna', value: d.capienza_esterna },
+        { label: 'Capienza totale', value: d.capienza_totale },
+      ]} />
+      <BoolGrid items={[
+        { label: 'Dehors', value: d.dehors },
+        { label: 'Terrazza', value: d.terrazza },
+        { label: 'Menu eventi', value: d.menu_eventi },
+        { label: 'Adatto gruppi', value: d.adatto_gruppi },
+        { label: 'Cene aziendali', value: d.adatto_cene_aziendali },
+        { label: 'Gala', value: d.adatto_gala },
+        { label: 'Accessibile disabili', value: d.accessibile_disabili },
+      ]} />
+    </div>
+  )
+}
+
+function AudioVideoCard({ d }: { d: SupplierDetails }) {
+  return (
+    <div className="space-y-3">
+      <BoolGrid items={[
+        { label: 'Audio', value: d.audio },
+        { label: 'Video', value: d.video },
+        { label: 'Luci', value: d.luci },
+        { label: 'Ledwall', value: d.ledwall },
+        { label: 'Streaming', value: d.streaming },
+        { label: 'Regia', value: d.regia },
+        { label: 'Traduzione simultanea', value: d.traduzione_simultanea },
+        { label: 'Palco', value: d.palco },
+        { label: 'Microfoni', value: d.microfoni },
+        { label: 'Videoproiettori', value: d.videoproiettori },
+        { label: 'Tecnici inclusi', value: d.tecnici_inclusi },
+        { label: 'Sopralluogo', value: d.sopralluogo },
+        { label: 'Disponibilita nazionale', value: d.disponibilita_nazionale },
+      ]} />
+      <InfoGrid items={[
+        { label: 'Area copertura', value: d.area_copertura },
+        { label: 'Magazzino', value: d.magazzino_citta },
+        { label: 'Certificazioni', value: d.certificazioni },
+        { label: 'Note tecniche', value: d.note_tecniche },
+      ]} />
+      {d.contatti && (
+        <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--line)' }}>
+          <InfoGrid items={[
+            { label: 'Ref. tecnico', value: d.contatti.referente_tecnico },
+            { label: 'Email tecnica', value: d.contatti.email_tecnica },
+            { label: 'Tel. tecnico', value: d.contatti.telefono_tecnico },
+          ]} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LocationCard({ d }: { d: SupplierDetails }) {
+  return (
+    <div className="space-y-3">
+      <InfoGrid items={[
+        { label: 'Tipo', value: d.tipo_location },
+        { label: 'Capienza max', value: d.capienza_massima },
+        { label: 'Capienza cena', value: d.capienza_cena },
+        { label: 'Capienza cocktail', value: d.capienza_cocktail },
+        { label: 'mq totali', value: d.mq_totali },
+        { label: 'Vincoli musica', value: d.vincoli_musica },
+        { label: 'Orario limite', value: d.orario_limite },
+      ]} />
+      <BoolGrid items={[
+        { label: 'Spazi interni', value: d.spazi_interni },
+        { label: 'Spazi esterni', value: d.spazi_esterni },
+        { label: 'Catering interno', value: d.catering_interno },
+        { label: 'Catering esclusivo', value: d.catering_esclusivo },
+      ]} />
+    </div>
+  )
+}
+
+function CateringCard({ d }: { d: SupplierDetails }) {
+  return (
+    <div className="space-y-3">
+      <InfoGrid items={[
+        { label: 'Tipologia servizi', value: d.tipologia_servizi },
+        { label: 'N. max ospiti', value: d.numero_massimo_ospiti },
+      ]} />
+      <BoolGrid items={[
+        { label: 'Coffee break', value: d.coffee_break },
+        { label: 'Light lunch', value: d.light_lunch },
+        { label: 'Cena servita', value: d.cena_servita },
+        { label: 'Buffet', value: d.buffet },
+        { label: 'Cocktail', value: d.cocktail },
+        { label: 'Banqueting', value: d.banqueting },
+        { label: 'Cucina interna', value: d.cucina_interna },
+        { label: 'Attrezzature incluse', value: d.attrezzature_incluse },
+        { label: 'Personale incluso', value: d.personale_incluso },
+        { label: 'Intolleranze', value: d.intolleranze },
+        { label: 'Vegano', value: d.vegano },
+        { label: 'Vegetariano', value: d.vegetariano },
+        { label: 'Kosher', value: d.kosher },
+        { label: 'Halal', value: d.halal },
+      ]} />
+    </div>
+  )
+}
+
+function GenericCard({ d }: { d: SupplierDetails }) {
+  const entries = Object.entries(d).filter(([k, v]) =>
+    v !== undefined && v !== '' && v !== null && v !== false &&
+    k !== 'contatti' && k !== 'sale_meeting' && k !== 'servizi_hotel' && k !== 'documenti'
+  )
+  if (!entries.length) return <p className="text-xs" style={{ color: 'var(--muted)' }}>Nessun dettaglio compilato.</p>
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      {entries.map(([k, v]) => (
+        <div key={k}>
+          <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{k.replace(/_/g, ' ')}</p>
+          <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text)' }}>{typeof v === 'boolean' ? 'Si' : String(v)}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function getCategoryCard(cat: string) {
+  const norm = normalizeCategory(cat)
+  switch (norm) {
+    case 'Hotel': return HotelCard
+    case 'Ristorante': return RistoranteCard
+    case 'Audio Video': return AudioVideoCard
+    case 'Location': return LocationCard
+    case 'Catering': return CateringCard
+    default: return GenericCard
+  }
+}
+
+// ─── Category Edit Fields ────────────────────────────────────────────────────
+
+function HotelFields({ details, onChange }: { details: SupplierDetails; onChange: (d: SupplierDetails) => void }) {
+  const upd = (k: string, v: unknown) => onChange({ ...details, [k]: v })
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      <Field label="Citta" value={details.citta ?? ''} onChange={v => upd('citta', v)} />
-      <Field label="Tipologia cucina" value={details.tipologia_cucina ?? ''} onChange={v => upd('tipologia_cucina', v)} />
-      <Field label="Coperti totali" value={String(details.coperti_totali ?? '')} onChange={v => upd('coperti_totali', parseInt(v) || undefined)} type="number" />
-      <Check label="Indoor" checked={!!details.indoor} onChange={v => upd('indoor', v)} />
-      <Check label="Dehor" checked={!!details.dehor} onChange={v => upd('dehor', v)} />
-      <Check label="Terrazza" checked={!!details.terrazza} onChange={v => upd('terrazza', v)} />
-      <Check label="Sala privata" checked={!!details.sala_privata} onChange={v => upd('sala_privata', v)} />
-      <Check label="Esclusiva" checked={!!details.esclusiva} onChange={v => upd('esclusiva', v)} />
+      <FormField label="Catena" value={details.catena ?? ''} onChange={v => upd('catena', v)} />
+      <FormField label="Stelle" value={String(details.stelle ?? '')} onChange={v => upd('stelle', parseInt(v) || undefined)} type="number" />
+      <FormField label="N. Camere" value={String(details.numero_camere ?? '')} onChange={v => upd('numero_camere', parseInt(v) || undefined)} type="number" />
+      <FormField label="N. Sale meeting" value={String(details.numero_sale_meeting ?? '')} onChange={v => upd('numero_sale_meeting', parseInt(v) || undefined)} type="number" />
+      <FormField label="Cap. sala max" value={String(details.capienza_sala_massima ?? '')} onChange={v => upd('capienza_sala_massima', parseInt(v) || undefined)} type="number" />
+      <FormCheck label="Ristorante interno" checked={!!details.ristorante_interno} onChange={v => upd('ristorante_interno', v)} />
+      <FormCheck label="Parcheggio" checked={!!details.parcheggio} onChange={v => upd('parcheggio', v)} />
+      <FormCheck label="Parcheggio bus" checked={!!details.parcheggio_bus} onChange={v => upd('parcheggio_bus', v)} />
+    </div>
+  )
+}
+
+function RistoranteFields({ details, onChange }: { details: SupplierDetails; onChange: (d: SupplierDetails) => void }) {
+  const upd = (k: string, v: unknown) => onChange({ ...details, [k]: v })
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <FormField label="Tipo cucina" value={details.tipo_cucina ?? ''} onChange={v => upd('tipo_cucina', v)} />
+      <FormField label="N. Sale" value={String(details.numero_sale ?? '')} onChange={v => upd('numero_sale', parseInt(v) || undefined)} type="number" />
+      <FormField label="Capienza interna" value={String(details.capienza_interna ?? '')} onChange={v => upd('capienza_interna', parseInt(v) || undefined)} type="number" />
+      <FormField label="Capienza esterna" value={String(details.capienza_esterna ?? '')} onChange={v => upd('capienza_esterna', parseInt(v) || undefined)} type="number" />
+      <FormCheck label="Dehors" checked={!!details.dehors} onChange={v => upd('dehors', v)} />
+      <FormCheck label="Terrazza" checked={!!details.terrazza} onChange={v => upd('terrazza', v)} />
+      <FormCheck label="Menu eventi" checked={!!details.menu_eventi} onChange={v => upd('menu_eventi', v)} />
+      <FormCheck label="Adatto gruppi" checked={!!details.adatto_gruppi} onChange={v => upd('adatto_gruppi', v)} />
+    </div>
+  )
+}
+
+function AudioVideoFields({ details, onChange }: { details: SupplierDetails; onChange: (d: SupplierDetails) => void }) {
+  const upd = (k: string, v: unknown) => onChange({ ...details, [k]: v })
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <FormCheck label="Audio" checked={!!details.audio} onChange={v => upd('audio', v)} />
+      <FormCheck label="Video" checked={!!details.video} onChange={v => upd('video', v)} />
+      <FormCheck label="Luci" checked={!!details.luci} onChange={v => upd('luci', v)} />
+      <FormCheck label="Ledwall" checked={!!details.ledwall} onChange={v => upd('ledwall', v)} />
+      <FormCheck label="Streaming" checked={!!details.streaming} onChange={v => upd('streaming', v)} />
+      <FormCheck label="Regia" checked={!!details.regia} onChange={v => upd('regia', v)} />
+      <FormCheck label="Tecnici inclusi" checked={!!details.tecnici_inclusi} onChange={v => upd('tecnici_inclusi', v)} />
+      <FormField label="Area copertura" value={details.area_copertura ?? ''} onChange={v => upd('area_copertura', v)} />
+      <FormField label="Magazzino citta" value={details.magazzino_citta ?? ''} onChange={v => upd('magazzino_citta', v)} />
     </div>
   )
 }
 
 function LocationFields({ details, onChange }: { details: SupplierDetails; onChange: (d: SupplierDetails) => void }) {
-  const upd = (k: keyof SupplierDetails, v: unknown) => onChange({ ...details, [k]: v })
+  const upd = (k: string, v: unknown) => onChange({ ...details, [k]: v })
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      <Field label="Citta" value={details.citta ?? ''} onChange={v => upd('citta', v)} />
-      <Field label="Capienza" value={String(details.capienza ?? '')} onChange={v => upd('capienza', parseInt(v) || undefined)} type="number" />
-      <Check label="Indoor" checked={!!details.indoor} onChange={v => upd('indoor', v)} />
-      <Check label="Outdoor" checked={!!details.outdoor} onChange={v => upd('outdoor', v)} />
-      <Check label="Parcheggio" checked={!!details.parcheggio} onChange={v => upd('parcheggio', v)} />
+      <FormField label="Tipo location" value={details.tipo_location ?? ''} onChange={v => upd('tipo_location', v)} />
+      <FormField label="Capienza max" value={String(details.capienza_massima ?? '')} onChange={v => upd('capienza_massima', parseInt(v) || undefined)} type="number" />
+      <FormField label="Capienza cena" value={String(details.capienza_cena ?? '')} onChange={v => upd('capienza_cena', parseInt(v) || undefined)} type="number" />
+      <FormField label="Capienza cocktail" value={String(details.capienza_cocktail ?? '')} onChange={v => upd('capienza_cocktail', parseInt(v) || undefined)} type="number" />
+      <FormField label="mq totali" value={String(details.mq_totali ?? '')} onChange={v => upd('mq_totali', parseInt(v) || undefined)} type="number" />
+      <FormCheck label="Spazi interni" checked={!!details.spazi_interni} onChange={v => upd('spazi_interni', v)} />
+      <FormCheck label="Spazi esterni" checked={!!details.spazi_esterni} onChange={v => upd('spazi_esterni', v)} />
+      <FormCheck label="Catering interno" checked={!!details.catering_interno} onChange={v => upd('catering_interno', v)} />
     </div>
   )
 }
 
-function AttivitaFields({ details, onChange }: { details: SupplierDetails; onChange: (d: SupplierDetails) => void }) {
-  const upd = (k: keyof SupplierDetails, v: unknown) => onChange({ ...details, [k]: v })
+function CateringFields({ details, onChange }: { details: SupplierDetails; onChange: (d: SupplierDetails) => void }) {
+  const upd = (k: string, v: unknown) => onChange({ ...details, [k]: v })
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      <Field label="Citta" value={details.citta ?? ''} onChange={v => upd('citta', v)} />
-      <Field label="Tipologia attivita" value={details.tipologia_attivita ?? ''} onChange={v => upd('tipologia_attivita', v)} />
-      <Field label="Capienza" value={String(details.capienza ?? '')} onChange={v => upd('capienza', parseInt(v) || undefined)} type="number" />
-      <Field label="Durata" value={details.durata ?? ''} onChange={v => upd('durata', v)} />
+      <FormField label="Tipologia servizi" value={details.tipologia_servizi ?? ''} onChange={v => upd('tipologia_servizi', v)} />
+      <FormField label="N. max ospiti" value={String(details.numero_massimo_ospiti ?? '')} onChange={v => upd('numero_massimo_ospiti', parseInt(v) || undefined)} type="number" />
+      <FormCheck label="Coffee break" checked={!!details.coffee_break} onChange={v => upd('coffee_break', v)} />
+      <FormCheck label="Light lunch" checked={!!details.light_lunch} onChange={v => upd('light_lunch', v)} />
+      <FormCheck label="Cena servita" checked={!!details.cena_servita} onChange={v => upd('cena_servita', v)} />
+      <FormCheck label="Buffet" checked={!!details.buffet} onChange={v => upd('buffet', v)} />
+      <FormCheck label="Vegano" checked={!!details.vegano} onChange={v => upd('vegano', v)} />
+      <FormCheck label="Halal" checked={!!details.halal} onChange={v => upd('halal', v)} />
     </div>
   )
 }
 
-function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
+function FormField({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
   return (
     <div>
       <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>{label}</label>
@@ -112,29 +455,31 @@ function Field({ label, value, onChange, type = 'text' }: { label: string; value
   )
 }
 
-function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+function FormCheck({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <div className="flex items-center gap-2 py-2">
-      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
-        id={`chk_${label.replace(/\s/g, '_')}`} />
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} id={`chk_${label.replace(/\s/g, '_')}`} />
       <label htmlFor={`chk_${label.replace(/\s/g, '_')}`} className="text-xs" style={{ color: 'var(--text)' }}>{label}</label>
     </div>
   )
 }
 
-function getCategoryDetailsComponent(cat: string) {
-  const norm = cat.toLowerCase()
-  if (norm === 'hotel') return HotelFields
-  if (norm === 'ristoranti' || norm === 'ristorante') return RistorantiFields
-  if (norm === 'location' || norm.includes('location')) return LocationFields
-  if (norm === 'attività' || norm === 'attivita' || norm.includes('attivit')) return AttivitaFields
-  return null
+function getCategoryEditFields(cat: string) {
+  const norm = normalizeCategory(cat)
+  switch (norm) {
+    case 'Hotel': return HotelFields
+    case 'Ristorante': return RistoranteFields
+    case 'Audio Video': return AudioVideoFields
+    case 'Location': return LocationFields
+    case 'Catering': return CateringFields
+    default: return null
+  }
 }
 
 // ─── Supplier Detail ─────────────────────────────────────────────────────────
 
 function SupplierDetail({ supplier, onBack, onEdit, onDelete, onSave }: {
-  supplier: Supplier; events: Event[]
+  supplier: Supplier
   onBack: () => void; onEdit: () => void; onDelete: () => void
   onSave: (s: Supplier) => void
 }) {
@@ -146,7 +491,8 @@ function SupplierDetail({ supplier, onBack, onEdit, onDelete, onSave }: {
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const DetailForm = getCategoryDetailsComponent(supplier.categoria)
+  const DetailCard = getCategoryCard(supplier.categoria)
+  const DetailEditForm = getCategoryEditFields(supplier.categoria)
 
   async function handleRating(v: number) {
     setRating(v)
@@ -178,6 +524,8 @@ function SupplierDetail({ supplier, onBack, onEdit, onDelete, onSave }: {
     setUploading(false)
   }
 
+  const geoLine = [supplier.city, supplier.province, supplier.region, supplier.country].filter(Boolean).join(', ')
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -196,7 +544,7 @@ function SupplierDetail({ supplier, onBack, onEdit, onDelete, onSave }: {
         </div>
       </div>
 
-      {/* Header Card */}
+      {/* Header */}
       <div className="panel p-6">
         <div className="flex flex-col sm:flex-row items-start gap-5">
           <div className="relative group">
@@ -213,10 +561,10 @@ function SupplierDetail({ supplier, onBack, onEdit, onDelete, onSave }: {
             <div className="flex flex-wrap items-center gap-3 mb-1">
               <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{supplier.nome}</h1>
               <span className="text-xs px-2.5 py-0.5 rounded-full font-medium"
-                style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>{supplier.categoria}</span>
+                style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>{normalizeCategory(supplier.categoria)}</span>
             </div>
             <div className="flex flex-wrap items-center gap-4 mt-2 text-sm" style={{ color: 'var(--muted)' }}>
-              {supplier.location && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{supplier.location}</span>}
+              {(geoLine || supplier.location) && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{geoLine || supplier.location}</span>}
               {supplier.telefono && <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5" />{supplier.telefono}</span>}
               {supplier.email && <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" />{supplier.email}</span>}
               {supplier.sito && <span className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" />{supplier.sito}</span>}
@@ -234,43 +582,30 @@ function SupplierDetail({ supplier, onBack, onEdit, onDelete, onSave }: {
         <MiniCard icon={Building2} label="Referente" value={supplier.referente || '-'} />
         <MiniCard icon={Phone} label="Tel. Referente" value={supplier.referenteTelefono || '-'} />
         <MiniCard icon={FileText} label="P.IVA" value={supplier.piva || '-'} />
-        <MiniCard icon={Euro} label="Costo medio" value={supplier.costoMedioPerEvento ? `€${supplier.costoMedioPerEvento.toLocaleString('it-IT')}` : '-'} />
+        <MiniCard icon={Euro} label="Costo medio" value={supplier.costoMedioPerEvento ? `${supplier.costoMedioPerEvento.toLocaleString('it-IT')} EUR` : '-'} />
       </div>
 
       {/* Category-specific details */}
-      {DetailForm && (
-        <div className="panel p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>Scheda {supplier.categoria}</p>
-            {!editingDetails ? (
-              <button onClick={() => setEditingDetails(true)} className="text-xs font-medium px-3 py-1 rounded-lg"
-                style={{ color: 'var(--red2)', border: '1px solid var(--line)' }}>
-                <Edit3 className="w-3 h-3 inline mr-1" />Modifica
-              </button>
-            ) : (
-              <button onClick={saveDetails} className="text-xs font-medium px-3 py-1 rounded-lg text-white"
-                style={{ background: 'var(--red2)' }}>
-                <Save className="w-3 h-3 inline mr-1" />Salva
-              </button>
-            )}
-          </div>
-          {editingDetails ? (
-            <DetailForm details={details} onChange={setDetails} />
+      <DetailSection title={`Scheda ${normalizeCategory(supplier.categoria)}`}>
+        <div className="flex items-center justify-end mb-3 -mt-8">
+          {!editingDetails ? (
+            <button onClick={() => setEditingDetails(true)} className="text-xs font-medium px-3 py-1 rounded-lg"
+              style={{ color: 'var(--red2)', border: '1px solid var(--line)' }}>
+              <Edit3 className="w-3 h-3 inline mr-1" />Modifica
+            </button>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {Object.entries(details).filter(([, v]) => v !== undefined && v !== '' && v !== null && v !== false).map(([k, v]) => (
-                <div key={k}>
-                  <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{k.replace(/_/g, ' ')}</p>
-                  <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text)' }}>{typeof v === 'boolean' ? 'Si' : String(v)}</p>
-                </div>
-              ))}
-              {Object.keys(details).filter(k => details[k as keyof SupplierDetails] !== undefined && details[k as keyof SupplierDetails] !== '' && details[k as keyof SupplierDetails] !== null && details[k as keyof SupplierDetails] !== false).length === 0 && (
-                <p className="text-xs col-span-full" style={{ color: 'var(--muted)' }}>Nessun dettaglio compilato. Clicca Modifica per aggiungere informazioni.</p>
-              )}
-            </div>
+            <button onClick={saveDetails} className="text-xs font-medium px-3 py-1 rounded-lg text-white"
+              style={{ background: 'var(--red2)' }}>
+              <Save className="w-3 h-3 inline mr-1" />Salva
+            </button>
           )}
         </div>
-      )}
+        {editingDetails && DetailEditForm ? (
+          <DetailEditForm details={details} onChange={setDetails} />
+        ) : (
+          <DetailCard d={details} />
+        )}
+      </DetailSection>
 
       {/* Note operative */}
       <div className="panel p-5">
@@ -312,21 +647,6 @@ function SupplierDetail({ supplier, onBack, onEdit, onDelete, onSave }: {
   )
 }
 
-function MiniCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
-  return (
-    <div className="panel p-4 flex items-center gap-3">
-      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-        style={{ background: 'rgba(208,0,58,0.08)' }}>
-        <Icon className="w-4 h-4" style={{ color: 'var(--red2)' }} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{label}</p>
-        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>{value}</p>
-      </div>
-    </div>
-  )
-}
-
 // ─── Form Modal ──────────────────────────────────────────────────────────────
 
 function SupplierFormModal({ supplier, onSave, onCancel }: {
@@ -344,16 +664,21 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
   const [stato, setStato] = useState<'attivo' | 'inattivo'>(supplier?.stato ?? 'attivo')
   const [servizi, setServizi] = useState(supplier?.servizi?.join(', ') ?? '')
   const [noteOperative, setNoteOperative] = useState(supplier?.noteOperative ?? '')
+  const [city, setCity] = useState(supplier?.city ?? '')
+  const [province, setProvince] = useState(supplier?.province ?? '')
+  const [region, setRegion] = useState(supplier?.region ?? '')
+  const [country, setCountry] = useState(supplier?.country ?? 'Italia')
+  const [address, setAddress] = useState(supplier?.address ?? '')
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!nome.trim() || !email.trim()) return
+    if (!nome.trim()) return
     const updated: Supplier = {
       id: supplier?.id ?? `sup_${Date.now()}`,
       nome: nome.trim(),
       email: email.trim(),
       telefono: telefono.trim(),
-      categoria: categoria.trim(),
+      categoria: categoria.trim() || 'Altro',
       referente: referente.trim(),
       referenteTelefono: referenteTelefono.trim(),
       rating: supplier?.rating ?? 0,
@@ -373,6 +698,13 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
       piva: piva.trim(),
       logoUrl: supplier?.logoUrl,
       details: supplier?.details,
+      city: city.trim(),
+      province: province.trim(),
+      region: region.trim(),
+      country: country.trim(),
+      address: address.trim(),
+      latitude: supplier?.latitude,
+      longitude: supplier?.longitude,
     }
     onSave(updated)
   }
@@ -399,7 +731,7 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
                 style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
             </div>
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Categoria *</label>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Categoria</label>
               <select value={categoria} onChange={e => setCategoria(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
                 style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
@@ -411,8 +743,8 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Email *</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
                 style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
             </div>
@@ -439,9 +771,46 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
             </div>
           </div>
 
+          {/* Geo fields */}
+          <div className="pt-3" style={{ borderTop: '1px solid var(--line)' }}>
+            <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text)' }}>Localizzazione</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Citta</label>
+                <input type="text" value={city} onChange={e => setCity(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Provincia</label>
+                <input type="text" value={province} onChange={e => setProvince(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Regione</label>
+                <input type="text" value={region} onChange={e => setRegion(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Paese</label>
+                <input type="text" value={country} onChange={e => setCountry(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Indirizzo</label>
+                <input type="text" value={address} onChange={e => setAddress(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Location / Citta</label>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Location (legacy)</label>
               <input type="text" value={location} onChange={e => setLocation(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
                 style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
@@ -503,37 +872,26 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
   )
 }
 
-// ─── Category Icons ──────────────────────────────────────────────────────────
-
-import {
-  Hotel, UtensilsCrossed, MapPinned, Sparkles, Bus, CookingPot,
-  Speaker, PaintBucket, Users, MoreHorizontal, Filter,
-} from 'lucide-react'
-
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  Hotel, Ristoranti: UtensilsCrossed, Location: MapPinned,
-  'Attività': Sparkles, Trasporti: Bus, Catering: CookingPot,
-  'Audio Video': Speaker, Allestimenti: PaintBucket, Staff: Users, Varie: MoreHorizontal,
-}
-
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function Fornitori() {
   loadUser()
   const [searchParams, setSearchParams] = useSearchParams()
   const [supplierList, setSupplierList] = useState<Supplier[]>([])
-  const [eventsList, setEventsList] = useState<Event[]>([])
+  const [_eventsList, setEventsList] = useState<Event[]>([])
   const [selected, setSelected] = useState<Supplier | null>(null)
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<Supplier | undefined>(undefined)
   const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null)
-  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showGeoFilters, setShowGeoFilters] = useState(false)
+
+  // Geo filters
+  const [filterRegion, setFilterRegion] = useState('')
+  const [filterProvince, setFilterProvince] = useState('')
   const [filterCity, setFilterCity] = useState('')
   const [filterMinRating, setFilterMinRating] = useState(0)
-  const [filterMinCapacity, setFilterMinCapacity] = useState('')
-  const [filterMinRooms, setFilterMinRooms] = useState('')
 
   const loadData = useCallback(async () => {
     const [sups, evs] = await Promise.all([fetchSuppliers(), fetchEvents()])
@@ -548,10 +906,27 @@ export default function Fornitori() {
     const id = searchParams.get('id')
     if (id && supplierList.length > 0) {
       const found = supplierList.find(s => s.id === id)
-      if (found) { setSelected(found); setActiveCategory(found.categoria) }
+      if (found) { setSelected(found); setActiveCategory(normalizeCategory(found.categoria)) }
       setSearchParams({}, { replace: true })
     }
   }, [searchParams, supplierList, setSearchParams])
+
+  // Derive geo options from data
+  const geoOptions = useMemo(() => {
+    const regions = new Set<string>()
+    const provinces = new Set<string>()
+    const cities = new Set<string>()
+    for (const s of supplierList) {
+      if (s.region) regions.add(s.region)
+      if (s.province) provinces.add(s.province)
+      if (s.city) cities.add(s.city)
+    }
+    return {
+      regions: [...regions].sort(),
+      provinces: [...provinces].sort(),
+      cities: [...cities].sort(),
+    }
+  }, [supplierList])
 
   async function handleSave(s: Supplier) {
     await upsertSupplier(s)
@@ -572,7 +947,7 @@ export default function Fornitori() {
   const categoryCounts = useMemo(() => {
     const map: Record<string, number> = {}
     for (const s of supplierList) {
-      const c = s.categoria || 'Varie'
+      const c = normalizeCategory(s.categoria)
       map[c] = (map[c] || 0) + 1
     }
     return map
@@ -580,31 +955,26 @@ export default function Fornitori() {
 
   const filtered = useMemo(() => {
     let list = supplierList
-    if (activeCategory) list = list.filter(s => s.categoria === activeCategory)
+    if (activeCategory && activeCategory !== '__all__') {
+      list = list.filter(s => matchesCategory(s.categoria, activeCategory))
+    }
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(s =>
         s.nome.toLowerCase().includes(q) ||
-        s.location.toLowerCase().includes(q) ||
-        s.referente.toLowerCase().includes(q) ||
-        (s.details?.citta ?? '').toLowerCase().includes(q)
+        (s.location || '').toLowerCase().includes(q) ||
+        (s.referente || '').toLowerCase().includes(q) ||
+        (s.city || '').toLowerCase().includes(q) ||
+        (s.province || '').toLowerCase().includes(q) ||
+        (s.region || '').toLowerCase().includes(q)
       )
     }
-    if (filterCity.trim()) {
-      const c = filterCity.toLowerCase()
-      list = list.filter(s => s.location.toLowerCase().includes(c) || (s.details?.citta ?? '').toLowerCase().includes(c))
-    }
+    if (filterRegion) list = list.filter(s => s.region === filterRegion)
+    if (filterProvince) list = list.filter(s => s.province === filterProvince)
+    if (filterCity) list = list.filter(s => s.city === filterCity || (s.location || '').toLowerCase().includes(filterCity.toLowerCase()))
     if (filterMinRating > 0) list = list.filter(s => s.rating >= filterMinRating)
-    if (filterMinCapacity) {
-      const min = parseInt(filterMinCapacity)
-      if (min > 0) list = list.filter(s => (s.details?.capienza ?? 0) >= min || (s.details?.coperti_totali ?? 0) >= min || (s.details?.capienza_sale ?? 0) >= min)
-    }
-    if (filterMinRooms) {
-      const min = parseInt(filterMinRooms)
-      if (min > 0) list = list.filter(s => (s.details?.numero_camere ?? 0) >= min)
-    }
     return list
-  }, [supplierList, activeCategory, search, filterCity, filterMinRating, filterMinCapacity, filterMinRooms])
+  }, [supplierList, activeCategory, search, filterRegion, filterProvince, filterCity, filterMinRating])
 
   // ─── Detail View ─────────────────────────────────────────────────────────────
   if (selected) {
@@ -612,7 +982,6 @@ export default function Fornitori() {
     return (
       <SupplierDetail
         supplier={live}
-        events={eventsList}
         onBack={() => setSelected(null)}
         onEdit={() => { setEditingSupplier(live); setShowForm(true) }}
         onDelete={() => setDeletingSupplier(live)}
@@ -621,7 +990,7 @@ export default function Fornitori() {
     )
   }
 
-  // ─── Category Tiles View (landing) ───────────────────────────────────────────
+  // ─── Category Tiles (landing) ─────────────────────────────────────────────────
   if (!activeCategory) {
     return (
       <div className="space-y-6">
@@ -629,7 +998,7 @@ export default function Fornitori() {
           <div>
             <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Fornitori</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-              {supplierList.length} fornitori · Seleziona una categoria
+              {supplierList.length} fornitori nel database MICE
             </p>
           </div>
           <button onClick={() => { setEditingSupplier(undefined); setShowForm(true) }}
@@ -660,7 +1029,7 @@ export default function Fornitori() {
           })}
         </div>
 
-        {/* Quick search across all */}
+        {/* Quick search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
           <input type="text" value={search} onChange={e => { setSearch(e.target.value); if (e.target.value) setActiveCategory('__all__') }}
@@ -674,13 +1043,13 @@ export default function Fornitori() {
     )
   }
 
-  // ─── Supplier List View (category selected) ─────────────────────────────────
+  // ─── Supplier List (category selected) ─────────────────────────────────────────
   return (
     <div className="space-y-5">
-      {/* Header with back */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => { setActiveCategory(null); setSearch(''); setFilterCity(''); setFilterMinRating(0); setFilterMinCapacity(''); setFilterMinRooms('') }}
+          <button onClick={() => { setActiveCategory(null); setSearch(''); setFilterRegion(''); setFilterProvince(''); setFilterCity(''); setFilterMinRating(0) }}
             className="p-2 rounded-lg transition-all hover:bg-white/5"
             style={{ border: '1px solid var(--line)' }}>
             <ArrowLeft className="w-4 h-4" style={{ color: 'var(--muted)' }} />
@@ -699,7 +1068,7 @@ export default function Fornitori() {
         </button>
       </div>
 
-      {/* Search + Advanced */}
+      {/* Search + Geo Filters */}
       <div className="space-y-3">
         <div className="flex gap-2">
           <div className="relative flex-1">
@@ -709,18 +1078,38 @@ export default function Fornitori() {
               className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none"
               style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
           </div>
-          <button onClick={() => setShowAdvanced(!showAdvanced)}
+          <button onClick={() => setShowGeoFilters(!showGeoFilters)}
             className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-medium"
-            style={{ background: showAdvanced ? 'rgba(208,0,58,0.1)' : 'var(--panel)', color: showAdvanced ? 'var(--red2)' : 'var(--muted)', border: '1px solid var(--line)' }}>
-            <Filter className="w-3.5 h-3.5" /> Filtri
+            style={{ background: showGeoFilters ? 'rgba(208,0,58,0.1)' : 'var(--panel)', color: showGeoFilters ? 'var(--red2)' : 'var(--muted)', border: '1px solid var(--line)' }}>
+            <Filter className="w-3.5 h-3.5" /> Filtri geo
+            <ChevronDown className={`w-3 h-3 transition-transform ${showGeoFilters ? 'rotate-180' : ''}`} />
           </button>
         </div>
-        {showAdvanced && (
+        {showGeoFilters && (
           <div className="panel p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-in">
             <div>
+              <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Regione</label>
+              <select value={filterRegion} onChange={e => setFilterRegion(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+                <option value="">Tutte</option>
+                {geoOptions.regions.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Provincia</label>
+              <select value={filterProvince} onChange={e => setFilterProvince(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+                <option value="">Tutte</option>
+                {geoOptions.provinces.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
               <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Citta</label>
-              <input type="text" value={filterCity} onChange={e => setFilterCity(e.target.value)} placeholder="Es. Roma"
-                className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+              <select value={filterCity} onChange={e => setFilterCity(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+                <option value="">Tutte</option>
+                {geoOptions.cities.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Rating min.</label>
@@ -731,16 +1120,6 @@ export default function Fornitori() {
                 <option value="4">4+</option>
                 <option value="5">5</option>
               </select>
-            </div>
-            <div>
-              <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Capienza min.</label>
-              <input type="number" value={filterMinCapacity} onChange={e => setFilterMinCapacity(e.target.value)} placeholder="Es. 100"
-                className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }} />
-            </div>
-            <div>
-              <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Camere min.</label>
-              <input type="number" value={filterMinRooms} onChange={e => setFilterMinRooms(e.target.value)} placeholder="Es. 50"
-                className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }} />
             </div>
           </div>
         )}
@@ -754,39 +1133,45 @@ export default function Fornitori() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(sup => (
-            <div key={sup.id} onClick={() => setSelected(sup)}
-              className="panel p-4 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
-              style={{ border: '1px solid var(--line)' }}>
-              <div className="flex items-start gap-3 mb-3">
-                <SupplierLogo supplier={sup} size={40} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{sup.nome}</p>
-                  <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
-                    {sup.details?.citta || sup.location || sup.categoria}
-                  </p>
+          {filtered.map(sup => {
+            const geoLine = [sup.city, sup.province].filter(Boolean).join(', ')
+            return (
+              <div key={sup.id} onClick={() => setSelected(sup)}
+                className="panel p-4 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
+                style={{ border: '1px solid var(--line)' }}>
+                <div className="flex items-start gap-3 mb-3">
+                  <SupplierLogo supplier={sup} size={40} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{sup.nome}</p>
+                    <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
+                      {geoLine || sup.location || normalizeCategory(sup.categoria)}
+                    </p>
+                  </div>
+                  {sup.stato === 'inattivo' && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(255,49,95,0.1)', color: 'var(--red2)' }}>Inattivo</span>
+                  )}
                 </div>
-                {sup.stato === 'inattivo' && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(255,49,95,0.1)', color: 'var(--red2)' }}>Inattivo</span>
+                <div className="flex items-center justify-between">
+                  <InteractiveStars rating={sup.rating} size="sm" />
+                  <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--muted)' }}>
+                    {sup.details?.numero_camere && <span>{sup.details.numero_camere} camere</span>}
+                    {sup.details?.capienza_massima && <span>cap. {sup.details.capienza_massima}</span>}
+                    {sup.details?.capienza_totale && <span>{sup.details.capienza_totale} coperti</span>}
+                    {sup.details?.numero_sale_meeting && <span>{sup.details.numero_sale_meeting} sale</span>}
+                  </div>
+                </div>
+                {sup.servizi.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {sup.servizi.slice(0, 3).map(s => (
+                      <span key={s} className="text-[10px] px-2 py-0.5 rounded-full"
+                        style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>{s}</span>
+                    ))}
+                    {sup.servizi.length > 3 && <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>+{sup.servizi.length - 3}</span>}
+                  </div>
                 )}
               </div>
-              <div className="flex items-center justify-between">
-                <InteractiveStars rating={sup.rating} size="sm" />
-                {sup.details?.numero_camere && <span className="text-[10px]" style={{ color: 'var(--muted)' }}>{sup.details.numero_camere} camere</span>}
-                {sup.details?.capienza && <span className="text-[10px]" style={{ color: 'var(--muted)' }}>cap. {sup.details.capienza}</span>}
-                {sup.details?.coperti_totali && <span className="text-[10px]" style={{ color: 'var(--muted)' }}>{sup.details.coperti_totali} coperti</span>}
-              </div>
-              {sup.servizi.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {sup.servizi.slice(0, 3).map(s => (
-                    <span key={s} className="text-[10px] px-2 py-0.5 rounded-full"
-                      style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>{s}</span>
-                  ))}
-                  {sup.servizi.length > 3 && <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>+{sup.servizi.length - 3}</span>}
-                </div>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
