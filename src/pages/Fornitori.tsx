@@ -87,19 +87,18 @@ function getCountryGroup(country: string): string {
 function getCapacity(s: Supplier): number {
   const d = s.details
   if (!d) return 0
-  const cat = normalizeCategory(s.categoria)
-  switch (cat) {
-    case 'Hotel':
-      return Math.max(d.capienza_sala_massima ?? 0, d.capienza_totale_meeting ?? 0)
-    case 'Ristorante':
-      return Math.max(d.capienza_totale ?? 0, d.capienza_interna ?? 0, d.capienza_esterna ?? 0)
-    case 'Location':
-      return Math.max(d.capienza_massima ?? 0, d.capienza_cena ?? 0, d.capienza_cocktail ?? 0)
-    case 'Catering':
-      return d.numero_massimo_ospiti ?? 0
-    default:
-      return d.capienza ?? d.capienza_massima ?? 0
-  }
+  return Math.max(
+    d.capienza_sala_massima ?? 0,
+    d.capienza_totale_meeting ?? 0,
+    d.capienza_totale ?? 0,
+    d.capienza_interna ?? 0,
+    d.capienza_esterna ?? 0,
+    d.capienza_massima ?? 0,
+    d.capienza_cena ?? 0,
+    d.capienza_cocktail ?? 0,
+    d.numero_massimo_ospiti ?? 0,
+    d.capienza ?? 0,
+  )
 }
 
 function getRooms(s: Supplier): number {
@@ -126,7 +125,7 @@ function parseSearchQuery(raw: string): ParsedSearch {
 
   const text = raw.toLowerCase().trim()
 
-  // Extract capacity: "200 persone", "200 pax", "200 posti"
+  // Extract capacity: "200 persone", "200 pax", "200 posti", "200 ospiti"
   const capacityMatch = text.match(/(\d+)\s*(person[ei]|pax|posti|coperti|ospiti)/i)
   if (capacityMatch) result.minCapacity = parseInt(capacityMatch[1])
 
@@ -148,12 +147,16 @@ function parseSearchQuery(raw: string): ParsedSearch {
   if (!result.categoryHint) {
     if (text.includes('ristorante') || text.includes('ristoranti')) result.categoryHint = 'Ristorante'
     else if (text.includes('audio') || text.includes('av ')) result.categoryHint = 'Audio Video'
+    else if (text.includes('location') || text.includes('venue')) result.categoryHint = 'Location'
+    else if (text.includes('catering')) result.categoryHint = 'Catering'
+    else if (text.includes('trasport')) result.categoryHint = 'Trasporti'
+    else if (text.includes('allestiment')) result.categoryHint = 'Allestimenti'
   }
 
   // Remaining text tokens (remove matched patterns)
   let cleaned = text
     .replace(/\d+\s*(person[ei]|pax|posti|coperti|ospiti|camer[ea]|sal[ea](?:\s*meeting)?)/gi, '')
-    .replace(/\b(hotel|ristorante|ristoranti|audio\s*video|catering|location|trasporti|allestimenti|altro)\b/gi, '')
+    .replace(/\b(hotel|ristorante|ristoranti|audio\s*video|catering|location|locations|venue|trasporti|trasporto|allestimenti|allestimento|altro)\b/gi, '')
     .trim()
   result.textTokens = cleaned.split(/\s+/).filter(t => t.length > 1)
 
@@ -170,7 +173,7 @@ function supplierMatchesSearch(s: Supplier, parsed: ParsedSearch): boolean {
 
   const searchable = [
     s.nome,
-    s.city, s.region, s.province, s.country, s.location,
+    s.city, s.region, s.province, s.country, s.location, s.address,
     s.categoria,
     s.email, s.telefono, s.sito,
     s.referente, s.referenteTelefono,
@@ -989,7 +992,18 @@ export default function Fornitori() {
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
     const parsed = parseSearchQuery(searchQuery)
-    return supplierList.filter(s => supplierMatchesSearch(s, parsed))
+    const results = supplierList.filter(s => supplierMatchesSearch(s, parsed))
+    console.log('SEARCH FORNITORI', {
+      query: searchQuery,
+      textTokens: parsed.textTokens,
+      minCapacity: parsed.minCapacity || null,
+      minRooms: parsed.minRooms || null,
+      minMeetingRooms: parsed.minMeetingRooms || null,
+      categoryHint: parsed.categoryHint,
+      tipoNumero: parsed.minCapacity ? 'pax' : parsed.minRooms ? 'camere' : parsed.minMeetingRooms ? 'sale' : null,
+      risultati: results.length,
+    })
+    return results
   }, [supplierList, searchQuery])
 
   // ─── Breadcrumb construction ────────────────────────────────────────────────
@@ -1120,7 +1134,7 @@ export default function Fornitori() {
 
           {searchQuery.trim() && (
             <p className="text-xs font-medium px-1" style={{ color: 'var(--muted)' }}>
-              {searchResults.length} risultat{searchResults.length !== 1 ? 'i' : 'o'} per "{searchQuery}"
+              {searchResults.length} fornitor{searchResults.length !== 1 ? 'i' : 'e'} trovat{searchResults.length !== 1 ? 'i' : 'o'}
             </p>
           )}
 
