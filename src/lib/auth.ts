@@ -99,15 +99,11 @@ const ALL_NAV: NavItem[] = [
   { name: 'Feedback Beta', href: '/feedback-beta' },
 ]
 
-const ADMIN_ONLY_PATHS = ['/utenti', '/impostazioni']
+const ADMIN_ONLY_PATHS = ['/utenti']
 const FINANCE_PATHS = ['/amministrazione']
 
 export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
-  if (role === 'Super Admin') return ALL_NAV
-
-  if (role === 'Admin') {
-    return ALL_NAV.filter(item => item.href !== '/impostazioni')
-  }
+  if (role === 'Super Admin' || role === 'Admin') return ALL_NAV
 
   if (role === 'Project Manager') {
     return ALL_NAV.filter(item => !ADMIN_ONLY_PATHS.includes(item.href))
