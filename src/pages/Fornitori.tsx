@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Phone, Mail, MapPin, Globe, Star, FileText, Euro,
-  Search, X, Plus, Trash2, Save, Upload, Building2,
+  Search, X, Plus, Trash2, Save, Upload, Building2, Edit3, Link2,
   Hotel, UtensilsCrossed, MapPinned, Sparkles, Bus, CookingPot,
   Speaker, PaintBucket, Users, MoreHorizontal, Camera, Video, Shield,
   Music, ChevronRight, Navigation,
@@ -11,7 +11,7 @@ import { loadUser } from '@/lib/auth'
 import { fetchSuppliers, upsertSupplier, deleteSupplier as deleteSupplierRemote, updateSupplier } from '@/lib/suppliers-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { supabase } from '@/lib/supabase'
-import type { Supplier, SupplierDetails, SalaMeeting } from '@/data/suppliers'
+import type { Supplier, SupplierDetails, SalaMeeting, StatoContratto } from '@/data/suppliers'
 import { SUPPLIER_CATEGORIES } from '@/data/suppliers'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -172,6 +172,9 @@ function supplierMatchesSearch(s: Supplier, parsed: ParsedSearch): boolean {
     s.nome,
     s.city, s.region, s.province, s.country, s.location,
     s.categoria,
+    s.email, s.telefono, s.sito,
+    s.referente, s.referenteTelefono,
+    s.noteOperative,
     ...(s.servizi ?? []),
     s.details ? JSON.stringify(s.details) : '',
   ].join(' ').toLowerCase()
@@ -405,8 +408,9 @@ function SupplierCard({ supplier, onClick }: { supplier: Supplier; onClick: () =
 
 // ─── Supplier Detail ────────────────────────────────────────────────────────
 
-function SupplierDetail({ supplier, onBack, onSave }: {
+function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
   supplier: Supplier; onBack: () => void; onSave: (s: Supplier) => void
+  onEdit: () => void; onDelete: () => void
 }) {
   const [rating, setRating] = useState(supplier.rating)
   const [notes, setNotes] = useState(supplier.noteOperative)
@@ -446,9 +450,21 @@ function SupplierDetail({ supplier, onBack, onSave }: {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <button onClick={onBack} className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--muted)' }}>
-        <ArrowLeft className="w-4 h-4" /> Indietro
-      </button>
+      <div className="flex items-center justify-between">
+        <button onClick={onBack} className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--muted)' }}>
+          <ArrowLeft className="w-4 h-4" /> Indietro
+        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={onEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>
+            <Edit3 className="w-3.5 h-3.5" /> Modifica
+          </button>
+          <button onClick={onDelete} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ border: '1px solid var(--line)', color: 'var(--red2)' }}>
+            <Trash2 className="w-3.5 h-3.5" /> Elimina
+          </button>
+        </div>
+      </div>
 
       <div className="panel p-6">
         <div className="flex flex-col sm:flex-row items-start gap-5">
@@ -557,22 +573,37 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
   const [sito, setSito] = useState(supplier?.sito ?? '')
   const [piva, setPiva] = useState(supplier?.piva ?? '')
   const [stato, setStato] = useState<'attivo' | 'inattivo'>(supplier?.stato ?? 'attivo')
+  const [statoContratto, setStatoContratto] = useState<StatoContratto>(supplier?.statoContratto ?? 'attivo')
   const [servizi, setServizi] = useState(supplier?.servizi?.join(', ') ?? '')
   const [noteOperative, setNoteOperative] = useState(supplier?.noteOperative ?? '')
   const [city, setCity] = useState(supplier?.city ?? '')
   const [province, setProvince] = useState(supplier?.province ?? '')
   const [region, setRegion] = useState(supplier?.region ?? '')
   const [country, setCountry] = useState(supplier?.country ?? 'Italia')
+  const [detailsJson, setDetailsJson] = useState(supplier?.details ? JSON.stringify(supplier.details, null, 2) : '')
+  const [detailsError, setDetailsError] = useState<string | null>(null)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!nome.trim()) return
+    let parsedDetails: SupplierDetails | undefined = supplier?.details
+    if (detailsJson.trim()) {
+      try {
+        parsedDetails = JSON.parse(detailsJson)
+        setDetailsError(null)
+      } catch {
+        setDetailsError('JSON non valido')
+        return
+      }
+    } else {
+      parsedDetails = undefined
+    }
     const updated: Supplier = {
       id: supplier?.id ?? `sup_${Date.now()}`,
       nome: nome.trim(), email: email.trim(), telefono: telefono.trim(),
       categoria: categoria.trim() || 'Altro', referente: referente.trim(),
       referenteTelefono: referenteTelefono.trim(), rating: supplier?.rating ?? 0,
-      stato, statoContratto: supplier?.statoContratto ?? 'attivo',
+      stato, statoContratto,
       scadenzaContratto: supplier?.scadenzaContratto ?? '',
       servizi: servizi.split(',').map(s => s.trim()).filter(Boolean),
       location: location.trim(), sito: sito.trim(),
@@ -580,7 +611,7 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
       costoMinimo: supplier?.costoMinimo ?? 0, costoMassimo: supplier?.costoMassimo ?? 0,
       noteOperative: noteOperative.trim(), eventiId: supplier?.eventiId ?? [],
       documenti: supplier?.documenti ?? [], recensioni: supplier?.recensioni ?? [],
-      piva: piva.trim(), logoUrl: supplier?.logoUrl, details: supplier?.details,
+      piva: piva.trim(), logoUrl: supplier?.logoUrl, details: parsedDetails,
       city: city.trim(), province: province.trim(), region: region.trim(), country: country.trim(),
     }
     onSave(updated)
@@ -712,6 +743,27 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
               <option value="inattivo">Inattivo</option>
             </select>
           </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Stato Contratto</label>
+            <select value={statoContratto} onChange={e => setStatoContratto(e.target.value as StatoContratto)}
+              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+              <option value="attivo">Attivo</option>
+              <option value="in_scadenza">In scadenza</option>
+              <option value="scaduto">Scaduto</option>
+              <option value="in_rinnovo">In rinnovo</option>
+              <option value="sospeso">Sospeso</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>
+              Details (JSON) {detailsError && <span style={{ color: 'var(--red2)' }}> - {detailsError}</span>}
+            </label>
+            <textarea value={detailsJson} onChange={e => { setDetailsJson(e.target.value); setDetailsError(null) }} rows={5}
+              className="w-full px-4 py-3 rounded-xl text-xs font-mono focus:outline-none resize-none"
+              style={{ background: 'var(--panel)', border: `1px solid ${detailsError ? 'var(--red2)' : 'var(--line)'}`, color: 'var(--text)' }}
+              placeholder='{"catena": "NH Hotels", "stelle": 4, "numero_camere": 200}' />
+          </div>
           <div className="flex gap-3 pt-4" style={{ borderTop: '1px solid var(--line)' }}>
             <button type="submit" className="btn-primary flex-1 py-3 rounded-xl text-sm font-semibold">
               {supplier ? 'Salva Modifiche' : 'Crea Fornitore'}
@@ -799,6 +851,7 @@ export default function Fornitori() {
   const [navCountryGroup, setNavCountryGroup] = useState<string | null>(null)
   const [navRegion, setNavRegion] = useState<string | null>(null)
   const [navCity, setNavCity] = useState<string | null>(null)
+  const [navChain, setNavChain] = useState<string | null>(null)
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -821,9 +874,16 @@ export default function Fornitori() {
   }, [searchParams, supplierList, setSearchParams])
 
   async function handleSave(s: Supplier) {
-    await upsertSupplier(s)
+    if (editingSupplier) {
+      await updateSupplier(s.id, s)
+    } else {
+      await upsertSupplier(s)
+    }
     await loadData()
-    if (selected?.id === s.id) setSelected(s)
+    if (selected?.id === s.id) {
+      const refreshed = (await fetchSuppliers()).find(x => x.id === s.id)
+      setSelected(refreshed ?? s)
+    }
     setShowForm(false)
     setEditingSupplier(undefined)
   }
@@ -898,6 +958,28 @@ export default function Fornitori() {
     return map
   }, [supplierList])
 
+  // Hotel chain grouping
+  const hotelChains = useMemo(() => {
+    if (navCategory !== 'Hotel') return {}
+    const map: Record<string, Supplier[]> = {}
+    for (const s of categorySuppliers) {
+      const chain = s.details?.catena || 'Indipendenti'
+      if (!map[chain]) map[chain] = []
+      map[chain].push(s)
+    }
+    return map
+  }, [categorySuppliers, navCategory])
+
+  const chainSuppliers = useMemo(() => {
+    if (!navChain) return []
+    const chainKey = navChain === 'Indipendenti' ? '' : navChain
+    return categorySuppliers.filter(s => {
+      const sc = s.details?.catena || ''
+      if (navChain === 'Indipendenti') return !sc
+      return sc === chainKey
+    })
+  }, [categorySuppliers, navChain])
+
   // ─── Search results ─────────────────────────────────────────────────────────
 
   const searchResults = useMemo(() => {
@@ -910,22 +992,27 @@ export default function Fornitori() {
 
   const breadcrumbItems = useMemo(() => {
     const items: BreadcrumbItem[] = [
-      { label: 'Fornitori', onClick: () => { setNavCategory(null); setNavCountryGroup(null); setNavRegion(null); setNavCity(null) } }
+      { label: 'Fornitori', onClick: () => { setNavCategory(null); setNavCountryGroup(null); setNavRegion(null); setNavCity(null); setNavChain(null) } }
     ]
     if (navCategory) {
-      items.push({ label: navCategory, onClick: () => { setNavCountryGroup(null); setNavRegion(null); setNavCity(null) } })
+      items.push({ label: navCategory, onClick: () => { setNavCountryGroup(null); setNavRegion(null); setNavCity(null); setNavChain(null) } })
     }
-    if (navCountryGroup) {
-      items.push({ label: navCountryGroup, onClick: () => { setNavRegion(null); setNavCity(null) } })
-    }
-    if (navRegion) {
-      items.push({ label: navRegion, onClick: () => { setNavCity(null) } })
-    }
-    if (navCity) {
-      items.push({ label: navCity, onClick: () => {} })
+    if (navChain) {
+      items.push({ label: 'Catene', onClick: () => { setNavChain(null) } })
+      items.push({ label: navChain, onClick: () => {} })
+    } else {
+      if (navCountryGroup) {
+        items.push({ label: navCountryGroup, onClick: () => { setNavRegion(null); setNavCity(null) } })
+      }
+      if (navRegion) {
+        items.push({ label: navRegion, onClick: () => { setNavCity(null) } })
+      }
+      if (navCity) {
+        items.push({ label: navCity, onClick: () => {} })
+      }
     }
     return items
-  }, [navCategory, navCountryGroup, navRegion, navCity])
+  }, [navCategory, navCountryGroup, navRegion, navCity, navChain])
 
   // ─── Detail View ────────────────────────────────────────────────────────────
 
@@ -936,6 +1023,8 @@ export default function Fornitori() {
         supplier={live}
         onBack={() => setSelected(null)}
         onSave={handleSave}
+        onEdit={() => { setEditingSupplier(live); setShowForm(true) }}
+        onDelete={() => setDeletingSupplier(live)}
       />
     )
   }
@@ -1047,7 +1136,7 @@ export default function Fornitori() {
       {mode === 'navigate' && (
         <div className="space-y-4 animate-fade-in">
           {/* Breadcrumb */}
-          {navCategory && <Breadcrumb items={breadcrumbItems} />}
+          {navCategory && navCountryGroup !== '__chains__' && <Breadcrumb items={breadcrumbItems} />}
 
           {/* Level: Categories */}
           {!navCategory && (
@@ -1073,9 +1162,17 @@ export default function Fornitori() {
             </div>
           )}
 
-          {/* Level: Country groups (Italia / Estero / Altro) */}
-          {navCategory && !navCountryGroup && (
+          {/* Level: Country groups (Catene / Italia / Estero / Altro) */}
+          {navCategory && !navCountryGroup && !navChain && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {navCategory === 'Hotel' && (
+                <NavTile
+                  label="Catene"
+                  count={Object.keys(hotelChains).length}
+                  icon={Link2}
+                  onClick={() => setNavCountryGroup('__chains__')}
+                />
+              )}
               {Object.entries(countryGroups)
                 .sort(([a], [b]) => {
                   const order = ['Italia', 'Estero', 'Altro']
@@ -1088,8 +1185,52 @@ export default function Fornitori() {
             </div>
           )}
 
+          {/* Level: Hotel Chains list */}
+          {navCategory === 'Hotel' && navCountryGroup === '__chains__' && !navChain && (
+            <div className="space-y-3">
+              <Breadcrumb items={[
+                { label: 'Fornitori', onClick: () => { setNavCategory(null); setNavCountryGroup(null); setNavChain(null) } },
+                { label: 'Hotel', onClick: () => { setNavCountryGroup(null); setNavChain(null) } },
+                { label: 'Catene', onClick: () => {} },
+              ]} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {Object.entries(hotelChains)
+                  .sort(([a, sa], [b, sb]) => {
+                    if (a === 'Indipendenti') return 1
+                    if (b === 'Indipendenti') return -1
+                    return sb.length - sa.length
+                  })
+                  .map(([chain, sups]) => (
+                    <NavTile key={chain} label={chain} count={sups.length} icon={Hotel}
+                      onClick={() => setNavChain(chain)} />
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Level: Hotel Chain supplier list */}
+          {navCategory === 'Hotel' && navCountryGroup === '__chains__' && navChain && (
+            <div className="space-y-3">
+              <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+                {chainSuppliers.length} hotel {navChain}
+              </p>
+              {chainSuppliers.length === 0 ? (
+                <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
+                  <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p>Nessun hotel in questa catena</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {chainSuppliers.map(sup => (
+                    <SupplierCard key={sup.id} supplier={sup} onClick={() => setSelected(sup)} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Level: Regions */}
-          {navCategory && navCountryGroup && !navRegion && (
+          {navCategory && navCountryGroup && navCountryGroup !== '__chains__' && !navRegion && (
             <>
               {Object.keys(regions).length === 1 ? (
                 // Skip region level if only one region
@@ -1132,7 +1273,7 @@ export default function Fornitori() {
           )}
 
           {/* Level: Cities */}
-          {navCategory && navCountryGroup && navRegion && !navCity && (
+          {navCategory && navCountryGroup && navCountryGroup !== '__chains__' && navRegion && !navCity && (
             <>
               {Object.keys(cities).length === 1 ? (
                 // Only one city, show suppliers directly
@@ -1155,7 +1296,7 @@ export default function Fornitori() {
           )}
 
           {/* Level: Supplier list (final) */}
-          {navCategory && navCountryGroup && (navCity || (navRegion && Object.keys(cities).length === 1)) && (
+          {navCategory && navCountryGroup && navCountryGroup !== '__chains__' && (navCity || (navRegion && Object.keys(cities).length === 1)) && (
             <div className="space-y-3">
               <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
                 {finalNavList.length} risultat{finalNavList.length !== 1 ? 'i' : 'o'}

@@ -168,6 +168,11 @@ export async function updateSupplier(id: string, patch: Partial<Supplier>): Prom
   if ((patch as Record<string, unknown>).logoUrl !== undefined) (dbPatch as Record<string, unknown>).logo_url = (patch as Record<string, unknown>).logoUrl ?? null
   if ((patch as Record<string, unknown>).details !== undefined) (dbPatch as Record<string, unknown>).details = (patch as Record<string, unknown>).details ?? null
   if (patch.noteOperative !== undefined) (dbPatch as Record<string, unknown>).note_operative = patch.noteOperative
+  if (patch.city !== undefined) (dbPatch as Record<string, unknown>).city = patch.city
+  if (patch.province !== undefined) (dbPatch as Record<string, unknown>).province = patch.province
+  if (patch.region !== undefined) (dbPatch as Record<string, unknown>).region = patch.region
+  if (patch.country !== undefined) (dbPatch as Record<string, unknown>).country = patch.country
+  if (patch.address !== undefined) (dbPatch as Record<string, unknown>).address = patch.address
 
   const { data, error } = await supabase
     .from('suppliers')
