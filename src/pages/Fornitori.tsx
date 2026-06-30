@@ -875,7 +875,9 @@ export default function Fornitori() {
 
   async function handleSave(s: Supplier) {
     if (editingSupplier) {
-      await updateSupplier(s.id, s)
+      console.log('EDIT SUPPLIER', { id: s.id, name: s.nome })
+      const result = await updateSupplier(s.id, s)
+      if (!result) console.error('SUPABASE UPDATE ERROR', { id: s.id, name: s.nome })
     } else {
       await upsertSupplier(s)
     }
@@ -890,7 +892,9 @@ export default function Fornitori() {
 
   async function handleDelete() {
     if (!deletingSupplier) return
-    await deleteSupplierRemote(deletingSupplier.id)
+    console.log('DELETE SUPPLIER', { id: deletingSupplier.id, name: deletingSupplier.nome })
+    const ok = await deleteSupplierRemote(deletingSupplier.id)
+    if (!ok) console.error('SUPABASE DELETE ERROR', { id: deletingSupplier.id, name: deletingSupplier.nome })
     await loadData()
     setSelected(null)
     setDeletingSupplier(null)
@@ -1019,13 +1023,35 @@ export default function Fornitori() {
   if (selected) {
     const live = supplierList.find(s => s.id === selected.id) ?? selected
     return (
-      <SupplierDetail
-        supplier={live}
-        onBack={() => setSelected(null)}
-        onSave={handleSave}
-        onEdit={() => { setEditingSupplier(live); setShowForm(true) }}
-        onDelete={() => setDeletingSupplier(live)}
-      />
+      <>
+        <SupplierDetail
+          supplier={live}
+          onBack={() => setSelected(null)}
+          onSave={handleSave}
+          onEdit={() => { setEditingSupplier(live); setShowForm(true) }}
+          onDelete={() => setDeletingSupplier(live)}
+        />
+        {showForm && <SupplierFormModal supplier={editingSupplier} onSave={handleSave} onCancel={() => { setShowForm(false); setEditingSupplier(undefined) }} />}
+        {deletingSupplier && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+            <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,49,95,0.12)' }}>
+                  <Trash2 className="w-5 h-5" style={{ color: 'var(--red2)' }} />
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Elimina fornitore</h3>
+              </div>
+              <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>
+                Sei sicuro di voler eliminare <strong style={{ color: 'var(--text)' }}>"{deletingSupplier.nome}"</strong>?
+              </p>
+              <div className="flex gap-3">
+                <button onClick={handleDelete} className="flex-1 py-3 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--red2)' }}>Elimina</button>
+                <button onClick={() => setDeletingSupplier(null)} className="flex-1 py-3 rounded-xl text-sm font-medium" style={{ background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>Annulla</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     )
   }
 
