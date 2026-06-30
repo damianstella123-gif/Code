@@ -261,7 +261,7 @@ function EventFormModal({ event, internalUsers, allClients, onSave, onCancel }: 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Budget (EUR)</label>
               <input type="number" value={budget} onChange={e => setBudget(e.target.value)}
@@ -1343,7 +1343,7 @@ function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier; onClos
         </div>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <DetailField label="Email" value={supplier.email} />
             <DetailField label="Telefono" value={supplier.telefono} />
             <DetailField label="Referente" value={supplier.referente} />

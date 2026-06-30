@@ -540,13 +540,13 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
   return (
     <div className="panel overflow-hidden">
       <div className="overflow-x-auto">
-      <div className="grid grid-cols-7 border-b min-w-[320px]" style={{ borderColor: 'var(--line)' }}>
+      <div className="grid grid-cols-7 border-b min-w-[600px]" style={{ borderColor: 'var(--line)' }}>
         {DAYS_IT.map((d, i) => (
           <div key={d} className="py-2.5 text-center text-xs font-semibold"
             style={{ color: i === 0 || i === 6 ? 'rgba(155,163,170,0.45)' : 'var(--muted)' }}>{d}</div>
         ))}
       </div>
-      <div className="grid grid-cols-7 min-w-[320px]">
+      <div className="grid grid-cols-7 min-w-[600px]">
         {cells.map((day, idx) => {
           const isToday = sameDay(day, today)
           const isCurrentMonth = day.getMonth() === current.getMonth()
@@ -639,7 +639,8 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
 
   return (
     <div className="panel overflow-hidden">
-      <div className="grid grid-cols-7 border-b" style={{ borderColor: 'var(--line)' }}>
+      <div className="overflow-x-auto">
+      <div className="grid grid-cols-7 border-b min-w-[600px]" style={{ borderColor: 'var(--line)' }}>
         {days.map((day, i) => {
           const isToday = sameDay(day, today)
           return (
@@ -658,7 +659,7 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
           )
         })}
       </div>
-      <div className="grid grid-cols-7" style={{ minHeight: 300 }}>
+      <div className="grid grid-cols-7 min-w-[600px]" style={{ minHeight: 300 }}>
         {days.map((day, i) => {
           const iso = toISO(day)
           const dayItems = getForDay(day)
@@ -692,6 +693,7 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
             </div>
           )
         })}
+      </div>
       </div>
     </div>
   )

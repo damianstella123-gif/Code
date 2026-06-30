@@ -450,24 +450,24 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <button onClick={onBack} className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--muted)' }}>
+      <div className="flex items-center justify-between gap-2">
+        <button onClick={onBack} className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg" style={{ color: 'var(--muted)' }}>
           <ArrowLeft className="w-4 h-4" /> Indietro
         </button>
         <div className="flex items-center gap-2">
-          <button onClick={onEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+          <button onClick={onEdit} className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium"
             style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>
-            <Edit3 className="w-3.5 h-3.5" /> Modifica
+            <Edit3 className="w-4 h-4" /> <span className="hidden sm:inline">Modifica</span>
           </button>
-          <button onClick={onDelete} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+          <button onClick={onDelete} className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium"
             style={{ border: '1px solid var(--line)', color: 'var(--red2)' }}>
-            <Trash2 className="w-3.5 h-3.5" /> Elimina
+            <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Elimina</span>
           </button>
         </div>
       </div>
 
-      <div className="panel p-6">
-        <div className="flex flex-col sm:flex-row items-start gap-5">
+      <div className="panel p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
           <div className="relative group">
             <SupplierLogo supplier={supplier} size={72} />
             <button onClick={() => fileRef.current?.click()}
@@ -484,11 +484,11 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
               <span className="text-xs px-2.5 py-0.5 rounded-full font-medium"
                 style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>{cat}</span>
             </div>
-            <div className="flex flex-wrap items-center gap-4 mt-2 text-sm" style={{ color: 'var(--muted)' }}>
-              {(geoLine || supplier.location) && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{geoLine || supplier.location}</span>}
-              {supplier.telefono && <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5" />{supplier.telefono}</span>}
-              {supplier.email && <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" />{supplier.email}</span>}
-              {supplier.sito && <span className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" />{supplier.sito}</span>}
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-4 mt-2 text-sm" style={{ color: 'var(--muted)' }}>
+              {(geoLine || supplier.location) && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{geoLine || supplier.location}</span></span>}
+              {supplier.telefono && <a href={`tel:${supplier.telefono}`} className="flex items-center gap-1"><Phone className="w-3.5 h-3.5 flex-shrink-0" />{supplier.telefono}</a>}
+              {supplier.email && <a href={`mailto:${supplier.email}`} className="flex items-center gap-1 truncate"><Mail className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{supplier.email}</span></a>}
+              {supplier.sito && <a href={supplier.sito.startsWith('http') ? supplier.sito : `https://${supplier.sito}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 truncate"><Globe className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{supplier.sito}</span></a>}
             </div>
             <div className="flex items-center gap-3 mt-3">
               <div className="flex items-center gap-0.5">
@@ -505,7 +505,7 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MiniCard icon={Building2} label="Referente" value={supplier.referente || '-'} />
         <MiniCard icon={Phone} label="Tel. Referente" value={supplier.referenteTelefono || '-'} />
         <MiniCard icon={FileText} label="P.IVA" value={supplier.piva || '-'} />
@@ -618,11 +618,11 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+      <div className="w-full sm:max-w-2xl max-h-[100vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 safe-bottom"
         style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
+          <h2 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--text)' }}>
             {supplier ? 'Modifica Fornitore' : 'Nuovo Fornitore'}
           </h2>
           <button onClick={onCancel} className="p-2 rounded-lg transition-all hover:bg-white/5">
@@ -675,7 +675,7 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
                 style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Citta</label>
               <input type="text" value={city} onChange={e => setCity(e.target.value)}

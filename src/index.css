@@ -78,6 +78,18 @@
   textarea, select {
     font-size: 16px !important;
   }
+  .panel {
+    border-radius: 12px;
+  }
+}
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
 }
 
 input[type="date"],

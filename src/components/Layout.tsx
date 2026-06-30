@@ -522,7 +522,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <div className="lg:pl-64 flex flex-col min-h-screen">
         <Topbar setOpen={setSidebarOpen} />
         <main className="flex-1">
-          <div className="p-4 lg:p-6">{children}</div>
+          <div className="p-4 lg:p-6 pb-safe">{children}</div>
         </main>
       </div>
       <FlyAssistant />
