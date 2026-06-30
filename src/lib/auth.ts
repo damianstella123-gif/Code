@@ -44,7 +44,7 @@ export async function signOutEverywhere(): Promise<void> {
 }
 
 export function isPartnerUser(user: AuthUser | null): boolean {
-  return user?.role === 'Partner'
+  return user?.role === 'Partner' || user?.role === 'Project Manager'
 }
 
 export type NavItem = {
@@ -70,15 +70,17 @@ const ALL_NAV: NavItem[] = [
   { name: 'Feedback Beta', href: '/feedback-beta' },
 ]
 
-const PARTNER_ONLY_PATHS = ['/utenti', '/impostazioni']
-const ADMIN_PATHS = ['/amministrazione']
+const ADMIN_ROLES: string[] = ['Partner', 'Project Manager']
+const ADMIN_ONLY_PATHS = ['/utenti', '/impostazioni']
+const FINANCE_PATHS = ['/amministrazione']
+const FINANCE_ROLES: string[] = ['Partner', 'Project Manager', 'Amministrazione']
 
-export function getAllowedNavForRole(role: AppRole): NavItem[] {
-  if (role === 'Partner') return ALL_NAV
+export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
+  if (ADMIN_ROLES.includes(role)) return ALL_NAV
 
   return ALL_NAV.filter(item => {
-    if (PARTNER_ONLY_PATHS.includes(item.href)) return false
-    if (ADMIN_PATHS.includes(item.href) && role !== 'Amministrazione') return false
+    if (ADMIN_ONLY_PATHS.includes(item.href)) return false
+    if (FINANCE_PATHS.includes(item.href) && !FINANCE_ROLES.includes(role)) return false
     return true
   })
 }

@@ -97,7 +97,7 @@ export default function Utenti() {
   const [submitting, setSubmitting] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null)
 
-  const isPartner = currentUser?.role === 'Partner'
+  const isPartner = currentUser?.role === 'Partner' || currentUser?.role === 'Project Manager'
 
   const refresh = useCallback(async () => {
     try {

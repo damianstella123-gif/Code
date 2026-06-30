@@ -51,28 +51,23 @@ export default function Login() {
       }
 
       const profile = await fetchProfile(authUser.id)
-      if (!profile) {
-        setError('Profilo non trovato. Contatta un amministratore.')
-        await supabase.auth.signOut()
-        setLoading(false)
-        return
-      }
 
-      if (!profile.is_active) {
+      if (profile && !profile.is_active) {
         setError('Account disattivato. Contatta un amministratore.')
         await supabase.auth.signOut()
         setLoading(false)
         return
       }
 
+      const meta = authUser.user_metadata || {}
       saveUser({
-        id: profile.id,
-        first_name: profile.first_name,
-        last_name: profile.last_name,
-        email: profile.email,
-        role: profile.role,
-        avatar_url: profile.avatar_url,
-        is_active: profile.is_active,
+        id: profile?.id ?? authUser.id,
+        first_name: profile?.first_name ?? meta.first_name ?? '',
+        last_name: profile?.last_name ?? meta.last_name ?? '',
+        email: profile?.email ?? authUser.email ?? '',
+        role: (profile?.role ?? meta.role ?? 'User') as any,
+        avatar_url: profile?.avatar_url ?? null,
+        is_active: profile?.is_active ?? true,
       })
 
       await syncThemeFromProfile()

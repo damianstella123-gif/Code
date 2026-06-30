@@ -56,20 +56,21 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
-        if (profile && profile.is_active) {
-          saveUser({
-            id: profile.id,
-            first_name: profile.first_name,
-            last_name: profile.last_name,
-            email: profile.email,
-            role: profile.role,
-            avatar_url: profile.avatar_url,
-            is_active: profile.is_active,
-          })
-          if (mounted) setAuthenticated(true)
-        } else {
+        if (profile && !profile.is_active) {
           clearUser()
           await supabase.auth.signOut()
+        } else {
+          const meta = session.user.user_metadata || {}
+          saveUser({
+            id: profile?.id ?? session.user.id,
+            first_name: profile?.first_name ?? meta.first_name ?? '',
+            last_name: profile?.last_name ?? meta.last_name ?? '',
+            email: profile?.email ?? session.user.email ?? '',
+            role: (profile?.role ?? meta.role ?? 'User') as any,
+            avatar_url: profile?.avatar_url ?? null,
+            is_active: profile?.is_active ?? true,
+          })
+          if (mounted) setAuthenticated(true)
         }
       }
       if (mounted) setChecking(false)
