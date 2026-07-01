@@ -1,1 +1,0 @@
-import{a5 as c,a8 as a}from"./index-B85V2gGW.js";let u=0;function l(e,n){const s=c.useRef(n);s.current=n,c.useEffect(()=>{const r=++u,t=a.channel(`realtime-${e}-${r}`).on("postgres_changes",{event:"*",schema:"public",table:e},()=>{s.current()}).subscribe();return()=>{a.removeChannel(t)}},[e])}export{l as u};
