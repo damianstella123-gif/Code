@@ -1040,6 +1040,7 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
         budget: 0,
         ricavo_cliente: null,
         fee_agenzia_pct: 6,
+        margine_target: 25,
         stato: 'pianificazione',
         partecipanti: 0,
         responsabile: '',

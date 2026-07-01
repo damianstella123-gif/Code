@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet } from 'lucide-react'
+import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, Clock, ShieldCheck, Lock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import type { Event } from '@/data/events'
@@ -44,6 +44,8 @@ const SOTTO_LABELS: Record<string, string> = {
   staff_simmetria: 'Staff Simmetria', staff_esterno: 'Staff Esterno',
 }
 
+type StatoConferma = 'richiesto' | 'confermato' | 'contrattualizzato'
+
 interface BudgetLine {
   id: string
   categoria: string
@@ -61,29 +63,41 @@ interface BudgetLine {
   iva_inclusa_costo: boolean
   margine: number
   marginePct: number
+  stato_conferma: StatoConferma
+}
+
+const STATO_CONFIG: Record<StatoConferma, { label: string; color: string; icon: typeof CheckCircle2 }> = {
+  richiesto: { label: 'Stimato', color: 'var(--yellow)', icon: Clock },
+  confermato: { label: 'Confermato', color: 'var(--blue)', icon: CheckCircle2 },
+  contrattualizzato: { label: 'Contratto', color: 'var(--green)', icon: ShieldCheck },
 }
 
 export default function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const [lines, setLines] = useState<BudgetLine[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editVenduto, setEditVenduto] = useState('')
-  const [editCosto, setEditCosto] = useState('')
-  const [editIvaVenduto, setEditIvaVenduto] = useState('22')
-  const [editIvaInclVenduto, setEditIvaInclVenduto] = useState(false)
-  const [editIvaCosto, setEditIvaCosto] = useState('22')
-  const [editIvaInclCosto, setEditIvaInclCosto] = useState(false)
 
   const [feePct, setFeePct] = useState(event.fee_agenzia_pct ?? 6)
   const [editingFee, setEditingFee] = useState(false)
   const [feeInput, setFeeInput] = useState(String(event.fee_agenzia_pct ?? 6))
+  const [savingFee, setSavingFee] = useState(false)
+
+  const [margineTarget, setMargineTarget] = useState(event.margine_target ?? 25)
+  const [editingTarget, setEditingTarget] = useState(false)
+  const [targetInput, setTargetInput] = useState(String(event.margine_target ?? 25))
 
   async function saveFee(newPct: number) {
+    setSavingFee(true)
     setFeePct(newPct)
     setEditingFee(false)
     await supabase.from('events').update({ fee_agenzia_pct: newPct }).eq('id', event.id)
+    setSavingFee(false)
+  }
+
+  async function saveTarget(newTarget: number) {
+    setMargineTarget(newTarget)
+    setEditingTarget(false)
+    await supabase.from('events').update({ margine_target: newTarget }).eq('id', event.id)
   }
 
   function getSupName(id: string | null | undefined) {
@@ -93,7 +107,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
   const loadData = useCallback(async () => {
     const [linksRes, svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes] = await Promise.all([
-      supabase.from('event_suppliers').select('supplier_id, service_category').eq('event_id', event.id),
+      supabase.from('event_suppliers').select('supplier_id, service_category, stato_conferma').eq('event_id', event.id),
       supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
       supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
       supabase.from('event_restaurant_details').select('*').eq('event_id', event.id),
@@ -107,17 +121,23 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       supabase.from('event_grafica_stampa_details').select('*').eq('event_id', event.id),
     ])
 
-    // Build supplier_id -> budget category map from user's choice
     const catMap: Record<string, string> = {}
-    for (const link of (linksRes.data ?? []) as { supplier_id: string; service_category: string }[]) {
+    const statoMap: Record<string, StatoConferma> = {}
+    for (const link of (linksRes.data ?? []) as { supplier_id: string; service_category: string; stato_conferma: string }[]) {
       if (link.service_category) {
         catMap[link.supplier_id] = SERVICE_CAT_TO_BUDGET[link.service_category] || 'VARIE'
       }
+      statoMap[link.supplier_id] = (link.stato_conferma as StatoConferma) || 'richiesto'
     }
 
     function resolveCat(supplierId: string | null | undefined, fallback: string): string {
       if (supplierId && catMap[supplierId]) return catMap[supplierId]
       return fallback
+    }
+
+    function resolveStato(supplierId: string | null | undefined): StatoConferma {
+      if (supplierId && statoMap[supplierId]) return statoMap[supplierId]
+      return 'richiesto'
     }
 
     const all: BudgetLine[] = []
@@ -148,6 +168,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         iva_inclusa_costo: (row.iva_inclusa_costo as boolean) ?? false,
         margine,
         marginePct,
+        stato_conferma: resolveStato(row.supplier_id as string),
       })
     }
 
@@ -158,8 +179,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const costo = (s.costo_totale as number) ?? ((s.costo_unitario as number) ? (s.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
       pushLine(s, resolveCat(s.supplier_id as string, 'TRANSFER'), 'event_supplier_services', {
-        descrizione: (s.titolo as string) || 'Transfer',
-        qty, venduto, costo,
+        descrizione: (s.titolo as string) || 'Transfer', qty, venduto, costo,
       })
     }
 
@@ -170,8 +190,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const costo = (h.costo_totale as number) ?? ((h.costo_unitario as number) ? (h.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
       pushLine(h, resolveCat(h.supplier_id as string, 'HOTEL'), 'event_hotel_details', {
-        descrizione: (h.titolo as string) || (h.tipo as string) || 'Hotel',
-        qty, venduto, costo,
+        descrizione: (h.titolo as string) || (h.tipo as string) || 'Hotel', qty, venduto, costo,
       })
     }
 
@@ -182,8 +201,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const costo = (r.costo_totale_reale as number) ?? ((r.costo_per_persona as number) ? (r.costo_per_persona as number) * pax : 0)
       if (!venduto && !costo) continue
       pushLine(r, resolveCat(r.supplier_id as string, 'RISTORANTE'), 'event_restaurant_details', {
-        descrizione: (r.tipologia_servizio as string) || 'Ristorante',
-        qty: pax, venduto, costo,
+        descrizione: (r.tipologia_servizio as string) || 'Ristorante', qty: pax, venduto, costo,
       })
     }
 
@@ -194,8 +212,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const costo = (e.costo_totale as number) ?? ((e.costo_unitario as number) ? (e.costo_unitario as number) * pax : 0)
       if (!venduto && !costo) continue
       pushLine(e, resolveCat(e.supplier_id as string, 'LOCATION / EXPERIENCE'), 'event_experience_details', {
-        descrizione: (e.nome_attivita as string) || 'Experience',
-        qty: pax, venduto, costo,
+        descrizione: (e.nome_attivita as string) || 'Experience', qty: pax, venduto, costo,
       })
     }
 
@@ -206,8 +223,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const costo = (c.costo_totale as number) ?? ((c.costo_per_persona as number) ? (c.costo_per_persona as number) * pax : 0)
       if (!venduto && !costo) continue
       pushLine(c, resolveCat(c.supplier_id as string, 'CATERING'), 'event_catering_details', {
-        descrizione: (c.tipologia as string) || 'Catering',
-        qty: pax, venduto, costo,
+        descrizione: (c.tipologia as string) || 'Catering', qty: pax, venduto, costo,
       })
     }
 
@@ -220,8 +236,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const nome = [(si.nome as string), (si.cognome as string)].filter(Boolean).join(' ') || (si.risorsa as string)
       pushLine(si, resolveCat(si.supplier_id as string, 'STAFF'), 'event_staff_interno_details', {
         descrizione: nome ? `${nome} - ${(si.ruolo as string) || 'Staff'}` : (si.ruolo as string) || 'Staff Simmetria',
-        qty, venduto, costo,
-        sotto: 'staff_simmetria',
+        qty, venduto, costo, sotto: 'staff_simmetria',
       })
     }
 
@@ -234,8 +249,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const nome = [(se.nome as string), (se.cognome as string)].filter(Boolean).join(' ')
       pushLine(se, resolveCat(se.supplier_id as string, 'STAFF'), 'event_staff_esterno_details', {
         descrizione: nome ? `${nome} - ${(se.ruolo as string) || 'Staff'}` : (se.ruolo as string) || 'Staff Esterno',
-        qty, venduto, costo,
-        sotto: 'staff_esterno',
+        qty, venduto, costo, sotto: 'staff_esterno',
       })
     }
 
@@ -246,8 +260,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const costo = (av.costo_totale as number) ?? ((av.costo_unitario as number) ? (av.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
       pushLine(av, resolveCat(av.supplier_id as string, 'AUDIO VIDEO'), 'event_audio_video_details', {
-        descrizione: (av.tipologia_servizio as string) || (av.descrizione as string) || 'Audio Video',
-        qty, venduto, costo,
+        descrizione: (av.tipologia_servizio as string) || (av.descrizione as string) || 'Audio Video', qty, venduto, costo,
       })
     }
 
@@ -258,8 +271,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const costo = (al.costo_totale as number) ?? ((al.costo_unitario as number) ? (al.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
       pushLine(al, resolveCat(al.supplier_id as string, 'ALLESTIMENTI'), 'event_allestimenti_details', {
-        descrizione: (al.descrizione as string) || 'Allestimento',
-        qty, venduto, costo,
+        descrizione: (al.descrizione as string) || 'Allestimento', qty, venduto, costo,
       })
     }
 
@@ -270,8 +282,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const costo = (g.costo_totale as number) ?? ((g.costo_unitario as number) ? (g.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
       pushLine(g, resolveCat(g.supplier_id as string, 'GRAFICA'), 'event_grafica_stampa_details', {
-        descrizione: (g.tipo_materiale as string) || (g.descrizione as string) || 'Grafica',
-        qty, venduto, costo,
+        descrizione: (g.tipo_materiale as string) || (g.descrizione as string) || 'Grafica', qty, venduto, costo,
       })
     }
 
@@ -282,8 +293,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const costo = (v.costo_totale as number) ?? ((v.costo_unitario as number) ? (v.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
       pushLine(v, resolveCat(v.supplier_id as string, 'VARIE'), 'event_varie_details', {
-        descrizione: (v.descrizione as string) || 'Voce varia',
-        qty, venduto, costo,
+        descrizione: (v.descrizione as string) || 'Voce varia', qty, venduto, costo,
       })
     }
 
@@ -304,7 +314,64 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     return { venduto, costo, fee, ricavi, margine, marginePct }
   }, [lines, feePct])
 
-  // Group by category (only those with data), sorted per CATEGORY_ORDER
+  // Confirmed vs estimated split
+  const confirmSplit = useMemo(() => {
+    const confermati = lines.filter(l => l.stato_conferma !== 'richiesto')
+    const stimati = lines.filter(l => l.stato_conferma === 'richiesto')
+    const costoConfermato = confermati.reduce((s, l) => s + l.costo, 0)
+    const costoStimato = stimati.reduce((s, l) => s + l.costo, 0)
+    const vendutoConfermato = confermati.reduce((s, l) => s + l.venduto, 0)
+    const vendutoStimato = stimati.reduce((s, l) => s + l.venduto, 0)
+    const pctConfermato = totals.costo > 0 ? (costoConfermato / totals.costo) * 100 : 0
+    return { costoConfermato, costoStimato, vendutoConfermato, vendutoStimato, pctConfermato, countConfermati: confermati.length, countStimati: stimati.length }
+  }, [lines, totals.costo])
+
+  // Alerts
+  const alerts = useMemo(() => {
+    const result: { type: 'warning' | 'error' | 'success'; message: string }[] = []
+    const budgetCliente = event.budget || 0
+
+    if (budgetCliente > 0 && totals.venduto > budgetCliente) {
+      result.push({ type: 'error', message: `Budget cliente superato di \u20AC${fmt(totals.venduto - budgetCliente)} (venduto \u20AC${fmt(totals.venduto)} vs budget \u20AC${fmt(budgetCliente)})` })
+    }
+
+    if (totals.marginePct < margineTarget && lines.length > 0) {
+      result.push({ type: 'warning', message: `Margine ${totals.marginePct.toFixed(1)}% sotto target ${margineTarget}%` })
+    }
+
+    // Check categories under target
+    const catWarnings: string[] = []
+    const catMap: Record<string, BudgetLine[]> = {}
+    for (const l of lines) {
+      if (!catMap[l.categoria]) catMap[l.categoria] = []
+      catMap[l.categoria].push(l)
+    }
+    for (const [cat, items] of Object.entries(catMap)) {
+      const catV = items.reduce((s, i) => s + i.venduto, 0)
+      const catC = items.reduce((s, i) => s + i.costo, 0)
+      const catFee = catV * feePct / 100
+      const catRicavi = catV + catFee
+      const catMp = catRicavi > 0 ? ((catRicavi - catC) / catRicavi) * 100 : 0
+      if (catMp < margineTarget && catMp >= 0) catWarnings.push(`${cat} (${catMp.toFixed(0)}%)`)
+    }
+    if (catWarnings.length > 0) {
+      result.push({ type: 'warning', message: `Margine sotto target per: ${catWarnings.join(', ')}` })
+    }
+
+    // Lines without costs
+    const noCost = lines.filter(l => l.costo === 0 && l.venduto === 0)
+    if (noCost.length > 0) {
+      result.push({ type: 'warning', message: `${noCost.length} ${noCost.length === 1 ? 'voce' : 'voci'} senza valori economici` })
+    }
+
+    if (confirmSplit.pctConfermato >= 80 && totals.marginePct >= margineTarget) {
+      result.push({ type: 'success', message: `${confirmSplit.pctConfermato.toFixed(0)}% dei costi confermati, margine in target` })
+    }
+
+    return result
+  }, [lines, totals, feePct, margineTarget, event.budget, confirmSplit.pctConfermato])
+
+  // Group by category
   const grouped = useMemo(() => {
     const map: Record<string, BudgetLine[]> = {}
     for (const l of lines) {
@@ -316,73 +383,14 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       .map(cat => ({ label: cat, items: map[cat] }))
   }, [lines])
 
-  // Inline edit: writes back to the source table
-  function startEdit(line: BudgetLine) {
-    setEditingId(line.id)
-    setEditVenduto(String(line.venduto))
-    setEditCosto(String(line.costo))
-    setEditIvaVenduto(line.aliquota_iva_venduto)
-    setEditIvaInclVenduto(line.iva_inclusa_venduto)
-    setEditIvaCosto(line.aliquota_iva_costo)
-    setEditIvaInclCosto(line.iva_inclusa_costo)
-  }
-
-  async function saveEdit(line: BudgetLine) {
-    setSaving(true)
-    const vt = Number(editVenduto) || 0
-    const ct = Number(editCosto) || 0
-
-    const patch: Record<string, unknown> = {
-      aliquota_iva_venduto: editIvaVenduto,
-      iva_inclusa_venduto: editIvaInclVenduto,
-      aliquota_iva_costo: editIvaCosto,
-      iva_inclusa_costo: editIvaInclCosto,
-    }
-
-    // Write totals back to source table using the correct column names
-    if (line.table === 'event_restaurant_details') {
-      patch.budget_totale = vt
-      if (line.qty > 0) patch.budget_per_persona = vt / line.qty
-      patch.costo_totale_reale = ct
-      if (line.qty > 0) patch.costo_per_persona = ct / line.qty
-    } else if (line.table === 'event_catering_details') {
-      patch.venduto_totale = vt
-      if (line.qty > 0) patch.venduto_per_persona = vt / line.qty
-      patch.costo_totale = ct
-      if (line.qty > 0) patch.costo_per_persona = ct / line.qty
-    } else if (line.table === 'event_staff_interno_details') {
-      patch.venduto_totale = vt
-      patch.costo_totale = ct
-    } else {
-      // All other tables use venduto_totale / costo_totale + unit prices
-      patch.venduto_totale = vt
-      patch.costo_totale = ct
-      if (line.qty > 0) {
-        patch.venduto_unitario = vt / line.qty
-        patch.costo_unitario = ct / line.qty
-      }
-    }
-
-    await supabase.from(line.table).update(patch).eq('id', line.id)
-    setEditingId(null)
-    setSaving(false)
-    await loadData()
-  }
-
   const fmt = (n: number) => '\u20AC' + n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
   const fmtN = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
 
   const EXPORT_LABELS: Record<string, string> = {
-    'HOTEL': 'HOTEL',
-    'TRANSFER': 'TRASPORTI',
-    'RISTORANTE': 'RISTORANTI',
-    'LOCATION / EXPERIENCE': 'ATTIVITA\' / LOCATION',
-    'CATERING': 'CATERING',
-    'AUDIO VIDEO': 'AUDIO VIDEO',
-    'ALLESTIMENTI': 'ALLESTIMENTI',
-    'STAFF': 'STAFF',
-    'GRAFICA': 'GRAFICA / STAMPA',
-    'VARIE': 'VARIE + EXTRA',
+    'HOTEL': 'HOTEL', 'TRANSFER': 'TRASPORTI', 'RISTORANTE': 'RISTORANTI',
+    'LOCATION / EXPERIENCE': 'ATTIVITA\' / LOCATION', 'CATERING': 'CATERING',
+    'AUDIO VIDEO': 'AUDIO VIDEO', 'ALLESTIMENTI': 'ALLESTIMENTI',
+    'STAFF': 'STAFF', 'GRAFICA': 'GRAFICA / STAMPA', 'VARIE': 'VARIE + EXTRA',
   }
 
   function sanitizeFilename(name: string): string {
@@ -397,7 +405,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     return EXPORT_LABELS[cat] || cat
   }
 
-  // Split STAFF into STAFF SIMMETRIA + STAFF ESTERNO for exports
   function getExportGroups() {
     const result: { label: string; items: BudgetLine[] }[] = []
     for (const cat of grouped) {
@@ -422,7 +429,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     const clientName = getClientName()
     const exportGroups = getExportGroups()
 
-    // Header
     doc.setFontSize(9)
     doc.setTextColor(100)
     doc.text('Simmetria Immagine e Comunicazione Srl', 250, 10, { align: 'right' })
@@ -452,14 +458,14 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         const itemFee = item.venduto * feePct / 100
         const itemMargine = item.venduto + itemFee - item.costo
         const itemMp = (item.venduto + itemFee) > 0 ? ((itemMargine / (item.venduto + itemFee)) * 100).toFixed(1) : '0.0'
+        const statoLabel = item.stato_conferma === 'contrattualizzato' ? 'C' : item.stato_conferma === 'confermato' ? 'OK' : '?'
         return [
           item.descrizione,
           item.fornitore || '-',
+          statoLabel,
           String(item.qty),
           fmtN(item.venduto),
-          `${item.aliquota_iva_venduto}%`,
           fmtN(item.costo),
-          `${item.aliquota_iva_costo}%`,
           fmtN(itemFee),
           fmtN(itemMargine),
           `${itemMp}%`,
@@ -468,11 +474,9 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
       body.push([
         { content: `Totale ${cat.label}`, styles: { fontStyle: 'bold' } },
-        '', '',
+        '', '', '',
         { content: fmtN(catV), styles: { fontStyle: 'bold' } },
-        '',
         { content: fmtN(catC), styles: { fontStyle: 'bold' } },
-        '',
         { content: fmtN(catFee), styles: { fontStyle: 'bold' } },
         { content: fmtN(catM), styles: { fontStyle: 'bold' } },
         { content: `${catMp}%`, styles: { fontStyle: 'bold' } },
@@ -480,30 +484,23 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
       autoTable(doc, {
         startY,
-        head: [[cat.label, 'Fornitore', 'Qty', 'Venduto', 'IVA V.', 'Costo', 'IVA C.', `Fee ${feePct}%`, 'Margine', 'M%']],
+        head: [[cat.label, 'Fornitore', 'St.', 'Qty', 'Venduto', 'Costo', `Fee ${feePct}%`, 'Margine', 'M%']],
         body: body as string[][],
         theme: 'grid',
         headStyles: { fillColor: [208, 0, 58], textColor: 255, fontSize: 7.5, fontStyle: 'bold' },
         bodyStyles: { fontSize: 7 },
         columnStyles: {
-          0: { cellWidth: 55 },
-          1: { cellWidth: 35 },
-          2: { halign: 'right', cellWidth: 12 },
-          3: { halign: 'right', cellWidth: 25 },
-          4: { halign: 'right', cellWidth: 16 },
-          5: { halign: 'right', cellWidth: 25 },
-          6: { halign: 'right', cellWidth: 16 },
-          7: { halign: 'right', cellWidth: 22 },
-          8: { halign: 'right', cellWidth: 25 },
-          9: { halign: 'right', cellWidth: 16 },
+          0: { cellWidth: 55 }, 1: { cellWidth: 35 }, 2: { halign: 'center', cellWidth: 12 },
+          3: { halign: 'right', cellWidth: 12 }, 4: { halign: 'right', cellWidth: 25 },
+          5: { halign: 'right', cellWidth: 25 }, 6: { halign: 'right', cellWidth: 22 },
+          7: { halign: 'right', cellWidth: 25 }, 8: { halign: 'right', cellWidth: 16 },
         },
         margin: { left: 14, right: 14 },
       })
       startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
     }
 
-    // RIEPILOGO DEI SERVIZI
-    const riepilogoHead = [['RIEPILOGO DEI SERVIZI', 'Totale Venduto', 'Totale Costi', 'Fee', 'Margine']]
+    // RIEPILOGO
     const riepilogoBody: unknown[][] = exportGroups.map(cat => {
       const cv = cat.items.reduce((s, i) => s + i.venduto, 0)
       const cc = cat.items.reduce((s, i) => s + i.costo, 0)
@@ -521,17 +518,12 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
     autoTable(doc, {
       startY: startY + 4,
-      head: riepilogoHead,
+      head: [['RIEPILOGO DEI SERVIZI', 'Venduto', 'Costi', 'Fee', 'Margine']],
       body: riepilogoBody as string[][],
       theme: 'grid',
       headStyles: { fillColor: [208, 0, 58], textColor: 255, fontSize: 8.5, fontStyle: 'bold' },
       bodyStyles: { fontSize: 8 },
-      columnStyles: {
-        1: { halign: 'right' },
-        2: { halign: 'right' },
-        3: { halign: 'right' },
-        4: { halign: 'right' },
-      },
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
       margin: { left: 14, right: 14 },
     })
 
@@ -548,7 +540,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     const clientName = getClientName()
     const exportGroups = getExportGroups()
 
-    // Header
     doc.setFontSize(9)
     doc.setTextColor(100)
     doc.text('Simmetria Immagine e Comunicazione Srl', 196, 10, { align: 'right' })
@@ -567,20 +558,12 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
     for (const cat of exportGroups) {
       const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
-
       const body: unknown[][] = cat.items.map(item => {
         const unitario = item.qty > 0 ? item.venduto / item.qty : item.venduto
-        return [
-          item.descrizione,
-          String(item.qty),
-          `\u20AC ${fmtN(unitario)}`,
-          `\u20AC ${fmtN(item.venduto)}`,
-        ]
+        return [item.descrizione, String(item.qty), `\u20AC ${fmtN(unitario)}`, `\u20AC ${fmtN(item.venduto)}`]
       })
-
       body.push([
-        { content: `Totale ${cat.label}`, styles: { fontStyle: 'bold' } },
-        '', '',
+        { content: `Totale ${cat.label}`, styles: { fontStyle: 'bold' } }, '', '',
         { content: `\u20AC ${fmtN(catV)}`, styles: { fontStyle: 'bold' } },
       ])
 
@@ -591,18 +574,12 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         theme: 'grid',
         headStyles: { fillColor: [208, 0, 58], textColor: 255, fontSize: 9, fontStyle: 'bold' },
         bodyStyles: { fontSize: 8.5 },
-        columnStyles: {
-          0: { cellWidth: 85 },
-          1: { halign: 'center', cellWidth: 20 },
-          2: { halign: 'right', cellWidth: 35 },
-          3: { halign: 'right', cellWidth: 35 },
-        },
+        columnStyles: { 0: { cellWidth: 85 }, 1: { halign: 'center', cellWidth: 20 }, 2: { halign: 'right', cellWidth: 35 }, 3: { halign: 'right', cellWidth: 35 } },
         margin: { left: 14, right: 14 },
       })
       startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
     }
 
-    // RIEPILOGO DEI SERVIZI
     const riepilogoBody: unknown[][] = exportGroups.map(cat => {
       const cv = cat.items.reduce((s, i) => s + i.venduto, 0)
       return [cat.label, `\u20AC ${fmtN(cv)}`]
@@ -619,10 +596,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       theme: 'grid',
       headStyles: { fillColor: [208, 0, 58], textColor: 255, fontSize: 9, fontStyle: 'bold' },
       bodyStyles: { fontSize: 9 },
-      columnStyles: {
-        0: { cellWidth: 100 },
-        1: { halign: 'right', cellWidth: 45 },
-      },
+      columnStyles: { 0: { cellWidth: 100 }, 1: { halign: 'right', cellWidth: 45 } },
       margin: { left: 14, right: 14 },
     })
 
@@ -644,8 +618,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     const exportGroups = getExportGroups()
 
     const rows: (string | number | null)[][] = []
-
-    // Header rows
     rows.push(['Simmetria Immagine e Comunicazione Srl'])
     rows.push(['Viale Egeo 8 | 00144 Roma'])
     rows.push([])
@@ -654,67 +626,41 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     rows.push([`Preventivo al ${new Date().toLocaleDateString('it-IT')}`])
     rows.push([])
     rows.push([])
-
-    // Column headers
-    rows.push(['CATEGORIA', 'DESCRIZIONE', 'FORNITORE', 'QTY', 'VENDUTO CLIENTE', 'IVA V.%', 'COSTO REALE', 'IVA C.%', `FEE ${feePct}%`, 'MARGINE NETTO', 'MARGINE %'])
+    rows.push(['CATEGORIA', 'DESCRIZIONE', 'FORNITORE', 'STATO', 'QTY', 'VENDUTO CLIENTE', 'COSTO REALE', `FEE ${feePct}%`, 'MARGINE NETTO', 'MARGINE %'])
 
     for (const cat of exportGroups) {
-      // Category header row
-      rows.push([cat.label, '', '', '', '', '', '', '', '', '', ''])
-
+      rows.push([cat.label, '', '', '', '', '', '', '', '', ''])
       for (const item of cat.items) {
         const itemFee = item.venduto * feePct / 100
         const itemMargine = item.venduto + itemFee - item.costo
         const itemMp = (item.venduto + itemFee) > 0 ? ((itemMargine / (item.venduto + itemFee)) * 100) : 0
-        rows.push([
-          '',
-          item.descrizione,
-          item.fornitore || '',
-          item.qty,
-          item.venduto,
-          Number(item.aliquota_iva_venduto) / 100,
-          item.costo,
-          Number(item.aliquota_iva_costo) / 100,
-          itemFee,
-          itemMargine,
-          itemMp / 100,
-        ])
+        const statoLabel = STATO_CONFIG[item.stato_conferma].label
+        rows.push(['', item.descrizione, item.fornitore || '', statoLabel, item.qty, item.venduto, item.costo, itemFee, itemMargine, itemMp / 100])
       }
-
-      // Subtotal
       const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
       const catC = cat.items.reduce((s, i) => s + i.costo, 0)
       const catFee = catV * feePct / 100
       const catM = catV + catFee - catC
       const catMp = (catV + catFee) > 0 ? catM / (catV + catFee) : 0
-      rows.push(['', `Totale ${cat.label}`, '', '', catV, '', catC, '', catFee, catM, catMp])
+      rows.push(['', `Totale ${cat.label}`, '', '', '', catV, catC, catFee, catM, catMp])
       rows.push([])
     }
 
-    // Riepilogo
     rows.push([])
-    rows.push(['RIEPILOGO DEI SERVIZI', '', '', '', 'VENDUTO', '', 'COSTI', '', 'FEE', 'MARGINE', ''])
+    rows.push(['RIEPILOGO', '', '', '', '', 'VENDUTO', 'COSTI', 'FEE', 'MARGINE', ''])
     for (const cat of exportGroups) {
       const cv = cat.items.reduce((s, i) => s + i.venduto, 0)
       const cc = cat.items.reduce((s, i) => s + i.costo, 0)
       const cf = cv * feePct / 100
       const cm = cv + cf - cc
-      rows.push([cat.label, '', '', '', cv, '', cc, '', cf, cm, ''])
+      rows.push([cat.label, '', '', '', '', cv, cc, cf, cm, ''])
     }
-    rows.push(['TOTALE EVENTO', '', '', '', totals.venduto, '', totals.costo, '', totals.fee, totals.margine, totals.marginePct / 100])
+    rows.push(['TOTALE EVENTO', '', '', '', '', totals.venduto, totals.costo, totals.fee, totals.margine, totals.marginePct / 100])
 
     const ws = XLSX.utils.aoa_to_sheet(rows)
-
-    // Column widths
-    ws['!cols'] = [
-      { wch: 22 }, { wch: 40 }, { wch: 20 }, { wch: 8 },
-      { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 10 },
-      { wch: 14 }, { wch: 16 }, { wch: 12 },
-    ]
-
+    ws['!cols'] = [{ wch: 22 }, { wch: 40 }, { wch: 20 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 12 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Budget Interno')
-
     const filename = `${sanitizeFilename(evName)}_${sanitizeFilename(clientName)}_Budget_Interno.xlsx`
     XLSX.writeFile(wb, filename)
   }
@@ -728,8 +674,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     const exportGroups = getExportGroups()
 
     const rows: (string | number | null)[][] = []
-
-    // Header
     rows.push(['Simmetria Immagine e Comunicazione Srl'])
     rows.push(['Viale Egeo 8 | 00144 Roma'])
     rows.push([])
@@ -738,32 +682,19 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     rows.push([`Preventivo al ${new Date().toLocaleDateString('it-IT')}`])
     rows.push([])
     rows.push([])
-
-    // Column headers
     rows.push(['CATEGORIA', 'DESCRIZIONE', 'Nr/Qty', 'COSTO UNITARIO', 'TOTALE'])
 
     for (const cat of exportGroups) {
-      // Category header
       rows.push([cat.label, '', '', '', ''])
-
       for (const item of cat.items) {
         const unitario = item.qty > 0 ? item.venduto / item.qty : item.venduto
-        rows.push([
-          '',
-          item.descrizione,
-          item.qty,
-          unitario,
-          item.venduto,
-        ])
+        rows.push(['', item.descrizione, item.qty, unitario, item.venduto])
       }
-
-      // Subtotal
       const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
       rows.push(['', `Totale ${cat.label}`, '', '', catV])
       rows.push([])
     }
 
-    // Riepilogo
     rows.push([])
     rows.push(['RIEPILOGO DEI SERVIZI', '', '', '', 'TOTALE'])
     for (const cat of exportGroups) {
@@ -775,21 +706,22 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     rows.push(['I prezzi indicati sono da intendersi IVA esclusa salvo diversa indicazione.'])
 
     const ws = XLSX.utils.aoa_to_sheet(rows)
-
-    ws['!cols'] = [
-      { wch: 24 }, { wch: 50 }, { wch: 10 }, { wch: 18 }, { wch: 18 },
-    ]
-
+    ws['!cols'] = [{ wch: 24 }, { wch: 50 }, { wch: 10 }, { wch: 18 }, { wch: 18 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Preventivo Cliente')
-
     const filename = `${sanitizeFilename(evName)}_${sanitizeFilename(clientName)}_Budget_Cliente.xlsx`
     XLSX.writeFile(wb, filename)
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════
+
   function renderBudgetLine(item: BudgetLine) {
     const isExpanded = expandedId === item.id
-    const isEditing = editingId === item.id
+    const statoConf = STATO_CONFIG[item.stato_conferma]
+    const Icon = statoConf.icon
+
     return (
       <div key={item.id} style={{ borderBottom: '1px solid var(--line)' }}>
         <button
@@ -797,93 +729,42 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
           onClick={() => setExpandedId(isExpanded ? null : item.id)}
         >
           <ChevronDown className={`w-3.5 h-3.5 transition-transform flex-shrink-0 ${isExpanded ? '' : '-rotate-90'}`} style={{ color: 'var(--muted)' }} />
+          <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: statoConf.color }} />
           <span className="flex-1 text-xs font-medium truncate" style={{ color: 'var(--text)' }}>{item.descrizione}</span>
-          <span className="w-24 text-xs truncate hidden md:block" style={{ color: 'var(--muted)' }}>
-            {SOTTO_LABELS[item.sotto_categoria] || item.sotto_categoria || '-'}
-          </span>
           <span className="w-24 text-xs truncate hidden md:block" style={{ color: 'var(--muted)' }}>{item.fornitore || '-'}</span>
           <span className="w-10 text-xs text-right" style={{ color: 'var(--text)' }}>{item.qty}</span>
           <span className="w-20 text-xs text-right" style={{ color: 'var(--text)' }}>{fmt(item.venduto)}</span>
           <span className="w-20 text-xs text-right" style={{ color: 'var(--yellow)' }}>{fmt(item.costo)}</span>
-          <span className="w-14 text-xs text-right hidden md:block" style={{ color: 'var(--muted)' }}>{item.aliquota_iva_venduto}%</span>
           <span className="w-20 text-xs text-right font-medium" style={{ color: item.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmt(item.margine)}</span>
-          <span className="w-10 text-xs text-right font-medium" style={{ color: item.marginePct >= 20 ? 'var(--green)' : item.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{item.marginePct.toFixed(0)}%</span>
+          <span className="w-10 text-xs text-right font-medium" style={{ color: item.marginePct >= margineTarget ? 'var(--green)' : item.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{item.marginePct.toFixed(0)}%</span>
         </button>
         {isExpanded && (
           <div className="px-4 pb-4 pt-2" style={{ background: 'var(--bg)' }}>
-            {isEditing ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <Field label="Venduto cliente" value={editVenduto} onChange={setEditVenduto} type="number" />
-                  <Field label="Costo reale" value={editCosto} onChange={setEditCosto} type="number" />
-                  <div>
-                    <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>IVA Venduto</label>
-                    <div className="flex gap-1">
-                      <select value={editIvaVenduto} onChange={e => setEditIvaVenduto(e.target.value)}
-                        className="flex-1 px-2 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                        {['0','4','5','10','22'].map(v => <option key={v} value={v}>{v}%</option>)}
-                      </select>
-                      <select value={editIvaInclVenduto ? 'i' : 'e'} onChange={e => setEditIvaInclVenduto(e.target.value === 'i')}
-                        className="w-16 px-1 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                        <option value="e">Escl</option>
-                        <option value="i">Incl</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>IVA Costo</label>
-                    <div className="flex gap-1">
-                      <select value={editIvaCosto} onChange={e => setEditIvaCosto(e.target.value)}
-                        className="flex-1 px-2 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                        {['0','4','5','10','22'].map(v => <option key={v} value={v}>{v}%</option>)}
-                      </select>
-                      <select value={editIvaInclCosto ? 'i' : 'e'} onChange={e => setEditIvaInclCosto(e.target.value === 'i')}
-                        className="w-16 px-1 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                        <option value="e">Escl</option>
-                        <option value="i">Incl</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)' }}>
-                  {(() => {
-                    const v = Number(editVenduto) || 0; const c = Number(editCosto) || 0
-                    const m = v - c; const mp = v > 0 ? (m / v) * 100 : 0
-                    return <span style={{ color: 'var(--muted)' }}>Margine: <strong style={{ color: m >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmt(m)} ({mp.toFixed(1)}%)</strong></span>
-                  })()}
-                </div>
-                <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
-                  <button disabled={saving} onClick={() => saveEdit(item)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium"
-                    style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: '#fff', opacity: saving ? 0.6 : 1 }}>
-                    <Save className="w-3 h-3" /> {saving ? 'Salvataggio...' : 'Salva'}
-                  </button>
-                  <button onClick={() => setEditingId(null)} className="px-4 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>Annulla</button>
-                </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 mb-3">
+              <Detail label="Descrizione" value={item.descrizione} />
+              {item.sotto_categoria && item.sotto_categoria !== 'staff_simmetria' && item.sotto_categoria !== 'staff_esterno' && (
+                <Detail label="Sotto-categoria" value={SOTTO_LABELS[item.sotto_categoria] || item.sotto_categoria} />
+              )}
+              {item.fornitore && <Detail label="Fornitore" value={item.fornitore} />}
+              <Detail label="Stato" value={statoConf.label} />
+              <Detail label="Quantita" value={String(item.qty)} />
+              <Detail label="Venduto cliente" value={fmt(item.venduto)} />
+              <Detail label="Costo reale" value={fmt(item.costo)} />
+              <Detail label="IVA Venduto" value={`${item.aliquota_iva_venduto}% ${item.iva_inclusa_venduto ? '(inclusa)' : '(esclusa)'}`} />
+              <Detail label="IVA Costo" value={`${item.aliquota_iva_costo}% ${item.iva_inclusa_costo ? '(inclusa)' : '(esclusa)'}`} />
+              <Detail label="Margine" value={fmt(item.margine)} />
+              <Detail label="Margine %" value={`${item.marginePct.toFixed(1)}%`} />
+            </div>
+            {item.stato_conferma === 'richiesto' && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(255,194,75,0.08)', border: '1px solid rgba(255,194,75,0.2)' }}>
+                <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--yellow)' }} />
+                <span style={{ color: 'var(--yellow)' }}>Costo stimato - fornitore non confermato. Modifica dal tab Fornitori.</span>
               </div>
-            ) : (
-              <div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 mb-3">
-                  <Detail label="Descrizione" value={item.descrizione} />
-                  {item.sotto_categoria && item.sotto_categoria !== 'staff_simmetria' && item.sotto_categoria !== 'staff_esterno' && (
-                    <Detail label="Sotto-categoria" value={SOTTO_LABELS[item.sotto_categoria] || item.sotto_categoria} />
-                  )}
-                  {item.fornitore && <Detail label="Fornitore" value={item.fornitore} />}
-                  <Detail label="Quantita" value={String(item.qty)} />
-                  <Detail label="Venduto cliente" value={fmt(item.venduto)} />
-                  <Detail label="Costo reale" value={fmt(item.costo)} />
-                  <Detail label="IVA Venduto" value={`${item.aliquota_iva_venduto}% ${item.iva_inclusa_venduto ? '(inclusa)' : '(esclusa)'}`} />
-                  <Detail label="IVA Costo" value={`${item.aliquota_iva_costo}% ${item.iva_inclusa_costo ? '(inclusa)' : '(esclusa)'}`} />
-                  <Detail label="Margine" value={fmt(item.margine)} />
-                  <Detail label="Margine %" value={`${item.marginePct.toFixed(1)}%`} />
-                </div>
-                <div className="pt-2" style={{ borderTop: '1px solid var(--line)' }}>
-                  <button onClick={() => startEdit(item)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80"
-                    style={{ background: 'var(--panel2)', color: 'var(--blue)' }}>
-                    <Edit3 className="w-3 h-3" /> Modifica venduto/costo
-                  </button>
-                </div>
+            )}
+            {item.stato_conferma !== 'richiesto' && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(56,210,125,0.06)', border: '1px solid rgba(56,210,125,0.15)' }}>
+                <Lock className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />
+                <span style={{ color: 'var(--muted)' }}>Costo confermato. Per modificare i valori vai al tab Fornitori.</span>
               </div>
             )}
           </div>
@@ -898,9 +779,26 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
   return (
     <div className="space-y-5">
-      {/* Summary - Fee Simmetria */}
-      <AnimatedLaserBorder loading={saving}>
+      {/* ══════ LEVEL 1: KPI Dashboard ══════ */}
+      <AnimatedLaserBorder loading={savingFee}>
         <div className="panel p-5 space-y-4">
+          {/* Budget di riferimento + venduto + delta */}
+          {event.budget > 0 && (
+            <div className="flex items-center justify-between px-2 pb-3" style={{ borderBottom: '1px solid var(--line)' }}>
+              <div className="flex items-center gap-4 text-xs">
+                <span style={{ color: 'var(--muted)' }}>Budget cliente: <strong style={{ color: 'var(--text)' }}>{fmt(event.budget)}</strong></span>
+                <span style={{ color: 'var(--muted)' }}>Venduto: <strong style={{ color: 'var(--text)' }}>{fmt(totals.venduto)}</strong></span>
+                {totals.venduto > event.budget ? (
+                  <span className="flex items-center gap-1" style={{ color: 'var(--red2)' }}>
+                    <AlertTriangle className="w-3 h-3" /> +{fmt(totals.venduto - event.budget)} sopra budget
+                  </span>
+                ) : (
+                  <span style={{ color: 'var(--green)' }}>{fmt(event.budget - totals.venduto)} disponibile</span>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Kpi label="Totale Venduto Servizi" value={fmt(totals.venduto)} color="var(--text)" />
             <div className="text-center">
@@ -935,31 +833,92 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
             <Kpi label="Totale Ricavi" value={fmt(totals.ricavi)} color="var(--text)" />
           </div>
           <div className="h-px" style={{ background: 'var(--line)' }} />
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Kpi label="Totale Costi" value={fmt(totals.costo)} color="var(--yellow)" />
             <Kpi label="Margine Netto" value={fmt(totals.margine)} color={totals.margine >= 0 ? 'var(--green)' : 'var(--red2)'} />
-            <Kpi label="Margine %" value={`${totals.marginePct.toFixed(1)}%`} color={totals.marginePct >= 20 ? 'var(--green)' : totals.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)'} />
+            <Kpi label="Margine %" value={`${totals.marginePct.toFixed(1)}%`} color={totals.marginePct >= margineTarget ? 'var(--green)' : totals.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)'} />
+            <div className="text-center">
+              <p className="text-xs flex items-center justify-center gap-1" style={{ color: 'var(--muted)' }}>
+                Target
+                {!editingTarget && (
+                  <button onClick={() => { setEditingTarget(true); setTargetInput(String(margineTarget)) }} className="opacity-60 hover:opacity-100">
+                    <Edit3 className="w-3 h-3" />
+                  </button>
+                )}
+              </p>
+              {editingTarget ? (
+                <div className="flex items-center justify-center gap-1 mt-1">
+                  <input type="number" step="1" min="0" max="100" value={targetInput}
+                    onChange={e => setTargetInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveTarget(Number(targetInput) || 25); if (e.key === 'Escape') setEditingTarget(false) }}
+                    className="w-16 px-2 py-1 text-center text-sm rounded-lg"
+                    style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                    autoFocus />
+                  <span className="text-sm" style={{ color: 'var(--muted)' }}>%</span>
+                  <button onClick={() => saveTarget(Number(targetInput) || 25)} className="p-1 rounded-lg hover:bg-white/10" style={{ color: 'var(--green)' }}>
+                    <Save className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xl font-bold mt-1" style={{ color: totals.marginePct >= margineTarget ? 'var(--green)' : 'var(--yellow)' }}>
+                  {margineTarget}%
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </AnimatedLaserBorder>
 
-      {/* Margin bar */}
-      {totals.venduto > 0 && (
+      {/* ══════ Completeness bar ══════ */}
+      {lines.length > 0 && (
         <div className="panel p-4">
           <div className="flex justify-between text-xs mb-2">
-            <span style={{ color: 'var(--muted)' }}>Margine operativo</span>
-            <span style={{ color: totals.marginePct >= 20 ? 'var(--green)' : 'var(--yellow)' }}>{totals.marginePct.toFixed(1)}%</span>
+            <span style={{ color: 'var(--muted)' }}>Affidabilita costi ({confirmSplit.pctConfermato.toFixed(0)}% confermati)</span>
+            <span style={{ color: 'var(--muted)' }}>
+              <span style={{ color: 'var(--green)' }}>{confirmSplit.countConfermati}</span> confermati
+              {confirmSplit.countStimati > 0 && <> · <span style={{ color: 'var(--yellow)' }}>{confirmSplit.countStimati}</span> stimati</>}
+            </span>
           </div>
-          <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
-            <div className="h-full rounded-full transition-all" style={{
-              width: `${Math.min(Math.max(totals.marginePct, 0), 100)}%`,
-              background: totals.marginePct >= 20 ? 'var(--green)' : totals.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)',
+          <div className="h-3 rounded-full overflow-hidden flex" style={{ background: 'var(--panel2)' }}>
+            <div className="h-full transition-all" style={{
+              width: `${confirmSplit.pctConfermato}%`,
+              background: 'var(--green)',
+              borderRadius: confirmSplit.pctConfermato >= 100 ? '9999px' : '9999px 0 0 9999px',
             }} />
+            {confirmSplit.pctConfermato < 100 && (
+              <div className="h-full transition-all" style={{
+                width: `${100 - confirmSplit.pctConfermato}%`,
+                background: 'rgba(255,194,75,0.3)',
+                borderRadius: '0 9999px 9999px 0',
+              }} />
+            )}
+          </div>
+          <div className="flex justify-between text-[10px] mt-1">
+            <span style={{ color: 'var(--green)' }}>{fmt(confirmSplit.costoConfermato)} confermati</span>
+            {confirmSplit.costoStimato > 0 && <span style={{ color: 'var(--yellow)' }}>{fmt(confirmSplit.costoStimato)} stimati</span>}
           </div>
         </div>
       )}
 
-      {/* Export buttons */}
+      {/* ══════ ALERTS ══════ */}
+      {alerts.length > 0 && (
+        <div className="panel p-4 space-y-2">
+          {alerts.map((alert, i) => (
+            <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+              style={{
+                background: alert.type === 'error' ? 'rgba(208,0,58,0.08)' : alert.type === 'warning' ? 'rgba(255,194,75,0.08)' : 'rgba(56,210,125,0.08)',
+                border: `1px solid ${alert.type === 'error' ? 'rgba(208,0,58,0.2)' : alert.type === 'warning' ? 'rgba(255,194,75,0.2)' : 'rgba(56,210,125,0.2)'}`,
+              }}>
+              {alert.type === 'error' && <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--red2)' }} />}
+              {alert.type === 'warning' && <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--yellow)' }} />}
+              {alert.type === 'success' && <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--green)' }} />}
+              <span style={{ color: alert.type === 'error' ? 'var(--red2)' : alert.type === 'warning' ? 'var(--yellow)' : 'var(--green)' }}>{alert.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ══════ Export buttons ══════ */}
       {lines.length > 0 && (
         <div className="panel p-4">
           <p className="text-[10px] uppercase tracking-wider font-semibold mb-3" style={{ color: 'var(--muted)' }}>Esporta Budget</p>
@@ -988,7 +947,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         </div>
       )}
 
-      {/* Category breakdown */}
+      {/* ══════ LEVEL 2: Category breakdown ══════ */}
       {grouped.length === 0 ? (
         <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <Euro className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -1000,14 +959,30 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
           {grouped.map(cat => {
             const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
             const catC = cat.items.reduce((s, i) => s + i.costo, 0)
-            const catM = catV - catC
-            const catMp = catV > 0 ? (catM / catV) * 100 : 0
+            const catFee = catV * feePct / 100
+            const catRicavi = catV + catFee
+            const catM = catRicavi - catC
+            const catMp = catRicavi > 0 ? (catM / catRicavi) * 100 : 0
+            const catStimati = cat.items.filter(i => i.stato_conferma === 'richiesto').length
+            const isUnderTarget = catMp < margineTarget && catMp >= 0
 
             return (
-              <div key={cat.label} className="panel overflow-hidden">
+              <div key={cat.label} className="panel overflow-hidden" style={{ border: isUnderTarget ? '1px solid rgba(255,194,75,0.3)' : undefined }}>
                 {/* Category header */}
                 <div className="px-4 py-3 flex items-center justify-between" style={{ background: 'var(--panel2)' }}>
-                  <p className="text-sm font-bold tracking-wide" style={{ color: 'var(--text)' }}>{cat.label}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold tracking-wide" style={{ color: 'var(--text)' }}>{cat.label}</p>
+                    {catStimati > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,194,75,0.15)', color: 'var(--yellow)' }}>
+                        {catStimati} stimati
+                      </span>
+                    )}
+                    {isUnderTarget && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,194,75,0.15)', color: 'var(--yellow)' }}>
+                        sotto target
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-4 text-xs">
                     <span style={{ color: 'var(--muted)' }}>V: <strong style={{ color: 'var(--text)' }}>{fmt(catV)}</strong></span>
                     <span style={{ color: 'var(--muted)' }}>C: <strong style={{ color: 'var(--yellow)' }}>{fmt(catC)}</strong></span>
@@ -1018,13 +993,12 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
                 {/* Column headers */}
                 <div className="hidden md:flex px-4 py-1.5 items-center gap-3 text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--muted)', borderBottom: '1px solid var(--line)' }}>
                   <span className="w-4" />
+                  <span className="w-4" />
                   <span className="flex-1">Descrizione</span>
-                  <span className="w-24">Sotto-cat.</span>
                   <span className="w-24">Fornitore</span>
                   <span className="w-10 text-right">Qty</span>
                   <span className="w-20 text-right">Venduto</span>
                   <span className="w-20 text-right">Costo</span>
-                  <span className="w-14 text-right">IVA</span>
                   <span className="w-20 text-right">Margine</span>
                   <span className="w-10 text-right">M%</span>
                 </div>
@@ -1074,7 +1048,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
               <span style={{ color: 'var(--muted)' }}>Costi: <strong style={{ color: 'var(--yellow)' }}>{fmt(totals.costo)}</strong></span>
               <span style={{ color: 'var(--muted)' }}>Fee {feePct}%: <strong style={{ color: 'var(--blue)' }}>{fmt(totals.fee)}</strong></span>
               <span style={{ color: 'var(--muted)' }}>Margine: <strong style={{ color: totals.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmt(totals.margine)}</strong></span>
-              <strong style={{ color: totals.marginePct >= 20 ? 'var(--green)' : 'var(--yellow)' }}>{totals.marginePct.toFixed(1)}%</strong>
+              <strong style={{ color: totals.marginePct >= margineTarget ? 'var(--green)' : 'var(--yellow)' }}>{totals.marginePct.toFixed(1)}%</strong>
             </div>
           </div>
         </div>
@@ -1097,17 +1071,6 @@ function Detail({ label, value }: { label: string; value: string }) {
     <div>
       <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{label}</p>
       <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text)' }}>{value}</p>
-    </div>
-  )
-}
-
-function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
-  return (
-    <div>
-      <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>{label}</label>
-      <input type={type} step={type === 'number' ? '0.01' : undefined} value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-lg text-xs"
-        style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }} />
     </div>
   )
 }

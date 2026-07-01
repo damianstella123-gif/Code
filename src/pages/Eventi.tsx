@@ -166,6 +166,7 @@ function EventFormModal({ event, internalUsers, allClients, onSave, onCancel }: 
       budget: parseInt(budget) || 0,
       ricavo_cliente: event?.ricavo_cliente ?? null,
       fee_agenzia_pct: event?.fee_agenzia_pct ?? 6,
+      margine_target: event?.margine_target ?? 25,
       stato,
       partecipanti: parseInt(partecipanti) || 0,
       responsabile,

@@ -9,6 +9,7 @@ export interface Event {
   budget: number
   ricavo_cliente: number | null
   fee_agenzia_pct: number
+  margine_target: number
   stato: 'bozza' | 'pianificazione' | 'in_corso' | 'completato'
   partecipanti: number
   responsabile: string
@@ -27,6 +28,7 @@ export const events: Event[] = [
     budget: 150000,
     ricavo_cliente: null,
     fee_agenzia_pct: 6,
+    margine_target: 25,
     stato: 'in_corso',
     partecipanti: 520,
     responsabile: 'usr_003',
@@ -43,6 +45,7 @@ export const events: Event[] = [
     budget: 45000,
     ricavo_cliente: null,
     fee_agenzia_pct: 6,
+    margine_target: 25,
     stato: 'pianificazione',
     partecipanti: 150,
     responsabile: 'usr_002',
@@ -59,6 +62,7 @@ export const events: Event[] = [
     budget: 85000,
     ricavo_cliente: null,
     fee_agenzia_pct: 6,
+    margine_target: 25,
     stato: 'pianificazione',
     partecipanti: 2000,
     responsabile: 'usr_003',
@@ -75,6 +79,7 @@ export const events: Event[] = [
     budget: 22000,
     ricavo_cliente: null,
     fee_agenzia_pct: 6,
+    margine_target: 25,
     stato: 'completato',
     partecipanti: 85,
     responsabile: 'usr_012',
@@ -91,6 +96,7 @@ export const events: Event[] = [
     budget: 120000,
     ricavo_cliente: null,
     fee_agenzia_pct: 6,
+    margine_target: 25,
     stato: 'bozza',
     partecipanti: 300,
     responsabile: 'usr_002',
