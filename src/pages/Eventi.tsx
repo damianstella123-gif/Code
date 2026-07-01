@@ -973,13 +973,22 @@ interface SupplierService {
 
 const HOTEL_TIPOS = [
   { value: 'pernottamento', label: 'Pernottamento' },
-  { value: 'sala_meeting', label: 'Meeting' },
+  { value: 'meeting_room', label: 'Sala Meeting' },
+  { value: 'breakout_room', label: 'Breakout Room' },
+  { value: 'sala_regia', label: 'Sala Regia' },
+  { value: 'welcome_coffee', label: 'Welcome Coffee' },
   { value: 'coffee_break', label: 'Coffee Break' },
   { value: 'lunch', label: 'Lunch' },
   { value: 'dinner', label: 'Dinner' },
-  { value: 'coffee_station', label: 'Coffee Station' },
-  { value: 'setup_sala', label: 'Setup Sala' },
-  { value: 'attrezzature', label: 'Attrezzature Tecniche' },
+  { value: 'cocktail', label: 'Cocktail' },
+  { value: 'aperitivo', label: 'Aperitivo' },
+  { value: 'aperitivo_rinforzato', label: 'Aperitivo Rinforzato' },
+  { value: 'open_bar', label: 'Open Bar' },
+  { value: 'hospitality_desk', label: 'Hospitality Desk' },
+  { value: 'parking', label: 'Parcheggio' },
+  { value: 'deposito_bagagli', label: 'Deposito Bagagli' },
+  { value: 'city_tax', label: 'City Tax' },
+  { value: 'altro', label: 'Altro' },
 ]
 
 interface HotelDetail {
@@ -987,6 +996,7 @@ interface HotelDetail {
   event_id: string
   supplier_id: string
   tipo: string
+  sotto_categoria: string
   titolo: string
   data: string | null
   ora_inizio: string | null
@@ -2012,8 +2022,9 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
     }
 
     for (const h of (hotelRes.data ?? []) as HotelDetail[]) {
-      const tipoLabel = HOTEL_TIPOS.find(t => t.value === h.tipo)?.label ?? h.tipo
-      if (h.tipo === 'pernottamento') {
+      const sotto = h.sotto_categoria || h.tipo || 'pernottamento'
+      const tipoLabel = HOTEL_TIPOS.find(t => t.value === sotto)?.label ?? sotto
+      if (sotto === 'pernottamento') {
         if (h.check_in_date) {
           const roomInfo = [h.quantita ? `${h.quantita} camere` : '', h.room_type].filter(Boolean).join(' ')
           program.push({ id: h.id + '-cin', supplier_id: h.supplier_id, titolo: 'Check-in Hotel', categoria: 'Hotel', data: h.check_in_date, ora_inizio: h.check_in_time || '14:00', ora_fine: null, luogo: h.luogo, note: roomInfo })
@@ -2022,9 +2033,9 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
           const roomInfo = [h.quantita ? `${h.quantita} camere` : '', h.room_type].filter(Boolean).join(' ')
           program.push({ id: h.id + '-cout', supplier_id: h.supplier_id, titolo: 'Check-out Hotel', categoria: 'Hotel', data: h.check_out_date, ora_inizio: h.check_out_time || '10:00', ora_fine: null, luogo: h.luogo, note: roomInfo })
         }
-      } else if (h.tipo === 'sala_meeting') {
+      } else if (sotto === 'meeting_room' || sotto === 'breakout_room' || sotto === 'sala_regia') {
         if (h.data && h.ora_inizio) {
-          program.push({ id: h.id + '-meet', supplier_id: h.supplier_id, titolo: `Meeting${h.luogo ? ' - ' + h.luogo : ''}${h.meeting_pax ? ' ' + h.meeting_pax + ' pax' : ''}`, categoria: 'Meeting', data: h.data, ora_inizio: h.ora_inizio, ora_fine: h.ora_fine, luogo: h.luogo, note: [h.meeting_setup, h.meeting_equipment, h.note].filter(Boolean).join(' | ') })
+          program.push({ id: h.id + '-meet', supplier_id: h.supplier_id, titolo: `${tipoLabel}${h.luogo ? ' - ' + h.luogo : ''}${h.meeting_pax ? ' ' + h.meeting_pax + ' pax' : ''}`, categoria: 'Meeting', data: h.data, ora_inizio: h.ora_inizio, ora_fine: h.ora_fine, luogo: h.luogo, note: [h.meeting_setup, h.meeting_equipment, h.note].filter(Boolean).join(' | ') })
         }
       } else {
         if (h.data && h.ora_inizio) {

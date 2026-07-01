@@ -25,9 +25,30 @@ const EXPERIENCE_TIPOLOGIE = ['Location', 'Driving Experience', 'Simulatore', 'T
 const CATERING_TIPOLOGIE = ['Welcome Coffee', 'Coffee Break', 'Lunch', 'Dinner', 'Cocktail']
 const STAFF_INT_RUOLI = ['Project Manager', 'Account', 'Responsabile Evento', 'Tour Leader', 'Regia', 'Supporto Operativo', 'Altro']
 const STAFF_EXT_RUOLI = ['Hostess', 'Steward', 'Tour Leader', 'Promoter', 'Guardaroba', 'Interprete', 'Traduttore', 'Altro']
-const RISTORANTE_TIPOLOGIE = ['Pranzo', 'Cena', 'Aperitivo', 'Aperitivo Rinforzato', 'Cena di Gala']
+const RISTORANTE_TIPOLOGIE = ['Pranzo', 'Cena', 'Aperitivo', 'Aperitivo Rinforzato', 'Cocktail', 'Cena di Gala']
 const RISTORANTE_MENU_TYPES = ['2 Portate', '3 Portate', '4 Portate', 'Menu Personalizzato']
 const GRAFICA_TIPI = ['Badge', 'Menu', 'Cartelli', 'Segnaletica', 'Materiale Stampato', 'Altro']
+
+const HOTEL_SERVIZI: { key: string; label: string; group: 'alloggio' | 'meeting' | 'fb' | 'servizi' }[] = [
+  { key: 'pernottamento', label: 'Pernottamento', group: 'alloggio' },
+  { key: 'meeting_room', label: 'Sala Meeting', group: 'meeting' },
+  { key: 'breakout_room', label: 'Breakout Room', group: 'meeting' },
+  { key: 'sala_regia', label: 'Sala Regia', group: 'meeting' },
+  { key: 'welcome_coffee', label: 'Welcome Coffee', group: 'fb' },
+  { key: 'coffee_break', label: 'Coffee Break', group: 'fb' },
+  { key: 'lunch', label: 'Lunch', group: 'fb' },
+  { key: 'dinner', label: 'Dinner', group: 'fb' },
+  { key: 'cocktail', label: 'Cocktail', group: 'fb' },
+  { key: 'aperitivo', label: 'Aperitivo', group: 'fb' },
+  { key: 'aperitivo_rinforzato', label: 'Aperitivo Rinforzato', group: 'fb' },
+  { key: 'open_bar', label: 'Open Bar', group: 'fb' },
+  { key: 'hospitality_desk', label: 'Hospitality Desk', group: 'servizi' },
+  { key: 'parking', label: 'Parcheggio', group: 'servizi' },
+  { key: 'deposito_bagagli', label: 'Deposito Bagagli', group: 'servizi' },
+  { key: 'city_tax', label: 'City Tax', group: 'servizi' },
+  { key: 'altro', label: 'Altro', group: 'servizi' },
+]
+const HOTEL_KEY_TO_LABEL: Record<string, string> = Object.fromEntries(HOTEL_SERVIZI.map(s => [s.key, s.label]))
 
 export function getIvaRate(aliquota: string): number {
   const n = parseFloat(aliquota)
@@ -95,7 +116,7 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
       aliquota_iva_costo: '22', iva_inclusa_costo: false,
     }
     if (category === 'hotel') {
-      Object.assign(base, { titolo: '', tipo: 'pernottamento', check_in_date: '', check_in_time: '', check_out_date: '', check_out_time: '', quantita: '1', room_type: '', note: '', data: '', ora_inizio: '', ora_fine: '', meeting_pax: '', meeting_setup: '', meeting_equipment: '', natural_light_preference: false, luogo: '', coffee_break_time: '', coffee_break_notes: '', lunch_time: '', lunch_notes: '', dinner_time: '', dinner_notes: '', coffee_station_notes: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10' })
+      Object.assign(base, { sotto_categoria: 'pernottamento', titolo: '', data: '', ora_inizio: '', ora_fine: '', check_in_date: '', check_in_time: '', check_out_date: '', check_out_time: '', quantita: '1', pax: '', room_type: '', luogo: '', meeting_pax: '', meeting_setup: '', meeting_equipment: '', natural_light_preference: false, note: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10' })
     } else if (category === 'transfer') {
       Object.assign(base, { titolo: '', data: '', ora_inizio: '', ora_fine: '', partenza: '', destinazione: '', quantita: '1', luogo: '', note: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else if (category === 'ristorante') {
@@ -146,7 +167,36 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
     record.iva_inclusa_costo = !!form.iva_inclusa_costo
 
     if (category === 'hotel') {
-      Object.assign(record, { titolo: strOrEmpty('titolo'), tipo: strOrEmpty('tipo') || 'pernottamento', check_in_date: strOrNull('check_in_date'), check_in_time: strOrNull('check_in_time'), check_out_date: strOrNull('check_out_date'), check_out_time: strOrNull('check_out_time'), quantita: numOrNull('quantita') ?? 1, room_type: strOrEmpty('room_type'), note: strOrEmpty('note'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), meeting_pax: numOrNull('meeting_pax'), meeting_setup: strOrEmpty('meeting_setup'), meeting_equipment: strOrEmpty('meeting_equipment'), luogo: strOrEmpty('luogo'), natural_light_preference: !!form.natural_light_preference, coffee_break_time: strOrNull('coffee_break_time'), coffee_break_notes: strOrEmpty('coffee_break_notes'), lunch_time: strOrNull('lunch_time'), lunch_notes: strOrEmpty('lunch_notes'), dinner_time: strOrNull('dinner_time'), dinner_notes: strOrEmpty('dinner_notes'), coffee_station_notes: strOrEmpty('coffee_station_notes'), venduto_unitario: numOrNull('venduto_unitario'), venduto_totale: numOrNull('venduto_totale'), costo_unitario: numOrNull('costo_unitario'), costo_totale: numOrNull('costo_totale') })
+      const sotto = strOrEmpty('sotto_categoria') || 'pernottamento'
+      const qty = numOrNull('quantita') ?? 1
+      const pax = numOrNull('pax')
+      const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
+      const multiplier = pax ?? qty
+      Object.assign(record, {
+        sotto_categoria: sotto,
+        titolo: strOrEmpty('titolo'),
+        data: strOrNull('data'),
+        ora_inizio: strOrNull('ora_inizio'),
+        ora_fine: strOrNull('ora_fine'),
+        check_in_date: strOrNull('check_in_date'),
+        check_in_time: strOrNull('check_in_time'),
+        check_out_date: strOrNull('check_out_date'),
+        check_out_time: strOrNull('check_out_time'),
+        quantita: qty,
+        pax,
+        room_type: strOrEmpty('room_type'),
+        luogo: strOrEmpty('luogo'),
+        meeting_pax: numOrNull('meeting_pax'),
+        meeting_setup: strOrEmpty('meeting_setup'),
+        meeting_equipment: strOrEmpty('meeting_equipment'),
+        natural_light_preference: !!form.natural_light_preference,
+        note: strOrEmpty('note'),
+        note_operative: strOrEmpty('note_operative'),
+        venduto_unitario: vu,
+        venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * multiplier : null),
+        costo_unitario: cu,
+        costo_totale: numOrNull('costo_totale') ?? (cu ? cu * multiplier : null),
+      })
     } else if (category === 'transfer') {
       const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
       Object.assign(record, { titolo: strOrEmpty('titolo') || 'Transfer', categoria: 'transfer', data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), partenza: strOrEmpty('partenza'), destinazione: strOrEmpty('destinazione'), quantita: qty, luogo: strOrEmpty('luogo'), note: strOrEmpty('note'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
@@ -199,7 +249,7 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
 
   function getItemTitle(item: Record<string, unknown>): string {
     switch (category) {
-      case 'hotel': return (item.titolo as string) || (item.tipo === 'pernottamento' ? 'Pernottamento' : 'Hotel')
+      case 'hotel': { const _s = (item.sotto_categoria as string) || 'pernottamento'; const _l = HOTEL_KEY_TO_LABEL[_s] || _s; const _t = item.titolo as string; return _t ? `${_l} - ${_t}` : _l }
       case 'transfer': return (item.titolo as string) || 'Transfer'
       case 'ristorante': return (item.tipologia_servizio as string) || 'Ristorante'
       case 'experience': return (item.nome_attivita as string) || (item.tipologia as string) || 'Experience'
@@ -266,53 +316,95 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
   )
 
   const renderForm = () => {
-    if (category === 'hotel') return (
-      <div className="space-y-5">
-        {/* PERNOTTAMENTI */}
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--red2)' }}>Pernottamenti</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {inp('titolo', 'Titolo / Nome hotel')}
+    if (category === 'hotel') {
+      const sotto = String(form.sotto_categoria || 'pernottamento')
+      const svc = HOTEL_SERVIZI.find(s => s.key === sotto)
+      const group = svc?.group || 'servizi'
+
+      const renderFieldsBySotto = () => {
+        if (sotto === 'pernottamento') return (
+          <>
             {inp('check_in_date', 'Check-in data', 'date')}{inp('check_in_time', 'Check-in ora', 'time')}
             {inp('check_out_date', 'Check-out data', 'date')}{inp('check_out_time', 'Check-out ora', 'time')}
             {inp('quantita', 'N. Camere', 'number')}{inp('room_type', 'Tipologia camere')}
             <div className="sm:col-span-3">{inp('note', 'Note camere / Rooming list')}</div>
-          </div>
-        </div>
-
-        {/* MEETING */}
-        <div style={{ borderTop: '1px solid var(--line)', paddingTop: '16px' }}>
-          <p className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--red2)' }}>Meeting</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {inp('data', 'Data meeting', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
+          </>
+        )
+        if (group === 'meeting') return (
+          <>
+            {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
             {inp('luogo', 'Nome sala')}{inp('meeting_pax', 'Pax', 'number')}{inp('meeting_setup', 'Disposizione sala')}
-            {inp('meeting_equipment', 'Attrezzature')}
+            {inp('meeting_equipment', 'Attrezzature')}{inp('quantita', 'N. Sale', 'number')}
             {chk('natural_light_preference', 'Preferenza luce naturale')}
-          </div>
-        </div>
+            <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+          </>
+        )
+        if (group === 'fb') return (
+          <>
+            {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
+            {inp('pax', 'Pax', 'number')}{inp('luogo', 'Sala / Location')}
+            <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+          </>
+        )
+        // group === 'servizi'
+        if (sotto === 'city_tax') return (
+          <>
+            {inp('quantita', 'N. Notti', 'number')}{inp('pax', 'N. Persone', 'number')}
+            <div className="sm:col-span-3">{inp('note_operative', 'Note')}</div>
+          </>
+        )
+        if (sotto === 'parking') return (
+          <>
+            {inp('quantita', 'N. Posti', 'number')}{inp('data', 'Data inizio', 'date')}{inp('ora_inizio', 'Data fine (o note)', 'text')}
+            <div className="sm:col-span-3">{inp('note_operative', 'Note')}</div>
+          </>
+        )
+        return (
+          <>
+            {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora', 'time')}{inp('quantita', 'Quantita', 'number')}
+            <div className="sm:col-span-3">{inp('note_operative', 'Note')}</div>
+          </>
+        )
+      }
 
-        {/* F&B HOTEL */}
-        <div style={{ borderTop: '1px solid var(--line)', paddingTop: '16px' }}>
-          <p className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--red2)' }}>F&B Hotel</p>
+      const econLabel = sotto === 'pernottamento' ? 'camera' : (group === 'fb' ? 'pax' : 'unita')
+
+      return (
+        <div className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {inp('coffee_station_notes', 'Coffee station (note)')}
-            {inp('coffee_break_time', 'Coffee break ora', 'time')}{inp('coffee_break_notes', 'Coffee break note')}
-            {inp('lunch_time', 'Lunch ora', 'time')}{inp('lunch_notes', 'Lunch note')}
-            {inp('dinner_time', 'Dinner ora', 'time')}{inp('dinner_notes', 'Dinner note')}
+            <div>
+              <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Tipo servizio</label>
+              <select value={sotto} onChange={e => upd('sotto_categoria', e.target.value)} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+                <optgroup label="Alloggio">
+                  {HOTEL_SERVIZI.filter(s => s.group === 'alloggio').map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </optgroup>
+                <optgroup label="Sale">
+                  {HOTEL_SERVIZI.filter(s => s.group === 'meeting').map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </optgroup>
+                <optgroup label="F&B">
+                  {HOTEL_SERVIZI.filter(s => s.group === 'fb').map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </optgroup>
+                <optgroup label="Servizi">
+                  {HOTEL_SERVIZI.filter(s => s.group === 'servizi').map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </optgroup>
+              </select>
+            </div>
+            {inp('titolo', 'Titolo / Descrizione')}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" style={{ borderTop: '1px solid var(--line)', paddingTop: '12px' }}>
+            {renderFieldsBySotto()}
+          </div>
+          <div style={{ borderTop: '1px solid var(--line)', paddingTop: '12px' }}>
+            <p className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>Economico</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {inp('venduto_unitario', `Venduto/${econLabel}`, 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+              {inp('costo_unitario', `Costo/${econLabel}`, 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+            </div>
+            {ivaFields()}
           </div>
         </div>
-
-        {/* ECONOMICO */}
-        <div style={{ borderTop: '1px solid var(--line)', paddingTop: '16px' }}>
-          <p className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>Economico</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {inp('venduto_unitario', 'Venduto/camera', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
-            {inp('costo_unitario', 'Costo/camera', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
-          </div>
-          {ivaFields()}
-        </div>
-      </div>
-    )
+      )
+    }
     if (category === 'transfer') return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {inp('titolo', 'Titolo corsa')}{inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora', 'time')}
@@ -549,7 +641,7 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
       supplier_id: '',
     }
     if (activeCategory === 'hotel') {
-      Object.assign(base, { titolo: '', tipo: 'pernottamento', check_in_date: '', check_in_time: '', check_out_date: '', check_out_time: '', quantita: '1', room_type: '', note: '', data: '', ora_inizio: '', ora_fine: '', meeting_pax: '', meeting_setup: '', meeting_equipment: '', natural_light_preference: false, luogo: '', coffee_break_time: '', coffee_break_notes: '', lunch_time: '', lunch_notes: '', dinner_time: '', dinner_notes: '', coffee_station_notes: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10' })
+      Object.assign(base, { sotto_categoria: 'pernottamento', titolo: '', data: '', ora_inizio: '', ora_fine: '', check_in_date: '', check_in_time: '', check_out_date: '', check_out_time: '', quantita: '1', pax: '', room_type: '', luogo: '', meeting_pax: '', meeting_setup: '', meeting_equipment: '', natural_light_preference: false, note: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10' })
     } else if (activeCategory === 'transfer') {
       Object.assign(base, { titolo: '', data: '', ora_inizio: '', ora_fine: '', partenza: '', destinazione: '', quantita: '1', luogo: '', note: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else if (activeCategory === 'ristorante') {
@@ -602,21 +694,35 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
     record.supplier_id = strOrNull('supplier_id')
 
     if (activeCategory === 'hotel') {
+      const sotto = strOrEmpty('sotto_categoria') || 'pernottamento'
+      const qty = numOrNull('quantita') ?? 1
+      const pax = numOrNull('pax')
+      const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
+      const multiplier = pax ?? qty
       Object.assign(record, {
-        titolo: strOrEmpty('titolo'), tipo: strOrEmpty('tipo') || 'pernottamento',
-        check_in_date: strOrNull('check_in_date'), check_in_time: strOrNull('check_in_time'),
-        check_out_date: strOrNull('check_out_date'), check_out_time: strOrNull('check_out_time'),
-        quantita: numOrNull('quantita') ?? 1, room_type: strOrEmpty('room_type'), note: strOrEmpty('note'),
-        data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'),
-        meeting_pax: numOrNull('meeting_pax'), meeting_setup: strOrEmpty('meeting_setup'),
-        meeting_equipment: strOrEmpty('meeting_equipment'), luogo: strOrEmpty('luogo'),
+        sotto_categoria: sotto,
+        titolo: strOrEmpty('titolo'),
+        data: strOrNull('data'),
+        ora_inizio: strOrNull('ora_inizio'),
+        ora_fine: strOrNull('ora_fine'),
+        check_in_date: strOrNull('check_in_date'),
+        check_in_time: strOrNull('check_in_time'),
+        check_out_date: strOrNull('check_out_date'),
+        check_out_time: strOrNull('check_out_time'),
+        quantita: qty,
+        pax,
+        room_type: strOrEmpty('room_type'),
+        luogo: strOrEmpty('luogo'),
+        meeting_pax: numOrNull('meeting_pax'),
+        meeting_setup: strOrEmpty('meeting_setup'),
+        meeting_equipment: strOrEmpty('meeting_equipment'),
         natural_light_preference: !!form.natural_light_preference,
-        coffee_break_time: strOrNull('coffee_break_time'), coffee_break_notes: strOrEmpty('coffee_break_notes'),
-        lunch_time: strOrNull('lunch_time'), lunch_notes: strOrEmpty('lunch_notes'),
-        dinner_time: strOrNull('dinner_time'), dinner_notes: strOrEmpty('dinner_notes'),
-        coffee_station_notes: strOrEmpty('coffee_station_notes'),
-        venduto_unitario: numOrNull('venduto_unitario'), venduto_totale: numOrNull('venduto_totale'),
-        costo_unitario: numOrNull('costo_unitario'), costo_totale: numOrNull('costo_totale'),
+        note: strOrEmpty('note'),
+        note_operative: strOrEmpty('note_operative'),
+        venduto_unitario: vu,
+        venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * multiplier : null),
+        costo_unitario: cu,
+        costo_totale: numOrNull('costo_totale') ?? (cu ? cu * multiplier : null),
       })
     } else if (activeCategory === 'transfer') {
       const qty = numOrNull('quantita') ?? 1
@@ -768,7 +874,7 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
 
   function getItemTitle(item: Record<string, unknown>): string {
     switch (activeCategory) {
-      case 'hotel': return (item.titolo as string) || (item.tipo === 'pernottamento' ? 'Pernottamento' : 'Hotel')
+      case 'hotel': { const _s = (item.sotto_categoria as string) || 'pernottamento'; const _l = HOTEL_KEY_TO_LABEL[_s] || _s; const _t = item.titolo as string; return _t ? `${_l} - ${_t}` : _l }
       case 'transfer': return (item.titolo as string) || 'Transfer'
       case 'ristorante': return (item.tipologia_servizio as string) || 'Ristorante'
       case 'experience': return (item.nome_attivita as string) || (item.tipologia as string) || 'Experience'
@@ -846,39 +952,94 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
   )
 
   const renderForm = () => {
-    if (activeCategory === 'hotel') return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {inp('titolo', 'Titolo')}
-        {inp('quantita', 'N. Camere', 'number')}
-        {inp('room_type', 'Tipo camera')}
-        {inp('check_in_date', 'Check-in data', 'date')}
-        {inp('check_in_time', 'Check-in ora', 'time')}
-        {inp('check_out_date', 'Check-out data', 'date')}
-        {inp('check_out_time', 'Check-out ora', 'time')}
-        {inp('data', 'Data meeting', 'date')}
-        {inp('ora_inizio', 'Ora inizio meeting', 'time')}
-        {inp('ora_fine', 'Ora fine meeting', 'time')}
-        {inp('luogo', 'Sala')}
-        {inp('meeting_pax', 'Pax meeting', 'number')}
-        {inp('meeting_setup', 'Setup')}
-        {inp('meeting_equipment', 'Attrezzature')}
-        {chk('natural_light_preference', 'Luce naturale')}
-        {inp('coffee_break_time', 'Coffee Break', 'time')}
-        {inp('coffee_break_notes', 'Note Coffee Break')}
-        {inp('lunch_time', 'Lunch', 'time')}
-        {inp('lunch_notes', 'Note Lunch')}
-        {inp('dinner_time', 'Dinner', 'time')}
-        {inp('dinner_notes', 'Note Dinner')}
-        {inp('coffee_station_notes', 'Coffee Station')}
-        {inp('venduto_unitario', 'Venduto/camera', 'number')}
-        {inp('venduto_totale', 'Venduto totale', 'number')}
-        {inp('costo_unitario', 'Costo/camera', 'number')}
-        {inp('costo_totale', 'Costo totale', 'number')}
-        {supplierSel()}
-        <div className="sm:col-span-3">{inp('note', 'Note')}</div>
-        {ivaFields()}
-      </div>
-    )
+    if (activeCategory === 'hotel') {
+      const sotto = String(form.sotto_categoria || 'pernottamento')
+      const svc = HOTEL_SERVIZI.find(s => s.key === sotto)
+      const group = svc?.group || 'servizi'
+      const econLabel = sotto === 'pernottamento' ? 'camera' : (group === 'fb' ? 'pax' : 'unita')
+
+      const renderHotelFields = () => {
+        if (sotto === 'pernottamento') return (
+          <>
+            {inp('check_in_date', 'Check-in data', 'date')}{inp('check_in_time', 'Check-in ora', 'time')}
+            {inp('check_out_date', 'Check-out data', 'date')}{inp('check_out_time', 'Check-out ora', 'time')}
+            {inp('quantita', 'N. Camere', 'number')}{inp('room_type', 'Tipologia camere')}
+            <div className="sm:col-span-3">{inp('note', 'Note camere / Rooming list')}</div>
+          </>
+        )
+        if (group === 'meeting') return (
+          <>
+            {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
+            {inp('luogo', 'Nome sala')}{inp('meeting_pax', 'Pax', 'number')}{inp('meeting_setup', 'Disposizione sala')}
+            {inp('meeting_equipment', 'Attrezzature')}{inp('quantita', 'N. Sale', 'number')}
+            {chk('natural_light_preference', 'Preferenza luce naturale')}
+            <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+          </>
+        )
+        if (group === 'fb') return (
+          <>
+            {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
+            {inp('pax', 'Pax', 'number')}{inp('luogo', 'Sala / Location')}
+            <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+          </>
+        )
+        if (sotto === 'city_tax') return (
+          <>
+            {inp('quantita', 'N. Notti', 'number')}{inp('pax', 'N. Persone', 'number')}
+            <div className="sm:col-span-3">{inp('note_operative', 'Note')}</div>
+          </>
+        )
+        if (sotto === 'parking') return (
+          <>
+            {inp('quantita', 'N. Posti', 'number')}{inp('data', 'Data inizio', 'date')}{inp('ora_inizio', 'Data fine (o note)', 'text')}
+            <div className="sm:col-span-3">{inp('note_operative', 'Note')}</div>
+          </>
+        )
+        return (
+          <>
+            {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora', 'time')}{inp('quantita', 'Quantita', 'number')}
+            <div className="sm:col-span-3">{inp('note_operative', 'Note')}</div>
+          </>
+        )
+      }
+
+      return (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Tipo servizio</label>
+              <select value={sotto} onChange={e => upd('sotto_categoria', e.target.value)} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+                <optgroup label="Alloggio">
+                  {HOTEL_SERVIZI.filter(s => s.group === 'alloggio').map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </optgroup>
+                <optgroup label="Sale">
+                  {HOTEL_SERVIZI.filter(s => s.group === 'meeting').map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </optgroup>
+                <optgroup label="F&B">
+                  {HOTEL_SERVIZI.filter(s => s.group === 'fb').map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </optgroup>
+                <optgroup label="Servizi">
+                  {HOTEL_SERVIZI.filter(s => s.group === 'servizi').map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </optgroup>
+              </select>
+            </div>
+            {inp('titolo', 'Titolo / Descrizione')}
+            {supplierSel()}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" style={{ borderTop: '1px solid var(--line)', paddingTop: '12px' }}>
+            {renderHotelFields()}
+          </div>
+          <div style={{ borderTop: '1px solid var(--line)', paddingTop: '12px' }}>
+            <p className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>Economico</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {inp('venduto_unitario', `Venduto/${econLabel}`, 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+              {inp('costo_unitario', `Costo/${econLabel}`, 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+            </div>
+            {ivaFields()}
+          </div>
+        </div>
+      )
+    }
     if (activeCategory === 'transfer') return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {inp('titolo', 'Titolo corsa')}
