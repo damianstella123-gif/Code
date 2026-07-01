@@ -8,6 +8,9 @@ export interface Task {
   stato: 'da_fare' | 'in_corso' | 'completato'
   scadenza: string
   creatoIl: string
+  supplier_id?: string | null
+  fase?: string | null
+  categoria?: string | null
 }
 
 export const tasks: Task[] = [

@@ -12,6 +12,9 @@ interface TaskRow {
   due_date: string
   created_at: string
   updated_at: string
+  supplier_id: string | null
+  fase: string | null
+  categoria: string | null
 }
 
 function rowToTask(r: TaskRow): Task {
@@ -25,6 +28,9 @@ function rowToTask(r: TaskRow): Task {
     stato: r.status,
     scadenza: r.due_date,
     creatoIl: r.created_at?.slice(0, 10) ?? '',
+    supplier_id: r.supplier_id,
+    fase: r.fase,
+    categoria: r.categoria,
   }
 }
 
@@ -39,6 +45,9 @@ function taskToRow(t: Task): Omit<TaskRow, 'updated_at'> {
     status: t.stato,
     due_date: t.scadenza,
     created_at: t.creatoIl ? new Date(t.creatoIl).toISOString() : new Date().toISOString(),
+    supplier_id: t.supplier_id ?? null,
+    fase: t.fase ?? null,
+    categoria: t.categoria ?? null,
   }
 }
 
@@ -103,6 +112,9 @@ export async function updateTask(id: string, patch: Partial<Task>): Promise<Task
   if (patch.priorita !== undefined) dbPatch.priority = patch.priorita
   if (patch.stato !== undefined) dbPatch.status = patch.stato
   if (patch.scadenza !== undefined) dbPatch.due_date = patch.scadenza
+  if (patch.supplier_id !== undefined) dbPatch.supplier_id = patch.supplier_id ?? null
+  if (patch.fase !== undefined) dbPatch.fase = patch.fase ?? null
+  if (patch.categoria !== undefined) dbPatch.categoria = patch.categoria ?? null
 
   const { data, error } = await supabase
     .from('tasks')
