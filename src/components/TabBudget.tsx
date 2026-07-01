@@ -314,6 +314,9 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     return { venduto, costo, fee, ricavi, margine, marginePct }
   }, [lines, feePct])
 
+  const fmt = (n: number) => '\u20AC' + n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
+  const fmtN = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
+
   // Confirmed vs estimated split
   const confirmSplit = useMemo(() => {
     const confermati = lines.filter(l => l.stato_conferma !== 'richiesto')
@@ -383,8 +386,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       .map(cat => ({ label: cat, items: map[cat] }))
   }, [lines])
 
-  const fmt = (n: number) => '\u20AC' + n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
-  const fmtN = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
 
   const EXPORT_LABELS: Record<string, string> = {
     'HOTEL': 'HOTEL', 'TRANSFER': 'TRASPORTI', 'RISTORANTE': 'RISTORANTI',
