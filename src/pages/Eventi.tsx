@@ -15,7 +15,6 @@ import {
   AlertCircle,
   MessageSquare,
   GitBranch,
-  Palette,
   ArrowDownLeft,
   ArrowUpRight,
   FileText,
@@ -23,12 +22,11 @@ import {
   Plus,
   Edit3,
   Trash2,
-  Package,
   Upload,
   Download,
   Eye,
   Euro,
-  Plus as PlusIcon,
+  Link2,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { loadTasksFromStorage, cacheEventsSnapshot, loadWorkflowsFromStorage } from '@/lib/storage'
@@ -37,9 +35,6 @@ import { fetchTasksByEvent, upsertTask, changeTaskStatus } from '@/lib/tasks-ser
 import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchBudgets } from '@/lib/budgets-service'
 import { fetchCommunications } from '@/lib/communications-service'
-import { fetchPackagesByEvent, upsertClientPackage, updateClientPackage, deleteClientPackage, uploadPackageFile, type ClientPackage } from '@/lib/packages-service'
-import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
-import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
 import { fetchClients as fetchClientsService } from '@/lib/clients-service'
 import type { Client } from '@/data/clients'
 import { fetchAllProfiles } from '@/lib/profiles'
@@ -62,7 +57,7 @@ import type { EventoWorkflow } from '@/data/workflow'
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 type StatoEvento = Event['stato']
 
-type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'documenti' | 'programma' | 'timeline' | 'creative' | 'social' | 'presentazioni' | 'pacchetto'
+type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'documenti' | 'programma' | 'timeline'
 
 function statoColor(stato: string) {
   switch (stato) {
@@ -1946,7 +1941,7 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
             </div>
 
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Servizio (da costi fornitore)</label>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Servizio collegato</label>
               <select
                 value={formData.servizio}
                 onChange={e => setFormData(prev => ({ ...prev, servizio: e.target.value }))}
@@ -2118,8 +2113,8 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
                             </p>
                           )}
                           {entry.servizio && (
-                            <p className="text-xs mt-0.5" style={{ color: 'var(--blue)' }}>
-                              <Euro className="w-3 h-3 inline mr-1" />{entry.servizio}
+                            <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                              <Link2 className="w-3 h-3 inline mr-1" />{entry.servizio}
                             </p>
                           )}
                           {entry.luogo && (
@@ -2235,260 +2230,6 @@ function TabTimeline({ event }: { event: Event }) {
   )
 }
 
-function TabCreative({ event }: { event: Event }) {
-  const [projects, setProjects] = useState<CreativeProject[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchCreativeProjects().then(all => {
-      setProjects(all.filter(p => p.event_id === event.id))
-      setLoading(false)
-    })
-  }, [event.id])
-
-  const statusColor = (s: string) => {
-    switch (s) {
-      case 'completato': return 'var(--green)'
-      case 'in_lavorazione': return '#a855f7'
-      case 'in_revisione': return 'var(--yellow)'
-      case 'approvato': return 'var(--blue)'
-      default: return 'var(--muted)'
-    }
-  }
-
-  return (
-    <div className="space-y-5">
-      <div className="panel p-5"
-        style={{ border: '1px solid rgba(208,0,58,0.15)', background: 'linear-gradient(135deg, rgba(208,0,58,0.03) 0%, var(--panel) 70%)' }}>
-        <div className="flex items-center gap-2 mb-1">
-          <Palette className="w-4 h-4" style={{ color: 'var(--red2)' }} />
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Materiali Creativi</h3>
-          <span className="text-xs px-2 py-0.5 rounded-full ml-auto"
-            style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)' }}>
-            {projects.length} {projects.length === 1 ? 'progetto' : 'progetti'}
-          </span>
-        </div>
-        <p className="text-xs" style={{ color: 'var(--muted)' }}>
-          Materiali creativi collegati a "{event.nome}"
-        </p>
-      </div>
-
-      {loading ? (
-        <div className="panel p-8 text-center">
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>
-        </div>
-      ) : projects.length === 0 ? (
-        <div className="panel p-8 text-center">
-          <Palette className="w-8 h-8 mx-auto mb-2 opacity-30" style={{ color: 'var(--muted)' }} />
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun materiale creativo collegato</p>
-          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Crea progetti dal Creative Studio e collegali a questo evento</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {projects.map(p => (
-            <div key={p.id} className="panel p-4 transition-all hover:bg-white/5"
-              style={{ border: '1px solid var(--line)' }}>
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate" style={{ color: 'var(--text)' }}>{p.title}</p>
-                  <p className="text-xs capitalize" style={{ color: 'var(--muted)' }}>{p.type.replace(/_/g, ' ')}</p>
-                </div>
-                <span className="text-xs px-2 py-0.5 rounded-full capitalize flex-shrink-0"
-                  style={{ background: `${statusColor(p.status)}18`, color: statusColor(p.status), border: `1px solid ${statusColor(p.status)}30` }}>
-                  {p.status.replace(/_/g, ' ')}
-                </span>
-              </div>
-              {p.due_date && (
-                <div className="flex items-center gap-1.5 mt-2">
-                  <Clock className="w-3 h-3" style={{ color: 'var(--muted)' }} />
-                  <span className="text-xs" style={{ color: daysLeft(p.due_date) < 0 ? 'var(--red2)' : 'var(--muted)' }}>
-                    {fmtShort(p.due_date)}
-                  </span>
-                </div>
-              )}
-              {p.output_format && (
-                <div className="flex items-center gap-1.5 mt-1">
-                  <FileText className="w-3 h-3" style={{ color: 'var(--muted)' }} />
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>{p.output_format}</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function TabSocial({ event }: { event: Event }) {
-  const [contents, setContents] = useState<SocialContent[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchSocialContents().then(all => {
-      setContents(all.filter(c => c.event_id === event.id))
-      setLoading(false)
-    })
-  }, [event.id])
-
-  const statusColor = (s: string) => {
-    switch (s) {
-      case 'pubblicato': return 'var(--green)'
-      case 'approvato': return 'var(--blue)'
-      case 'in_lavorazione': return 'var(--yellow)'
-      default: return 'var(--muted)'
-    }
-  }
-
-  return (
-    <div className="space-y-5">
-      <div className="panel p-5"
-        style={{ border: '1px solid rgba(249,115,22,0.15)', background: 'linear-gradient(135deg, rgba(249,115,22,0.03) 0%, var(--panel) 70%)' }}>
-        <div className="flex items-center gap-2 mb-1">
-          <Zap className="w-4 h-4" style={{ color: '#f97316' }} />
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Contenuti Social</h3>
-          <span className="text-xs px-2 py-0.5 rounded-full ml-auto"
-            style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316' }}>
-            {contents.length} {contents.length === 1 ? 'contenuto' : 'contenuti'}
-          </span>
-        </div>
-        <p className="text-xs" style={{ color: 'var(--muted)' }}>
-          Contenuti social collegati a "{event.nome}"
-        </p>
-      </div>
-
-      {loading ? (
-        <div className="panel p-8 text-center">
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>
-        </div>
-      ) : contents.length === 0 ? (
-        <div className="panel p-8 text-center">
-          <Zap className="w-8 h-8 mx-auto mb-2 opacity-30" style={{ color: 'var(--muted)' }} />
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun contenuto social collegato</p>
-          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Crea contenuti dal Social Studio e collegali a questo evento</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {contents.map(c => (
-            <div key={c.id} className="panel p-4 transition-all hover:bg-white/5"
-              style={{ border: '1px solid var(--line)' }}>
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate" style={{ color: 'var(--text)' }}>{c.title}</p>
-                  <p className="text-xs capitalize" style={{ color: 'var(--muted)' }}>{c.channel.replace(/_/g, ' ')}</p>
-                </div>
-                <span className="text-xs px-2 py-0.5 rounded-full capitalize flex-shrink-0"
-                  style={{ background: `${statusColor(c.status)}18`, color: statusColor(c.status), border: `1px solid ${statusColor(c.status)}30` }}>
-                  {c.status.replace(/_/g, ' ')}
-                </span>
-              </div>
-              {c.publish_date && (
-                <div className="flex items-center gap-1.5 mt-2">
-                  <Clock className="w-3 h-3" style={{ color: 'var(--muted)' }} />
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                    {fmtShort(c.publish_date)}
-                  </span>
-                </div>
-              )}
-              {c.copy && (
-                <p className="text-xs mt-2 line-clamp-2" style={{ color: 'var(--muted)' }}>{c.copy}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function TabPresentazioni({ event }: { event: Event }) {
-  const [versions, setVersions] = useState<{ id: string; template_name: string; status: string; notes: string; file_url: string | null; created_at: string }[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    supabase
-      .from('presentation_versions')
-      .select('*')
-      .eq('event_id', event.id)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        if (data) setVersions(data)
-        setLoading(false)
-      })
-  }, [event.id])
-
-  const statusColor = (s: string) => {
-    switch (s) {
-      case 'pronto': return 'var(--green)'
-      case 'generazione_richiesta': return 'var(--blue)'
-      case 'errore': return 'var(--red2)'
-      default: return 'var(--muted)'
-    }
-  }
-  const statusLabel = (s: string) => {
-    switch (s) {
-      case 'bozza': return 'Bozza'
-      case 'generazione_richiesta': return 'In Generazione'
-      case 'pronto': return 'Pronto'
-      case 'errore': return 'Errore'
-      default: return s
-    }
-  }
-
-  return (
-    <div className="space-y-5">
-      <div className="panel p-5"
-        style={{ border: '1px solid rgba(77,180,255,0.15)', background: 'linear-gradient(135deg, rgba(77,180,255,0.03) 0%, var(--panel) 70%)' }}>
-        <div className="flex items-center gap-2 mb-1">
-          <FileText className="w-4 h-4" style={{ color: 'var(--blue)' }} />
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Presentazioni</h3>
-          <span className="text-xs px-2 py-0.5 rounded-full ml-auto"
-            style={{ background: 'rgba(77,180,255,0.12)', color: 'var(--blue)' }}>
-            {versions.length} {versions.length === 1 ? 'versione' : 'versioni'}
-          </span>
-        </div>
-        <p className="text-xs" style={{ color: 'var(--muted)' }}>
-          Presentazioni generate per "{event.nome}"
-        </p>
-      </div>
-
-      {loading ? (
-        <div className="panel p-8 text-center">
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>
-        </div>
-      ) : versions.length === 0 ? (
-        <div className="panel p-8 text-center">
-          <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" style={{ color: 'var(--muted)' }} />
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessuna presentazione per questo evento</p>
-          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Crea presentazioni dal modulo Presentazioni e collegale a questo evento</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {versions.map(v => (
-            <div key={v.id} className="panel p-4 flex items-center gap-4 transition-all hover:bg-white/5"
-              style={{ border: '1px solid var(--line)' }}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(77,180,255,0.1)' }}>
-                <FileText className="w-5 h-5" style={{ color: 'var(--blue)' }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm" style={{ color: 'var(--text)' }}>{v.template_name}</p>
-                <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                  {new Date(v.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
-                </p>
-                {v.notes && <p className="text-xs mt-1 truncate" style={{ color: 'var(--muted)' }}>{v.notes}</p>}
-              </div>
-              <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
-                style={{ background: `${statusColor(v.status)}18`, color: statusColor(v.status), border: `1px solid ${statusColor(v.status)}30` }}>
-                {statusLabel(v.status)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function BudgetTabContainer({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const [view, setView] = useState<'fornitori' | 'servizi'>('fornitori')
@@ -2523,171 +2264,6 @@ function BudgetTabContainer({ event, suppliers }: { event: Event; suppliers: Sup
   )
 }
 
-function TabPacchetto({ event }: { event: Event }) {
-  const [packages, setPackages] = useState<ClientPackage[]>([])
-  const [loading, setLoading] = useState(true)
-  const [uploading, setUploading] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetchPackagesByEvent(event.id).then(p => { setPackages(p); setLoading(false) })
-  }, [event.id])
-
-  async function handleCreate() {
-    const result = await upsertClientPackage({
-      event_id: event.id,
-      client_id: event.cliente,
-      status: 'bozza',
-    })
-    if (result) setPackages(prev => [result, ...prev])
-  }
-
-  async function handleStatusChange(pkg: ClientPackage, status: string) {
-    const patch: Partial<ClientPackage> = { status }
-    if (status === 'inviato') patch.sent_at = new Date().toISOString()
-    const result = await updateClientPackage(pkg.id, patch)
-    if (result) setPackages(prev => prev.map(p => p.id === result.id ? result : p))
-  }
-
-  async function handleFileUpload(pkg: ClientPackage, type: 'pptx' | 'pdf_presentation' | 'xlsx' | 'pdf_budget', e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(`${pkg.id}_${type}`)
-    const url = await uploadPackageFile(file, pkg.id, type)
-    if (url) {
-      const field = type === 'pptx' ? 'pptx_url' : type === 'pdf_presentation' ? 'pdf_presentation_url' : type === 'xlsx' ? 'xlsx_url' : 'pdf_budget_url'
-      const result = await updateClientPackage(pkg.id, { [field]: url })
-      if (result) setPackages(prev => prev.map(p => p.id === result.id ? result : p))
-    }
-    setUploading(null)
-  }
-
-  async function handleDelete(id: string) {
-    await deleteClientPackage(id)
-    setPackages(prev => prev.filter(p => p.id !== id))
-  }
-
-  if (loading) return <div className="text-center py-8" style={{ color: 'var(--muted)' }}>Caricamento...</div>
-
-  const fileTypes: { key: 'pptx' | 'pdf_presentation' | 'xlsx' | 'pdf_budget'; label: string; field: keyof ClientPackage; accept: string }[] = [
-    { key: 'pptx', label: 'Presentazione PPTX', field: 'pptx_url', accept: '.pptx,.ppt' },
-    { key: 'pdf_presentation', label: 'Presentazione PDF', field: 'pdf_presentation_url', accept: '.pdf' },
-    { key: 'xlsx', label: 'Budget XLSX', field: 'xlsx_url', accept: '.xlsx,.xls' },
-    { key: 'pdf_budget', label: 'Budget PDF', field: 'pdf_budget_url', accept: '.pdf' },
-  ]
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-bold" style={{ color: 'var(--text)' }}>Pacchetto Cliente</h3>
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>
-            Raccoglie presentazione, budget e documenti per il cliente.
-          </p>
-        </div>
-        <button onClick={handleCreate}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
-          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
-          <PlusIcon className="w-3.5 h-3.5" /> Nuovo Pacchetto
-        </button>
-      </div>
-
-      {packages.length === 0 ? (
-        <div className="text-center py-8 panel rounded-xl">
-          <Package className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--muted)' }} />
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Nessun pacchetto creato per questo evento.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {packages.map(pkg => {
-            const statusColors: Record<string, string> = {
-              bozza: '#9ba3aa', in_preparazione: '#4db4ff', pronto: '#38d27d', inviato: '#22c55e', archiviato: '#6b7280',
-            }
-            const statusLabels: Record<string, string> = {
-              bozza: 'Bozza', in_preparazione: 'In Preparazione', pronto: 'Pronto', inviato: 'Inviato', archiviato: 'Archiviato',
-            }
-            const color = statusColors[pkg.status] ?? '#9ba3aa'
-            return (
-              <div key={pkg.id} className="panel p-5 rounded-xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs px-2.5 py-1 rounded-full font-medium"
-                    style={{ background: `${color}20`, color }}>
-                    {statusLabels[pkg.status] ?? pkg.status}
-                  </span>
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                    {new Date(pkg.created_at).toLocaleDateString('it-IT')}
-                  </span>
-                </div>
-
-                {/* File slots */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {fileTypes.map(ft => {
-                    const url = pkg[ft.field] as string | null
-                    const isUploading = uploading === `${pkg.id}_${ft.key}`
-                    return (
-                      <div key={ft.key} className="flex items-center gap-2 p-3 rounded-xl"
-                        style={{ background: 'var(--bg)', border: `1px solid ${url ? 'rgba(56,210,125,0.3)' : 'var(--line)'}` }}>
-                        <FileText className="w-4 h-4 flex-shrink-0" style={{ color: url ? 'var(--green)' : 'var(--muted)' }} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate" style={{ color: url ? 'var(--text)' : 'var(--muted)' }}>
-                            {ft.label}
-                          </p>
-                          {url ? (
-                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs" style={{ color: 'var(--blue)' }}>
-                              Scarica
-                            </a>
-                          ) : (
-                            <span className="text-xs" style={{ color: 'var(--muted)' }}>Non caricato</span>
-                          )}
-                        </div>
-                        <label className="flex-shrink-0 p-1.5 rounded-lg cursor-pointer hover:bg-white/10 transition-all"
-                          title={`Carica ${ft.label}`}>
-                          <Upload className="w-3.5 h-3.5" style={{ color: isUploading ? 'var(--yellow)' : 'var(--muted)' }} />
-                          <input type="file" className="hidden" accept={ft.accept}
-                            onChange={e => handleFileUpload(pkg, ft.key, e)} />
-                        </label>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 pt-3" style={{ borderTop: '1px solid var(--line)' }}>
-                  <select value={pkg.status} onChange={e => handleStatusChange(pkg, e.target.value)}
-                    className="flex-1 px-2 py-1.5 rounded-lg text-xs"
-                    style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                    <option value="bozza">Bozza</option>
-                    <option value="in_preparazione">In Preparazione</option>
-                    <option value="pronto">Pronto</option>
-                    <option value="inviato">Inviato</option>
-                    <option value="archiviato">Archiviato</option>
-                  </select>
-                  <button onClick={() => handleDelete(pkg.id)} className="p-1.5 rounded-lg hover:bg-white/10">
-                    <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
-                  </button>
-                </div>
-
-                {pkg.sent_at && (
-                  <p className="text-xs" style={{ color: 'var(--green)' }}>
-                    Inviato il {new Date(pkg.sent_at).toLocaleDateString('it-IT')}
-                  </p>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Technical status */}
-      <div className="p-3 rounded-xl text-xs space-y-1" style={{ background: 'rgba(77,180,255,0.06)', border: '1px solid rgba(77,180,255,0.2)' }}>
-        <p className="font-medium" style={{ color: 'var(--blue)' }}>Stato tecnico file</p>
-        <p style={{ color: 'var(--muted)' }}>
-          La generazione automatica di PPTX e XLSX da dati evento richiede una Edge Function dedicata (non ancora attiva).
-          Per ora puoi caricare manualmente i file esportati da Budget (XLSX/PDF) e Presentazioni (PPTX/PDF).
-        </p>
-      </div>
-    </div>
-  )
-}
 
 // ─── EventDetail ──────────────────────────────────────────────────────────────
 
@@ -2724,15 +2300,14 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'overview', label: 'Panoramica' },
+    { id: 'fornitori', label: `Fornitori${eventSuppliers.length > 0 ? ` (${eventSuppliers.length})` : ''}` },
+    { id: 'programma', label: 'Programma' },
+    { id: 'budget', label: 'Budget' },
     { id: 'task', label: `Task${totalTasks > 0 ? ` (${totalTasks})` : ''}` },
     { id: 'team', label: `Team (${event.team.length})` },
-    { id: 'fornitori', label: `Fornitori${eventSuppliers.length > 0 ? ` (${eventSuppliers.length})` : ''}` },
-    { id: 'budget', label: 'Budget' },
-    { id: 'comunicazioni', label: `Comunicazioni${eventMsg.length > 0 ? ` (${eventMsg.length})` : ''}` },
     { id: 'documenti', label: 'Documenti' },
-    { id: 'programma', label: 'Programma' },
+    { id: 'comunicazioni', label: `Comunicazioni${eventMsg.length > 0 ? ` (${eventMsg.length})` : ''}` },
     { id: 'timeline', label: 'Timeline' },
-    { id: 'pacchetto', label: 'Pacchetto' },
   ]
 
   return (
@@ -2901,10 +2476,6 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         {activeTab === 'documenti' && <TabDocumenti event={event} />}
         {activeTab === 'programma' && <TabProgramma event={event} suppliers={suppliers} />}
         {activeTab === 'timeline' && <TabTimeline event={event} />}
-        {activeTab === 'creative' && <TabCreative event={event} />}
-        {activeTab === 'social' && <TabSocial event={event} />}
-        {activeTab === 'presentazioni' && <TabPresentazioni event={event} />}
-        {activeTab === 'pacchetto' && <TabPacchetto event={event} />}
       </div>
     </div>
   )
