@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   TrendingUp,
   AlertCircle,
+  AlertTriangle,
   MessageSquare,
   GitBranch,
   ArrowDownLeft,
@@ -27,8 +28,10 @@ import {
   Download,
   Eye,
   Link2,
+  User,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
+import { useEventServices } from '@/lib/use-event-services'
 import { loadTasksFromStorage, cacheEventsSnapshot, loadWorkflowsFromStorage } from '@/lib/storage'
 import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote } from '@/lib/events-service'
 import { fetchTasksByEvent, upsertTask, changeTaskStatus, deleteTask as deleteTaskRemote } from '@/lib/tasks-service'
@@ -931,19 +934,6 @@ function TabTeam({ event, internalUsers }: { event: Event; internalUsers: Intern
   )
 }
 
-interface EventSupplierLink {
-  id: string
-  event_id: string
-  supplier_id: string
-  service_category: string
-  start_date: string | null
-  start_time: string | null
-  end_date: string | null
-  end_time: string | null
-  location: string
-  operational_notes: string
-}
-
 
 
 const SVC_CATEGORIES = [
@@ -1154,73 +1144,14 @@ const LINK_CATEGORIES: { value: CategoryType; label: string }[] = [
   { value: 'varie', label: 'Varie' },
 ]
 
-function SupplierServiceBadge({ eventId, supplierId, category }: { eventId: string; supplierId: string; category: CategoryType }) {
-  const [count, setCount] = useState(0)
-  const [totals, setTotals] = useState({ venduto: 0, costo: 0 })
-
-  useEffect(() => {
-    const TABLES: Record<CategoryType, string> = {
-      hotel: 'event_hotel_details', transfer: 'event_supplier_services',
-      ristorante: 'event_restaurant_details', experience: 'event_experience_details',
-      catering: 'event_catering_details', audio_video: 'event_audio_video_details',
-      allestimenti: 'event_allestimenti_details', staff_interno: 'event_staff_interno_details',
-      staff_esterno: 'event_staff_esterno_details', grafica_stampa: 'event_grafica_stampa_details',
-      varie: 'event_varie_details',
-    }
-    const table = TABLES[category]
-    if (!table) return
-
-    let query = supabase.from(table).select('*').eq('event_id', eventId).eq('supplier_id', supplierId)
-    if (category === 'transfer') query = query.eq('categoria', 'transfer')
-
-    query.then(({ data }) => {
-      if (!data) return
-      setCount(data.length)
-      let venduto = 0, costo = 0
-      for (const row of data as Record<string, unknown>[]) {
-        if (category === 'ristorante') {
-          const pax = (row.pax_confermati as number) ?? (row.pax_previsti as number) ?? 1
-          venduto += (row.budget_totale as number) ?? ((row.budget_per_persona as number) ? (row.budget_per_persona as number) * pax : 0)
-          costo += (row.costo_totale_reale as number) ?? ((row.costo_per_persona as number) ? (row.costo_per_persona as number) * pax : 0)
-        } else if (category === 'catering') {
-          const pax = (row.pax as number) ?? 1
-          venduto += (row.venduto_totale as number) ?? ((row.venduto_per_persona as number) ? (row.venduto_per_persona as number) * pax : 0)
-          costo += (row.costo_totale as number) ?? ((row.costo_per_persona as number) ? (row.costo_per_persona as number) * pax : 0)
-        } else if (category === 'staff_interno') {
-          venduto += (row.venduto_totale as number) ?? 0
-          costo += (row.costo_totale as number) ?? (row.costo_giornaliero as number) ?? 0
-        } else {
-          const qty = (row.quantita as number) ?? (row.pax as number) ?? 1
-          venduto += (row.venduto_totale as number) ?? ((row.venduto_unitario as number) ? (row.venduto_unitario as number) * qty : 0)
-          costo += (row.costo_totale as number) ?? ((row.costo_unitario as number) ? (row.costo_unitario as number) * qty : 0)
-        }
-      }
-      setTotals({ venduto, costo })
-    })
-  }, [eventId, supplierId, category])
-
-  if (count === 0) return null
-
-  const margine = totals.venduto - totals.costo
-  const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-
-  return (
-    <div className="flex items-center gap-3 text-[11px]">
-      <span className="px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
-        {count} {count === 1 ? 'servizio' : 'servizi'}
-      </span>
-      {(totals.venduto > 0 || totals.costo > 0) && (
-        <span style={{ color: margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>
-          {'\u20AC'}{fmt(margine)}
-        </span>
-      )}
-    </div>
-  )
-}
+const STATO_CONFERMA_CONFIG = {
+  richiesto: { label: 'Richiesto', color: 'var(--yellow)', bg: 'rgba(255,194,75,0.12)', border: 'rgba(255,194,75,0.4)' },
+  confermato: { label: 'Confermato', color: 'var(--blue)', bg: 'rgba(77,180,255,0.12)', border: 'rgba(77,180,255,0.4)' },
+  contrattualizzato: { label: 'Contrattualizzato', color: 'var(--green)', bg: 'rgba(56,210,125,0.12)', border: 'rgba(56,210,125,0.4)' },
+} as const
 
 function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
-  const [links, setLinks] = useState<EventSupplierLink[]>([])
-  const [loading, setLoading] = useState(true)
+  const { links, summaries, loading, reload, updateLinkStatus } = useEventServices(event.id)
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
   const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null)
@@ -1229,17 +1160,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   const [toastTimer, setToastTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
   const [pendingLink, setPendingLink] = useState<string | null>(null)
   const [linkCategory, setLinkCategory] = useState<CategoryType | ''>('')
-
-  async function loadLinks() {
-    const { data } = await supabase
-      .from('event_suppliers')
-      .select('*')
-      .eq('event_id', event.id)
-    setLinks((data ?? []) as EventSupplierLink[])
-    setLoading(false)
-  }
-
-  useEffect(() => { loadLinks() }, [event.id])
+  const [editingContact, setEditingContact] = useState<string | null>(null)
+  const [contactForm, setContactForm] = useState({ contatto_operativo: '', telefono_operativo: '', email_operativo: '' })
 
   const linkedIds = links.map(l => l.supplier_id)
 
@@ -1258,7 +1180,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       setSearch('')
       setPendingLink(null)
       setLinkCategory('')
-      await loadLinks()
+      await reload()
     }
   }
 
@@ -1275,11 +1197,11 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
     await Promise.all(tables.map(t => supabase.from(t).delete().eq('event_id', event.id).eq('supplier_id', supplierId)))
     const { error } = await supabase.from('event_suppliers').delete().eq('event_id', event.id).eq('supplier_id', supplierId)
     if (!error) {
-      setLinks(prev => prev.filter(l => l.supplier_id !== supplierId))
       if (toastTimer) clearTimeout(toastTimer)
       setToast({ supplierId, nome: sup?.nome ?? '' })
       const timer = setTimeout(() => setToast(null), 5000)
       setToastTimer(timer)
+      await reload()
     }
   }
 
@@ -1287,7 +1209,13 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
     if (toastTimer) clearTimeout(toastTimer)
     setToast(null)
     await supabase.from('event_suppliers').insert({ event_id: event.id, supplier_id: supplierId })
-    await loadLinks()
+    await reload()
+  }
+
+  async function saveContact(linkId: string) {
+    await supabase.from('event_suppliers').update(contactForm).eq('id', linkId)
+    setEditingContact(null)
+    await reload()
   }
 
   const linkedSuppliers = suppliers.filter(s => linkedIds.includes(s.id))
@@ -1296,16 +1224,55 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
     (search === '' || s.nome.toLowerCase().includes(search.toLowerCase()) || s.categoria.toLowerCase().includes(search.toLowerCase()))
   )
 
+  // Summary KPIs
+  const totalVenduto = summaries.reduce((s, x) => s + x.totals.venduto, 0)
+  const totalCosto = summaries.reduce((s, x) => s + x.totals.costo, 0)
+  const totalMargine = totalVenduto - totalCosto
+  const confermati = summaries.filter(s => s.link.stato_conferma !== 'richiesto').length
+  const withWarnings = summaries.filter(s => !s.hasServices || s.hasMissingCosts).length
+
+  const fmtE = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+
   if (loading) {
     return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</div></div>
   }
 
   return (
     <div className="space-y-4">
+      {/* Summary bar */}
+      {linkedSuppliers.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="panel p-3 text-center">
+            <p className="text-lg font-bold" style={{ color: 'var(--text)' }}>{linkedSuppliers.length}</p>
+            <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Fornitori</p>
+          </div>
+          <div className="panel p-3 text-center">
+            <p className="text-lg font-bold" style={{ color: 'var(--green)' }}>{confermati}/{linkedSuppliers.length}</p>
+            <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Confermati</p>
+          </div>
+          <div className="panel p-3 text-center">
+            <p className="text-lg font-bold" style={{ color: 'var(--text)' }}>{'\u20AC'}{fmtE(totalCosto)}</p>
+            <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Costi totali</p>
+          </div>
+          <div className="panel p-3 text-center">
+            <p className="text-lg font-bold" style={{ color: totalMargine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{fmtE(totalMargine)}</p>
+            <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Margine</p>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <p className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
-          Fornitori collegati ({linkedSuppliers.length})
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
+            Fornitori collegati ({linkedSuppliers.length})
+          </p>
+          {withWarnings > 0 && (
+            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,194,75,0.15)', color: 'var(--yellow)' }}>
+              <AlertTriangle className="w-3 h-3" /> {withWarnings} da completare
+            </span>
+          )}
+        </div>
         {!adding && (
           <button onClick={() => setAdding(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
@@ -1315,6 +1282,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
         )}
       </div>
 
+      {/* Search panel for linking */}
       {adding && (
         <div className="panel p-4 space-y-3" style={{ border: '1px solid rgba(208,0,58,0.2)' }}>
           <div className="flex items-center gap-2">
@@ -1349,6 +1317,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
         </div>
       )}
 
+      {/* Category selection modal */}
       {pendingLink && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPendingLink(null)}>
           <div className="panel p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
@@ -1379,6 +1348,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
         </div>
       )}
 
+      {/* Empty state */}
       {linkedSuppliers.length === 0 && !adding ? (
         <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <Truck className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -1388,56 +1358,132 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       ) : (
         <div className="space-y-3">
           {linkedSuppliers.map(sup => {
-            const link = links.find(l => l.supplier_id === sup.id)
+            const summary = summaries.find(s => s.supplierId === sup.id)
+            const link = summary?.link || links.find(l => l.supplier_id === sup.id)
             const catType = (link?.service_category as CategoryType) || detectSupplierCategory(sup.categoria)
-            const hasStoredCat = !!(link?.service_category)
             const isExpanded = expandedSupplier === sup.id
+            const stato = (link?.stato_conferma || 'richiesto') as keyof typeof STATO_CONFERMA_CONFIG
+            const statoConf = STATO_CONFERMA_CONFIG[stato]
+            const totals = summary?.totals || { venduto: 0, costo: 0, margine: 0, marginePct: 0, count: 0 }
+            const hasWarning = summary && (!summary.hasServices || summary.hasMissingCosts)
+            const isEditingContact = editingContact === sup.id
+
             return (
-              <div key={sup.id} className="panel overflow-hidden" style={{ border: '1px solid var(--line)' }}>
-                <div className="p-4 flex items-center gap-4">
-                  <button
-                    onClick={() => setExpandedSupplier(isExpanded ? null : sup.id)}
-                    className="p-1 rounded transition-transform"
-                    style={{ color: 'var(--muted)' }}>
-                    {isExpanded
-                      ? <ChevronDown className="w-4 h-4" />
-                      : <ChevronRight className="w-4 h-4" />}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{sup.nome}</p>
-                    <div className="flex items-center gap-3 mt-0.5">
-                      <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
-                        {sup.categoria}{sup.location ? ` · ${sup.location}` : ''}{sup.city ? ` · ${sup.city}` : ''}
-                      </p>
-                      <SupplierServiceBadge eventId={event.id} supplierId={sup.id} category={catType} />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <select value={catType}
-                      onChange={async (e) => {
-                        const newCat = e.target.value as CategoryType
-                        if (link) {
-                          await supabase.from('event_suppliers').update({ service_category: newCat }).eq('id', link.id)
-                          await loadLinks()
-                        }
-                      }}
-                      className="px-2 py-1.5 rounded-lg text-xs font-medium"
-                      style={{ background: 'var(--panel2)', border: `1px solid ${hasStoredCat ? 'var(--line)' : 'var(--yellow)'}`, color: 'var(--text)', maxWidth: '130px' }}>
-                      {LINK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                    </select>
+              <div key={sup.id} className="panel overflow-hidden" style={{ border: `1px solid ${hasWarning ? 'rgba(255,194,75,0.4)' : 'var(--line)'}` }}>
+                {/* Header row */}
+                <div className="p-4">
+                  <div className="flex items-start gap-3">
                     <button
                       onClick={() => setExpandedSupplier(isExpanded ? null : sup.id)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
-                      style={{ background: isExpanded ? 'rgba(208,0,58,0.15)' : 'rgba(208,0,58,0.08)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.25)' }}>
-                      <Plus className="w-3.5 h-3.5 inline mr-1" />
-                      Servizi
+                      className="p-1 rounded transition-transform mt-0.5"
+                      style={{ color: 'var(--muted)' }}>
+                      {isExpanded
+                        ? <ChevronDown className="w-4 h-4" />
+                        : <ChevronRight className="w-4 h-4" />}
                     </button>
-                    <button onClick={() => setConfirmUnlink(sup.id)}
-                      className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi fornitore dall'evento">
-                      <Trash2 className="w-4 h-4" style={{ color: 'var(--muted)' }} />
-                    </button>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{sup.nome}</p>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                          style={{ background: statoConf.bg, color: statoConf.color, border: `1px solid ${statoConf.border}` }}>
+                          {statoConf.label}
+                        </span>
+                        {hasWarning && !summary?.hasServices && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,194,75,0.15)', color: 'var(--yellow)' }}>
+                            Nessun servizio
+                          </span>
+                        )}
+                        {hasWarning && summary?.hasServices && summary?.hasMissingCosts && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,194,75,0.15)', color: 'var(--yellow)' }}>
+                            Costi mancanti
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+                        <span>{LINK_CATEGORIES.find(c => c.value === catType)?.label || sup.categoria}</span>
+                        {sup.location && <span>· {sup.location}</span>}
+                        {totals.count > 0 && (
+                          <>
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium" style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
+                              {totals.count} {totals.count === 1 ? 'servizio' : 'servizi'}
+                            </span>
+                            <span style={{ color: totals.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>
+                              {'\u20AC'}{fmtE(totals.costo)} costo · {'\u20AC'}{fmtE(totals.margine)} margine
+                            </span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Contact info row */}
+                      {link?.contatto_operativo && !isEditingContact && (
+                        <div className="flex items-center gap-2 mt-1.5 text-[11px]" style={{ color: 'var(--muted)' }}>
+                          <User className="w-3 h-3" />
+                          <span>{link.contatto_operativo}</span>
+                          {link.telefono_operativo && <span>· {link.telefono_operativo}</span>}
+                          {link.email_operativo && <span>· {link.email_operativo}</span>}
+                          <button onClick={() => { setEditingContact(sup.id); setContactForm({ contatto_operativo: link.contatto_operativo || '', telefono_operativo: link.telefono_operativo || '', email_operativo: link.email_operativo || '' }) }}
+                            className="p-0.5 rounded hover:bg-white/10">
+                            <Edit3 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <select value={stato}
+                        onChange={async (e) => {
+                          if (link) await updateLinkStatus(link.id, e.target.value as 'richiesto' | 'confermato' | 'contrattualizzato')
+                        }}
+                        className="px-2 py-1 rounded-lg text-[11px] font-medium cursor-pointer"
+                        style={{ background: statoConf.bg, border: `1px solid ${statoConf.border}`, color: statoConf.color }}>
+                        <option value="richiesto">Richiesto</option>
+                        <option value="confermato">Confermato</option>
+                        <option value="contrattualizzato">Contrattualizzato</option>
+                      </select>
+                      <button
+                        onClick={() => setExpandedSupplier(isExpanded ? null : sup.id)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
+                        style={{ background: isExpanded ? 'rgba(208,0,58,0.15)' : 'rgba(208,0,58,0.08)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.25)' }}>
+                        <Plus className="w-3.5 h-3.5 inline mr-1" />
+                        Servizi
+                      </button>
+                      <button onClick={() => setConfirmUnlink(sup.id)}
+                        className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi fornitore dall'evento">
+                        <Trash2 className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Inline contact edit */}
+                  {isEditingContact && link && (
+                    <div className="mt-3 pt-3 flex items-center gap-2 flex-wrap" style={{ borderTop: '1px solid var(--line)' }}>
+                      <input type="text" value={contactForm.contatto_operativo} onChange={e => setContactForm(p => ({ ...p, contatto_operativo: e.target.value }))}
+                        placeholder="Nome contatto" className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[120px]"
+                        style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      <input type="text" value={contactForm.telefono_operativo} onChange={e => setContactForm(p => ({ ...p, telefono_operativo: e.target.value }))}
+                        placeholder="Telefono" className="px-2 py-1.5 rounded-lg text-xs w-[120px]"
+                        style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      <input type="text" value={contactForm.email_operativo} onChange={e => setContactForm(p => ({ ...p, email_operativo: e.target.value }))}
+                        placeholder="Email" className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[140px]"
+                        style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                      <button onClick={() => saveContact(link.id)} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: 'var(--red2)' }}>Salva</button>
+                      <button onClick={() => setEditingContact(null)} className="px-2 py-1.5 rounded-lg text-xs" style={{ color: 'var(--muted)' }}>Annulla</button>
+                    </div>
+                  )}
+
+                  {/* Add contact button when empty */}
+                  {!link?.contatto_operativo && !isEditingContact && (
+                    <button onClick={() => { setEditingContact(sup.id); setContactForm({ contatto_operativo: '', telefono_operativo: '', email_operativo: '' }) }}
+                      className="mt-1.5 ml-7 text-[11px] flex items-center gap-1 hover:opacity-80"
+                      style={{ color: 'var(--muted)' }}>
+                      <User className="w-3 h-3" /> Aggiungi contatto operativo
+                    </button>
+                  )}
                 </div>
+
+                {/* Expanded services panel */}
                 {isExpanded && (
                   <div className="px-4 pb-4 pt-2" style={{ borderTop: '1px solid var(--line)', background: 'var(--bg)' }}>
                     <SupplierCategoryPanel event={event} supplierId={sup.id} category={catType} />
@@ -1452,6 +1498,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
       {/* Distance & Logistics Section */}
       <DistanceLogistics linkedSuppliers={linkedSuppliers} eventLocation={event.location} />
 
+      {/* Confirm unlink modal */}
       {confirmUnlink && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setConfirmUnlink(null)}>
           <div className="panel p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
@@ -1469,13 +1516,13 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
         </div>
       )}
 
+      {/* Undo toast */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-lg" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
           <p className="text-sm" style={{ color: 'var(--text)' }}>Fornitore rimosso dall'evento</p>
           <button onClick={() => handleUndoUnlink(toast.supplierId)} className="text-sm font-medium px-2 py-1 rounded-lg hover:opacity-80" style={{ color: 'var(--blue)' }}>Annulla</button>
         </div>
       )}
-
     </div>
   )
 }
