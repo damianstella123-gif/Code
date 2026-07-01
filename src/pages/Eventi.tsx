@@ -45,7 +45,7 @@ import type { Client } from '@/data/clients'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
-import { SupplierCategoryPanel, detectSupplierCategory, type CategoryType } from '@/components/TabOperativo'
+import { detectSupplierCategory, type CategoryType } from '@/components/TabOperativo'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import SupplierCostModal, { EventBudgetSummary } from '@/components/SupplierCostModal'
 import TabBudget from '@/components/TabBudget'
@@ -974,8 +974,6 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
-  const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null)
-  const [managingCategory, setManagingCategory] = useState<string | null>(null)
   const [confirmUnlink, setConfirmUnlink] = useState<string | null>(null)
   const [toast, setToast] = useState<{ supplierId: string; nome: string } | null>(null)
   const [toastTimer, setToastTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
@@ -1029,7 +1027,6 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
     const { error } = await supabase.from('event_suppliers').delete().eq('event_id', event.id).eq('supplier_id', supplierId)
     if (!error) {
       setLinks(prev => prev.filter(l => l.supplier_id !== supplierId))
-      if (managingCategory === supplierId) setManagingCategory(null)
       if (toastTimer) clearTimeout(toastTimer)
       setToast({ supplierId, nome: sup?.nome ?? '' })
       const timer = setTimeout(() => setToast(null), 5000)
@@ -1144,63 +1141,40 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
           {linkedSuppliers.map(sup => {
             const link = links.find(l => l.supplier_id === sup.id)
             const catType = (link?.service_category as CategoryType) || detectSupplierCategory(sup.categoria)
-            const isManaging = managingCategory === sup.id
             const hasStoredCat = !!(link?.service_category)
             return (
-              <AnimatedLaserBorder key={sup.id} active={isManaging}>
-              <div className="panel overflow-hidden" style={{ border: `1px solid ${isManaging ? 'var(--red2)' : 'var(--line)'}` }}>
-                <div className="p-4 sm:p-5 space-y-3 sm:space-y-0 sm:flex sm:items-start sm:justify-between sm:gap-4">
-                  <div className="flex items-start gap-3 cursor-pointer min-w-0" onClick={() => setViewingSupplier(sup)}>
-                    {sup.logoUrl ? (
-                      <img src={sup.logoUrl} alt={sup.nome} className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold text-sm"
-                        style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
-                        {sup.nome.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="font-semibold truncate" style={{ color: 'var(--text)' }}>{sup.nome}</p>
-                      <p className="text-sm truncate" style={{ color: 'var(--muted)' }}>{sup.categoria} · {sup.location}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:flex-shrink-0">
-                    <select value={catType}
-                      onChange={async (e) => {
-                        const newCat = e.target.value as CategoryType
-                        if (link) {
-                          await supabase.from('event_suppliers').update({ service_category: newCat }).eq('id', link.id)
-                          await loadLinks()
-                        }
-                      }}
-                      className="px-2 py-1.5 rounded-lg text-xs font-medium flex-1 sm:flex-none"
-                      style={{ background: 'var(--panel2)', border: `1px solid ${hasStoredCat ? 'var(--line)' : 'var(--yellow)'}`, color: 'var(--text)', maxWidth: '140px' }}>
-                      {LINK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                    </select>
-                    <button onClick={() => setManagingCategory(isManaging ? null : sup.id)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
-                      style={{ border: '1px solid var(--line)', color: isManaging ? 'var(--red2)' : 'var(--muted)' }}>
-                      <Zap className="w-3.5 h-3.5 inline mr-1" />
-                      Scheda
-                    </button>
-                    <button onClick={() => { if (link) setCostModal({ linkId: link.id, supplierName: sup.nome, category: catType }) }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10"
-                      style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>
-                      <Euro className="w-3.5 h-3.5 inline mr-1" />
-                      Costi
-                    </button>
-                    <button onClick={() => setConfirmUnlink(sup.id)}
-                      className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi fornitore dall'evento">
-                      <Trash2 className="w-4 h-4" style={{ color: 'var(--muted)' }} />
-                    </button>
-                  </div>
+              <div key={sup.id} className="panel p-4 flex items-center gap-4" style={{ border: '1px solid var(--line)' }}>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{sup.nome}</p>
+                  <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
+                    {sup.categoria}{sup.location ? ` · ${sup.location}` : ''}{sup.city ? ` · ${sup.city}` : ''}
+                  </p>
                 </div>
-
-                {isManaging && (
-                  <SupplierCategoryPanel event={event} supplierId={sup.id} category={catType} />
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <select value={catType}
+                    onChange={async (e) => {
+                      const newCat = e.target.value as CategoryType
+                      if (link) {
+                        await supabase.from('event_suppliers').update({ service_category: newCat }).eq('id', link.id)
+                        await loadLinks()
+                      }
+                    }}
+                    className="px-2 py-1.5 rounded-lg text-xs font-medium"
+                    style={{ background: 'var(--panel2)', border: `1px solid ${hasStoredCat ? 'var(--line)' : 'var(--yellow)'}`, color: 'var(--text)', maxWidth: '130px' }}>
+                    {LINK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                  <button onClick={() => { if (link) setCostModal({ linkId: link.id, supplierName: sup.nome, category: catType }) }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
+                    style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: '#fff' }}>
+                    <Euro className="w-3.5 h-3.5 inline mr-1" />
+                    Costi
+                  </button>
+                  <button onClick={() => setConfirmUnlink(sup.id)}
+                    className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi fornitore dall'evento">
+                    <Trash2 className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+                  </button>
+                </div>
               </div>
-              </AnimatedLaserBorder>
             )
           })}
         </div>
@@ -1208,10 +1182,6 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
 
       {/* Distance & Logistics Section */}
       <DistanceLogistics linkedSuppliers={linkedSuppliers} eventLocation={event.location} />
-
-      {viewingSupplier && (
-        <SupplierDetailModal supplier={viewingSupplier} onClose={() => setViewingSupplier(null)} />
-      )}
 
       {confirmUnlink && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setConfirmUnlink(null)}>
@@ -1339,99 +1309,6 @@ function DistanceLogistics({ linkedSuppliers, eventLocation }: { linkedSuppliers
           Aggiungi latitudine/longitudine nella scheda fornitore per includerli.
         </p>
       )}
-    </div>
-  )
-}
-
-function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}
-      onClick={onClose}>
-      <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl p-6"
-        style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}
-        onClick={e => e.stopPropagation()}>
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex items-center gap-4">
-            {supplier.logoUrl ? (
-              <img src={supplier.logoUrl} alt={supplier.nome} className="w-14 h-14 rounded-xl object-cover" />
-            ) : (
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg"
-                style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
-                {supplier.nome.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-              </div>
-            )}
-            <div>
-              <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{supplier.nome}</h2>
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>{supplier.categoria}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-lg transition-all hover:bg-white/5">
-            <X className="w-5 h-5" style={{ color: 'var(--muted)' }} />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <DetailField label="Email" value={supplier.email} />
-            <DetailField label="Telefono" value={supplier.telefono} />
-            <DetailField label="Referente" value={supplier.referente} />
-            <DetailField label="Tel. Referente" value={supplier.referenteTelefono} />
-            <DetailField label="Location" value={supplier.location} />
-            <DetailField label="Sito Web" value={supplier.sito} />
-            <DetailField label="P.IVA" value={supplier.piva} />
-            <DetailField label="Stato" value={supplier.stato === 'attivo' ? 'Attivo' : 'Inattivo'} />
-          </div>
-
-          {supplier.servizi.length > 0 && (
-            <div>
-              <p className="text-xs uppercase tracking-wide font-medium mb-2" style={{ color: 'var(--muted)' }}>Servizi</p>
-              <div className="flex flex-wrap gap-1.5">
-                {supplier.servizi.map(s => (
-                  <span key={s} className="text-xs px-2.5 py-1 rounded-lg"
-                    style={{ background: 'var(--panel2)', color: 'var(--text)' }}>{s}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-3 gap-3 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
-            <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>Rating</p>
-              <p className="text-lg font-bold mt-0.5" style={{ color: 'var(--yellow)' }}>{supplier.rating}/5</p>
-            </div>
-            <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>Contratto</p>
-              <p className="text-sm font-semibold mt-1" style={{
-                color: supplier.statoContratto === 'attivo' ? 'var(--green)' : supplier.statoContratto === 'in_scadenza' ? 'var(--yellow)' : 'var(--red2)'
-              }}>{supplier.statoContratto}</p>
-            </div>
-            <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>Costo medio</p>
-              <p className="text-sm font-semibold mt-1" style={{ color: 'var(--text)' }}>
-                {supplier.costoMedioPerEvento > 0 ? `€${supplier.costoMedioPerEvento.toLocaleString('it-IT')}` : 'N/D'}
-              </p>
-            </div>
-          </div>
-
-          {supplier.noteOperative && (
-            <div>
-              <p className="text-xs uppercase tracking-wide font-medium mb-2" style={{ color: 'var(--muted)' }}>Note operative</p>
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{supplier.noteOperative}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function DetailField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{label}</p>
-      <p className="text-sm mt-0.5" style={{ color: value ? 'var(--text)' : 'var(--muted)' }}>
-        {value || 'Non inserito'}
-      </p>
     </div>
   )
 }
