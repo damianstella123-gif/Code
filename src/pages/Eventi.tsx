@@ -25,7 +25,6 @@ import {
   Upload,
   Download,
   Eye,
-  Euro,
   Link2,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
@@ -42,9 +41,7 @@ import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { detectSupplierCategory, type CategoryType } from '@/components/TabOperativo'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
-import SupplierCostModal, { EventBudgetSummary } from '@/components/SupplierCostModal'
 import TabBudget from '@/components/TabBudget'
-import TabBudgetEvento from '@/components/TabBudgetEvento'
 import { setFlyContext } from '@/lib/fly'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
@@ -974,7 +971,6 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   const [toastTimer, setToastTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
   const [pendingLink, setPendingLink] = useState<string | null>(null)
   const [linkCategory, setLinkCategory] = useState<CategoryType | ''>('')
-  const [costModal, setCostModal] = useState<{ linkId: string; supplierName: string; category: string } | null>(null)
 
   async function loadLinks() {
     const { data } = await supabase
@@ -1158,12 +1154,6 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                     style={{ background: 'var(--panel2)', border: `1px solid ${hasStoredCat ? 'var(--line)' : 'var(--yellow)'}`, color: 'var(--text)', maxWidth: '130px' }}>
                     {LINK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </select>
-                  <button onClick={() => { if (link) setCostModal({ linkId: link.id, supplierName: sup.nome, category: catType }) }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
-                    style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: '#fff' }}>
-                    <Euro className="w-3.5 h-3.5 inline mr-1" />
-                    Costi
-                  </button>
                   <button onClick={() => setConfirmUnlink(sup.id)}
                     className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi fornitore dall'evento">
                     <Trash2 className="w-4 h-4" style={{ color: 'var(--muted)' }} />
@@ -1202,23 +1192,6 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
         </div>
       )}
 
-      {costModal && (
-        <SupplierCostModal
-          eventName={event.nome}
-          linkId={costModal.linkId}
-          supplierName={costModal.supplierName}
-          category={costModal.category}
-          onClose={() => setCostModal(null)}
-        />
-      )}
-
-      {/* Budget Summary - all supplier costs */}
-      {linkedSuppliers.length > 0 && (
-        <div className="mt-6">
-          <h3 className="text-sm font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Budget Fornitori Evento</h3>
-          <EventBudgetSummary eventId={event.id} eventName={event.nome} suppliers={linkedSuppliers.map(s => ({ id: s.id, nome: s.nome, categoria: s.categoria }))} />
-        </div>
-      )}
     </div>
   )
 }
@@ -2232,36 +2205,7 @@ function TabTimeline({ event }: { event: Event }) {
 
 
 function BudgetTabContainer({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
-  const [view, setView] = useState<'fornitori' | 'servizi'>('fornitori')
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <button onClick={() => setView('fornitori')}
-          className="px-4 py-2 rounded-lg text-xs font-medium transition-all"
-          style={{
-            background: view === 'fornitori' ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'var(--panel)',
-            color: view === 'fornitori' ? '#fff' : 'var(--muted)',
-            border: view === 'fornitori' ? 'none' : '1px solid var(--line)',
-          }}>
-          Budget Fornitori
-        </button>
-        <button onClick={() => setView('servizi')}
-          className="px-4 py-2 rounded-lg text-xs font-medium transition-all"
-          style={{
-            background: view === 'servizi' ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'var(--panel)',
-            color: view === 'servizi' ? '#fff' : 'var(--muted)',
-            border: view === 'servizi' ? 'none' : '1px solid var(--line)',
-          }}>
-          Budget Servizi (Legacy)
-        </button>
-      </div>
-      {view === 'fornitori' ? (
-        <TabBudgetEvento event={event} suppliers={suppliers} />
-      ) : (
-        <TabBudget event={event} suppliers={suppliers} />
-      )}
-    </div>
-  )
+  return <TabBudget event={event} suppliers={suppliers} />
 }
 
 
