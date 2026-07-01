@@ -585,22 +585,70 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
   const [country, setCountry] = useState(supplier?.country ?? 'Italia')
   const [detailsJson, setDetailsJson] = useState(supplier?.details ? JSON.stringify(supplier.details, null, 2) : '')
   const [detailsError, setDetailsError] = useState<string | null>(null)
+  const [showAdvancedJson, setShowAdvancedJson] = useState(false)
+
+  // Hotel-specific fields (read from existing details)
+  const det = supplier?.details
+  const [hotelCitta, setHotelCitta] = useState(det?.citta ?? '')
+  const [hotelCatena, setHotelCatena] = useState(det?.catena ?? '')
+  const [hotelNumeroCamere, setHotelNumeroCamere] = useState<number | ''>(det?.numero_camere ?? '')
+  const [hotelNumeroSaleMeeting, setHotelNumeroSaleMeeting] = useState<number | ''>(det?.numero_sale_meeting ?? '')
+  const [hotelParcheggio, setHotelParcheggio] = useState<boolean>(det?.parcheggio ?? false)
+  const [hotelRistoranteInterno, setHotelRistoranteInterno] = useState<boolean>(det?.ristorante_interno ?? false)
+  const [hotelStelle, setHotelStelle] = useState<number | ''>(det?.stelle ?? '')
+  const [hotelCapienzaSalaMassima, setHotelCapienzaSalaMassima] = useState<number | ''>(det?.capienza_sala_massima ?? '')
+  const [hotelCapienzaTotaleMeeting, setHotelCapienzaTotaleMeeting] = useState<number | ''>(det?.capienza_totale_meeting ?? '')
+
+  const isHotel = matchesCategory(categoria, 'Hotel')
+
+  function buildDetails(): SupplierDetails | undefined {
+    if (isHotel) {
+      // Merge hotel fields into existing details
+      let base: Record<string, unknown> = {}
+      if (detailsJson.trim()) {
+        try {
+          base = JSON.parse(detailsJson)
+        } catch {
+          // fallback: use supplier's existing details
+          base = supplier?.details ? { ...supplier.details } : {}
+        }
+      } else if (supplier?.details) {
+        base = { ...supplier.details }
+      }
+      // Overlay hotel-specific fields
+      base.citta = hotelCitta || undefined
+      base.catena = hotelCatena || undefined
+      base.numero_camere = hotelNumeroCamere !== '' ? Number(hotelNumeroCamere) : undefined
+      base.numero_sale_meeting = hotelNumeroSaleMeeting !== '' ? Number(hotelNumeroSaleMeeting) : undefined
+      base.parcheggio = hotelParcheggio
+      base.ristorante_interno = hotelRistoranteInterno
+      base.stelle = hotelStelle !== '' ? Number(hotelStelle) : undefined
+      base.capienza_sala_massima = hotelCapienzaSalaMassima !== '' ? Number(hotelCapienzaSalaMassima) : undefined
+      base.capienza_totale_meeting = hotelCapienzaTotaleMeeting !== '' ? Number(hotelCapienzaTotaleMeeting) : undefined
+      // Remove undefined keys
+      for (const k of Object.keys(base)) {
+        if (base[k] === undefined) delete base[k]
+      }
+      return base as SupplierDetails
+    }
+    // Non-hotel: parse JSON as before
+    if (detailsJson.trim()) {
+      try {
+        return JSON.parse(detailsJson)
+      } catch {
+        setDetailsError('JSON non valido')
+        return null as any
+      }
+    }
+    return supplier?.details
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!nome.trim()) return
-    let parsedDetails: SupplierDetails | undefined = supplier?.details
-    if (detailsJson.trim()) {
-      try {
-        parsedDetails = JSON.parse(detailsJson)
-        setDetailsError(null)
-      } catch {
-        setDetailsError('JSON non valido')
-        return
-      }
-    } else {
-      parsedDetails = undefined
-    }
+    setDetailsError(null)
+    const parsedDetails = buildDetails()
+    if (parsedDetails === null) return // JSON error for non-hotel
     const updated: Supplier = {
       id: supplier?.id ?? `sup_${Date.now()}`,
       nome: nome.trim(), email: email.trim(), telefono: telefono.trim(),
@@ -620,6 +668,9 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
     onSave(updated)
   }
 
+  const inputCls = "w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+  const inputStyle = { background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
       <div className="w-full sm:max-w-2xl max-h-[100vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 safe-bottom"
@@ -637,14 +688,12 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Nome *</label>
               <input type="text" value={nome} onChange={e => setNome(e.target.value)} required
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className={inputCls} style={inputStyle} />
             </div>
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Categoria</label>
               <select value={categoria} onChange={e => setCategoria(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                className={inputCls} style={inputStyle}>
                 <option value="">-- Seleziona --</option>
                 {SUPPLIER_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -654,94 +703,81 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Email</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className={inputCls} style={inputStyle} />
             </div>
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Telefono</label>
               <input type="text" value={telefono} onChange={e => setTelefono(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className={inputCls} style={inputStyle} />
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Referente</label>
               <input type="text" value={referente} onChange={e => setReferente(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className={inputCls} style={inputStyle} />
             </div>
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Tel. referente</label>
               <input type="text" value={referenteTelefono} onChange={e => setReferenteTelefono(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className={inputCls} style={inputStyle} />
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Citta</label>
               <input type="text" value={city} onChange={e => setCity(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className={inputCls} style={inputStyle} />
             </div>
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Provincia</label>
               <input type="text" value={province} onChange={e => setProvince(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className={inputCls} style={inputStyle} />
             </div>
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Regione</label>
               <input type="text" value={region} onChange={e => setRegion(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className={inputCls} style={inputStyle} />
             </div>
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Paese</label>
               <input type="text" value={country} onChange={e => setCountry(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className={inputCls} style={inputStyle} />
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Location (legacy)</label>
               <input type="text" value={location} onChange={e => setLocation(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className={inputCls} style={inputStyle} />
             </div>
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Sito web</label>
               <input type="text" value={sito} onChange={e => setSito(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className={inputCls} style={inputStyle} />
             </div>
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>P.IVA</label>
               <input type="text" value={piva} onChange={e => setPiva(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className={inputCls} style={inputStyle} />
             </div>
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Servizi (separati da virgola)</label>
             <input type="text" value={servizi} onChange={e => setServizi(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              className={inputCls} style={inputStyle}
               placeholder="Es. Impianti audio, Video proiezione" />
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Note operative</label>
             <textarea value={noteOperative} onChange={e => setNoteOperative(e.target.value)} rows={3}
               className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
-              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+              style={inputStyle} />
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Stato</label>
             <select value={stato} onChange={e => setStato(e.target.value as 'attivo' | 'inattivo')}
-              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+              className={inputCls} style={inputStyle}>
               <option value="attivo">Attivo</option>
               <option value="inattivo">Inattivo</option>
             </select>
@@ -749,8 +785,7 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Stato Contratto</label>
             <select value={statoContratto} onChange={e => setStatoContratto(e.target.value as StatoContratto)}
-              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+              className={inputCls} style={inputStyle}>
               <option value="attivo">Attivo</option>
               <option value="in_scadenza">In scadenza</option>
               <option value="scaduto">Scaduto</option>
@@ -758,15 +793,97 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
               <option value="sospeso">Sospeso</option>
             </select>
           </div>
+
+          {/* Hotel-specific fields */}
+          {isHotel && (
+            <div className="rounded-xl p-4 space-y-4" style={{ background: 'rgba(208,0,58,0.03)', border: '1px solid rgba(208,0,58,0.12)' }}>
+              <p className="text-xs font-bold uppercase tracking-wide flex items-center gap-2" style={{ color: 'var(--red2)' }}>
+                <Hotel className="w-4 h-4" /> Dati Hotel
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Citta (hotel)</label>
+                  <input type="text" value={hotelCitta} onChange={e => setHotelCitta(e.target.value)}
+                    className={inputCls} style={inputStyle} placeholder="Roma" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Catena</label>
+                  <input type="text" value={hotelCatena} onChange={e => setHotelCatena(e.target.value)}
+                    className={inputCls} style={inputStyle} placeholder="NH Hotels" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Stelle</label>
+                  <select value={hotelStelle} onChange={e => setHotelStelle(e.target.value ? Number(e.target.value) : '')}
+                    className={inputCls} style={inputStyle}>
+                    <option value="">--</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Numero camere</label>
+                  <input type="number" min={0} value={hotelNumeroCamere} onChange={e => setHotelNumeroCamere(e.target.value ? Number(e.target.value) : '')}
+                    className={inputCls} style={inputStyle} placeholder="200" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Numero sale meeting</label>
+                  <input type="number" min={0} value={hotelNumeroSaleMeeting} onChange={e => setHotelNumeroSaleMeeting(e.target.value ? Number(e.target.value) : '')}
+                    className={inputCls} style={inputStyle} placeholder="6" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Capienza sala massima</label>
+                  <input type="number" min={0} value={hotelCapienzaSalaMassima} onChange={e => setHotelCapienzaSalaMassima(e.target.value ? Number(e.target.value) : '')}
+                    className={inputCls} style={inputStyle} placeholder="300" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Capienza totale meeting</label>
+                  <input type="number" min={0} value={hotelCapienzaTotaleMeeting} onChange={e => setHotelCapienzaTotaleMeeting(e.target.value ? Number(e.target.value) : '')}
+                    className={inputCls} style={inputStyle} placeholder="800" />
+                </div>
+                <div className="flex items-center gap-3 pt-5">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked={hotelParcheggio} onChange={e => setHotelParcheggio(e.target.checked)} className="sr-only peer" />
+                    <div className="w-9 h-5 rounded-full peer-checked:bg-[var(--red2)] transition-colors" style={{ background: hotelParcheggio ? undefined : 'var(--panel2)' }} />
+                    <div className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform peer-checked:translate-x-4" />
+                  </label>
+                  <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>Parcheggio</span>
+                </div>
+                <div className="flex items-center gap-3 pt-5">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked={hotelRistoranteInterno} onChange={e => setHotelRistoranteInterno(e.target.checked)} className="sr-only peer" />
+                    <div className="w-9 h-5 rounded-full peer-checked:bg-[var(--red2)] transition-colors" style={{ background: hotelRistoranteInterno ? undefined : 'var(--panel2)' }} />
+                    <div className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform peer-checked:translate-x-4" />
+                  </label>
+                  <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>Ristorante interno</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Advanced JSON section (collapsible) */}
           <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>
-              Details (JSON) {detailsError && <span style={{ color: 'var(--red2)' }}> - {detailsError}</span>}
-            </label>
-            <textarea value={detailsJson} onChange={e => { setDetailsJson(e.target.value); setDetailsError(null) }} rows={5}
-              className="w-full px-4 py-3 rounded-xl text-xs font-mono focus:outline-none resize-none"
-              style={{ background: 'var(--panel)', border: `1px solid ${detailsError ? 'var(--red2)' : 'var(--line)'}`, color: 'var(--text)' }}
-              placeholder='{"catena": "NH Hotels", "stelle": 4, "numero_camere": 200}' />
+            <button type="button" onClick={() => setShowAdvancedJson(!showAdvancedJson)}
+              className="text-xs font-medium flex items-center gap-1.5 mb-2 transition-all hover:opacity-80"
+              style={{ color: 'var(--muted)' }}>
+              <ChevronRight className={`w-3 h-3 transition-transform ${showAdvancedJson ? 'rotate-90' : ''}`} />
+              Dettagli avanzati (JSON)
+              {detailsError && <span style={{ color: 'var(--red2)' }}> - {detailsError}</span>}
+            </button>
+            {showAdvancedJson && (
+              <textarea value={detailsJson} onChange={e => { setDetailsJson(e.target.value); setDetailsError(null) }} rows={5}
+                className="w-full px-4 py-3 rounded-xl text-xs font-mono focus:outline-none resize-none"
+                style={{ background: 'var(--panel)', border: `1px solid ${detailsError ? 'var(--red2)' : 'var(--line)'}`, color: 'var(--text)' }}
+                placeholder='{"catena": "NH Hotels", "stelle": 4, "numero_camere": 200}' />
+            )}
           </div>
+
           <div className="flex gap-3 pt-4" style={{ borderTop: '1px solid var(--line)' }}>
             <button type="submit" className="btn-primary flex-1 py-3 rounded-xl text-sm font-semibold">
               {supplier ? 'Salva Modifiche' : 'Crea Fornitore'}
