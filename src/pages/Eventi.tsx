@@ -8,6 +8,7 @@ import {
   Truck,
   Clock,
   ChevronRight,
+  ChevronDown,
   Search,
   X,
   ArrowLeft,
@@ -39,7 +40,7 @@ import type { Client } from '@/data/clients'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
-import { detectSupplierCategory, type CategoryType } from '@/components/TabOperativo'
+import { detectSupplierCategory, SupplierCategoryPanel, type CategoryType } from '@/components/TabOperativo'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import TabBudget from '@/components/TabBudget'
 import { setFlyContext } from '@/lib/fly'
@@ -966,6 +967,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
+  const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null)
   const [confirmUnlink, setConfirmUnlink] = useState<string | null>(null)
   const [toast, setToast] = useState<{ supplierId: string; nome: string } | null>(null)
   const [toastTimer, setToastTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
@@ -1133,32 +1135,55 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
             const link = links.find(l => l.supplier_id === sup.id)
             const catType = (link?.service_category as CategoryType) || detectSupplierCategory(sup.categoria)
             const hasStoredCat = !!(link?.service_category)
+            const isExpanded = expandedSupplier === sup.id
             return (
-              <div key={sup.id} className="panel p-4 flex items-center gap-4" style={{ border: '1px solid var(--line)' }}>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{sup.nome}</p>
-                  <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
-                    {sup.categoria}{sup.location ? ` · ${sup.location}` : ''}{sup.city ? ` · ${sup.city}` : ''}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <select value={catType}
-                    onChange={async (e) => {
-                      const newCat = e.target.value as CategoryType
-                      if (link) {
-                        await supabase.from('event_suppliers').update({ service_category: newCat }).eq('id', link.id)
-                        await loadLinks()
-                      }
-                    }}
-                    className="px-2 py-1.5 rounded-lg text-xs font-medium"
-                    style={{ background: 'var(--panel2)', border: `1px solid ${hasStoredCat ? 'var(--line)' : 'var(--yellow)'}`, color: 'var(--text)', maxWidth: '130px' }}>
-                    {LINK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                  </select>
-                  <button onClick={() => setConfirmUnlink(sup.id)}
-                    className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi fornitore dall'evento">
-                    <Trash2 className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+              <div key={sup.id} className="panel overflow-hidden" style={{ border: '1px solid var(--line)' }}>
+                <div className="p-4 flex items-center gap-4">
+                  <button
+                    onClick={() => setExpandedSupplier(isExpanded ? null : sup.id)}
+                    className="p-1 rounded transition-transform"
+                    style={{ color: 'var(--muted)' }}>
+                    {isExpanded
+                      ? <ChevronDown className="w-4 h-4" />
+                      : <ChevronRight className="w-4 h-4" />}
                   </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{sup.nome}</p>
+                    <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
+                      {sup.categoria}{sup.location ? ` · ${sup.location}` : ''}{sup.city ? ` · ${sup.city}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <select value={catType}
+                      onChange={async (e) => {
+                        const newCat = e.target.value as CategoryType
+                        if (link) {
+                          await supabase.from('event_suppliers').update({ service_category: newCat }).eq('id', link.id)
+                          await loadLinks()
+                        }
+                      }}
+                      className="px-2 py-1.5 rounded-lg text-xs font-medium"
+                      style={{ background: 'var(--panel2)', border: `1px solid ${hasStoredCat ? 'var(--line)' : 'var(--yellow)'}`, color: 'var(--text)', maxWidth: '130px' }}>
+                      {LINK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                    <button
+                      onClick={() => setExpandedSupplier(isExpanded ? null : sup.id)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
+                      style={{ background: isExpanded ? 'rgba(208,0,58,0.15)' : 'rgba(208,0,58,0.08)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.25)' }}>
+                      <Plus className="w-3.5 h-3.5 inline mr-1" />
+                      Servizi
+                    </button>
+                    <button onClick={() => setConfirmUnlink(sup.id)}
+                      className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi fornitore dall'evento">
+                      <Trash2 className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+                    </button>
+                  </div>
                 </div>
+                {isExpanded && (
+                  <div className="px-4 pb-4 pt-2" style={{ borderTop: '1px solid var(--line)', background: 'var(--bg)' }}>
+                    <SupplierCategoryPanel event={event} supplierId={sup.id} category={catType} />
+                  </div>
+                )}
               </div>
             )
           })}
@@ -1596,11 +1621,6 @@ interface ManualProgramRow {
   servizio: string
 }
 
-interface SupplierBudgetItems {
-  supplier_id: string
-  items: { voce: string; categoria_sezione: string }[]
-}
-
 const PROGRAM_CATEGORIES = [
   'Hotel', 'Meeting', 'F&B', 'Ristorante', 'Catering', 'Transfer',
   'Experience', 'Audio Video', 'Allestimenti', 'Staff', 'Grafica/Stampa', 'Varie', 'Altro',
@@ -1612,7 +1632,6 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [supplierBudgets, setSupplierBudgets] = useState<SupplierBudgetItems[]>([])
 
   const [formData, setFormData] = useState({
     supplier_id: '',
@@ -1645,25 +1664,13 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
   }
 
   async function loadAll() {
-    const [autoRes, manualRes, budgetRes] = await Promise.all([
+    const [autoRes, manualRes] = await Promise.all([
       loadAutoEntries(),
       supabase.from('event_program').select('*').eq('event_id', event.id),
-      supabase.from('event_suppliers').select('supplier_id, budget_items').eq('event_id', event.id),
     ])
 
     setAutoEntries(autoRes)
     setManualEntries((manualRes.data ?? []) as ManualProgramRow[])
-
-    const budgets: SupplierBudgetItems[] = []
-    for (const row of (budgetRes.data ?? []) as { supplier_id: string; budget_items: unknown }[]) {
-      if (Array.isArray(row.budget_items) && row.budget_items.length > 0) {
-        budgets.push({
-          supplier_id: row.supplier_id,
-          items: row.budget_items.map((bi: any) => ({ voce: bi.voce || '', categoria_sezione: bi.categoria_sezione || '' })),
-        })
-      }
-    }
-    setSupplierBudgets(budgets)
     setLoading(false)
   }
 
@@ -1862,8 +1869,6 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
     await loadAll()
   }
 
-  const selectedSupplierBudget = supplierBudgets.find(b => b.supplier_id === formData.supplier_id)
-
   if (loading) {
     return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento programma...</div></div>
   }
@@ -1915,18 +1920,13 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
 
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Servizio collegato</label>
-              <select
+              <input
                 value={formData.servizio}
                 onChange={e => setFormData(prev => ({ ...prev, servizio: e.target.value }))}
                 className="w-full px-3 py-2 rounded-lg text-sm"
                 style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
-                disabled={!selectedSupplierBudget}
-              >
-                <option value="">-- Nessun servizio --</option>
-                {selectedSupplierBudget?.items.map((item, i) => (
-                  <option key={i} value={item.voce}>{item.voce}{item.categoria_sezione ? ` [${item.categoria_sezione}]` : ''}</option>
-                ))}
-              </select>
+                placeholder="es. Coffee break, Allestimento palco..."
+              />
             </div>
 
             <div>
