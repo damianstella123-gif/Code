@@ -962,6 +962,70 @@ const LINK_CATEGORIES: { value: CategoryType; label: string }[] = [
   { value: 'varie', label: 'Varie' },
 ]
 
+function SupplierServiceBadge({ eventId, supplierId, category }: { eventId: string; supplierId: string; category: CategoryType }) {
+  const [count, setCount] = useState(0)
+  const [totals, setTotals] = useState({ venduto: 0, costo: 0 })
+
+  useEffect(() => {
+    const TABLES: Record<CategoryType, string> = {
+      hotel: 'event_hotel_details', transfer: 'event_supplier_services',
+      ristorante: 'event_restaurant_details', experience: 'event_experience_details',
+      catering: 'event_catering_details', audio_video: 'event_audio_video_details',
+      allestimenti: 'event_allestimenti_details', staff_interno: 'event_staff_interno_details',
+      staff_esterno: 'event_staff_esterno_details', grafica_stampa: 'event_grafica_stampa_details',
+      varie: 'event_varie_details',
+    }
+    const table = TABLES[category]
+    if (!table) return
+
+    let query = supabase.from(table).select('*').eq('event_id', eventId).eq('supplier_id', supplierId)
+    if (category === 'transfer') query = query.eq('categoria', 'transfer')
+
+    query.then(({ data }) => {
+      if (!data) return
+      setCount(data.length)
+      let venduto = 0, costo = 0
+      for (const row of data as Record<string, unknown>[]) {
+        if (category === 'ristorante') {
+          const pax = (row.pax_confermati as number) ?? (row.pax_previsti as number) ?? 1
+          venduto += (row.budget_totale as number) ?? ((row.budget_per_persona as number) ? (row.budget_per_persona as number) * pax : 0)
+          costo += (row.costo_totale_reale as number) ?? ((row.costo_per_persona as number) ? (row.costo_per_persona as number) * pax : 0)
+        } else if (category === 'catering') {
+          const pax = (row.pax as number) ?? 1
+          venduto += (row.venduto_totale as number) ?? ((row.venduto_per_persona as number) ? (row.venduto_per_persona as number) * pax : 0)
+          costo += (row.costo_totale as number) ?? ((row.costo_per_persona as number) ? (row.costo_per_persona as number) * pax : 0)
+        } else if (category === 'staff_interno') {
+          venduto += (row.venduto_totale as number) ?? 0
+          costo += (row.costo_totale as number) ?? (row.costo_giornaliero as number) ?? 0
+        } else {
+          const qty = (row.quantita as number) ?? (row.pax as number) ?? 1
+          venduto += (row.venduto_totale as number) ?? ((row.venduto_unitario as number) ? (row.venduto_unitario as number) * qty : 0)
+          costo += (row.costo_totale as number) ?? ((row.costo_unitario as number) ? (row.costo_unitario as number) * qty : 0)
+        }
+      }
+      setTotals({ venduto, costo })
+    })
+  }, [eventId, supplierId, category])
+
+  if (count === 0) return null
+
+  const margine = totals.venduto - totals.costo
+  const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+
+  return (
+    <div className="flex items-center gap-3 text-[11px]">
+      <span className="px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
+        {count} {count === 1 ? 'servizio' : 'servizi'}
+      </span>
+      {(totals.venduto > 0 || totals.costo > 0) && (
+        <span style={{ color: margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>
+          {'\u20AC'}{fmt(margine)}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const [links, setLinks] = useState<EventSupplierLink[]>([])
   const [loading, setLoading] = useState(true)
@@ -1149,9 +1213,12 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{sup.nome}</p>
-                    <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
-                      {sup.categoria}{sup.location ? ` · ${sup.location}` : ''}{sup.city ? ` · ${sup.city}` : ''}
-                    </p>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
+                        {sup.categoria}{sup.location ? ` · ${sup.location}` : ''}{sup.city ? ` · ${sup.city}` : ''}
+                      </p>
+                      <SupplierServiceBadge eventId={event.id} supplierId={sup.id} category={catType} />
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <select value={catType}
