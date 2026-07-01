@@ -49,6 +49,7 @@ import { SupplierCategoryPanel, detectSupplierCategory, type CategoryType } from
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import SupplierCostModal, { EventBudgetSummary } from '@/components/SupplierCostModal'
 import TabBudget from '@/components/TabBudget'
+import TabBudgetEvento from '@/components/TabBudgetEvento'
 import { setFlyContext } from '@/lib/fly'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
@@ -2424,6 +2425,39 @@ function TabPresentazioni({ event }: { event: Event }) {
   )
 }
 
+function BudgetTabContainer({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
+  const [view, setView] = useState<'fornitori' | 'servizi'>('fornitori')
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <button onClick={() => setView('fornitori')}
+          className="px-4 py-2 rounded-lg text-xs font-medium transition-all"
+          style={{
+            background: view === 'fornitori' ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'var(--panel)',
+            color: view === 'fornitori' ? '#fff' : 'var(--muted)',
+            border: view === 'fornitori' ? 'none' : '1px solid var(--line)',
+          }}>
+          Budget Fornitori
+        </button>
+        <button onClick={() => setView('servizi')}
+          className="px-4 py-2 rounded-lg text-xs font-medium transition-all"
+          style={{
+            background: view === 'servizi' ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'var(--panel)',
+            color: view === 'servizi' ? '#fff' : 'var(--muted)',
+            border: view === 'servizi' ? 'none' : '1px solid var(--line)',
+          }}>
+          Budget Servizi (Legacy)
+        </button>
+      </div>
+      {view === 'fornitori' ? (
+        <TabBudgetEvento event={event} suppliers={suppliers} />
+      ) : (
+        <TabBudget event={event} suppliers={suppliers} />
+      )}
+    </div>
+  )
+}
+
 function TabPacchetto({ event }: { event: Event }) {
   const [packages, setPackages] = useState<ClientPackage[]>([])
   const [loading, setLoading] = useState(true)
@@ -2797,7 +2831,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         {activeTab === 'task' && <TabTask event={event} />}
         {activeTab === 'team' && <TabTeam event={event} internalUsers={internalUsers} />}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} />}
-        {activeTab === 'budget' && <TabBudget event={event} suppliers={suppliers} />}
+        {activeTab === 'budget' && <BudgetTabContainer event={event} suppliers={suppliers} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} />}
         {activeTab === 'programma' && <TabProgramma event={event} suppliers={suppliers} />}

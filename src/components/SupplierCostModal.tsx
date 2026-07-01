@@ -7,14 +7,32 @@ export interface BudgetItem {
   voce: string
   descrizione: string
   area: string
+  categoria_sezione: string
   quantita: number
+  pax: number
   costo_unitario: number
   venduto_unitario: number
   iva_percentuale: number
+  commissione_percentuale: number
   totale_costo: number
   totale_venduto: number
   margine: number
+  note: string
 }
+
+export const SEZIONI_BUDGET = [
+  'Pernottamento',
+  'Meeting',
+  'F&B',
+  'Audio Video',
+  'Transfer',
+  'Allestimenti',
+  'Staff',
+  'Grafica',
+  'Altro',
+] as const
+
+export type SezioneBudget = typeof SEZIONI_BUDGET[number]
 
 interface SupplierCostModalProps {
   eventName: string
@@ -73,18 +91,22 @@ function needsAreaField(voce: string, category: string): boolean {
   return lower.includes('area riservata') || lower.includes('esclusiva')
 }
 
-function emptyItem(voce = ''): BudgetItem {
+function emptyItem(voce = '', sezione = ''): BudgetItem {
   return {
     voce,
     descrizione: '',
     area: '',
+    categoria_sezione: sezione,
     quantita: 0,
+    pax: 0,
     costo_unitario: 0,
     venduto_unitario: 0,
     iva_percentuale: 22,
+    commissione_percentuale: 0,
     totale_costo: 0,
     totale_venduto: 0,
     margine: 0,
+    note: '',
   }
 }
 
@@ -117,8 +139,9 @@ export default function SupplierCostModal({ eventName, linkId, supplierName, cat
   }
 
   function recalc(item: BudgetItem): BudgetItem {
-    const totale_costo = item.quantita * item.costo_unitario
-    const totale_venduto = item.quantita * item.venduto_unitario
+    const multiplier = item.quantita * (item.pax > 0 ? item.pax : 1)
+    const totale_costo = multiplier * item.costo_unitario
+    const totale_venduto = multiplier * item.venduto_unitario
     return { ...item, totale_costo, totale_venduto, margine: totale_venduto - totale_costo }
   }
 
@@ -126,7 +149,7 @@ export default function SupplierCostModal({ eventName, linkId, supplierName, cat
     setItems(prev => {
       const updated = [...prev]
       const item = { ...updated[idx] }
-      if (field === 'quantita' || field === 'costo_unitario' || field === 'venduto_unitario' || field === 'iva_percentuale') {
+      if (field === 'quantita' || field === 'pax' || field === 'costo_unitario' || field === 'venduto_unitario' || field === 'iva_percentuale' || field === 'commissione_percentuale') {
         (item as any)[field] = parseNum(value as string)
       } else {
         (item as any)[field] = value
@@ -140,9 +163,25 @@ export default function SupplierCostModal({ eventName, linkId, supplierName, cat
     setItems(prev => prev.filter((_, i) => i !== idx))
   }
 
+  const defaultSezione = useMemo(() => {
+    const map: Record<string, string> = {
+      hotel: 'Pernottamento',
+      ristorante: 'F&B',
+      catering: 'F&B',
+      audio_video: 'Audio Video',
+      experience: 'Altro',
+      transfer: 'Transfer',
+      allestimenti: 'Allestimenti',
+      staff_interno: 'Staff',
+      staff_esterno: 'Staff',
+      grafica_stampa: 'Grafica',
+    }
+    return map[category] || 'Altro'
+  }, [category])
+
   function addVoce(voce: string) {
     if (!voce.trim()) return
-    setItems(prev => [...prev, emptyItem(voce.trim())])
+    setItems(prev => [...prev, emptyItem(voce.trim(), defaultSezione)])
     setCustomVoce('')
   }
 
@@ -172,34 +211,38 @@ export default function SupplierCostModal({ eventName, linkId, supplierName, cat
   function exportExcel() {
     const rows = items.map(it => ({
       'Fornitore': supplierName,
-      'Categoria': category,
+      'Sezione': it.categoria_sezione,
       'Voce': it.voce,
       'Descrizione': it.descrizione,
-      'Area': it.area,
-      'Quantità': it.quantita,
+      'Qtà/Notti': it.quantita,
+      'Pax': it.pax,
       'Costo Unitario': it.costo_unitario,
-      'Venduto Unitario': it.venduto_unitario,
-      'IVA %': it.iva_percentuale,
       'Totale Costo': it.totale_costo,
+      'Venduto Unitario': it.venduto_unitario,
       'Totale Venduto': it.totale_venduto,
       'Margine': it.margine,
+      'IVA %': it.iva_percentuale,
+      'Comm. %': it.commissione_percentuale,
+      'Note': it.note,
     }))
     rows.push({
       'Fornitore': '',
-      'Categoria': '',
+      'Sezione': '',
       'Voce': 'TOTALE',
       'Descrizione': '',
-      'Area': '',
-      'Quantità': 0,
+      'Qtà/Notti': 0,
+      'Pax': 0,
       'Costo Unitario': 0,
-      'Venduto Unitario': 0,
-      'IVA %': 0,
       'Totale Costo': totals.costo,
+      'Venduto Unitario': 0,
       'Totale Venduto': totals.venduto,
       'Margine': totals.margine,
+      'IVA %': 0,
+      'Comm. %': 0,
+      'Note': '',
     })
     const ws = XLSX.utils.json_to_sheet(rows)
-    const colWidths = [20, 14, 24, 24, 10, 10, 14, 14, 8, 14, 14, 12]
+    const colWidths = [20, 14, 24, 24, 10, 8, 14, 14, 14, 14, 12, 8, 8, 20]
     ws['!cols'] = colWidths.map(w => ({ wch: w }))
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Costi Fornitore')
@@ -282,6 +325,15 @@ export default function SupplierCostModal({ eventName, linkId, supplierName, cat
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div>
+                          <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Sezione</label>
+                          <select value={item.categoria_sezione} onChange={e => updateItem(idx, 'categoria_sezione', e.target.value)}
+                            className="w-full px-2.5 py-2 rounded-lg text-xs"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                            <option value="">--</option>
+                            {SEZIONI_BUDGET.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                        <div>
                           <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Descrizione</label>
                           <input type="text" value={item.descrizione} onChange={e => updateItem(idx, 'descrizione', e.target.value)}
                             className="w-full px-2.5 py-2 rounded-lg text-xs"
@@ -299,20 +351,20 @@ export default function SupplierCostModal({ eventName, linkId, supplierName, cat
                           </div>
                         )}
                         <div>
-                          <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Quantità</label>
+                          <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Qtà / Notti</label>
                           <input type="text" inputMode="decimal" value={item.quantita || ''} onChange={e => updateItem(idx, 'quantita', e.target.value)}
                             className="w-full px-2.5 py-2 rounded-lg text-xs"
                             style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
                         </div>
                         <div>
-                          <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>IVA %</label>
-                          <input type="text" inputMode="decimal" value={item.iva_percentuale || ''} onChange={e => updateItem(idx, 'iva_percentuale', e.target.value)}
+                          <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Pax</label>
+                          <input type="text" inputMode="decimal" value={item.pax || ''} onChange={e => updateItem(idx, 'pax', e.target.value)}
                             className="w-full px-2.5 py-2 rounded-lg text-xs"
                             style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div>
                           <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Costo unitario</label>
                           <input type="text" inputMode="decimal" value={item.costo_unitario || ''} onChange={e => updateItem(idx, 'costo_unitario', e.target.value)}
@@ -325,9 +377,30 @@ export default function SupplierCostModal({ eventName, linkId, supplierName, cat
                             className="w-full px-2.5 py-2 rounded-lg text-xs"
                             style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
                         </div>
-                        <div className="col-span-2 sm:col-span-1">
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>IVA %</label>
+                          <input type="text" inputMode="decimal" value={item.iva_percentuale || ''} onChange={e => updateItem(idx, 'iva_percentuale', e.target.value)}
+                            className="w-full px-2.5 py-2 rounded-lg text-xs"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Comm. %</label>
+                          <input type="text" inputMode="decimal" value={item.commissione_percentuale || ''} onChange={e => updateItem(idx, 'commissione_percentuale', e.target.value)}
+                            className="w-full px-2.5 py-2 rounded-lg text-xs"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Note</label>
+                          <input type="text" value={item.note || ''} onChange={e => updateItem(idx, 'note', e.target.value)}
+                            className="w-full px-2.5 py-2 rounded-lg text-xs"
+                            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                        </div>
+                        <div>
                           <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Totali</label>
-                          <div className="flex items-center gap-2 text-xs py-2">
+                          <div className="flex items-center gap-3 text-xs py-2">
                             <span style={{ color: 'var(--red2)' }}>C: {fmt(item.totale_costo)}</span>
                             <span style={{ color: 'var(--green)' }}>V: {fmt(item.totale_venduto)}</span>
                             <span style={{ color: item.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>
@@ -448,28 +521,31 @@ export function EventBudgetSummary({ eventId, eventName, suppliers }: BudgetSumm
       for (const it of group.items) {
         rows.push({
           'Fornitore': group.supplier,
-          'Categoria': group.categoria,
+          'Sezione': it.categoria_sezione || group.categoria,
           'Voce': it.voce,
           'Descrizione': it.descrizione,
-          'Area': it.area,
-          'Quantità': it.quantita,
+          'Qtà/Notti': it.quantita,
+          'Pax': it.pax || 0,
           'Costo Unitario': it.costo_unitario,
-          'Venduto Unitario': it.venduto_unitario,
-          'IVA %': it.iva_percentuale,
           'Totale Costo': it.totale_costo,
+          'Venduto Unitario': it.venduto_unitario,
           'Totale Venduto': it.totale_venduto,
           'Margine': it.margine,
+          'IVA %': it.iva_percentuale,
+          'Comm. %': it.commissione_percentuale || 0,
+          'Note': it.note || '',
         })
       }
     }
     if (rows.length === 0) return
     rows.push({
-      'Fornitore': '', 'Categoria': '', 'Voce': 'TOTALE', 'Descrizione': '', 'Area': '',
-      'Quantità': '', 'Costo Unitario': '', 'Venduto Unitario': '', 'IVA %': '',
-      'Totale Costo': totals.costo, 'Totale Venduto': totals.venduto, 'Margine': totals.margine,
+      'Fornitore': '', 'Sezione': '', 'Voce': 'TOTALE', 'Descrizione': '',
+      'Qtà/Notti': '', 'Pax': '', 'Costo Unitario': '', 'Totale Costo': totals.costo,
+      'Venduto Unitario': '', 'Totale Venduto': totals.venduto, 'Margine': totals.margine,
+      'IVA %': '', 'Comm. %': '', 'Note': '',
     })
     const ws = XLSX.utils.json_to_sheet(rows)
-    ws['!cols'] = [20, 14, 24, 24, 10, 10, 14, 14, 8, 14, 14, 12].map(w => ({ wch: w }))
+    ws['!cols'] = [20, 14, 24, 24, 10, 8, 14, 14, 14, 14, 12, 8, 8, 20].map(w => ({ wch: w }))
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Budget Fornitori Evento')
     XLSX.writeFile(wb, `Budget_Fornitori_${eventName.replace(/\s+/g, '_')}.xlsx`)
@@ -552,9 +628,11 @@ export function EventBudgetSummary({ eventId, eventName, suppliers }: BudgetSumm
                   <tr style={{ background: 'var(--panel2)' }}>
                     <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--muted)' }}>Voce</th>
                     <th className="px-3 py-2 text-right font-medium" style={{ color: 'var(--muted)' }}>Qtà</th>
+                    <th className="px-3 py-2 text-right font-medium" style={{ color: 'var(--muted)' }}>Pax</th>
                     <th className="px-3 py-2 text-right font-medium" style={{ color: 'var(--muted)' }}>Costo U.</th>
                     <th className="px-3 py-2 text-right font-medium" style={{ color: 'var(--muted)' }}>Venduto U.</th>
                     <th className="px-3 py-2 text-right font-medium" style={{ color: 'var(--muted)' }}>IVA</th>
+                    <th className="px-3 py-2 text-right font-medium" style={{ color: 'var(--muted)' }}>Comm.</th>
                     <th className="px-3 py-2 text-right font-medium" style={{ color: 'var(--muted)' }}>Tot. Costo</th>
                     <th className="px-3 py-2 text-right font-medium" style={{ color: 'var(--muted)' }}>Tot. Venduto</th>
                     <th className="px-3 py-2 text-right font-medium" style={{ color: 'var(--muted)' }}>Margine</th>
@@ -565,9 +643,11 @@ export function EventBudgetSummary({ eventId, eventName, suppliers }: BudgetSumm
                     <tr key={ii} style={{ borderTop: '1px solid var(--line)' }}>
                       <td className="px-3 py-2" style={{ color: 'var(--text)' }}>{it.voce}{it.area ? ` (${it.area})` : ''}</td>
                       <td className="px-3 py-2 text-right" style={{ color: 'var(--text)' }}>{it.quantita}</td>
+                      <td className="px-3 py-2 text-right" style={{ color: 'var(--text)' }}>{it.pax || '-'}</td>
                       <td className="px-3 py-2 text-right" style={{ color: 'var(--text)' }}>{fmt(it.costo_unitario)} &euro;</td>
                       <td className="px-3 py-2 text-right" style={{ color: 'var(--text)' }}>{fmt(it.venduto_unitario)} &euro;</td>
                       <td className="px-3 py-2 text-right" style={{ color: 'var(--muted)' }}>{it.iva_percentuale}%</td>
+                      <td className="px-3 py-2 text-right" style={{ color: 'var(--muted)' }}>{it.commissione_percentuale || 0}%</td>
                       <td className="px-3 py-2 text-right font-medium" style={{ color: 'var(--red2)' }}>{fmt(it.totale_costo)} &euro;</td>
                       <td className="px-3 py-2 text-right font-medium" style={{ color: 'var(--green)' }}>{fmt(it.totale_venduto)} &euro;</td>
                       <td className="px-3 py-2 text-right font-medium" style={{ color: it.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmt(it.margine)} &euro;</td>
