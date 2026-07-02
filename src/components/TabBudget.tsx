@@ -62,6 +62,7 @@ interface BudgetLine {
   aliquota_iva_costo: string
   iva_inclusa_costo: boolean
   commissione_pct: number | null
+  commissione_importo: number | null
   margine: number
   marginePct: number
   stato_conferma: StatoConferma
@@ -150,6 +151,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       costo: number
       sotto?: string
       commissione_pct?: number | null
+      commissione_importo?: number | null
     }) {
       const margine = opts.venduto - opts.costo
       const marginePct = opts.venduto > 0 ? (margine / opts.venduto) * 100 : 0
@@ -169,6 +171,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         aliquota_iva_costo: (row.aliquota_iva_costo as string) || '22',
         iva_inclusa_costo: (row.iva_inclusa_costo as boolean) ?? false,
         commissione_pct: opts.commissione_pct ?? null,
+        commissione_importo: opts.commissione_importo ?? null,
         margine,
         marginePct,
         stato_conferma: resolveStato(row.supplier_id as string),
@@ -188,14 +191,41 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
     // HOTEL
     for (const h of (hotelRes.data ?? []) as Record<string, unknown>[]) {
-      const qty = (h.quantita as number) ?? 1
-      const venduto = (h.venduto_totale as number) ?? ((h.venduto_unitario as number) ? (h.venduto_unitario as number) * qty : 0)
-      const costo = (h.costo_totale as number) ?? ((h.costo_unitario as number) ? (h.costo_unitario as number) * qty : 0)
-      if (!venduto && !costo) continue
-      pushLine(h, resolveCat(h.supplier_id as string, 'HOTEL'), 'event_hotel_details', {
-        descrizione: (h.titolo as string) || (h.tipo as string) || 'Hotel', qty, venduto, costo,
-        commissione_pct: (h.commissione_pct as number) ?? null,
-      })
+      const tipo = (h.tipo as string) || ''
+      const paymentMode = (h.payment_mode as string) || ''
+      const roomType = (h.room_type as string) || ''
+      const roomsClient = (h.rooms_client_count as number) || 0
+      const roomsSimmetria = (h.rooms_simmetria_count as number) || 0
+      const roomRateClient = (h.room_rate_client as number) || 0
+      const roomCostSimmetria = (h.room_cost_simmetria as number) || 0
+
+      if (tipo === 'pernottamento' && paymentMode) {
+        const totalRoomsQty = roomsClient + roomsSimmetria || 1
+        const venduto = (h.venduto_totale as number) || (roomsClient * roomRateClient)
+        const costo = (h.costo_totale as number) || (roomsSimmetria * roomCostSimmetria)
+
+        const descParts: string[] = []
+        if (roomType) descParts.push(roomType)
+        if (roomsClient > 0) descParts.push(`${roomsClient} cam. cliente`)
+        if (roomsSimmetria > 0) descParts.push(`${roomsSimmetria} cam. Simmetria`)
+        const descrizione = descParts.length > 0 ? descParts.join(' - ') : (h.titolo as string) || 'Pernottamento'
+
+        if (!venduto && !costo) continue
+        pushLine(h, resolveCat(h.supplier_id as string, 'HOTEL'), 'event_hotel_details', {
+          descrizione, qty: totalRoomsQty, venduto, costo,
+          commissione_pct: (h.commissione_pct as number) ?? null,
+          commissione_importo: (h.commissione_importo as number) ?? null,
+        })
+      } else {
+        const qty = (h.quantita as number) ?? 1
+        const venduto = (h.venduto_totale as number) ?? ((h.venduto_unitario as number) ? (h.venduto_unitario as number) * qty : 0)
+        const costo = (h.costo_totale as number) ?? ((h.costo_unitario as number) ? (h.costo_unitario as number) * qty : 0)
+        if (!venduto && !costo) continue
+        pushLine(h, resolveCat(h.supplier_id as string, 'HOTEL'), 'event_hotel_details', {
+          descrizione: (h.titolo as string) || (h.tipo as string) || 'Hotel', qty, venduto, costo,
+          commissione_pct: (h.commissione_pct as number) ?? null,
+        })
+      }
     }
 
     // RISTORANTE
@@ -313,6 +343,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     const costo = lines.reduce((s, l) => s + l.costo, 0)
     const fee = venduto * feePct / 100
     const commissioni = lines.reduce((s, l) => {
+      if (l.commissione_importo) return s + l.commissione_importo
       if (l.commissione_pct && l.costo > 0) return s + (l.costo * l.commissione_pct / 100)
       return s
     }, 0)

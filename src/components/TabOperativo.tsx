@@ -50,6 +50,8 @@ const HOTEL_SERVIZI: { key: string; label: string; group: 'alloggio' | 'meeting'
 ]
 const HOTEL_KEY_TO_LABEL: Record<string, string> = Object.fromEntries(HOTEL_SERVIZI.map(s => [s.key, s.label]))
 
+const ROOM_TYPES = ['DUS', 'Double', 'Twin', 'Triple', 'Suite', 'Junior Suite', 'Altro']
+
 export function getIvaRate(aliquota: string): number {
   const n = parseFloat(aliquota)
   return isNaN(n) ? 0 : n / 100
@@ -117,7 +119,7 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
       aliquota_iva_costo: '22', iva_inclusa_costo: false,
     }
     if (category === 'hotel') {
-      Object.assign(base, { sotto_categoria: 'pernottamento', titolo: '', data: '', ora_inizio: '', ora_fine: '', check_in_date: '', check_in_time: '', check_out_date: '', check_out_time: '', quantita: '1', pax: '', room_type: '', luogo: '', meeting_pax: '', meeting_setup: '', meeting_equipment: '', natural_light_preference: false, note: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10' })
+      Object.assign(base, { sotto_categoria: 'pernottamento', titolo: '', data: '', ora_inizio: '', ora_fine: '', check_in_date: '', check_in_time: '', check_out_date: '', check_out_time: '', quantita: '1', pax: '', room_type: '', luogo: '', meeting_pax: '', meeting_setup: '', meeting_equipment: '', natural_light_preference: false, note: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10', payment_mode: 'cliente', rooms_client_count: '', rooms_simmetria_count: '', rooms_total_count: '', room_rate_client: '', room_cost_simmetria: '', commissione_attiva: false, commissione_percentuale: '', commissione_base: '', commissione_importo: '', commissione_note: '' })
     } else if (category === 'transfer') {
       Object.assign(base, { titolo: '', data: '', ora_inizio: '', ora_fine: '', partenza: '', destinazione: '', quantita: '1', luogo: '', note: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else if (category === 'ristorante') {
@@ -174,6 +176,35 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
       const pax = numOrNull('pax')
       const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
       const multiplier = pax ?? qty
+
+      const paymentMode = strOrNull('payment_mode') || 'cliente'
+      const roomsClient = numOrNull('rooms_client_count') ?? 0
+      const roomsSimmetria = numOrNull('rooms_simmetria_count') ?? 0
+      const roomsTotal = roomsClient + roomsSimmetria
+      const roomRateClient = numOrNull('room_rate_client')
+      const roomCostSimmetria = numOrNull('room_cost_simmetria')
+      const commissioneAttiva = !!form.commissione_attiva
+      const commissionePerc = numOrNull('commissione_percentuale')
+      const commissioneBase = numOrNull('commissione_base') ?? (roomRateClient && roomsClient ? roomsClient * roomRateClient : null)
+      const commissioneImporto = commissioneAttiva && commissioneBase && commissionePerc
+        ? commissioneBase * commissionePerc / 100
+        : null
+
+      let computedCostoTotale = numOrNull('costo_totale')
+      let computedVendutoTotale = numOrNull('venduto_totale')
+
+      if (sotto === 'pernottamento' && paymentMode) {
+        if (!computedCostoTotale && roomCostSimmetria && roomsSimmetria) {
+          computedCostoTotale = roomCostSimmetria * roomsSimmetria
+        }
+        if (!computedVendutoTotale && roomRateClient && roomsClient) {
+          computedVendutoTotale = roomRateClient * roomsClient
+        }
+      }
+
+      if (!computedVendutoTotale) computedVendutoTotale = vu ? vu * multiplier : null
+      if (!computedCostoTotale) computedCostoTotale = cu ? cu * multiplier : null
+
       Object.assign(record, {
         tipo: sotto,
         sotto_categoria: sotto,
@@ -185,7 +216,7 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
         check_in_time: strOrNull('check_in_time'),
         check_out_date: strOrNull('check_out_date'),
         check_out_time: strOrNull('check_out_time'),
-        quantita: qty,
+        quantita: sotto === 'pernottamento' ? (roomsTotal || qty) : qty,
         pax,
         room_type: strOrEmpty('room_type'),
         luogo: strOrEmpty('luogo'),
@@ -201,9 +232,21 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
         note: strOrEmpty('note'),
         note_operative: strOrEmpty('note_operative'),
         venduto_unitario: vu,
-        venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * multiplier : null),
+        venduto_totale: computedVendutoTotale,
         costo_unitario: cu,
-        costo_totale: numOrNull('costo_totale') ?? (cu ? cu * multiplier : null),
+        costo_totale: computedCostoTotale,
+        payment_mode: sotto === 'pernottamento' ? paymentMode : null,
+        rooms_client_count: sotto === 'pernottamento' ? roomsClient : null,
+        rooms_simmetria_count: sotto === 'pernottamento' ? roomsSimmetria : null,
+        rooms_total_count: sotto === 'pernottamento' ? roomsTotal : null,
+        room_rate_client: sotto === 'pernottamento' ? roomRateClient : null,
+        room_cost_simmetria: sotto === 'pernottamento' ? roomCostSimmetria : null,
+        commissione_attiva: sotto === 'pernottamento' ? commissioneAttiva : false,
+        commissione_percentuale: sotto === 'pernottamento' ? commissionePerc : null,
+        commissione_base: sotto === 'pernottamento' ? commissioneBase : null,
+        commissione_importo: sotto === 'pernottamento' ? commissioneImporto : null,
+        commissione_note: sotto === 'pernottamento' ? (strOrNull('commissione_note') || null) : null,
+        commissione_pct: sotto === 'pernottamento' && commissioneAttiva ? commissionePerc : null,
       })
     } else if (category === 'transfer') {
       const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
@@ -992,14 +1035,85 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
       const econLabel = sotto === 'pernottamento' ? 'camera' : (group === 'fb' ? 'pax' : 'unita')
 
       const renderHotelFields = () => {
-        if (sotto === 'pernottamento') return (
-          <>
-            {inp('check_in_date', 'Check-in data', 'date')}{inp('check_in_time', 'Check-in ora', 'time')}
-            {inp('check_out_date', 'Check-out data', 'date')}{inp('check_out_time', 'Check-out ora', 'time')}
-            {inp('quantita', 'N. Camere', 'number')}{inp('room_type', 'Tipologia camere')}
-            <div className="sm:col-span-3">{inp('note', 'Note camere / Rooming list')}</div>
-          </>
-        )
+        if (sotto === 'pernottamento') {
+          const payMode = String(form.payment_mode || 'cliente')
+          return (
+            <>
+              {inp('check_in_date', 'Check-in data', 'date')}{inp('check_in_time', 'Check-in ora', 'time')}
+              {inp('check_out_date', 'Check-out data', 'date')}{inp('check_out_time', 'Check-out ora', 'time')}
+              {/* Room type dropdown */}
+              <div>
+                <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Tipologia camera</label>
+                <select value={String(form.room_type || '')} onChange={e => upd('room_type', e.target.value)} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+                  <option value="">-- Seleziona --</option>
+                  {ROOM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              {/* Payment mode */}
+              <div className="sm:col-span-3">
+                <label className="text-[10px] uppercase tracking-wide block mb-1.5" style={{ color: 'var(--muted)' }}>Modalita pagamento</label>
+                <div className="flex gap-2">
+                  {[{k:'cliente',l:'Cliente'},{k:'simmetria',l:'Simmetria'},{k:'misto',l:'Misto'}].map(o => (
+                    <button key={o.k} type="button"
+                      onClick={() => {
+                        upd('payment_mode', o.k)
+                        if (o.k === 'cliente') upd('rooms_simmetria_count', '')
+                        if (o.k === 'simmetria') upd('rooms_client_count', '')
+                      }}
+                      className="px-4 py-2 rounded-lg text-xs font-medium transition-all"
+                      style={{
+                        background: payMode === o.k ? 'var(--red)' : 'var(--panel2)',
+                        color: payMode === o.k ? '#fff' : 'var(--text)',
+                        border: `1px solid ${payMode === o.k ? 'var(--red)' : 'var(--line)'}`,
+                      }}>{o.l}</button>
+                  ))}
+                </div>
+              </div>
+              {/* Room counts based on payment mode */}
+              {(payMode === 'cliente' || payMode === 'misto') && (
+                <>
+                  {inp('rooms_client_count', 'N. Camere cliente', 'number')}
+                  {inp('room_rate_client', 'Tariffa/camera cliente', 'number')}
+                </>
+              )}
+              {(payMode === 'simmetria' || payMode === 'misto') && (
+                <>
+                  {inp('rooms_simmetria_count', 'N. Camere Simmetria', 'number')}
+                  {inp('room_cost_simmetria', 'Costo/camera Simmetria', 'number')}
+                </>
+              )}
+              {/* Commission section */}
+              {(payMode === 'cliente' || payMode === 'misto') && (
+                <div className="sm:col-span-3" style={{ borderTop: '1px solid var(--line)', paddingTop: '10px', marginTop: '4px' }}>
+                  <div className="flex items-center gap-3 mb-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={!!form.commissione_attiva} onChange={e => upd('commissione_attiva', e.target.checked)} className="w-4 h-4 rounded" />
+                      <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>Commissione attiva</span>
+                    </label>
+                  </div>
+                  {!!form.commissione_attiva && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {inp('commissione_percentuale', 'Commissione %', 'number')}
+                      {inp('commissione_base', 'Base calcolo', 'number')}
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Importo commissione</label>
+                        <div className="px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--green)', border: '1px solid var(--line)' }}>
+                          {(() => {
+                            const base = Number(form.commissione_base) || (Number(form.rooms_client_count) * Number(form.room_rate_client)) || 0
+                            const pct = Number(form.commissione_percentuale) || 0
+                            return base && pct ? `€ ${(base * pct / 100).toFixed(2)}` : '—'
+                          })()}
+                        </div>
+                      </div>
+                      {inp('commissione_note', 'Note commissione')}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="sm:col-span-3">{inp('note', 'Note camere / Rooming list')}</div>
+            </>
+          )
+        }
         if (group === 'meeting') return (
           <>
             {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}

@@ -196,15 +196,9 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-7 relative">
-      {/* Ambient radial gradient accent */}
-      <div className="absolute top-0 right-0 w-[500px] h-[400px] pointer-events-none opacity-30"
-        style={{ background: 'radial-gradient(ellipse at top right, rgba(211,28,48,0.08) 0%, transparent 60%)' }} />
-      <div className="absolute bottom-0 left-0 w-[400px] h-[300px] pointer-events-none opacity-20"
-        style={{ background: 'radial-gradient(ellipse at bottom left, rgba(77,180,255,0.06) 0%, transparent 60%)' }} />
-
+    <div className="space-y-7">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3 relative">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-medium" style={{ color: 'var(--muted)', letterSpacing: '0.01em' }}>
             {today.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
