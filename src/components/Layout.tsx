@@ -84,7 +84,6 @@ function Sidebar({ open, setOpen }: SidebarProps) {
           'fixed inset-y-0 left-0 z-50 w-64 sidebar transform transition-transform duration-300 ease-in-out lg:translate-x-0 flex flex-col',
           open ? 'translate-x-0' : '-translate-x-full'
         )}
-        style={{ background: 'linear-gradient(180deg, var(--panel) 0%, var(--bg) 100%)' }}
       >
         {/* Logo */}
         <div className="flex items-center justify-between px-5 py-5 border-b" style={{ borderColor: 'var(--line)' }}>
@@ -113,7 +112,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                 key={item.href}
                 to={item.href}
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 relative"
+                className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-200 relative"
 style={{
   background: isActive
     ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)'
@@ -141,9 +140,9 @@ style={{
         {/* User section */}
         <div className="p-4 border-t" style={{ borderColor: 'var(--line)' }}>
           {user ? (
-            <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+            <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: 'var(--glass-bg)', backdropFilter: 'blur(12px)', border: '1px solid var(--glass-border)' }}>
               <div
-                className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-sm font-bold text-white"
+                className="w-10 h-10 rounded-2xl flex-shrink-0 flex items-center justify-center text-sm font-bold text-white"
                 style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
               >
                 {(user.first_name || '').charAt(0)}{(user.last_name || '').charAt(0)}
@@ -165,7 +164,7 @@ style={{
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+            <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: 'var(--glass-bg)', backdropFilter: 'blur(12px)', border: '1px solid var(--glass-border)' }}>
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(208, 0, 58, 0.15)' }}
@@ -349,8 +348,8 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
             </button>
             {notifOpen && (
               <div
-                className="absolute right-0 top-full mt-2 w-[calc(100vw-32px)] sm:w-80 rounded-xl overflow-hidden animate-fade-in"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', boxShadow: '0 20px 60px rgba(35,39,42,0.12)' }}
+                className="absolute right-0 top-full mt-2 w-[calc(100vw-32px)] sm:w-80 rounded-3xl overflow-hidden animate-fade-in"
+                style={{ background: 'var(--glass-bg-strong)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid var(--glass-border)', boxShadow: '0 20px 60px rgba(211,28,48,0.08)' }}
               >
                 <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>
                   <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Notifiche</p>
@@ -427,17 +426,19 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
 
               {userMenuOpen && (
                 <div
-                  className="absolute right-0 top-full mt-2 w-64 rounded-xl overflow-hidden animate-fade-in"
+                  className="absolute right-0 top-full mt-2 w-64 rounded-3xl overflow-hidden animate-fade-in"
                   style={{
-                    background: 'var(--panel)',
-                    border: '1px solid var(--line)',
-                    boxShadow: '0 20px 60px rgba(35,39,42,0.12)',
+                    background: 'var(--glass-bg-strong)',
+                    backdropFilter: 'blur(24px)',
+                    WebkitBackdropFilter: 'blur(24px)',
+                    border: '1px solid var(--glass-border)',
+                    boxShadow: '0 20px 60px rgba(211,28,48,0.08)',
                   }}
                 >
-                  <div className="p-4 border-b" style={{ borderColor: 'var(--line)' }}>
+                  <div className="p-4 border-b" style={{ borderColor: 'var(--glass-border)' }}>
                     <div className="flex items-center gap-3">
                       <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold text-white"
+                        className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold text-white"
                         style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
                       >
                         {(user.first_name || '').charAt(0)}{(user.last_name || '').charAt(0)}
@@ -488,8 +489,8 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
       </div>
       {notifToast && (
         <div
-          className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-4 py-2 rounded-lg text-sm animate-fade-in z-50"
-          style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--muted)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}
+          className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-4 py-2 rounded-2xl text-sm animate-fade-in z-50"
+          style={{ background: 'var(--glass-bg-strong)', backdropFilter: 'blur(16px)', border: '1px solid var(--glass-border)', color: 'var(--muted)', boxShadow: '0 8px 24px rgba(211,28,48,0.08)' }}
         >
           {notifToast}
         </div>
