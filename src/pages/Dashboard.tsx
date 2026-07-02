@@ -31,18 +31,18 @@ function KpiCard({ label, value, sub, icon: Icon, color, onClick, delay = 0 }: {
 }) {
   return (
     <div className="panel p-5 hover-card cursor-pointer animate-fade-in flex flex-col justify-between gap-3"
-      style={{ animationDelay: `${delay}ms` }}
+      style={{ animationDelay: `${delay}ms`, borderRadius: '20px' }}
       onClick={onClick}>
       <div className="flex items-start justify-between">
-        <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{label}</p>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: `${color}15` }}>
+        <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)', letterSpacing: '0.06em' }}>{label}</p>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
+          style={{ background: `${color}12`, boxShadow: `0 4px 12px ${color}10` }}>
           <Icon className="w-[18px] h-[18px]" style={{ color }} />
         </div>
       </div>
       <div>
-        <p className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>{value}</p>
-        {sub && <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{sub}</p>}
+        <p className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}>{value}</p>
+        {sub && <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>{sub}</p>}
       </div>
     </div>
   )
@@ -53,18 +53,18 @@ function Section({ title, icon: Icon, color = 'var(--red2)', action, onAction, c
   children: React.ReactNode; delay?: number
 }) {
   return (
-    <div className="panel p-5 animate-fade-in" style={{ animationDelay: `${delay}ms` }}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ background: `${color}15` }}>
-            <Icon className="w-3.5 h-3.5" style={{ color }} />
+    <div className="panel p-6 animate-fade-in" style={{ animationDelay: `${delay}ms`, borderRadius: '22px' }}>
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{ background: `${color}10`, boxShadow: `0 2px 8px ${color}08` }}>
+            <Icon className="w-4 h-4" style={{ color }} />
           </div>
-          <h2 className="text-base font-semibold" style={{ color: 'var(--text)' }}>{title}</h2>
+          <h2 className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>{title}</h2>
         </div>
         {action && (
           <button onClick={onAction}
-            className="flex items-center gap-1 text-xs transition-all hover:opacity-80"
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 hover:bg-white/10"
             style={{ color: 'var(--muted)' }}>
             {action} <ArrowRight className="w-3 h-3" />
           </button>
@@ -195,25 +195,25 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-medium" style={{ color: 'var(--muted)' }}>
+          <p className="text-sm font-medium" style={{ color: 'var(--muted)', letterSpacing: '0.01em' }}>
             {today.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
-          <h1 className="text-3xl font-bold mt-1" style={{ color: 'var(--text)' }}>
+          <h1 className="text-3xl font-bold mt-1.5" style={{ color: 'var(--text)', letterSpacing: '-0.025em' }}>
             {getGreeting()}, {currentUser?.first_name ?? currentUser?.nome?.split(' ')[0] ?? 'utente'}
           </h1>
         </div>
-        <span className="text-xs px-3 py-1.5 rounded-lg font-medium"
-          style={{ background: 'rgba(208,0,58,0.08)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.15)' }}>
+        <span className="text-xs px-3.5 py-1.5 rounded-xl font-semibold"
+          style={{ background: 'rgba(208,0,58,0.06)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.10)' }}>
           {currentUser?.role ?? ruolo}
         </span>
       </div>
 
       {/* KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <KpiCard label="Task Aperti" value={kpi.taskAperti} sub={`su ${myTasks.length} totali`}
           icon={CheckSquare} color="var(--blue)" delay={0} onClick={() => navigate('/task')} />
         <KpiCard label="Completati" value={kpi.taskCompletati} sub={`${kpi.completionRate}% completamento`}
@@ -229,28 +229,28 @@ export default function Dashboard() {
       </div>
 
       {/* Diagnostic counters */}
-      <div className="panel p-4 animate-fade-in" style={{ border: '1px solid var(--line)' }}>
-        <div className="flex items-center gap-2 mb-3">
+      <div className="panel p-5 animate-fade-in" style={{ border: '1px solid var(--line)', borderRadius: '18px' }}>
+        <div className="flex items-center gap-2.5 mb-4">
           <Database className="w-4 h-4" style={{ color: 'var(--blue)' }} />
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Diagnostica Supabase</h3>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+          <div className="p-3.5 rounded-xl" style={{ background: 'var(--panel2)' }}>
             <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Suppliers caricati</p>
             <p className="text-xl font-bold" style={{ color: liveSuppliers.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveSuppliers.length}</p>
             {diagErrors.suppliers && <p className="text-[10px] mt-1" style={{ color: 'var(--red2)' }}>{diagErrors.suppliers}</p>}
           </div>
-          <div className="p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+          <div className="p-3.5 rounded-xl" style={{ background: 'var(--panel2)' }}>
             <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Events caricati</p>
             <p className="text-xl font-bold" style={{ color: liveEvents.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveEvents.length}</p>
             {diagErrors.events && <p className="text-[10px] mt-1" style={{ color: 'var(--red2)' }}>{diagErrors.events}</p>}
           </div>
-          <div className="p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+          <div className="p-3.5 rounded-xl" style={{ background: 'var(--panel2)' }}>
             <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Clients caricati</p>
             <p className="text-xl font-bold" style={{ color: liveClients.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveClients.length}</p>
             {diagErrors.clients && <p className="text-[10px] mt-1" style={{ color: 'var(--red2)' }}>{diagErrors.clients}</p>}
           </div>
-          <div className="p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+          <div className="p-3.5 rounded-xl" style={{ background: 'var(--panel2)' }}>
             <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>CRM (Referenti)</p>
             <p className="text-xl font-bold" style={{ color: recentReferenti.length > 0 ? 'var(--green)' : 'var(--muted)' }}>{recentReferenti.length}</p>
           </div>
@@ -258,9 +258,9 @@ export default function Dashboard() {
       </div>
 
       {/* Main grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: 2 cols */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="lg:col-span-2 space-y-6">
 
           {/* Eventi imminenti */}
           <Section title="Eventi imminenti" icon={Calendar} action="Tutti gli eventi" onAction={() => navigate('/eventi')} delay={60}>
@@ -396,10 +396,10 @@ export default function Dashboard() {
         </div>
 
         {/* Right sidebar */}
-        <div className="space-y-5">
+        <div className="space-y-6">
 
           {/* Task progress ring */}
-          <div className="panel p-5 animate-fade-in" style={{ animationDelay: '80ms' }}>
+          <div className="panel p-6 animate-fade-in" style={{ animationDelay: '80ms', borderRadius: '22px' }}>
             <div className="flex items-center gap-2.5 mb-4">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.12)' }}>
                 <BarChart3 className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />

@@ -85,20 +85,20 @@ function Sidebar({ open, setOpen }: SidebarProps) {
           open ? 'translate-x-0' : '-translate-x-full'
         )}
         style={{
-          background: 'rgba(255, 255, 255, 0.35)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          borderRight: '1px solid rgba(211, 28, 48, 0.12)',
-          boxShadow: '4px 0 32px rgba(38, 41, 46, 0.06)',
+          background: 'rgba(255, 255, 255, 0.52)',
+          backdropFilter: 'blur(32px) saturate(1.6)',
+          WebkitBackdropFilter: 'blur(32px) saturate(1.6)',
+          borderRight: '1px solid rgba(211, 28, 48, 0.08)',
+          boxShadow: '4px 0 48px rgba(38, 41, 46, 0.05), inset -1px 0 0 rgba(255,255,255,0.5)',
         }}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-5 py-5 border-b" style={{ borderColor: 'rgba(211, 28, 48, 0.10)' }}>
+        <div className="flex items-center justify-between px-5 py-6 border-b" style={{ borderColor: 'rgba(211, 28, 48, 0.06)' }}>
           <Link to="/dashboard" className="flex flex-col items-center w-full group">
             <img
               src="/logo-synergy.png"
               alt="Simmetria Synergy"
-              className="w-36 object-contain transition-all duration-300 group-hover:opacity-90"
+              className="w-36 object-contain transition-all duration-500 group-hover:scale-[1.02] group-hover:opacity-90"
             />
           </Link>
           <button
@@ -119,13 +119,13 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                 key={item.href}
                 to={item.href}
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-200 relative"
+                className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-200 relative group"
 style={{
   background: isActive
-    ? '#D31C30'
+    ? 'linear-gradient(135deg, #D31C30 0%, #e02040 100%)'
     : 'transparent',
   color: isActive ? '#ffffff' : '#26292E',
-  boxShadow: isActive ? '0 4px 16px rgba(211, 28, 48, 0.25)' : 'none',
+  boxShadow: isActive ? '0 4px 20px rgba(211, 28, 48, 0.22), 0 2px 6px rgba(211, 28, 48, 0.12)' : 'none',
   borderRadius: '1.5rem',
 }}
               >
@@ -146,9 +146,9 @@ style={{
         </nav>
 
         {/* User section */}
-        <div className="p-4 border-t" style={{ borderColor: 'rgba(211, 28, 48, 0.10)' }}>
+        <div className="p-4 border-t" style={{ borderColor: 'rgba(211, 28, 48, 0.06)' }}>
           {user ? (
-            <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: 'var(--glass-bg)', backdropFilter: 'blur(12px)', border: '1px solid var(--glass-border)' }}>
+            <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.45)', backdropFilter: 'blur(12px)', border: '1px solid rgba(211, 28, 48, 0.06)', boxShadow: '0 2px 8px rgba(38,41,46,0.03)' }}>
               <div
                 className="w-10 h-10 rounded-2xl flex-shrink-0 flex items-center justify-center text-sm font-bold text-white"
                 style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
@@ -323,11 +323,11 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
     <header
       className="sticky top-0 z-30 h-16"
       style={{
-        background: 'rgba(255, 255, 255, 0.50)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(211, 28, 48, 0.10)',
-        boxShadow: '0 2px 16px rgba(38, 41, 46, 0.04)',
+        background: 'rgba(255, 255, 255, 0.60)',
+        backdropFilter: 'blur(28px) saturate(1.4)',
+        WebkitBackdropFilter: 'blur(28px) saturate(1.4)',
+        borderBottom: '1px solid rgba(211, 28, 48, 0.06)',
+        boxShadow: '0 1px 24px rgba(38, 41, 46, 0.03)',
       }}
     >
       <div className="flex items-center justify-between h-full px-4 lg:px-6">
@@ -532,7 +532,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   return (
     <div
       className="min-h-screen"
-      style={{ background: '#F4F5F7' }}
+      style={{ background: '#f5f5f7' }}
     >
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
       <div className="lg:pl-64 flex flex-col min-h-screen">
@@ -540,13 +540,13 @@ export default function Layout({ children }: { children: ReactNode }) {
         <main className="flex-1">
           <div className="p-4 lg:p-6 pb-safe">
             <div
-              className="rounded-3xl p-5 lg:p-6"
+              className="rounded-[28px] p-5 lg:p-7"
               style={{
-                background: 'rgba(255, 255, 255, 0.40)',
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-                border: '1px solid rgba(255, 255, 255, 0.20)',
-                boxShadow: '0 8px 32px rgba(38, 41, 46, 0.08)',
+                background: 'rgba(255, 255, 255, 0.48)',
+                backdropFilter: 'blur(20px) saturate(1.3)',
+                WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+                border: '1px solid rgba(255, 255, 255, 0.35)',
+                boxShadow: '0 8px 40px rgba(38, 41, 46, 0.06), 0 1px 3px rgba(38, 41, 46, 0.04)',
                 minHeight: 'calc(100vh - 7rem)',
               }}
             >

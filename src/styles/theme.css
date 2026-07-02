@@ -2,11 +2,11 @@
 
 :root,
 [data-theme="light"] {
-  --bg: #f4f2ef;
-  --panel: rgba(255, 255, 255, 0.30);
+  --bg: #f5f5f7;
+  --panel: rgba(255, 255, 255, 0.38);
   --panel-solid: #ffffff;
-  --panel2: rgba(255, 255, 255, 0.45);
-  --line: rgba(211, 28, 48, 0.15);
+  --panel2: rgba(255, 255, 255, 0.50);
+  --line: rgba(211, 28, 48, 0.08);
 
   --text: #26292E;
   --muted: #5f666d;
@@ -32,10 +32,10 @@
   --shadow-red: 0 4px 20px rgba(211, 28, 48, 0.18);
   --shadow-red-lg: 0 8px 40px rgba(211, 28, 48, 0.24);
 
-  --glass-blur: 16px;
-  --glass-border: rgba(211, 28, 48, 0.15);
-  --glass-bg: rgba(255, 255, 255, 0.30);
-  --glass-bg-strong: rgba(255, 255, 255, 0.55);
+  --glass-blur: 18px;
+  --glass-border: rgba(211, 28, 48, 0.10);
+  --glass-bg: rgba(255, 255, 255, 0.35);
+  --glass-bg-strong: rgba(255, 255, 255, 0.62);
 
   --transition-fast: 180ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 280ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -87,7 +87,7 @@ body {
 }
 
 [data-theme="light"] body {
-  background: #F4F5F7 !important;
+  background: #f5f5f7 !important;
 }
 
 [data-theme="dark"] body {
@@ -103,8 +103,8 @@ body {
 
 .panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   transition: all var(--transition-normal);
@@ -112,15 +112,16 @@ body {
 
 .panel:hover {
   box-shadow: var(--shadow-md);
-  border-color: rgba(211, 28, 48, 0.25);
+  border-color: rgba(211, 28, 48, 0.18);
 }
 
 [data-theme="light"] .panel {
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 12px rgba(38, 41, 46, 0.04), 0 0 0 0.5px rgba(255,255,255,0.6) inset;
 }
 
 [data-theme="light"] .panel:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(38, 41, 46, 0.08), 0 0 0 0.5px rgba(255,255,255,0.8) inset;
 }
 
 [data-theme="dark"] .panel {
@@ -156,7 +157,7 @@ body {
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.01);
   box-shadow: var(--shadow-red-lg);
 }
 
@@ -215,13 +216,13 @@ body {
 
 .sidebar {
   background: var(--glass-bg-strong);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(32px) saturate(1.5);
+  -webkit-backdrop-filter: blur(32px) saturate(1.5);
   border-right: 1px solid var(--glass-border);
 }
 
 [data-theme="light"] .sidebar {
-  box-shadow: 8px 0 40px rgba(211, 28, 48, 0.04);
+  box-shadow: 4px 0 48px rgba(211, 28, 48, 0.03), inset -1px 0 0 rgba(255,255,255,0.5);
 }
 
 [data-theme="dark"] .sidebar {
@@ -240,14 +241,15 @@ body {
 }
 
 .sidebar-item:hover {
-  background: var(--glass-bg);
+  background: rgba(211, 28, 48, 0.04);
   color: var(--text);
+  transform: translateX(2px);
 }
 
 .sidebar-item.active {
   background: linear-gradient(135deg, var(--red) 0%, var(--red2) 100%);
   color: white;
-  box-shadow: var(--shadow-red);
+  box-shadow: 0 4px 20px rgba(211, 28, 48, 0.22), 0 2px 6px rgba(211, 28, 48, 0.12);
 }
 
 .sidebar-item.active::before {
@@ -265,18 +267,18 @@ body {
 /* ─── TOPBAR ───────────────────────────────────────────────────────────────── */
 
 .topbar {
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
   border-bottom: 1px solid var(--glass-border);
 }
 
 [data-theme="light"] .topbar {
-  background: rgba(255, 255, 255, 0.45);
-  box-shadow: 0 4px 20px rgba(211, 28, 48, 0.04);
+  background: rgba(255, 255, 255, 0.60);
+  box-shadow: 0 1px 24px rgba(211, 28, 48, 0.03);
 }
 
 [data-theme="dark"] .topbar {
-  background: rgba(10, 12, 16, 0.65);
+  background: rgba(10, 12, 16, 0.70);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
@@ -368,8 +370,8 @@ textarea::placeholder {
 /* ─── SCROLLBAR ────────────────────────────────────────────────────────────── */
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -377,12 +379,12 @@ textarea::placeholder {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(211, 28, 48, 0.15);
-  border-radius: 6px;
+  background: rgba(211, 28, 48, 0.10);
+  border-radius: 8px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(211, 28, 48, 0.30);
+  background: rgba(211, 28, 48, 0.22);
 }
 
 /* ─── HOVER UTILITIES ──────────────────────────────────────────────────────── */
@@ -418,9 +420,9 @@ textarea::placeholder {
 }
 
 .hover-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-lg);
-  border-color: rgba(211, 28, 48, 0.30);
+  transform: translateY(-3px) scale(1.005);
+  box-shadow: 0 16px 40px rgba(38, 41, 46, 0.10), 0 4px 12px rgba(211, 28, 48, 0.06);
+  border-color: rgba(211, 28, 48, 0.20);
 }
 
 /* ─── GLASS ────────────────────────────────────────────────────────────────── */
@@ -500,13 +502,13 @@ textarea::placeholder {
 /* ─── ANIMATIONS ───────────────────────────────────────────────────────────── */
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideInRight {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes pulse {
@@ -519,8 +521,8 @@ textarea::placeholder {
   100% { background-position: -200% 0; }
 }
 
-.animate-fade-in { animation: fadeIn 0.35s ease-out forwards; }
-.animate-slide-in-right { animation: slideInRight 0.3s ease-out forwards; }
+.animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.animate-slide-in-right { animation: slideInRight 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
 /* ─── LOGIN BRANDING ───────────────────────────────────────────────────────── */
