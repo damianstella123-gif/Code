@@ -99,6 +99,276 @@ body {
   min-height: 100vh;
 }
 
+/* ─── SHELL — Immersive Operating Environment ─────────────────────────────── */
+/*
+ * The shell IS the cockpit. Sidebar, header, and content area
+ * are parts of ONE continuous environment — not separate components.
+ * Same material. Same light direction. Same depth.
+ */
+
+.shell-environment {
+  min-height: 100vh;
+  position: relative;
+  background: var(--bg);
+}
+
+/* Ambient directional light — subtle, consistent top-left source */
+.shell-ambient {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.shell-light-primary {
+  position: absolute;
+  top: -5%;
+  left: -5%;
+  width: 55%;
+  height: 45%;
+  background: radial-gradient(ellipse at 20% 15%, rgba(255,255,255,0.35) 0%, transparent 60%);
+  opacity: 0.4;
+}
+
+.shell-light-secondary {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 35%;
+  height: 30%;
+  background: radial-gradient(ellipse at 80% 90%, rgba(38,41,46,0.015) 0%, transparent 50%);
+}
+
+[data-theme="dark"] .shell-light-primary {
+  background: radial-gradient(ellipse at 20% 15%, rgba(255,255,255,0.02) 0%, transparent 60%);
+  opacity: 1;
+}
+
+[data-theme="dark"] .shell-light-secondary {
+  background: radial-gradient(ellipse at 80% 90%, rgba(0,0,0,0.15) 0%, transparent 50%);
+}
+
+/* ─── Sidebar: Part of the Instrument Panel ─── */
+.shell-sidebar {
+  background: var(--cc-glass);
+  backdrop-filter: blur(var(--cc-blur-deep)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--cc-blur-deep)) saturate(1.5);
+  border-right: 1px solid var(--cc-divider);
+}
+
+[data-theme="dark"] .shell-sidebar {
+  border-right-color: rgba(255, 255, 255, 0.03);
+}
+
+.shell-sidebar-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px 20px;
+  position: relative;
+}
+
+/* Navigation items — instruments, not buttons */
+.shell-nav {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.shell-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: color 0.15s ease, background 0.15s ease;
+  position: relative;
+  letter-spacing: -0.005em;
+}
+
+.shell-nav-item:hover {
+  color: var(--text);
+  background: rgba(38, 41, 46, 0.03);
+}
+
+[data-theme="dark"] .shell-nav-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.shell-nav-item--active {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.shell-nav-indicator {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 0;
+  border-radius: 1px;
+  background: var(--red2);
+  transition: height 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shell-nav-item--active .shell-nav-indicator {
+  height: 16px;
+}
+
+.shell-nav-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.5;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+}
+
+.shell-nav-item--active .shell-nav-icon {
+  opacity: 0.85;
+  color: var(--red2);
+}
+
+.shell-nav-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sidebar user section */
+.shell-sidebar-user {
+  padding: 12px;
+  border-top: 1px solid var(--cc-divider);
+}
+
+.shell-user-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+.shell-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  background: var(--red);
+}
+
+.shell-user-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell-user-role {
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.6;
+  margin-top: 1px;
+}
+
+.shell-user-logout {
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--muted);
+  opacity: 0.4;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.shell-user-logout:hover {
+  opacity: 1;
+  color: var(--red2);
+}
+
+/* ─── Header: Integrated Strip ─── */
+.shell-header {
+  height: 52px;
+  background: transparent;
+  border-bottom: 1px solid var(--cc-divider);
+  position: relative;
+}
+
+[data-theme="dark"] .shell-header {
+  border-bottom-color: rgba(255, 255, 255, 0.03);
+}
+
+/* ─── Main Content: Directly in the Cockpit ─── */
+.shell-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+.shell-content {
+  flex: 1;
+  padding: 20px 24px 32px;
+  position: relative;
+}
+
+@media (max-width: 1024px) {
+  .shell-content { padding: 16px 18px 28px; }
+}
+
+@media (max-width: 640px) {
+  .shell-content { padding: 12px 12px 24px; }
+}
+
+/* ─── Header user chip ─── */
+.shell-user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+
+.shell-user-chip:hover {
+  background: rgba(38, 41, 46, 0.03);
+}
+
+[data-theme="dark"] .shell-user-chip:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.shell-chip-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  background: var(--red);
+}
+
+/* ─── SHELL RESPONSIVE ─── */
+@media (max-width: 768px) {
+  .shell-sidebar { width: 240px; }
+  .shell-header { height: 48px; }
+}
+
 /* ─── PANEL / CARD ─────────────────────────────────────────────────────────── */
 
 .panel {

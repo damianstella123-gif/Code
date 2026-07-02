@@ -74,31 +74,24 @@ function Sidebar({ open, setOpen }: SidebarProps) {
     <>
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
           onClick={() => setOpen(false)}
         />
       )}
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:translate-x-0 flex flex-col',
+          'shell-sidebar fixed inset-y-0 left-0 z-50 w-[232px] transform transition-transform duration-300 ease-in-out lg:translate-x-0 flex flex-col',
           open ? 'translate-x-0' : '-translate-x-full'
         )}
-        style={{
-          background: 'rgba(255, 255, 255, 0.58)',
-          backdropFilter: 'blur(40px) saturate(1.4)',
-          WebkitBackdropFilter: 'blur(40px) saturate(1.4)',
-          borderRight: '1px solid rgba(38, 41, 46, 0.04)',
-          boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.4)',
-        }}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-5 py-6 border-b" style={{ borderColor: 'rgba(38, 41, 46, 0.05)' }}>
-          <Link to="/dashboard" className="flex flex-col items-center w-full group">
+        <div className="shell-sidebar-logo">
+          <Link to="/dashboard" className="flex items-center justify-center w-full group">
             <img
               src="/logo-synergy.png"
               alt="Simmetria Synergy"
-              className="w-36 object-contain transition-all duration-500 group-hover:scale-[1.02] group-hover:opacity-90"
+              className="w-32 object-contain transition-opacity duration-300 group-hover:opacity-80"
             />
           </Link>
           <button
@@ -109,8 +102,8 @@ function Sidebar({ open, setOpen }: SidebarProps) {
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {/* Navigation — instruments, not buttons */}
+        <nav className="shell-nav flex-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = iconMap[item.href] ?? LayoutDashboard
             const isActive = location.pathname === item.href
@@ -119,66 +112,38 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                 key={item.href}
                 to={item.href}
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 relative group"
-style={{
-  background: isActive
-    ? 'var(--red)'
-    : 'transparent',
-  color: isActive ? '#ffffff' : '#26292E',
-  boxShadow: isActive ? '0 2px 8px rgba(211, 28, 48, 0.18)' : 'none',
-  borderRadius: '14px',
-}}
+                className={cn('shell-nav-item', isActive && 'shell-nav-item--active')}
               >
-                {isActive && (
-                  <div
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 bg-white rounded-r"
-                    style={{ height: '60%' }}
-                  />
-                )}
-               <Icon
-  className="w-5 h-5"
-  style={{ color: isActive ? '#ffffff' : '#26292E' }}
-/>
-                <span>{item.name}</span>
+                <div className="shell-nav-indicator" />
+                <Icon className="shell-nav-icon" />
+                <span className="shell-nav-label">{item.name}</span>
               </Link>
             )
           })}
         </nav>
 
         {/* User section */}
-        <div className="p-4 border-t" style={{ borderColor: 'rgba(38, 41, 46, 0.05)' }}>
+        <div className="shell-sidebar-user">
           {user ? (
-            <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.45)', border: '1px solid rgba(38,41,46,0.04)' }}>
-              <div
-                className="w-10 h-10 rounded-2xl flex-shrink-0 flex items-center justify-center text-sm font-bold text-white"
-                style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
-              >
+            <div className="shell-user-card">
+              <div className="shell-user-avatar">
                 {(user.first_name || '').charAt(0)}{(user.last_name || '').charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate" style={{ color: '#26292E' }}>
-                  {user.first_name} {user.last_name}
-                </p>
-                <p className="text-xs truncate" style={{ color: '#5f666d' }}>
-                  {user.role}
-                </p>
+                <p className="shell-user-name">{user.first_name} {user.last_name}</p>
+                <p className="shell-user-role">{user.role}</p>
               </div>
               <button
                 onClick={handleLogout}
-                className="p-1.5 rounded-lg transition-all hover:bg-white/10 flex-shrink-0"
+                className="shell-user-logout"
                 title="Logout"
               >
-                <LogOut className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+                <LogOut className="w-4 h-4" />
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: 'var(--glass-bg)', backdropFilter: 'blur(12px)', border: '1px solid var(--glass-border)' }}>
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center"
-                style={{ background: 'rgba(208, 0, 58, 0.15)' }}
-              >
-                <span style={{ color: 'var(--red2)', fontWeight: 600 }}>?</span>
-              </div>
+            <div className="shell-user-card">
+              <div className="shell-user-avatar">?</div>
               <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun utente</p>
             </div>
           )}
@@ -320,16 +285,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
   }
 
   return (
-    <header
-      className="sticky top-0 z-30 h-16"
-      style={{
-        background: 'rgba(255, 255, 255, 0.62)',
-        backdropFilter: 'blur(40px) saturate(1.4)',
-        WebkitBackdropFilter: 'blur(40px) saturate(1.4)',
-        borderBottom: '1px solid rgba(38, 41, 46, 0.04)',
-        boxShadow: 'none',
-      }}
-    >
+    <header className="shell-header sticky top-0 z-30">
       <div className="flex items-center justify-between h-full px-4 lg:px-6">
         {/* Left side */}
         <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
@@ -339,7 +295,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
           >
             <Menu className="w-5 h-5" style={{ color: 'var(--muted)' }} />
           </button>
-          <div className="hidden md:flex flex-1 min-w-0" style={{ maxWidth: 420 }}>
+          <div className="hidden md:flex flex-1 min-w-0" style={{ maxWidth: 380 }}>
             <GlobalSearch />
           </div>
         </div>
@@ -416,26 +372,19 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
             <div className="relative">
               <button
                 onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false) }}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all hover:bg-white/5"
-                style={{ border: '1px solid var(--line)' }}
+                className="shell-user-chip"
               >
-                <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
-                  style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
-                >
+                <div className="shell-chip-avatar">
                   {(user.first_name || '').charAt(0)}{(user.last_name || '').charAt(0)}
                 </div>
                 <div className="hidden sm:block text-left">
                   <p className="text-xs font-medium leading-none" style={{ color: 'var(--text)' }}>
                     {user.first_name}
                   </p>
-                  <p className="text-xs leading-none mt-0.5" style={{ color: 'var(--muted)' }}>
-                    {user.role}
-                  </p>
                 </div>
                 <ChevronDown
-                  className={`w-3.5 h-3.5 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
-                  style={{ color: 'var(--muted)' }}
+                  className={`w-3 h-3 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+                  style={{ color: 'var(--muted)', opacity: 0.5 }}
                 />
               </button>
 
@@ -530,34 +479,17 @@ export default function Layout({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <div
-      className="min-h-screen relative"
-      style={{ background: '#eef0f4' }}
-    >
-      {/* Ambient light — subtle, warm, top-left bias */}
-      <div className="fixed inset-0 pointer-events-none" aria-hidden="true">
-        <div className="absolute top-0 left-0 w-[60%] h-[50%]" style={{ background: 'radial-gradient(ellipse at 15% 10%, rgba(255,255,255,0.45) 0%, transparent 55%)', opacity: 0.5 }} />
-        <div className="absolute bottom-0 right-0 w-[40%] h-[35%]" style={{ background: 'radial-gradient(ellipse at 85% 90%, rgba(38,41,46,0.02) 0%, transparent 50%)', opacity: 0.6 }} />
+    <div className="shell-environment">
+      {/* Ambient environment — directional light from top-left */}
+      <div className="shell-ambient" aria-hidden="true">
+        <div className="shell-light-primary" />
+        <div className="shell-light-secondary" />
       </div>
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-      <div className="lg:pl-64 flex flex-col min-h-screen">
+      <div className="shell-main lg:pl-[232px]">
         <Topbar setOpen={setSidebarOpen} />
-        <main className="flex-1 relative">
-          <div className="p-4 lg:p-6 pb-safe">
-            <div
-              className="rounded-[24px] p-5 lg:p-7"
-              style={{
-                background: 'rgba(255, 255, 255, 0.52)',
-                backdropFilter: 'blur(40px) saturate(1.5)',
-                WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
-                border: '1px solid rgba(255, 255, 255, 0.35)',
-                boxShadow: '0 1px 3px rgba(38, 41, 46, 0.03), inset 0 1px 0 rgba(255,255,255,0.6)',
-                minHeight: 'calc(100vh - 7rem)',
-              }}
-            >
-              {children}
-            </div>
-          </div>
+        <main className="shell-content">
+          {children}
         </main>
       </div>
       <FlyAssistant />
