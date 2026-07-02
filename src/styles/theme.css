@@ -87,11 +87,11 @@ body {
 }
 
 [data-theme="light"] body {
-  background: linear-gradient(145deg, #f4f2ef 0%, #ece8e4 50%, #f0edea 100%);
+  background: #F4F5F7 !important;
 }
 
 [data-theme="dark"] body {
-  background: linear-gradient(145deg, #0a0c10 0%, #0e1218 50%, #0c0f14 100%);
+  background: #0a0c10 !important;
 }
 
 .app-background {
@@ -526,12 +526,12 @@ textarea::placeholder {
 /* ─── LOGIN BRANDING ───────────────────────────────────────────────────────── */
 
 [data-theme="light"] .login-background {
-  background: linear-gradient(145deg, #f4f2ef 0%, #ece8e4 40%, #f0edea 100%);
+  background: #F4F5F7;
   min-height: 100vh;
 }
 
 [data-theme="dark"] .login-background {
-  background: linear-gradient(145deg, #0a0c10 0%, #0e1218 50%, #121821 100%);
+  background: #0a0c10;
   min-height: 100vh;
 }
 

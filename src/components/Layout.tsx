@@ -81,12 +81,19 @@ function Sidebar({ open, setOpen }: SidebarProps) {
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 sidebar transform transition-transform duration-300 ease-in-out lg:translate-x-0 flex flex-col',
+          'fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:translate-x-0 flex flex-col',
           open ? 'translate-x-0' : '-translate-x-full'
         )}
+        style={{
+          background: 'rgba(255, 255, 255, 0.35)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderRight: '1px solid rgba(211, 28, 48, 0.12)',
+          boxShadow: '4px 0 32px rgba(38, 41, 46, 0.06)',
+        }}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-5 py-5 border-b" style={{ borderColor: 'var(--line)' }}>
+        <div className="flex items-center justify-between px-5 py-5 border-b" style={{ borderColor: 'rgba(211, 28, 48, 0.10)' }}>
           <Link to="/dashboard" className="flex flex-col items-center w-full group">
             <img
               src="/logo-synergy.png"
@@ -115,10 +122,11 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                 className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-200 relative"
 style={{
   background: isActive
-    ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)'
+    ? '#D31C30'
     : 'transparent',
-  color: isActive ? 'white' : 'var(--text)',
-  boxShadow: isActive ? 'var(--shadow-red)' : 'none',
+  color: isActive ? '#ffffff' : '#26292E',
+  boxShadow: isActive ? '0 4px 16px rgba(211, 28, 48, 0.25)' : 'none',
+  borderRadius: '1.5rem',
 }}
               >
                 {isActive && (
@@ -129,7 +137,7 @@ style={{
                 )}
                <Icon
   className="w-5 h-5"
-  style={{ color: isActive ? 'white' : 'var(--text)' }}
+  style={{ color: isActive ? '#ffffff' : '#26292E' }}
 />
                 <span>{item.name}</span>
               </Link>
@@ -138,7 +146,7 @@ style={{
         </nav>
 
         {/* User section */}
-        <div className="p-4 border-t" style={{ borderColor: 'var(--line)' }}>
+        <div className="p-4 border-t" style={{ borderColor: 'rgba(211, 28, 48, 0.10)' }}>
           {user ? (
             <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: 'var(--glass-bg)', backdropFilter: 'blur(12px)', border: '1px solid var(--glass-border)' }}>
               <div
@@ -148,10 +156,10 @@ style={{
                 {(user.first_name || '').charAt(0)}{(user.last_name || '').charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
+                <p className="text-sm font-medium truncate" style={{ color: '#26292E' }}>
                   {user.first_name} {user.last_name}
                 </p>
-                <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
+                <p className="text-xs truncate" style={{ color: '#5f666d' }}>
                   {user.role}
                 </p>
               </div>
@@ -313,7 +321,14 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
 
   return (
     <header
-      className="sticky top-0 z-30 h-16 topbar"
+      className="sticky top-0 z-30 h-16"
+      style={{
+        background: 'rgba(255, 255, 255, 0.50)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(211, 28, 48, 0.10)',
+        boxShadow: '0 2px 16px rgba(38, 41, 46, 0.04)',
+      }}
     >
       <div className="flex items-center justify-between h-full px-4 lg:px-6">
         {/* Left side */}
@@ -516,14 +531,28 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className="min-h-screen app-background"
-      style={{ background: 'var(--bg)' }}
+      className="min-h-screen"
+      style={{ background: '#F4F5F7' }}
     >
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
       <div className="lg:pl-64 flex flex-col min-h-screen">
         <Topbar setOpen={setSidebarOpen} />
         <main className="flex-1">
-          <div className="p-4 lg:p-6 pb-safe">{children}</div>
+          <div className="p-4 lg:p-6 pb-safe">
+            <div
+              className="rounded-3xl p-5 lg:p-6"
+              style={{
+                background: 'rgba(255, 255, 255, 0.40)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255, 255, 255, 0.20)',
+                boxShadow: '0 8px 32px rgba(38, 41, 46, 0.08)',
+                minHeight: 'calc(100vh - 7rem)',
+              }}
+            >
+              {children}
+            </div>
+          </div>
         </main>
       </div>
       <FlyAssistant />

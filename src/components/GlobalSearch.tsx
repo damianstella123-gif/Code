@@ -593,11 +593,13 @@ export default function GlobalSearch() {
       {/* Dropdown */}
       {open && (
         <div
-          className="absolute left-0 right-0 top-full mt-2 rounded-2xl overflow-hidden animate-fade-in"
+          className="absolute left-0 right-0 top-full mt-2 rounded-3xl overflow-hidden animate-fade-in"
           style={{
-            background: 'var(--panel)',
-            border: '1px solid rgba(208,0,58,0.15)',
-            boxShadow: '0 24px 80px rgba(0,0,0,0.65), 0 0 40px rgba(208,0,58,0.06)',
+            background: 'rgba(255, 255, 255, 0.45)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(211,28,48,0.15)',
+            boxShadow: '0 24px 80px rgba(38,41,46,0.12), 0 0 40px rgba(211,28,48,0.06)',
             zIndex: 500,
             maxHeight: 480,
             overflowY: 'auto',

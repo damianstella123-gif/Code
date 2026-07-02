@@ -92,11 +92,13 @@ export default function Login() {
 
         <form
           onSubmit={handleSubmit}
-          className="p-8 space-y-6 rounded-2xl"
+          className="p-8 space-y-6 rounded-3xl"
           style={{
-            background: 'var(--panel)',
-            border: '1px solid var(--line)',
-            boxShadow: 'var(--shadow-lg)',
+            background: 'rgba(255, 255, 255, 0.40)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(211, 28, 48, 0.15)',
+            boxShadow: '0 12px 40px rgba(38, 41, 46, 0.10)',
           }}
         >
           <div className="text-center mb-2">
