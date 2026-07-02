@@ -94,6 +94,7 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
   const [form, setForm] = useState<Record<string, string | number | boolean>>({})
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const catMeta = CATEGORIES.find(c => c.key === category)!
 
@@ -156,6 +157,7 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
 
   async function handleSave() {
     setSaving(true)
+    setSaveError(null)
     const record: Record<string, unknown> = { event_id: event.id, supplier_id: supplierId }
     const numOrNull = (key: string) => form[key] !== '' && form[key] !== undefined ? Number(form[key]) : null
     const strOrNull = (key: string) => (form[key] && String(form[key]).trim()) || null
@@ -173,6 +175,7 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
       const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
       const multiplier = pax ?? qty
       Object.assign(record, {
+        tipo: sotto,
         sotto_categoria: sotto,
         titolo: strOrEmpty('titolo'),
         data: strOrNull('data'),
@@ -189,7 +192,12 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
         meeting_pax: numOrNull('meeting_pax'),
         meeting_setup: strOrEmpty('meeting_setup'),
         meeting_equipment: strOrEmpty('meeting_equipment'),
+        natural_light: !!form.natural_light_preference,
         natural_light_preference: !!form.natural_light_preference,
+        coffee_break_notes: '',
+        lunch_notes: '',
+        dinner_notes: '',
+        coffee_station_notes: '',
         note: strOrEmpty('note'),
         note_operative: strOrEmpty('note_operative'),
         venduto_unitario: vu,
@@ -230,13 +238,21 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
       Object.assign(record, { descrizione: strOrEmpty('descrizione'), quantita: qty, data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), note: strOrEmpty('note'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
     }
 
+    let error: { message: string } | null = null
     if (editingId) {
-      await supabase.from(catMeta.table).update(record).eq('id', editingId)
+      const res = await supabase.from(catMeta.table).update(record).eq('id', editingId)
+      error = res.error
     } else {
       record.id = crypto.randomUUID()
-      await supabase.from(catMeta.table).insert(record)
+      const res = await supabase.from(catMeta.table).insert(record)
+      error = res.error
     }
-    setSaving(false); setShowForm(false); setEditingId(null)
+    setSaving(false)
+    if (error) {
+      setSaveError(error.message)
+      return
+    }
+    setShowForm(false); setEditingId(null)
     await loadItems()
   }
 
@@ -542,8 +558,9 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
             <button onClick={() => { setShowForm(false); setEditingId(null) }}><X className="w-4 h-4" style={{ color: 'var(--muted)' }} /></button>
           </div>
           {renderForm()}
+          {saveError && <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626' }}>Errore: {saveError}</p>}
           <div className="flex items-center gap-2 pt-2 justify-end" style={{ borderTop: '1px solid var(--line)' }}>
-            <button onClick={() => { setShowForm(false); setEditingId(null) }} className="px-4 py-2 rounded-lg text-xs font-medium" style={{ color: 'var(--muted)' }}>Annulla</button>
+            <button onClick={() => { setShowForm(false); setEditingId(null); setSaveError(null) }} className="px-4 py-2 rounded-lg text-xs font-medium" style={{ color: 'var(--muted)' }}>Annulla</button>
             <button disabled={saving} onClick={handleSave} className="px-4 py-2 rounded-lg text-xs font-medium" style={{ background: 'var(--red2)', color: '#fff', opacity: saving ? 0.6 : 1 }}>
               {saving ? 'Salvataggio...' : editingId ? 'Salva' : 'Aggiungi'}
             </button>
@@ -617,6 +634,7 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
   const [form, setForm] = useState<Record<string, string | number | boolean>>({})
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const catMeta = CATEGORIES.find(c => c.key === activeCategory)!
@@ -681,6 +699,7 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
 
   async function handleSave() {
     setSaving(true)
+    setSaveError(null)
     const record: Record<string, unknown> = { event_id: event.id }
 
     const numOrNull = (key: string) => form[key] !== '' && form[key] !== undefined ? Number(form[key]) : null
@@ -700,6 +719,7 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
       const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
       const multiplier = pax ?? qty
       Object.assign(record, {
+        tipo: sotto,
         sotto_categoria: sotto,
         titolo: strOrEmpty('titolo'),
         data: strOrNull('data'),
@@ -716,7 +736,12 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
         meeting_pax: numOrNull('meeting_pax'),
         meeting_setup: strOrEmpty('meeting_setup'),
         meeting_equipment: strOrEmpty('meeting_equipment'),
+        natural_light: !!form.natural_light_preference,
         natural_light_preference: !!form.natural_light_preference,
+        coffee_break_notes: '',
+        lunch_notes: '',
+        dinner_notes: '',
+        coffee_station_notes: '',
         note: strOrEmpty('note'),
         note_operative: strOrEmpty('note_operative'),
         venduto_unitario: vu,
@@ -855,13 +880,21 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
       })
     }
 
+    let error: { message: string } | null = null
     if (editingId) {
-      await supabase.from(catMeta.table).update(record).eq('id', editingId)
+      const res = await supabase.from(catMeta.table).update(record).eq('id', editingId)
+      error = res.error
     } else {
       record.id = crypto.randomUUID()
-      await supabase.from(catMeta.table).insert(record)
+      const res = await supabase.from(catMeta.table).insert(record)
+      error = res.error
     }
-    setSaving(false); setShowForm(false); setEditingId(null)
+    setSaving(false)
+    if (error) {
+      setSaveError(error.message)
+      return
+    }
+    setShowForm(false); setEditingId(null)
     await loadItems()
   }
 
@@ -1260,11 +1293,12 @@ export function TabOperativo({ event, suppliers }: { event: { id: string }; supp
             <button onClick={() => { setShowForm(false); setEditingId(null) }}><X className="w-4 h-4" style={{ color: 'var(--muted)' }} /></button>
           </div>
           {renderForm()}
+          {saveError && <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626' }}>Errore: {saveError}</p>}
           <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
             <button disabled={saving} onClick={handleSave} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium" style={{ background: 'var(--blue)', color: '#fff', opacity: saving ? 0.6 : 1 }}>
               <Save className="w-3 h-3" /> {saving ? 'Salvataggio...' : 'Salva'}
             </button>
-            <button onClick={() => { setShowForm(false); setEditingId(null) }} className="px-4 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>Annulla</button>
+            <button onClick={() => { setShowForm(false); setEditingId(null); setSaveError(null) }} className="px-4 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>Annulla</button>
           </div>
         </div>
       )}
