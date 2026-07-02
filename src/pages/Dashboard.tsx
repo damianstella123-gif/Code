@@ -4,6 +4,7 @@ import {
   Calendar, CheckSquare, Users, Clock, ArrowRight, Zap, MessageSquare,
   FileText, AlertTriangle, BarChart3, TrendingUp, Archive, Database,
 } from 'lucide-react'
+import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import { loadUser } from '@/lib/auth'
 import { daysLeft, fmtShort, eventColorByStato, eventLabelByStato, taskPriColor } from '@/lib/format'
 import { fetchEvents } from '@/lib/events-service'
@@ -30,18 +31,18 @@ function KpiCard({ label, value, sub, icon: Icon, color, onClick, delay = 0 }: {
   color: string; onClick?: () => void; delay?: number
 }) {
   return (
-    <div className="panel p-5 hover-card cursor-pointer animate-fade-in flex flex-col justify-between gap-3"
+    <div className="kpi-energy-card panel p-5 hover-card cursor-pointer animate-fade-in flex flex-col justify-between gap-3 group"
       style={{ animationDelay: `${delay}ms`, borderRadius: '20px' }}
       onClick={onClick}>
       <div className="flex items-start justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)', letterSpacing: '0.06em' }}>{label}</p>
-        <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
-          style={{ background: `${color}12`, boxShadow: `0 4px 12px ${color}10` }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all duration-400 group-hover:scale-110 group-hover:shadow-lg"
+          style={{ background: `${color}12`, boxShadow: `0 4px 14px ${color}15` }}>
           <Icon className="w-[18px] h-[18px]" style={{ color }} />
         </div>
       </div>
       <div>
-        <p className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}>{value}</p>
+        <p className="text-3xl font-bold tracking-tight kpi-value-glow" style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}>{value}</p>
         {sub && <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>{sub}</p>}
       </div>
     </div>
@@ -195,9 +196,15 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-7 relative">
+      {/* Ambient radial gradient accent */}
+      <div className="absolute top-0 right-0 w-[500px] h-[400px] pointer-events-none opacity-30"
+        style={{ background: 'radial-gradient(ellipse at top right, rgba(211,28,48,0.08) 0%, transparent 60%)' }} />
+      <div className="absolute bottom-0 left-0 w-[400px] h-[300px] pointer-events-none opacity-20"
+        style={{ background: 'radial-gradient(ellipse at bottom left, rgba(77,180,255,0.06) 0%, transparent 60%)' }} />
+
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 relative">
         <div>
           <p className="text-sm font-medium" style={{ color: 'var(--muted)', letterSpacing: '0.01em' }}>
             {today.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -229,12 +236,17 @@ export default function Dashboard() {
       </div>
 
       {/* Diagnostic counters */}
-      <div className="panel p-5 animate-fade-in" style={{ border: '1px solid var(--line)', borderRadius: '18px' }}>
-        <div className="flex items-center gap-2.5 mb-4">
-          <Database className="w-4 h-4" style={{ color: 'var(--blue)' }} />
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Diagnostica Supabase</h3>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <AnimatedLaserBorder active loading={false} style={{ borderRadius: '18px' }}>
+        <div className="panel p-5 animate-fade-in" style={{ border: 'none', borderRadius: '18px' }}>
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(77,180,255,0.10)' }}>
+              <Database className="w-3.5 h-3.5" style={{ color: 'var(--blue)' }} />
+            </div>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Diagnostica Supabase</h3>
+            <div className="flex-1" />
+            <div className="w-2 h-2 rounded-full energy-pulse-dot" style={{ background: 'var(--green)' }} />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="p-3.5 rounded-xl" style={{ background: 'var(--panel2)' }}>
             <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Suppliers caricati</p>
             <p className="text-xl font-bold" style={{ color: liveSuppliers.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveSuppliers.length}</p>
@@ -256,6 +268,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      </AnimatedLaserBorder>
 
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -399,23 +412,24 @@ export default function Dashboard() {
         <div className="space-y-6">
 
           {/* Task progress ring */}
-          <div className="panel p-6 animate-fade-in" style={{ animationDelay: '80ms', borderRadius: '22px' }}>
+          <div className="panel p-6 animate-fade-in energy-ring-card" style={{ animationDelay: '80ms', borderRadius: '22px' }}>
             <div className="flex items-center gap-2.5 mb-4">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.12)' }}>
                 <BarChart3 className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />
               </div>
               <h2 className="text-base font-semibold" style={{ color: 'var(--text)' }}>Progresso Task</h2>
             </div>
-            <div className="flex items-center justify-center py-3">
-              <div className="relative w-28 h-28">
-                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                  <circle cx="50" cy="50" r="40" fill="none" strokeWidth="8" stroke="var(--line)" />
-                  <circle cx="50" cy="50" r="40" fill="none" strokeWidth="8" stroke="var(--green)"
+            <div className="flex items-center justify-center py-4">
+              <div className="relative w-32 h-32">
+                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90" style={{ filter: 'drop-shadow(0 0 6px rgba(56,210,125,0.25))' }}>
+                  <circle cx="50" cy="50" r="40" fill="none" strokeWidth="7" stroke="var(--line)" />
+                  <circle cx="50" cy="50" r="40" fill="none" strokeWidth="7" stroke="var(--green)"
                     strokeLinecap="round"
-                    strokeDasharray={`${kpi.completionRate * 2.51} 251`} />
+                    strokeDasharray={`${kpi.completionRate * 2.51} 251`}
+                    className="progress-ring-animated" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{kpi.completionRate}%</span>
+                  <span className="text-2xl font-bold kpi-value-glow" style={{ color: 'var(--text)' }}>{kpi.completionRate}%</span>
                   <span className="text-[10px]" style={{ color: 'var(--muted)' }}>completamento</span>
                 </div>
               </div>
@@ -492,7 +506,7 @@ export default function Dashboard() {
           )}
 
           {/* Archivio quick stat */}
-          <div className="panel p-5 animate-fade-in" style={{ animationDelay: '260ms' }}>
+          <div className="panel p-5 animate-fade-in energy-ring-card" style={{ animationDelay: '260ms', borderRadius: '20px' }}>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center"
                 style={{ background: 'rgba(234,179,8,0.1)' }}>
