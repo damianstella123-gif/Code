@@ -1,11 +1,11 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Calendar, CheckSquare, Users, Clock, ArrowRight, Zap, MessageSquare,
-  FileText, AlertTriangle, BarChart3, TrendingUp, Archive, Database,
+  Calendar, CheckSquare, Users, ArrowRight,
+  AlertTriangle, TrendingUp, Archive,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
-import { daysLeft, fmtShort, eventColorByStato, eventLabelByStato, taskPriColor } from '@/lib/format'
+import { daysLeft, eventColorByStato } from '@/lib/format'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchClients } from '@/lib/clients-service'
@@ -25,56 +25,6 @@ function getGreeting(): string {
   return 'Buonasera'
 }
 
-function KpiCard({ label, value, sub, icon: Icon, color, onClick, delay = 0 }: {
-  label: string; value: string | number; sub?: string; icon: React.ElementType
-  color: string; onClick?: () => void; delay?: number
-}) {
-  return (
-    <div className="kpi-energy-card panel hover-card cursor-pointer animate-fade-in flex flex-col justify-between group"
-      style={{ animationDelay: `${delay}ms`, borderRadius: '20px', padding: '20px' }}
-      onClick={onClick}>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)', letterSpacing: '0.1em' }}>{label}</p>
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ background: `${color}08` }}>
-          <Icon className="w-3.5 h-3.5" style={{ color, opacity: 0.8 }} />
-        </div>
-      </div>
-      <div>
-        <p className="text-[2rem] font-bold tracking-tighter leading-none" style={{ color: 'var(--text)', letterSpacing: '-0.03em' }}>{value}</p>
-        {sub && <p className="text-[11px] mt-2 leading-tight" style={{ color: 'var(--muted)', opacity: 0.7 }}>{sub}</p>}
-      </div>
-    </div>
-  )
-}
-
-function Section({ title, icon: Icon, color = 'var(--red2)', action, onAction, children, delay = 0 }: {
-  title: string; icon: React.ElementType; color?: string; action?: string; onAction?: () => void
-  children: React.ReactNode; delay?: number
-}) {
-  return (
-    <div className="panel animate-fade-in red-thread-node" style={{ animationDelay: `${delay}ms`, borderRadius: '20px', padding: '24px' }}>
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-md flex items-center justify-center"
-            style={{ background: `${color}08` }}>
-            <Icon className="w-3 h-3" style={{ color, opacity: 0.8 }} />
-          </div>
-          <h2 className="text-[13px] font-semibold tracking-tight" style={{ color: 'var(--text)' }}>{title}</h2>
-        </div>
-        {action && (
-          <button onClick={onAction}
-            className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-all duration-200 hover:bg-white/10"
-            style={{ color: 'var(--muted)', opacity: 0.6 }}>
-            {action} <ArrowRight className="w-3 h-3" />
-          </button>
-        )}
-      </div>
-      {children}
-    </div>
-  )
-}
-
 type Referente = {
   id: string
   nome: string
@@ -88,18 +38,16 @@ type Referente = {
 export default function Dashboard() {
   const navigate = useNavigate()
   const currentUser = loadUser()
-  const ruolo = currentUser?.ruolo ?? 'Partner'
-  const userId = currentUser?.id ?? ''
 
   const [liveTasks, setLiveTasks] = useState<Task[]>([])
   const [liveEvents, setLiveEvents] = useState<Event[]>([])
   const [liveClients, setLiveClients] = useState<Client[]>([])
-  const [liveSuppliers, setLiveSuppliers] = useState<Supplier[]>([])
-  const [liveCommunications, setLiveCommunications] = useState<Messaggio[]>([])
+  const [, setLiveSuppliers] = useState<Supplier[]>([])
+  const [, setLiveCommunications] = useState<Messaggio[]>([])
   const [archiveCount, setArchiveCount] = useState(0)
-  const [recentReferenti, setRecentReferenti] = useState<Referente[]>([])
+  const [, setRecentReferenti] = useState<Referente[]>([])
   const [loading, setLoading] = useState(true)
-  const [diagErrors, setDiagErrors] = useState<Record<string, string>>({})
+  const [, setDiagErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     async function load() {
@@ -177,11 +125,122 @@ export default function Dashboard() {
       .slice(0, 5)
   , [myTasks])
 
-  const comunicazioniRecenti = useMemo(() =>
-    [...liveCommunications]
-      .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
-      .slice(0, 4)
-  , [liveCommunications])
+  // Build Mission Brief text from real data
+  const missionBrief = useMemo(() => {
+    const firstName = currentUser?.first_name ?? currentUser?.nome?.split(' ')[0] ?? 'utente'
+    const greeting = getGreeting()
+    const lines: string[] = []
+
+    lines.push(`${greeting}, ${firstName}.`)
+
+    // General status
+    if (kpi.taskInRitardo === 0 && kpi.eventiImminenti <= 2) {
+      lines.push('Oggi tutto procede bene.')
+    } else if (kpi.taskInRitardo > 3) {
+      lines.push(`Attenzione: ${kpi.taskInRitardo} task sono in ritardo.`)
+    } else if (kpi.taskInRitardo > 0) {
+      lines.push(`${kpi.taskInRitardo} task ${kpi.taskInRitardo === 1 ? 'richiede' : 'richiedono'} attenzione.`)
+    } else {
+      lines.push('Nessuna urgenza, tutto sotto controllo.')
+    }
+
+    // Events insight
+    if (kpi.eventiImminenti > 0) {
+      const closest = prossimEventi[0]
+      if (closest) {
+        const dl = daysLeft(closest.dataInizio)
+        const taskTotali = myTasks.filter(t => t.evento === closest.id).length
+        const taskDone = myTasks.filter(t => t.evento === closest.id && t.stato === 'completato').length
+        const pct = taskTotali > 0 ? Math.round((taskDone / taskTotali) * 100) : 100
+        if (dl <= 3) {
+          lines.push(`${closest.nome} e tra ${dl === 0 ? 'oggi' : dl === 1 ? 'domani' : dl + ' giorni'} — pronto al ${pct}%.`)
+        } else {
+          lines.push(`${kpi.eventiImminenti} ${kpi.eventiImminenti === 1 ? 'evento' : 'eventi'} nei prossimi 14 giorni.`)
+        }
+      }
+    }
+
+    // Financial pulse (from clients fatturato)
+    const fatturatoTotale = liveClients.reduce((sum, c) => sum + (c.fatturato || 0), 0)
+    if (fatturatoTotale > 0) {
+      lines.push(`Il portafoglio clienti vale €${(fatturatoTotale / 1000).toFixed(0)}K.`)
+    }
+
+    // Suggestion
+    if (kpi.taskInRitardo > 0 && taskInRitardoList.length > 0) {
+      lines.push(`Ti consiglio di iniziare dai task in ritardo.`)
+    } else if (prossimEventi.length > 0) {
+      lines.push(`Ti consiglio di controllare ${prossimEventi[0].nome}.`)
+    } else {
+      lines.push('Buon momento per pianificare.')
+    }
+
+    return lines
+  }, [currentUser, kpi, prossimEventi, myTasks, liveClients, taskInRitardoList])
+
+  // Determine brief status for Fly dot color
+  const briefStatus: 'ok' | 'attention' | 'urgent' = useMemo(() => {
+    if (kpi.taskInRitardo > 3) return 'urgent'
+    if (kpi.taskInRitardo > 0 || kpi.eventiImminenti > 3) return 'attention'
+    return 'ok'
+  }, [kpi])
+
+  // Build team workload from tasks assignees
+  const teamWorkload = useMemo(() => {
+    const assigneeMap = new Map<string, { total: number; completed: number }>()
+    myTasks.forEach(t => {
+      if (!t.assegnatario) return
+      const entry = assigneeMap.get(t.assegnatario) ?? { total: 0, completed: 0 }
+      entry.total++
+      if (t.stato === 'completato') entry.completed++
+      assigneeMap.set(t.assegnatario, entry)
+    })
+    return [...assigneeMap.entries()]
+      .map(([name, data]) => ({
+        name: name.split(' ')[0] || name,
+        fullName: name,
+        load: data.total > 0 ? Math.round(((data.total - data.completed) / Math.max(data.total, 8)) * 100) : 0,
+        openTasks: data.total - data.completed,
+      }))
+      .sort((a, b) => b.load - a.load)
+      .slice(0, 5)
+  }, [myTasks])
+
+  // Decisions from overdue tasks + events needing action
+  const decisions = useMemo(() => {
+    const items: { text: string; consequence: string; action: () => void; urgent: boolean }[] = []
+
+    // Overdue tasks as decisions
+    taskInRitardoList.slice(0, 3).forEach(t => {
+      const dl = Math.abs(daysLeft(t.scadenza))
+      items.push({
+        text: t.titolo,
+        consequence: `${dl}g in ritardo${t.assegnatario ? ` — ${t.assegnatario.split(' ')[0]} attende` : ''}`,
+        action: () => navigate('/task'),
+        urgent: dl > 3,
+      })
+    })
+
+    // Events very close without full readiness
+    prossimEventi.slice(0, 2).forEach(ev => {
+      const dl = daysLeft(ev.dataInizio)
+      if (dl <= 7 && dl >= 0) {
+        const taskTotali = myTasks.filter(t => t.evento === ev.id).length
+        const taskDone = myTasks.filter(t => t.evento === ev.id && t.stato === 'completato').length
+        const pct = taskTotali > 0 ? Math.round((taskDone / taskTotali) * 100) : 100
+        if (pct < 90) {
+          items.push({
+            text: `Preparazione ${ev.nome}`,
+            consequence: `${pct}% pronto — tra ${dl}g`,
+            action: () => navigate('/eventi'),
+            urgent: dl <= 3,
+          })
+        }
+      }
+    })
+
+    return items.slice(0, 5)
+  }, [taskInRitardoList, prossimEventi, myTasks, navigate])
 
   if (loading) {
     return (
@@ -195,323 +254,204 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3 red-thread-h" style={{ paddingBottom: '4px' }}>
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-widest" style={{ color: 'var(--muted)', letterSpacing: '0.08em', opacity: 0.6 }}>
-            {today.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-          </p>
-          <h1 className="text-[1.6rem] font-bold mt-1.5 tracking-tight" style={{ color: 'var(--text)', letterSpacing: '-0.025em' }}>
-            {getGreeting()}, {currentUser?.first_name ?? currentUser?.nome?.split(' ')[0] ?? 'utente'}
-          </h1>
-        </div>
-        <span className="text-[10px] px-3 py-1 rounded-lg font-medium uppercase tracking-wider"
-          style={{ background: 'rgba(38,41,46,0.03)', color: 'var(--muted)', letterSpacing: '0.06em' }}>
-          {currentUser?.role ?? ruolo}
-        </span>
-      </div>
-
-      {/* KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 red-thread-h" style={{ paddingBottom: '4px' }}>
-        <KpiCard label="Task Aperti" value={kpi.taskAperti} sub={`su ${myTasks.length} totali`}
-          icon={CheckSquare} color="var(--blue)" delay={0} onClick={() => navigate('/task')} />
-        <KpiCard label="Completati" value={kpi.taskCompletati} sub={`${kpi.completionRate}% completamento`}
-          icon={TrendingUp} color="var(--green)" delay={30} onClick={() => navigate('/task')} />
-        <KpiCard label="In Ritardo" value={kpi.taskInRitardo} sub={kpi.taskInRitardo > 0 ? 'azione richiesta' : 'nessuno'}
-          icon={AlertTriangle} color={kpi.taskInRitardo > 0 ? 'var(--red2)' : 'var(--green)'} delay={60} onClick={() => navigate('/task')} />
-        <KpiCard label="Eventi Imminenti" value={kpi.eventiImminenti} sub="prossimi 14 giorni"
-          icon={Calendar} color="var(--red2)" delay={90} onClick={() => navigate('/eventi')} />
-        <KpiCard label="Clienti Attivi" value={kpi.clientiAttivi} sub={`su ${liveClients.length} totali`}
-          icon={Users} color="var(--blue)" delay={120} onClick={() => navigate('/crm')} />
-        <KpiCard label="Documenti" value={archiveCount} sub="archivio aziendale"
-          icon={Archive} color="var(--yellow)" delay={150} onClick={() => navigate('/archivio')} />
-      </div>
-
-      {/* Diagnostic counters */}
-      <div className="panel animate-fade-in red-thread-h" style={{ borderRadius: '20px', padding: '18px 24px', paddingBottom: '22px' }}>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: 'rgba(77,180,255,0.06)' }}>
-            <Database className="w-3 h-3" style={{ color: 'var(--blue)', opacity: 0.7 }} />
-          </div>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)', letterSpacing: '0.06em' }}>Diagnostica</h3>
-          <div className="flex-1" />
-          <div className="w-1.5 h-1.5 rounded-full energy-pulse-dot" style={{ background: 'var(--green)' }} />
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-            <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}>Suppliers</p>
-            <p className="text-lg font-bold mt-0.5" style={{ color: liveSuppliers.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveSuppliers.length}</p>
-            {diagErrors.suppliers && <p className="text-[9px] mt-0.5" style={{ color: 'var(--red2)' }}>{diagErrors.suppliers}</p>}
-          </div>
-          <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-            <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}>Events</p>
-            <p className="text-lg font-bold mt-0.5" style={{ color: liveEvents.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveEvents.length}</p>
-            {diagErrors.events && <p className="text-[9px] mt-0.5" style={{ color: 'var(--red2)' }}>{diagErrors.events}</p>}
-          </div>
-          <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-            <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}>Clients</p>
-            <p className="text-lg font-bold mt-0.5" style={{ color: liveClients.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveClients.length}</p>
-            {diagErrors.clients && <p className="text-[9px] mt-0.5" style={{ color: 'var(--red2)' }}>{diagErrors.clients}</p>}
-          </div>
-          <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-            <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}>Referenti</p>
-            <p className="text-lg font-bold mt-0.5" style={{ color: recentReferenti.length > 0 ? 'var(--green)' : 'var(--muted)' }}>{recentReferenti.length}</p>
+    <div className="mc-root">
+      {/* ═══ MISSION BRIEF ═══ */}
+      <div className="mc-brief animate-fade-in">
+        <div className="mc-brief-inner">
+          <div className={`mc-fly-dot mc-fly-dot--${briefStatus}`} />
+          <div className="mc-brief-text">
+            {missionBrief.slice(0, -1).map((line, i) => (
+              <p key={i} className={i === 0 ? 'mc-brief-greeting' : 'mc-brief-line'}>{line}</p>
+            ))}
+            <p className="mc-brief-cta" onClick={() => {
+              if (kpi.taskInRitardo > 0) navigate('/task')
+              else if (prossimEventi.length > 0) navigate('/eventi')
+              else navigate('/task')
+            }}>
+              {missionBrief[missionBrief.length - 1]}
+              <ArrowRight className="mc-cta-arrow" />
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Main grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left: 2 cols */}
-        <div className="lg:col-span-2 space-y-4 red-thread-vertical">
+      {/* ═══ RED THREAD DESCENT ═══ */}
+      <div className="mc-thread-descent" />
 
-          {/* Eventi imminenti */}
-          <Section title="Eventi imminenti" icon={Calendar} action="Tutti gli eventi" onAction={() => navigate('/eventi')} delay={60}>
-            {prossimEventi.length === 0
-              ? <p className="text-sm text-center py-6" style={{ color: 'var(--muted)' }}>Nessun evento in programma</p>
-              : (
-                <div className="space-y-2">
-                  {prossimEventi.map(ev => {
-                    const color = eventColorByStato(ev.stato)
-                    const dl = daysLeft(ev.dataInizio)
-                    const completati = liveTasks.filter(t => t.evento === ev.id && t.stato === 'completato').length
-                    const totali = liveTasks.filter(t => t.evento === ev.id).length
-                    const pct = totali > 0 ? Math.round((completati / totali) * 100) : 0
-                    return (
-                      <button key={ev.id}
-                        onClick={() => navigate('/eventi')}
-                        className="w-full flex items-center gap-3 p-3.5 rounded-xl text-left transition-all hover:bg-white/5"
-                        style={{ background: 'var(--panel2)' }}>
-                        <div className="w-1.5 self-stretch rounded-full flex-shrink-0" style={{ background: color }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{ev.nome}</p>
-                            <span className="text-xs px-2 py-0.5 rounded flex-shrink-0"
-                              style={{ background: `${color}18`, color }}>
-                              {eventLabelByStato(ev.stato)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 mt-1">
-                            <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
-                              {ev.location} &middot; {fmtShort(ev.dataInizio)}
-                            </p>
-                            {dl >= 0 && dl <= 14 && (
-                              <span className="text-xs flex-shrink-0 font-medium"
-                                style={{ color: dl <= 3 ? 'var(--red2)' : dl <= 7 ? 'var(--yellow)' : 'var(--muted)' }}>
-                                tra {dl}g
-                              </span>
-                            )}
-                          </div>
-                          {totali > 0 && (
-                            <div className="flex items-center gap-2 mt-1.5">
-                              <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'var(--line)' }}>
-                                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
-                              </div>
-                              <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--muted)' }}>{completati}/{totali}</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                            &euro;{(ev.budget / 1000).toFixed(0)}K
-                          </p>
-                          {ev.team.length > 0 && (
-                            <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{ev.team.length} persone</p>
-                          )}
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              )
-            }
-          </Section>
+      {/* ═══ RADAR EVENTI ═══ */}
+      <div className="mc-section animate-fade-in" style={{ animationDelay: '80ms' }}>
+        <div className="mc-radar">
+          <div className="mc-radar-header">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5" style={{ color: 'var(--red2)', opacity: 0.7 }} />
+              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}>
+                Radar Eventi
+              </span>
+            </div>
+            <button onClick={() => navigate('/eventi')}
+              className="text-[11px] font-medium flex items-center gap-1 transition-opacity hover:opacity-100"
+              style={{ color: 'var(--muted)', opacity: 0.6 }}>
+              Tutti <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
 
-          {/* Task in ritardo */}
-          {kpi.taskInRitardo > 0 && (
-            <Section title="Task in ritardo" icon={AlertTriangle} color="var(--red2)" action="Gestisci" onAction={() => navigate('/task')} delay={120}>
-              <div className="space-y-2">
-                {taskInRitardoList.map(t => {
-                  const dl = daysLeft(t.scadenza)
-                  const color = taskPriColor(t.priorita, t.stato)
-                  return (
-                    <button key={t.id}
-                      onClick={() => navigate('/task')}
-                      className="w-full flex items-center gap-3 p-3.5 rounded-xl text-left transition-all hover:bg-white/5"
-                      style={{ background: 'var(--panel2)' }}>
-                      <div className="w-1.5 h-10 rounded-full flex-shrink-0" style={{ background: color }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{t.titolo}</p>
-                        <p className="text-xs truncate mt-0.5" style={{ color: 'var(--muted)' }}>
-                          {t.assegnatario || 'Non assegnato'}
-                        </p>
+          {/* Timeline axis */}
+          <div className="mc-timeline">
+            <div className="mc-timeline-labels">
+              <span>Oggi</span>
+              <span>+7g</span>
+              <span>+14g</span>
+            </div>
+            <div className="mc-timeline-track">
+              <div className="mc-timeline-line" />
+              {prossimEventi.map((ev, idx) => {
+                const dl = daysLeft(ev.dataInizio)
+                const position = Math.min(Math.max((dl / 14) * 100, 2), 96)
+                const taskTotali = myTasks.filter(t => t.evento === ev.id).length
+                const taskDone = myTasks.filter(t => t.evento === ev.id && t.stato === 'completato').length
+                const pct = taskTotali > 0 ? Math.round((taskDone / taskTotali) * 100) : 100
+                const color = eventColorByStato(ev.stato)
+                const isClose = dl <= 3
+
+                return (
+                  <button
+                    key={ev.id}
+                    className={`mc-timeline-node ${isClose ? 'mc-timeline-node--imminent' : ''}`}
+                    style={{ left: `${position}%`, animationDelay: `${idx * 60 + 200}ms` }}
+                    onClick={() => navigate('/eventi')}
+                  >
+                    <div className="mc-node-dot" style={{ background: color }} />
+                    <div className="mc-node-card">
+                      <p className="mc-node-name">{ev.nome}</p>
+                      <div className="mc-node-meta">
+                        <span className="mc-node-days" style={{ color: isClose ? 'var(--red2)' : 'var(--muted)' }}>
+                          {dl === 0 ? 'Oggi' : dl === 1 ? 'Domani' : `${dl}g`}
+                        </span>
+                        <span className="mc-node-budget">&euro;{(ev.budget / 1000).toFixed(0)}K</span>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="w-3 h-3" style={{ color: 'var(--red2)' }} />
-                          <span className="text-xs font-semibold" style={{ color: 'var(--red2)' }}>
-                            {Math.abs(dl)}g scaduto
-                          </span>
+                      <div className="mc-node-readiness">
+                        <div className="mc-readiness-bar">
+                          <div className="mc-readiness-fill" style={{ width: `${pct}%`, background: color }} />
                         </div>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{fmtShort(t.scadenza)}</p>
+                        <span className="mc-readiness-pct">{pct}%</span>
                       </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </Section>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {prossimEventi.length === 0 && (
+            <p className="text-sm text-center py-8" style={{ color: 'var(--muted)' }}>
+              Nessun evento nei prossimi 14 giorni
+            </p>
           )}
-
-          {/* Comunicazioni recenti */}
-          <Section title="Comunicazioni recenti" icon={MessageSquare} color="var(--blue)" action="Tutte" onAction={() => navigate('/comunicazioni')} delay={180}>
-            {comunicazioniRecenti.length === 0
-              ? <p className="text-sm text-center py-6" style={{ color: 'var(--muted)' }}>Nessuna comunicazione</p>
-              : (
-                <div className="space-y-2">
-                  {comunicazioniRecenti.map(m => {
-                    const unread = !m.letto.includes(userId) && m.destinatari.includes(userId)
-                    return (
-                      <button key={m.id}
-                        onClick={() => navigate('/comunicazioni')}
-                        className="w-full flex items-center gap-3 p-3.5 rounded-xl text-left transition-all hover:bg-white/5"
-                        style={{ background: 'var(--panel2)' }}>
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                          style={{ background: 'rgba(77,180,255,0.1)', color: 'var(--blue)' }}>
-                          {(m.mittente || '?').charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm truncate" style={{ color: unread ? 'var(--text)' : 'var(--muted)', fontWeight: unread ? 600 : 400 }}>
-                            {m.oggetto}
-                          </p>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{m.mittente} &middot; {fmtShort(m.data)}</p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {m.priorita === 'alta' && <Zap className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />}
-                          {unread && <div className="w-2 h-2 rounded-full" style={{ background: 'var(--blue)' }} />}
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              )
-            }
-          </Section>
         </div>
+      </div>
 
-        {/* Right sidebar */}
-        <div className="space-y-4 red-thread-spine">
-
-          {/* Task progress ring */}
-          <div className="panel animate-fade-in" style={{ animationDelay: '80ms', borderRadius: '20px', padding: '24px' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.06)' }}>
-                <BarChart3 className="w-3 h-3" style={{ color: 'var(--green)', opacity: 0.8 }} />
-              </div>
-              <h2 className="text-[13px] font-semibold tracking-tight" style={{ color: 'var(--text)' }}>Progresso Task</h2>
+      {/* ═══ MAIN GRID: Pulse + Decisions / Team ═══ */}
+      <div className="mc-grid animate-fade-in" style={{ animationDelay: '160ms' }}>
+        {/* Left column */}
+        <div className="mc-grid-left">
+          {/* Pulse Finanziario */}
+          <div className="mc-panel mc-pulse">
+            <div className="mc-panel-label">
+              <TrendingUp className="w-3 h-3" style={{ opacity: 0.6 }} />
+              <span>Pulse Finanziario</span>
             </div>
-            <div className="flex items-center justify-center py-3">
-              <div className="relative w-28 h-28">
-                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                  <circle cx="50" cy="50" r="40" fill="none" strokeWidth="5" stroke="var(--line)" />
-                  <circle cx="50" cy="50" r="40" fill="none" strokeWidth="5" stroke="var(--green)"
-                    strokeLinecap="round"
-                    strokeDasharray={`${kpi.completionRate * 2.51} 251`}
-                    className="progress-ring-animated" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold" style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}>{kpi.completionRate}%</span>
-                  <span className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--muted)', letterSpacing: '0.06em' }}>completamento</span>
-                </div>
+            <div className="mc-pulse-grid">
+              <div className="mc-pulse-item">
+                <span className="mc-pulse-value">
+                  &euro;{(liveClients.reduce((s, c) => s + (c.fatturato || 0), 0) / 1000).toFixed(0)}K
+                </span>
+                <span className="mc-pulse-label">Portafoglio</span>
               </div>
-            </div>
-            <div className="grid grid-cols-3 gap-2 mt-2 pt-3" style={{ borderTop: '1px solid var(--line)' }}>
-              <div className="text-center">
-                <p className="text-base font-bold" style={{ color: 'var(--blue)' }}>{kpi.taskAperti}</p>
-                <p className="text-[9px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--muted)', letterSpacing: '0.06em' }}>Aperti</p>
+              <div className="mc-pulse-item">
+                <span className="mc-pulse-value" style={{ color: 'var(--green)' }}>
+                  {kpi.completionRate}%
+                </span>
+                <span className="mc-pulse-label">Delivery</span>
               </div>
-              <div className="text-center">
-                <p className="text-base font-bold" style={{ color: 'var(--green)' }}>{kpi.taskCompletati}</p>
-                <p className="text-[9px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--muted)', letterSpacing: '0.06em' }}>Chiusi</p>
-              </div>
-              <div className="text-center">
-                <p className="text-base font-bold" style={{ color: kpi.taskInRitardo > 0 ? 'var(--red2)' : 'var(--muted)' }}>{kpi.taskInRitardo}</p>
-                <p className="text-[9px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--muted)', letterSpacing: '0.06em' }}>In ritardo</p>
+              <div className="mc-pulse-item">
+                <span className="mc-pulse-value" style={{ color: kpi.clientiAttivi > 0 ? 'var(--blue)' : 'var(--muted)' }}>
+                  {kpi.clientiAttivi}
+                </span>
+                <span className="mc-pulse-label">Clienti attivi</span>
               </div>
             </div>
           </div>
 
-          {/* Top clienti */}
-          <Section title="Clienti attivi" icon={Users} color="var(--blue)" action="CRM" onAction={() => navigate('/crm')} delay={140}>
-            <div className="space-y-1.5">
-              {liveClients
-                .filter(c => c.stato === 'vip' || c.stato === 'attivo')
-                .sort((a, b) => b.fatturato - a.fatturato)
-                .slice(0, 5)
-                .map(c => (
-                  <button key={c.id}
-                    onClick={() => navigate('/crm')}
-                    className="w-full flex items-center gap-2.5 p-2.5 rounded-lg text-left transition-all hover:bg-white/5"
-                    style={{ background: 'var(--panel2)' }}>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                      style={{ background: c.stato === 'vip' ? 'rgba(255,194,75,0.12)' : 'rgba(47,111,190,0.08)', color: c.stato === 'vip' ? 'var(--yellow)' : 'var(--blue)' }}>
-                      {(c.nome || '?').charAt(0)}
+          {/* Decisions */}
+          <div className="mc-panel mc-decisions">
+            <div className="mc-panel-label">
+              <AlertTriangle className="w-3 h-3" style={{ opacity: 0.6 }} />
+              <span>Decisioni</span>
+            </div>
+            {decisions.length === 0 ? (
+              <p className="mc-empty">Nessuna decisione urgente</p>
+            ) : (
+              <div className="mc-decisions-list">
+                {decisions.map((d, i) => (
+                  <button key={i} className="mc-decision-row" onClick={d.action}>
+                    <div className={`mc-decision-indicator ${d.urgent ? 'mc-decision-indicator--urgent' : ''}`} />
+                    <div className="mc-decision-content">
+                      <span className="mc-decision-text">{d.text}</span>
+                      <span className="mc-decision-consequence">{d.consequence}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate" style={{ color: 'var(--text)' }}>{c.nome}</p>
-                      <p className="text-[10px]" style={{ color: 'var(--muted)' }}>{c.settore}</p>
-                    </div>
-                    <span className="text-xs font-medium flex-shrink-0" style={{ color: 'var(--muted)' }}>
-                      &euro;{(c.fatturato / 1000).toFixed(0)}K
-                    </span>
+                    <ArrowRight className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--muted)', opacity: 0.4 }} />
                   </button>
                 ))}
-            </div>
-          </Section>
+              </div>
+            )}
+          </div>
+        </div>
 
-          {/* Referenti CRM recenti */}
-          {recentReferenti.length > 0 && (
-            <Section title="Referenti recenti" icon={FileText} color="var(--green)" action="CRM" onAction={() => navigate('/crm')} delay={200}>
-              <div className="space-y-1.5">
-                {recentReferenti.map(r => (
-                  <div key={r.id}
-                    className="flex items-center gap-2.5 p-2.5 rounded-lg"
-                    style={{ background: 'var(--panel2)' }}>
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold"
-                      style={{ background: r.is_principale ? 'rgba(34,197,94,0.12)' : 'var(--line)', color: r.is_principale ? 'var(--green)' : 'var(--muted)' }}>
-                      {(r.nome || '').charAt(0)}{(r.cognome || '').charAt(0)}
+        {/* Right column */}
+        <div className="mc-grid-right">
+          {/* Carico Team */}
+          <div className="mc-panel mc-team">
+            <div className="mc-panel-label">
+              <Users className="w-3 h-3" style={{ opacity: 0.6 }} />
+              <span>Carico Team</span>
+            </div>
+            {teamWorkload.length === 0 ? (
+              <p className="mc-empty">Nessun dato team</p>
+            ) : (
+              <div className="mc-team-list">
+                {teamWorkload.map((member, i) => (
+                  <div key={i} className="mc-team-row">
+                    <span className="mc-team-name" title={member.fullName}>{member.name}</span>
+                    <div className="mc-team-bar-wrapper">
+                      <div
+                        className="mc-team-bar"
+                        style={{
+                          width: `${Math.min(member.load, 100)}%`,
+                          background: member.load > 80 ? 'var(--red2)' : member.load > 50 ? 'var(--yellow)' : 'var(--green)',
+                        }}
+                      />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate" style={{ color: 'var(--text)' }}>
-                        {r.nome} {r.cognome}
-                        {r.is_principale && <span className="ml-1 text-[9px] uppercase" style={{ color: 'var(--green)' }}>P</span>}
-                      </p>
-                      <p className="text-[10px] truncate" style={{ color: 'var(--muted)' }}>
-                        {r.ruolo ? `${r.ruolo} — ` : ''}{r.client_name}
-                      </p>
-                    </div>
+                    <span className="mc-team-count">{member.openTasks}</span>
                   </div>
                 ))}
               </div>
-            </Section>
-          )}
+            )}
+          </div>
 
-          {/* Archivio quick stat */}
-          <div className="panel animate-fade-in" style={{ animationDelay: '260ms', borderRadius: '20px', padding: '20px 24px' }}>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                style={{ background: 'rgba(201,137,32,0.06)' }}>
-                <Archive className="w-3.5 h-3.5" style={{ color: 'var(--yellow)', opacity: 0.8 }} />
-              </div>
-              <div className="flex-1">
-                <p className="text-[13px] font-semibold tracking-tight" style={{ color: 'var(--text)' }}>Knowledge Library</p>
-                <p className="text-[11px]" style={{ color: 'var(--muted)', opacity: 0.6 }}>{archiveCount} documenti</p>
-              </div>
-              <button onClick={() => navigate('/archivio')}
-                className="p-1.5 rounded-lg hover:bg-white/10 transition-all">
-                <ArrowRight className="w-3.5 h-3.5" style={{ color: 'var(--muted)', opacity: 0.5 }} />
-              </button>
-            </div>
+          {/* Quick access */}
+          <div className="mc-panel mc-quicklinks">
+            <button onClick={() => navigate('/eventi')} className="mc-quicklink">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{kpi.eventiImminenti} eventi</span>
+            </button>
+            <button onClick={() => navigate('/task')} className="mc-quicklink">
+              <CheckSquare className="w-3.5 h-3.5" />
+              <span>{kpi.taskAperti} task</span>
+            </button>
+            <button onClick={() => navigate('/archivio')} className="mc-quicklink">
+              <Archive className="w-3.5 h-3.5" />
+              <span>{archiveCount} doc</span>
+            </button>
           </div>
         </div>
       </div>
