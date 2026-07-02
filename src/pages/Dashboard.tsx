@@ -328,6 +328,7 @@ export default function Dashboard() {
                           {dl === 0 ? 'Oggi' : dl === 1 ? 'Domani' : `${dl}g`}
                         </span>
                         <span className="mc-node-budget">&euro;{(ev.budget / 1000).toFixed(0)}K</span>
+                        <span className="mc-node-pct-mobile" style={{ color }}>{pct}%</span>
                       </div>
                       <div className="mc-node-readiness">
                         <div className="mc-readiness-bar">
