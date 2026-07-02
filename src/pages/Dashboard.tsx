@@ -53,7 +53,7 @@ function Section({ title, icon: Icon, color = 'var(--red2)', action, onAction, c
   children: React.ReactNode; delay?: number
 }) {
   return (
-    <div className="panel animate-fade-in" style={{ animationDelay: `${delay}ms`, borderRadius: '20px', padding: '24px' }}>
+    <div className="panel animate-fade-in red-thread-node" style={{ animationDelay: `${delay}ms`, borderRadius: '20px', padding: '24px' }}>
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2.5">
           <div className="w-6 h-6 rounded-md flex items-center justify-center"
@@ -197,7 +197,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 red-thread-h" style={{ paddingBottom: '4px' }}>
         <div>
           <p className="text-[11px] font-medium uppercase tracking-widest" style={{ color: 'var(--muted)', letterSpacing: '0.08em', opacity: 0.6 }}>
             {today.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -213,7 +213,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 red-thread-h" style={{ paddingBottom: '4px' }}>
         <KpiCard label="Task Aperti" value={kpi.taskAperti} sub={`su ${myTasks.length} totali`}
           icon={CheckSquare} color="var(--blue)" delay={0} onClick={() => navigate('/task')} />
         <KpiCard label="Completati" value={kpi.taskCompletati} sub={`${kpi.completionRate}% completamento`}
@@ -229,7 +229,7 @@ export default function Dashboard() {
       </div>
 
       {/* Diagnostic counters */}
-      <div className="panel animate-fade-in" style={{ borderRadius: '20px', padding: '18px 24px' }}>
+      <div className="panel animate-fade-in red-thread-h" style={{ borderRadius: '20px', padding: '18px 24px', paddingBottom: '22px' }}>
         <div className="flex items-center gap-2 mb-3">
           <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: 'rgba(77,180,255,0.06)' }}>
             <Database className="w-3 h-3" style={{ color: 'var(--blue)', opacity: 0.7 }} />
@@ -264,7 +264,7 @@ export default function Dashboard() {
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left: 2 cols */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4 red-thread-vertical">
 
           {/* Eventi imminenti */}
           <Section title="Eventi imminenti" icon={Calendar} action="Tutti gli eventi" onAction={() => navigate('/eventi')} delay={60}>
@@ -400,7 +400,7 @@ export default function Dashboard() {
         </div>
 
         {/* Right sidebar */}
-        <div className="space-y-4">
+        <div className="space-y-4 red-thread-spine">
 
           {/* Task progress ring */}
           <div className="panel animate-fade-in" style={{ animationDelay: '80ms', borderRadius: '20px', padding: '24px' }}>

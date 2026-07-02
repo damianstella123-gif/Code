@@ -550,6 +550,130 @@ textarea::placeholder {
   .card-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
+/* ─── RED THREAD SYSTEM ───────────────────────────────────────────────────── */
+
+.red-thread-vertical {
+  position: relative;
+}
+
+.red-thread-vertical::before {
+  content: '';
+  position: absolute;
+  left: 23px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(211, 28, 48, 0.10) 8%,
+    rgba(211, 28, 48, 0.06) 50%,
+    rgba(211, 28, 48, 0.10) 92%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+[data-theme="dark"] .red-thread-vertical::before {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(255, 51, 82, 0.12) 8%,
+    rgba(255, 51, 82, 0.06) 50%,
+    rgba(255, 51, 82, 0.12) 92%,
+    transparent 100%
+  );
+}
+
+.red-thread-h {
+  position: relative;
+}
+
+.red-thread-h::after {
+  content: '';
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(211, 28, 48, 0.10) 20%,
+    rgba(211, 28, 48, 0.06) 50%,
+    rgba(211, 28, 48, 0.10) 80%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+[data-theme="dark"] .red-thread-h::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 51, 82, 0.12) 20%,
+    rgba(255, 51, 82, 0.06) 50%,
+    rgba(255, 51, 82, 0.12) 80%,
+    transparent 100%
+  );
+}
+
+.red-thread-node {
+  position: relative;
+}
+
+.red-thread-node::before {
+  content: '';
+  position: absolute;
+  left: 21px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(211, 28, 48, 0.14);
+  pointer-events: none;
+  z-index: 1;
+}
+
+[data-theme="dark"] .red-thread-node::before {
+  background: rgba(255, 51, 82, 0.18);
+}
+
+.red-thread-spine {
+  position: relative;
+}
+
+.red-thread-spine::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(211, 28, 48, 0.08) 15%,
+    rgba(211, 28, 48, 0.05) 50%,
+    rgba(211, 28, 48, 0.08) 85%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+[data-theme="dark"] .red-thread-spine::before {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(255, 51, 82, 0.10) 15%,
+    rgba(255, 51, 82, 0.05) 50%,
+    rgba(255, 51, 82, 0.10) 85%,
+    transparent 100%
+  );
+}
+
 /* ─── ANIMATIONS ───────────────────────────────────────────────────────────── */
 
 @keyframes fadeIn {
