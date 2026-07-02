@@ -85,11 +85,11 @@ function Sidebar({ open, setOpen }: SidebarProps) {
           open ? 'translate-x-0' : '-translate-x-full'
         )}
         style={{
-          background: 'rgba(255, 255, 255, 0.60)',
+          background: 'linear-gradient(165deg, rgba(255,255,255,0.68) 0%, rgba(255,255,255,0.55) 100%)',
           backdropFilter: 'blur(40px) saturate(1.5)',
           WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
-          borderRight: '1px solid rgba(255, 255, 255, 0.50)',
-          boxShadow: '4px 0 40px rgba(38, 41, 46, 0.06), inset -1px 0 0 rgba(255,255,255,0.6)',
+          borderRight: '1px solid rgba(255, 255, 255, 0.40)',
+          boxShadow: '3px 0 32px rgba(38, 41, 46, 0.05), inset 1px 1px 0 rgba(255,255,255,0.7), inset 0 -1px 0 rgba(38,41,46,0.02)',
         }}
       >
         {/* Logo */}
@@ -122,10 +122,10 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                 className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-200 relative group"
 style={{
   background: isActive
-    ? 'linear-gradient(135deg, #D31C30 0%, #e02040 100%)'
+    ? 'linear-gradient(145deg, #D31C30 0%, #e02040 100%)'
     : 'transparent',
   color: isActive ? '#ffffff' : '#26292E',
-  boxShadow: isActive ? '0 4px 16px rgba(211, 28, 48, 0.20), 0 2px 4px rgba(211, 28, 48, 0.10), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none',
+  boxShadow: isActive ? '2px 3px 14px rgba(211, 28, 48, 0.20), 1px 2px 4px rgba(211, 28, 48, 0.10), inset 1px 1px 0 rgba(255,255,255,0.18)' : 'none',
   borderRadius: '1.5rem',
 }}
               >
@@ -148,7 +148,7 @@ style={{
         {/* User section */}
         <div className="p-4 border-t" style={{ borderColor: 'rgba(38, 41, 46, 0.05)' }}>
           {user ? (
-            <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.50)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.50)', boxShadow: '0 2px 8px rgba(38,41,46,0.04), inset 0 1px 0 rgba(255,255,255,0.6)' }}>
+            <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: 'linear-gradient(150deg, rgba(255,255,255,0.58) 0%, rgba(255,255,255,0.42) 100%)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.45)', boxShadow: '2px 3px 10px rgba(38,41,46,0.04), inset 1px 1px 0 rgba(255,255,255,0.65)' }}>
               <div
                 className="w-10 h-10 rounded-2xl flex-shrink-0 flex items-center justify-center text-sm font-bold text-white"
                 style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}
@@ -323,11 +323,11 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
     <header
       className="sticky top-0 z-30 h-16"
       style={{
-        background: 'rgba(255, 255, 255, 0.65)',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.58) 100%)',
         backdropFilter: 'blur(40px) saturate(1.5)',
         WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.40)',
-        boxShadow: '0 4px 24px rgba(38, 41, 46, 0.04), inset 0 -1px 0 rgba(38, 41, 46, 0.03)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.35)',
+        boxShadow: '0 2px 20px rgba(38, 41, 46, 0.04), inset 0 1px 0 rgba(255,255,255,0.8)',
       }}
     >
       <div className="flex items-center justify-between h-full px-4 lg:px-6">
@@ -534,11 +534,11 @@ export default function Layout({ children }: { children: ReactNode }) {
       className="min-h-screen relative"
       style={{ background: '#eef0f4' }}
     >
-      {/* Level 1: Ambient depth lights */}
+      {/* Level 1: Ambient depth lights — directional from top-left */}
       <div className="fixed inset-0 pointer-events-none" aria-hidden="true">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[500px]" style={{ background: 'radial-gradient(ellipse, rgba(211,28,48,0.025) 0%, transparent 65%)', opacity: 0.8 }} />
-        <div className="absolute bottom-0 right-1/6 w-[500px] h-[400px]" style={{ background: 'radial-gradient(ellipse, rgba(47,111,190,0.02) 0%, transparent 60%)', opacity: 0.7 }} />
-        <div className="absolute top-1/3 right-0 w-[400px] h-[400px]" style={{ background: 'radial-gradient(ellipse, rgba(211,28,48,0.015) 0%, transparent 55%)', opacity: 0.6 }} />
+        <div className="absolute top-0 left-0 w-[700px] h-[500px]" style={{ background: 'radial-gradient(ellipse at 20% 15%, rgba(255,255,255,0.55) 0%, transparent 60%)', opacity: 0.7 }} />
+        <div className="absolute bottom-0 right-0 w-[600px] h-[400px]" style={{ background: 'radial-gradient(ellipse at 80% 85%, rgba(38,41,46,0.025) 0%, transparent 55%)', opacity: 0.8 }} />
+        <div className="absolute top-1/4 left-1/6 w-[400px] h-[350px]" style={{ background: 'radial-gradient(ellipse, rgba(211,28,48,0.015) 0%, transparent 60%)', opacity: 0.6 }} />
       </div>
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
       <div className="lg:pl-64 flex flex-col min-h-screen">
@@ -548,11 +548,13 @@ export default function Layout({ children }: { children: ReactNode }) {
             <div
               className="rounded-[28px] p-5 lg:p-7"
               style={{
-                background: 'rgba(255, 255, 255, 0.55)',
+                background: 'linear-gradient(150deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.48) 100%)',
                 backdropFilter: 'blur(40px) saturate(1.6)',
                 WebkitBackdropFilter: 'blur(40px) saturate(1.6)',
-                border: '1px solid rgba(255, 255, 255, 0.50)',
-                boxShadow: '0 20px 60px rgba(38, 41, 46, 0.07), 0 8px 20px rgba(38, 41, 46, 0.03), inset 0 1px 0 rgba(255,255,255,0.7)',
+                border: '1px solid rgba(255, 255, 255, 0.42)',
+                borderTopColor: 'rgba(255,255,255,0.65)',
+                borderLeftColor: 'rgba(255,255,255,0.58)',
+                boxShadow: '4px 6px 40px rgba(38, 41, 46, 0.06), 2px 3px 12px rgba(38, 41, 46, 0.03), inset 1px 1px 0 rgba(255,255,255,0.75), inset -1px -1px 0 rgba(38,41,46,0.015)',
                 minHeight: 'calc(100vh - 7rem)',
               }}
             >

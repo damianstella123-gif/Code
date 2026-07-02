@@ -32,12 +32,12 @@ function KpiCard({ label, value, sub, icon: Icon, color, onClick, delay = 0 }: {
 }) {
   return (
     <div className="kpi-energy-card panel p-5 hover-card cursor-pointer animate-fade-in flex flex-col justify-between gap-3 group"
-      style={{ animationDelay: `${delay}ms`, borderRadius: '20px' }}
+      style={{ animationDelay: `${delay}ms`, borderRadius: '20px', backgroundImage: 'linear-gradient(150deg, rgba(255,255,255,0.3) 0%, transparent 45%)' }}
       onClick={onClick}>
       <div className="flex items-start justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)', letterSpacing: '0.06em' }}>{label}</p>
         <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all duration-400 group-hover:scale-110 group-hover:shadow-lg"
-          style={{ background: `${color}12`, boxShadow: `0 4px 14px ${color}15` }}>
+          style={{ background: `${color}12`, boxShadow: `1px 2px 10px ${color}10, inset 1px 1px 0 rgba(255,255,255,0.5)` }}>
           <Icon className="w-[18px] h-[18px]" style={{ color }} />
         </div>
       </div>
@@ -54,11 +54,11 @@ function Section({ title, icon: Icon, color = 'var(--red2)', action, onAction, c
   children: React.ReactNode; delay?: number
 }) {
   return (
-    <div className="panel p-6 animate-fade-in" style={{ animationDelay: `${delay}ms`, borderRadius: '22px' }}>
+    <div className="panel p-6 animate-fade-in" style={{ animationDelay: `${delay}ms`, borderRadius: '22px', backgroundImage: 'linear-gradient(150deg, rgba(255,255,255,0.25) 0%, transparent 40%)' }}>
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-            style={{ background: `${color}10`, boxShadow: `0 2px 8px ${color}08` }}>
+            style={{ background: `${color}10`, boxShadow: `1px 2px 6px ${color}08, inset 1px 1px 0 rgba(255,255,255,0.4)` }}>
             <Icon className="w-4 h-4" style={{ color }} />
           </div>
           <h2 className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>{title}</h2>
@@ -406,7 +406,7 @@ export default function Dashboard() {
         <div className="space-y-6">
 
           {/* Task progress ring */}
-          <div className="panel p-6 animate-fade-in energy-ring-card" style={{ animationDelay: '80ms', borderRadius: '22px' }}>
+          <div className="panel p-6 animate-fade-in energy-ring-card" style={{ animationDelay: '80ms', borderRadius: '22px', backgroundImage: 'linear-gradient(150deg, rgba(255,255,255,0.28) 0%, transparent 40%)' }}>
             <div className="flex items-center gap-2.5 mb-4">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.12)' }}>
                 <BarChart3 className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />
@@ -500,7 +500,7 @@ export default function Dashboard() {
           )}
 
           {/* Archivio quick stat */}
-          <div className="panel p-5 animate-fade-in energy-ring-card" style={{ animationDelay: '260ms', borderRadius: '20px' }}>
+          <div className="panel p-5 animate-fade-in energy-ring-card" style={{ animationDelay: '260ms', borderRadius: '20px', backgroundImage: 'linear-gradient(150deg, rgba(255,255,255,0.25) 0%, transparent 40%)' }}>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center"
                 style={{ background: 'rgba(234,179,8,0.1)' }}>
