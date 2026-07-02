@@ -61,6 +61,7 @@ interface BudgetLine {
   iva_inclusa_venduto: boolean
   aliquota_iva_costo: string
   iva_inclusa_costo: boolean
+  commissione_pct: number | null
   margine: number
   marginePct: number
   stato_conferma: StatoConferma
@@ -148,6 +149,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       venduto: number
       costo: number
       sotto?: string
+      commissione_pct?: number | null
     }) {
       const margine = opts.venduto - opts.costo
       const marginePct = opts.venduto > 0 ? (margine / opts.venduto) * 100 : 0
@@ -166,6 +168,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         iva_inclusa_venduto: (row.iva_inclusa_venduto as boolean) ?? false,
         aliquota_iva_costo: (row.aliquota_iva_costo as string) || '22',
         iva_inclusa_costo: (row.iva_inclusa_costo as boolean) ?? false,
+        commissione_pct: opts.commissione_pct ?? null,
         margine,
         marginePct,
         stato_conferma: resolveStato(row.supplier_id as string),
@@ -191,6 +194,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       if (!venduto && !costo) continue
       pushLine(h, resolveCat(h.supplier_id as string, 'HOTEL'), 'event_hotel_details', {
         descrizione: (h.titolo as string) || (h.tipo as string) || 'Hotel', qty, venduto, costo,
+        commissione_pct: (h.commissione_pct as number) ?? null,
       })
     }
 
@@ -308,10 +312,14 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     const venduto = lines.reduce((s, l) => s + l.venduto, 0)
     const costo = lines.reduce((s, l) => s + l.costo, 0)
     const fee = venduto * feePct / 100
-    const ricavi = venduto + fee
+    const commissioni = lines.reduce((s, l) => {
+      if (l.commissione_pct && l.costo > 0) return s + (l.costo * l.commissione_pct / 100)
+      return s
+    }, 0)
+    const ricavi = venduto + fee + commissioni
     const margine = ricavi - costo
     const marginePct = ricavi > 0 ? (margine / ricavi) * 100 : 0
-    return { venduto, costo, fee, ricavi, margine, marginePct }
+    return { venduto, costo, fee, commissioni, ricavi, margine, marginePct }
   }, [lines, feePct])
 
   const fmt = (n: number) => '\u20AC' + n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
@@ -516,6 +524,15 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       { content: fmtN(totals.fee), styles: { fontStyle: 'bold' } },
       { content: fmtN(totals.margine), styles: { fontStyle: 'bold' } },
     ])
+    if (totals.commissioni > 0) {
+      riepilogoBody.push([
+        { content: 'COMMISSIONI HOTEL (interno)', styles: { fontStyle: 'italic' } },
+        { content: '', styles: {} },
+        { content: '', styles: {} },
+        { content: '', styles: {} },
+        { content: fmtN(totals.commissioni), styles: { fontStyle: 'bold' } },
+      ])
+    }
 
     autoTable(doc, {
       startY: startY + 4,
@@ -657,6 +674,9 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       rows.push([cat.label, '', '', '', '', cv, cc, cf, cm, ''])
     }
     rows.push(['TOTALE EVENTO', '', '', '', '', totals.venduto, totals.costo, totals.fee, totals.margine, totals.marginePct / 100])
+    if (totals.commissioni > 0) {
+      rows.push(['COMMISSIONI HOTEL (interno)', '', '', '', '', '', '', '', totals.commissioni, ''])
+    }
 
     const ws = XLSX.utils.aoa_to_sheet(rows)
     ws['!cols'] = [{ wch: 22 }, { wch: 40 }, { wch: 20 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 12 }]
@@ -736,6 +756,12 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
           <span className="w-10 text-xs text-right" style={{ color: 'var(--text)' }}>{item.qty}</span>
           <span className="w-20 text-xs text-right" style={{ color: 'var(--text)' }}>{fmt(item.venduto)}</span>
           <span className="w-20 text-xs text-right" style={{ color: 'var(--yellow)' }}>{fmt(item.costo)}</span>
+          {item.commissione_pct != null && item.commissione_pct > 0 && (
+            <span className="w-14 text-[10px] text-right" style={{ color: 'var(--green)' }} title="Commissione hotel sul costo">+{item.commissione_pct}%</span>
+          )}
+          {(item.commissione_pct == null || item.commissione_pct <= 0) && (
+            <span className="w-14" />
+          )}
           <span className="w-20 text-xs text-right font-medium" style={{ color: item.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmt(item.margine)}</span>
           <span className="w-10 text-xs text-right font-medium" style={{ color: item.marginePct >= margineTarget ? 'var(--green)' : item.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{item.marginePct.toFixed(0)}%</span>
         </button>
@@ -753,6 +779,9 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
               <Detail label="Costo reale" value={fmt(item.costo)} />
               <Detail label="IVA Venduto" value={`${item.aliquota_iva_venduto}% ${item.iva_inclusa_venduto ? '(inclusa)' : '(esclusa)'}`} />
               <Detail label="IVA Costo" value={`${item.aliquota_iva_costo}% ${item.iva_inclusa_costo ? '(inclusa)' : '(esclusa)'}`} />
+              {item.commissione_pct != null && item.commissione_pct > 0 && (
+                <Detail label="Commissione Hotel" value={`${item.commissione_pct}% sul costo = ${fmt(item.costo * item.commissione_pct / 100)}`} />
+              )}
               <Detail label="Margine" value={fmt(item.margine)} />
               <Detail label="Margine %" value={`${item.marginePct.toFixed(1)}%`} />
             </div>
@@ -831,6 +860,9 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
                 </p>
               )}
             </div>
+            {totals.commissioni > 0 && (
+              <Kpi label="Commissioni Hotel" value={fmt(totals.commissioni)} color="var(--green)" />
+            )}
             <Kpi label="Totale Ricavi" value={fmt(totals.ricavi)} color="var(--text)" />
           </div>
           <div className="h-px" style={{ background: 'var(--line)' }} />
@@ -1048,6 +1080,9 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
               <span style={{ color: 'var(--muted)' }}>Venduto: <strong style={{ color: 'var(--text)' }}>{fmt(totals.venduto)}</strong></span>
               <span style={{ color: 'var(--muted)' }}>Costi: <strong style={{ color: 'var(--yellow)' }}>{fmt(totals.costo)}</strong></span>
               <span style={{ color: 'var(--muted)' }}>Fee {feePct}%: <strong style={{ color: 'var(--blue)' }}>{fmt(totals.fee)}</strong></span>
+              {totals.commissioni > 0 && (
+                <span style={{ color: 'var(--muted)' }}>Comm.: <strong style={{ color: 'var(--green)' }}>{fmt(totals.commissioni)}</strong></span>
+              )}
               <span style={{ color: 'var(--muted)' }}>Margine: <strong style={{ color: totals.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmt(totals.margine)}</strong></span>
               <strong style={{ color: totals.marginePct >= margineTarget ? 'var(--green)' : 'var(--yellow)' }}>{totals.marginePct.toFixed(1)}%</strong>
             </div>
