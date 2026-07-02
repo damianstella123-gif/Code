@@ -111,25 +111,22 @@ body {
 }
 
 .panel:hover {
-  border-color: rgba(255, 255, 255, 0.48);
+  border-color: rgba(255, 255, 255, 0.44);
 }
 
 [data-theme="light"] .panel {
-  background-image: linear-gradient(145deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 50%);
+  background-image: linear-gradient(160deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0) 40%);
   box-shadow:
-    3px 4px 18px rgba(38, 41, 46, 0.06),
-    1px 2px 5px rgba(38, 41, 46, 0.03),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.80),
-    inset -1px -1px 0 rgba(38, 41, 46, 0.025);
+    0 2px 12px rgba(38, 41, 46, 0.04),
+    0 1px 3px rgba(38, 41, 46, 0.02),
+    inset 0 1px 0 rgba(255, 255, 255, 0.80);
 }
 
 [data-theme="light"] .panel:hover {
-  transform: translateY(-1px);
   box-shadow:
-    3px 6px 24px rgba(38, 41, 46, 0.07),
-    2px 3px 8px rgba(38, 41, 46, 0.035),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.85),
-    inset -1px -1px 0 rgba(38, 41, 46, 0.02);
+    0 4px 16px rgba(38, 41, 46, 0.05),
+    0 1px 4px rgba(38, 41, 46, 0.025),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
 [data-theme="dark"] .panel {
@@ -141,12 +138,11 @@ body {
 }
 
 [data-theme="dark"] .panel:hover {
-  border-color: rgba(255, 255, 255, 0.10);
-  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.09);
   box-shadow:
-    0 12px 36px rgba(0, 0, 0, 0.45),
-    0 4px 12px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 8px 28px rgba(0, 0, 0, 0.40),
+    0 2px 8px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .panel-2 {
@@ -442,25 +438,23 @@ textarea::placeholder {
 /* ─── HOVER CARD ───────────────────────────────────────────────────────────── */
 
 .hover-card {
-  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.4s ease;
+  transition: box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease;
 }
 
 .hover-card:hover {
-  transform: translateY(-1px);
   box-shadow:
-    3px 6px 24px rgba(38, 41, 46, 0.06),
-    2px 3px 8px rgba(38, 41, 46, 0.03),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.85),
-    inset -1px -1px 0 rgba(38, 41, 46, 0.015);
+    0 4px 16px rgba(38, 41, 46, 0.05),
+    0 1px 4px rgba(38, 41, 46, 0.025),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
   border-color: rgba(255, 255, 255, 0.50);
 }
 
 [data-theme="dark"] .hover-card:hover {
   box-shadow:
-    0 14px 40px rgba(0, 0, 0, 0.45),
-    0 4px 10px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.10);
+    0 8px 28px rgba(0, 0, 0, 0.40),
+    0 2px 8px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.09);
 }
 
 /* ─── GLASS ────────────────────────────────────────────────────────────────── */
@@ -521,75 +515,10 @@ textarea::placeholder {
   text-shadow: 0 0 20px rgba(211, 28, 48, 0.5);
 }
 
-/* ─── DASHBOARD ENERGY EFFECTS ────────────────────────────────────────────── */
+/* ─── DASHBOARD CARDS ─────────────────────────────────────────────────────── */
 
 .kpi-energy-card {
   position: relative;
-  overflow: hidden;
-}
-
-.kpi-energy-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(211, 28, 48, 0.12), transparent 40%, transparent 60%, rgba(211, 28, 48, 0.06));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-.kpi-energy-card:hover::before {
-  opacity: 1;
-}
-
-.kpi-energy-card::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(ellipse at center, rgba(211, 28, 48, 0.03) 0%, transparent 50%);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-.kpi-energy-card:hover::after {
-  opacity: 1;
-}
-
-.kpi-value-glow {
-  transition: text-shadow 0.3s ease;
-}
-
-.kpi-energy-card:hover .kpi-value-glow,
-.energy-ring-card:hover .kpi-value-glow {
-  text-shadow: 0 0 12px rgba(211, 28, 48, 0.15), 0 0 4px rgba(211, 28, 48, 0.08);
-}
-
-.energy-ring-card {
-  position: relative;
-}
-
-.energy-ring-card::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  background: linear-gradient(160deg, rgba(211, 28, 48, 0.08), transparent 30%, transparent 70%, rgba(56, 210, 125, 0.06));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  padding: 1px;
-  pointer-events: none;
 }
 
 .energy-pulse-dot {
@@ -603,19 +532,6 @@ textarea::placeholder {
 
 .progress-ring-animated {
   transition: stroke-dasharray 1s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-[data-theme="dark"] .kpi-energy-card::before {
-  background: linear-gradient(135deg, rgba(255, 51, 82, 0.18), transparent 40%, transparent 60%, rgba(255, 51, 82, 0.08));
-}
-
-[data-theme="dark"] .kpi-energy-card:hover .kpi-value-glow,
-[data-theme="dark"] .energy-ring-card:hover .kpi-value-glow {
-  text-shadow: 0 0 16px rgba(255, 51, 82, 0.25), 0 0 6px rgba(255, 51, 82, 0.12);
-}
-
-[data-theme="dark"] .energy-ring-card::before {
-  background: linear-gradient(160deg, rgba(255, 51, 82, 0.14), transparent 30%, transparent 70%, rgba(56, 210, 125, 0.10));
 }
 
 /* ─── CARD GRID ────────────────────────────────────────────────────────────── */
@@ -637,7 +553,7 @@ textarea::placeholder {
 /* ─── ANIMATIONS ───────────────────────────────────────────────────────────── */
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -656,7 +572,7 @@ textarea::placeholder {
   100% { background-position: -200% 0; }
 }
 
-.animate-fade-in { animation: fadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 .animate-slide-in-right { animation: slideInRight 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 

@@ -4,7 +4,6 @@ import {
   Calendar, CheckSquare, Users, Clock, ArrowRight, Zap, MessageSquare,
   FileText, AlertTriangle, BarChart3, TrendingUp, Archive, Database,
 } from 'lucide-react'
-import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import { loadUser } from '@/lib/auth'
 import { daysLeft, fmtShort, eventColorByStato, eventLabelByStato, taskPriColor } from '@/lib/format'
 import { fetchEvents } from '@/lib/events-service'
@@ -32,18 +31,18 @@ function KpiCard({ label, value, sub, icon: Icon, color, onClick, delay = 0 }: {
 }) {
   return (
     <div className="kpi-energy-card panel hover-card cursor-pointer animate-fade-in flex flex-col justify-between group"
-      style={{ animationDelay: `${delay}ms`, borderRadius: '18px', padding: '20px 20px 18px' }}
+      style={{ animationDelay: `${delay}ms`, borderRadius: '20px', padding: '20px' }}
       onClick={onClick}>
       <div className="flex items-center justify-between mb-4">
         <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)', letterSpacing: '0.1em' }}>{label}</p>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-105"
-          style={{ background: `${color}0a` }}>
-          <Icon className="w-4 h-4" style={{ color, opacity: 0.85 }} />
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: `${color}08` }}>
+          <Icon className="w-3.5 h-3.5" style={{ color, opacity: 0.8 }} />
         </div>
       </div>
       <div>
-        <p className="text-[2rem] font-bold tracking-tighter leading-none kpi-value-glow" style={{ color: 'var(--text)', letterSpacing: '-0.03em' }}>{value}</p>
-        {sub && <p className="text-[11px] mt-2 leading-tight" style={{ color: 'var(--muted)', opacity: 0.8 }}>{sub}</p>}
+        <p className="text-[2rem] font-bold tracking-tighter leading-none" style={{ color: 'var(--text)', letterSpacing: '-0.03em' }}>{value}</p>
+        {sub && <p className="text-[11px] mt-2 leading-tight" style={{ color: 'var(--muted)', opacity: 0.7 }}>{sub}</p>}
       </div>
     </div>
   )
@@ -57,16 +56,16 @@ function Section({ title, icon: Icon, color = 'var(--red2)', action, onAction, c
     <div className="panel animate-fade-in" style={{ animationDelay: `${delay}ms`, borderRadius: '20px', padding: '24px' }}>
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+          <div className="w-6 h-6 rounded-md flex items-center justify-center"
             style={{ background: `${color}08` }}>
-            <Icon className="w-3.5 h-3.5" style={{ color, opacity: 0.9 }} />
+            <Icon className="w-3 h-3" style={{ color, opacity: 0.8 }} />
           </div>
-          <h2 className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text)' }}>{title}</h2>
+          <h2 className="text-[13px] font-semibold tracking-tight" style={{ color: 'var(--text)' }}>{title}</h2>
         </div>
         {action && (
           <button onClick={onAction}
             className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-all duration-200 hover:bg-white/10"
-            style={{ color: 'var(--muted)', opacity: 0.7 }}>
+            style={{ color: 'var(--muted)', opacity: 0.6 }}>
             {action} <ArrowRight className="w-3 h-3" />
           </button>
         )}
@@ -196,25 +195,25 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3 pb-1">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-widest" style={{ color: 'var(--muted)', letterSpacing: '0.08em', opacity: 0.7 }}>
+          <p className="text-[11px] font-medium uppercase tracking-widest" style={{ color: 'var(--muted)', letterSpacing: '0.08em', opacity: 0.6 }}>
             {today.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
-          <h1 className="text-[1.75rem] font-bold mt-2 tracking-tight" style={{ color: 'var(--text)', letterSpacing: '-0.025em' }}>
+          <h1 className="text-[1.6rem] font-bold mt-1.5 tracking-tight" style={{ color: 'var(--text)', letterSpacing: '-0.025em' }}>
             {getGreeting()}, {currentUser?.first_name ?? currentUser?.nome?.split(' ')[0] ?? 'utente'}
           </h1>
         </div>
         <span className="text-[10px] px-3 py-1 rounded-lg font-medium uppercase tracking-wider"
-          style={{ background: 'rgba(38,41,46,0.04)', color: 'var(--muted)', letterSpacing: '0.06em' }}>
+          style={{ background: 'rgba(38,41,46,0.03)', color: 'var(--muted)', letterSpacing: '0.06em' }}>
           {currentUser?.role ?? ruolo}
         </span>
       </div>
 
       {/* KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <KpiCard label="Task Aperti" value={kpi.taskAperti} sub={`su ${myTasks.length} totali`}
           icon={CheckSquare} color="var(--blue)" delay={0} onClick={() => navigate('/task')} />
         <KpiCard label="Completati" value={kpi.taskCompletati} sub={`${kpi.completionRate}% completamento`}
@@ -230,44 +229,42 @@ export default function Dashboard() {
       </div>
 
       {/* Diagnostic counters */}
-      <AnimatedLaserBorder active loading={false} style={{ borderRadius: '16px' }}>
-        <div className="panel animate-fade-in" style={{ border: 'none', borderRadius: '16px', padding: '16px 20px' }}>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: 'rgba(77,180,255,0.08)' }}>
-              <Database className="w-3 h-3" style={{ color: 'var(--blue)', opacity: 0.8 }} />
-            </div>
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)', letterSpacing: '0.06em' }}>Diagnostica</h3>
-            <div className="flex-1" />
-            <div className="w-1.5 h-1.5 rounded-full energy-pulse-dot" style={{ background: 'var(--green)' }} />
+      <div className="panel animate-fade-in" style={{ borderRadius: '20px', padding: '18px 24px' }}>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: 'rgba(77,180,255,0.06)' }}>
+            <Database className="w-3 h-3" style={{ color: 'var(--blue)', opacity: 0.7 }} />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <div className="p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)', letterSpacing: '0.06em' }}>Diagnostica</h3>
+          <div className="flex-1" />
+          <div className="w-1.5 h-1.5 rounded-full energy-pulse-dot" style={{ background: 'var(--green)' }} />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
             <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}>Suppliers</p>
             <p className="text-lg font-bold mt-0.5" style={{ color: liveSuppliers.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveSuppliers.length}</p>
             {diagErrors.suppliers && <p className="text-[9px] mt-0.5" style={{ color: 'var(--red2)' }}>{diagErrors.suppliers}</p>}
           </div>
-          <div className="p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+          <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
             <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}>Events</p>
             <p className="text-lg font-bold mt-0.5" style={{ color: liveEvents.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveEvents.length}</p>
             {diagErrors.events && <p className="text-[9px] mt-0.5" style={{ color: 'var(--red2)' }}>{diagErrors.events}</p>}
           </div>
-          <div className="p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+          <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
             <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}>Clients</p>
             <p className="text-lg font-bold mt-0.5" style={{ color: liveClients.length > 0 ? 'var(--green)' : 'var(--red2)' }}>{liveClients.length}</p>
             {diagErrors.clients && <p className="text-[9px] mt-0.5" style={{ color: 'var(--red2)' }}>{diagErrors.clients}</p>}
           </div>
-          <div className="p-3 rounded-lg" style={{ background: 'var(--panel2)' }}>
+          <div className="p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
             <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}>Referenti</p>
             <p className="text-lg font-bold mt-0.5" style={{ color: recentReferenti.length > 0 ? 'var(--green)' : 'var(--muted)' }}>{recentReferenti.length}</p>
           </div>
         </div>
       </div>
-      </AnimatedLaserBorder>
 
       {/* Main grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left: 2 cols */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="lg:col-span-2 space-y-4">
 
           {/* Eventi imminenti */}
           <Section title="Eventi imminenti" icon={Calendar} action="Tutti gli eventi" onAction={() => navigate('/eventi')} delay={60}>
@@ -285,7 +282,7 @@ export default function Dashboard() {
                       <button key={ev.id}
                         onClick={() => navigate('/eventi')}
                         className="w-full flex items-center gap-3 p-3.5 rounded-xl text-left transition-all hover:bg-white/5"
-                        style={{ background: 'var(--panel2)', border: `1px solid ${color}20` }}>
+                        style={{ background: 'var(--panel2)' }}>
                         <div className="w-1.5 self-stretch rounded-full flex-shrink-0" style={{ background: color }} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
@@ -342,7 +339,7 @@ export default function Dashboard() {
                     <button key={t.id}
                       onClick={() => navigate('/task')}
                       className="w-full flex items-center gap-3 p-3.5 rounded-xl text-left transition-all hover:bg-white/5"
-                      style={{ background: 'var(--panel2)', border: '1px solid rgba(255,49,95,0.12)' }}>
+                      style={{ background: 'var(--panel2)' }}>
                       <div className="w-1.5 h-10 rounded-full flex-shrink-0" style={{ background: color }} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{t.titolo}</p>
@@ -378,7 +375,7 @@ export default function Dashboard() {
                       <button key={m.id}
                         onClick={() => navigate('/comunicazioni')}
                         className="w-full flex items-center gap-3 p-3.5 rounded-xl text-left transition-all hover:bg-white/5"
-                        style={{ background: 'var(--panel2)', border: unread ? '1px solid rgba(77,180,255,0.2)' : '1px solid transparent' }}>
+                        style={{ background: 'var(--panel2)' }}>
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold"
                           style={{ background: 'rgba(77,180,255,0.1)', color: 'var(--blue)' }}>
                           {(m.mittente || '?').charAt(0).toUpperCase()}
@@ -403,27 +400,27 @@ export default function Dashboard() {
         </div>
 
         {/* Right sidebar */}
-        <div className="space-y-5">
+        <div className="space-y-4">
 
           {/* Task progress ring */}
-          <div className="panel animate-fade-in energy-ring-card" style={{ animationDelay: '80ms', borderRadius: '20px', padding: '24px' }}>
+          <div className="panel animate-fade-in" style={{ animationDelay: '80ms', borderRadius: '20px', padding: '24px' }}>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.08)' }}>
-                <BarChart3 className="w-3 h-3" style={{ color: 'var(--green)', opacity: 0.9 }} />
+              <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.06)' }}>
+                <BarChart3 className="w-3 h-3" style={{ color: 'var(--green)', opacity: 0.8 }} />
               </div>
-              <h2 className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text)' }}>Progresso Task</h2>
+              <h2 className="text-[13px] font-semibold tracking-tight" style={{ color: 'var(--text)' }}>Progresso Task</h2>
             </div>
             <div className="flex items-center justify-center py-3">
               <div className="relative w-28 h-28">
                 <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                  <circle cx="50" cy="50" r="40" fill="none" strokeWidth="6" stroke="var(--line)" />
-                  <circle cx="50" cy="50" r="40" fill="none" strokeWidth="6" stroke="var(--green)"
+                  <circle cx="50" cy="50" r="40" fill="none" strokeWidth="5" stroke="var(--line)" />
+                  <circle cx="50" cy="50" r="40" fill="none" strokeWidth="5" stroke="var(--green)"
                     strokeLinecap="round"
                     strokeDasharray={`${kpi.completionRate * 2.51} 251`}
                     className="progress-ring-animated" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold kpi-value-glow" style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}>{kpi.completionRate}%</span>
+                  <span className="text-xl font-bold" style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}>{kpi.completionRate}%</span>
                   <span className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--muted)', letterSpacing: '0.06em' }}>completamento</span>
                 </div>
               </div>
@@ -500,19 +497,19 @@ export default function Dashboard() {
           )}
 
           {/* Archivio quick stat */}
-          <div className="panel animate-fade-in energy-ring-card" style={{ animationDelay: '260ms', borderRadius: '18px', padding: '18px 20px' }}>
+          <div className="panel animate-fade-in" style={{ animationDelay: '260ms', borderRadius: '20px', padding: '20px 24px' }}>
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center"
-                style={{ background: 'rgba(201,137,32,0.07)' }}>
-                <Archive className="w-4 h-4" style={{ color: 'var(--yellow)', opacity: 0.85 }} />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ background: 'rgba(201,137,32,0.06)' }}>
+                <Archive className="w-3.5 h-3.5" style={{ color: 'var(--yellow)', opacity: 0.8 }} />
               </div>
               <div className="flex-1">
                 <p className="text-[13px] font-semibold tracking-tight" style={{ color: 'var(--text)' }}>Knowledge Library</p>
-                <p className="text-[11px]" style={{ color: 'var(--muted)', opacity: 0.7 }}>{archiveCount} documenti</p>
+                <p className="text-[11px]" style={{ color: 'var(--muted)', opacity: 0.6 }}>{archiveCount} documenti</p>
               </div>
               <button onClick={() => navigate('/archivio')}
                 className="p-1.5 rounded-lg hover:bg-white/10 transition-all">
-                <ArrowRight className="w-3.5 h-3.5" style={{ color: 'var(--muted)', opacity: 0.6 }} />
+                <ArrowRight className="w-3.5 h-3.5" style={{ color: 'var(--muted)', opacity: 0.5 }} />
               </button>
             </div>
           </div>
