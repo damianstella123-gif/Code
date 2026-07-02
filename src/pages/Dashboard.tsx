@@ -254,56 +254,50 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="mc-root">
-      {/* ═══ MISSION BRIEF ═══ */}
-      <div className="mc-brief animate-fade-in">
-        <div className="mc-brief-inner">
-          <div className={`mc-fly-dot mc-fly-dot--${briefStatus}`} />
-          <div className="mc-brief-text">
+    <div className="cc-cockpit">
+      {/* ═══ PRIMARY DISPLAY — The Main Screen ═══ */}
+      <div className="cc-primary-display animate-fade-in">
+        <div className="cc-display-content">
+          <div className={`cc-status-beacon cc-status-beacon--${briefStatus}`} />
+          <div className="cc-display-text">
             {missionBrief.slice(0, -1).map((line, i) => (
-              <p key={i} className={i === 0 ? 'mc-brief-greeting' : 'mc-brief-line'}>{line}</p>
+              <p key={i} className={i === 0 ? 'cc-display-headline' : 'cc-display-line'}>{line}</p>
             ))}
-            <p className="mc-brief-cta" onClick={() => {
+            <p className="cc-display-action" onClick={() => {
               if (kpi.taskInRitardo > 0) navigate('/task')
               else if (prossimEventi.length > 0) navigate('/eventi')
               else navigate('/task')
             }}>
               {missionBrief[missionBrief.length - 1]}
-              <ArrowRight className="mc-cta-arrow" />
+              <ArrowRight className="cc-action-arrow" />
             </p>
           </div>
         </div>
       </div>
 
-      {/* ═══ RED THREAD DESCENT ═══ */}
-      <div className="mc-thread-descent" />
+      {/* ═══ RED THREAD — Horizon Line ═══ */}
+      <div className="cc-horizon" />
 
-      {/* ═══ RADAR EVENTI ═══ */}
-      <div className="mc-section animate-fade-in" style={{ animationDelay: '80ms' }}>
-        <div className="mc-radar">
-          <div className="mc-radar-header">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-3.5 h-3.5" style={{ color: 'var(--red2)', opacity: 0.7 }} />
-              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}>
-                Radar Eventi
-              </span>
-            </div>
-            <button onClick={() => navigate('/eventi')}
-              className="text-[11px] font-medium flex items-center gap-1 transition-opacity hover:opacity-100"
-              style={{ color: 'var(--muted)', opacity: 0.6 }}>
+      {/* ═══ INSTRUMENT BAND — Single Continuous Surface ═══ */}
+      <div className="cc-instrument-band animate-fade-in" style={{ animationDelay: '100ms' }}>
+
+        {/* Zone 1: Radar */}
+        <div className="cc-zone cc-zone-radar">
+          <div className="cc-zone-header">
+            <Calendar className="w-3.5 h-3.5" />
+            <span>Radar</span>
+            <button onClick={() => navigate('/eventi')} className="cc-zone-link">
               Tutti <ArrowRight className="w-3 h-3" />
             </button>
           </div>
-
-          {/* Timeline axis */}
-          <div className="mc-timeline">
-            <div className="mc-timeline-labels">
+          <div className="cc-timeline">
+            <div className="cc-timeline-labels">
               <span>Oggi</span>
               <span>+7g</span>
               <span>+14g</span>
             </div>
-            <div className="mc-timeline-track">
-              <div className="mc-timeline-line" />
+            <div className="cc-timeline-track">
+              <div className="cc-timeline-axis" />
               {prossimEventi.map((ev, idx) => {
                 const dl = daysLeft(ev.dataInizio)
                 const position = Math.min(Math.max((dl / 14) * 100, 2), 96)
@@ -316,25 +310,25 @@ export default function Dashboard() {
                 return (
                   <button
                     key={ev.id}
-                    className={`mc-timeline-node ${isClose ? 'mc-timeline-node--imminent' : ''}`}
+                    className={`cc-node ${isClose ? 'cc-node--imminent' : ''}`}
                     style={{ left: `${position}%`, animationDelay: `${idx * 60 + 200}ms` }}
                     onClick={() => navigate('/eventi')}
                   >
-                    <div className="mc-node-dot" style={{ background: color }} />
-                    <div className="mc-node-card">
-                      <p className="mc-node-name">{ev.nome}</p>
-                      <div className="mc-node-meta">
-                        <span className="mc-node-days" style={{ color: isClose ? 'var(--red2)' : 'var(--muted)' }}>
+                    <div className="cc-node-dot" style={{ background: color }} />
+                    <div className="cc-node-info">
+                      <p className="cc-node-name">{ev.nome}</p>
+                      <div className="cc-node-meta">
+                        <span className="cc-node-days" style={{ color: isClose ? 'var(--red2)' : 'var(--muted)' }}>
                           {dl === 0 ? 'Oggi' : dl === 1 ? 'Domani' : `${dl}g`}
                         </span>
-                        <span className="mc-node-budget">&euro;{(ev.budget / 1000).toFixed(0)}K</span>
-                        <span className="mc-node-pct-mobile" style={{ color }}>{pct}%</span>
+                        <span className="cc-node-budget">&euro;{(ev.budget / 1000).toFixed(0)}K</span>
+                        <span className="cc-node-pct-mobile" style={{ color }}>{pct}%</span>
                       </div>
-                      <div className="mc-node-readiness">
-                        <div className="mc-readiness-bar">
-                          <div className="mc-readiness-fill" style={{ width: `${pct}%`, background: color }} />
+                      <div className="cc-node-readiness">
+                        <div className="cc-readiness-track">
+                          <div className="cc-readiness-fill" style={{ width: `${pct}%`, background: color }} />
                         </div>
-                        <span className="mc-readiness-pct">{pct}%</span>
+                        <span className="cc-readiness-label">{pct}%</span>
                       </div>
                     </div>
                   </button>
@@ -342,119 +336,116 @@ export default function Dashboard() {
               })}
             </div>
           </div>
-
           {prossimEventi.length === 0 && (
-            <p className="text-sm text-center py-8" style={{ color: 'var(--muted)' }}>
-              Nessun evento nei prossimi 14 giorni
-            </p>
+            <p className="cc-zone-empty">Nessun evento nei prossimi 14 giorni</p>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="cc-divider" />
+
+        {/* Zone 2: Pulse */}
+        <div className="cc-zone cc-zone-pulse">
+          <div className="cc-zone-header">
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>Pulse</span>
+          </div>
+          <div className="cc-pulse-metrics">
+            <div className="cc-metric">
+              <span className="cc-metric-value">
+                &euro;{(liveClients.reduce((s, c) => s + (c.fatturato || 0), 0) / 1000).toFixed(0)}K
+              </span>
+              <span className="cc-metric-label">Portafoglio</span>
+            </div>
+            <div className="cc-metric">
+              <span className="cc-metric-value" style={{ color: 'var(--green)' }}>
+                {kpi.completionRate}%
+              </span>
+              <span className="cc-metric-label">Delivery</span>
+            </div>
+            <div className="cc-metric">
+              <span className="cc-metric-value" style={{ color: kpi.clientiAttivi > 0 ? 'var(--blue)' : 'var(--muted)' }}>
+                {kpi.clientiAttivi}
+              </span>
+              <span className="cc-metric-label">Clienti attivi</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="cc-divider" />
+
+        {/* Zone 3: Team */}
+        <div className="cc-zone cc-zone-team">
+          <div className="cc-zone-header">
+            <Users className="w-3.5 h-3.5" />
+            <span>Team</span>
+          </div>
+          {teamWorkload.length === 0 ? (
+            <p className="cc-zone-empty">Nessun dato team</p>
+          ) : (
+            <div className="cc-team-rows">
+              {teamWorkload.map((member, i) => (
+                <div key={i} className="cc-team-row">
+                  <span className="cc-team-name" title={member.fullName}>{member.name}</span>
+                  <div className="cc-team-gauge">
+                    <div
+                      className="cc-team-fill"
+                      style={{
+                        width: `${Math.min(member.load, 100)}%`,
+                        background: member.load > 80 ? 'var(--red2)' : member.load > 50 ? 'var(--yellow)' : 'var(--green)',
+                      }}
+                    />
+                  </div>
+                  <span className="cc-team-count">{member.openTasks}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="cc-divider" />
+
+        {/* Zone 4: Decisions */}
+        <div className="cc-zone cc-zone-decisions">
+          <div className="cc-zone-header">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>Decisioni</span>
+          </div>
+          {decisions.length === 0 ? (
+            <p className="cc-zone-empty">Nessuna decisione urgente</p>
+          ) : (
+            <div className="cc-decisions-list">
+              {decisions.map((d, i) => (
+                <button key={i} className="cc-decision" onClick={d.action}>
+                  <div className={`cc-decision-beacon ${d.urgent ? 'cc-decision-beacon--urgent' : ''}`} />
+                  <div className="cc-decision-body">
+                    <span className="cc-decision-title">{d.text}</span>
+                    <span className="cc-decision-sub">{d.consequence}</span>
+                  </div>
+                  <ArrowRight className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--muted)', opacity: 0.3 }} />
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>
 
-      {/* ═══ MAIN GRID: Pulse + Decisions / Team ═══ */}
-      <div className="mc-grid animate-fade-in" style={{ animationDelay: '160ms' }}>
-        {/* Left column */}
-        <div className="mc-grid-left">
-          {/* Pulse Finanziario */}
-          <div className="mc-panel mc-pulse">
-            <div className="mc-panel-label">
-              <TrendingUp className="w-3 h-3" style={{ opacity: 0.6 }} />
-              <span>Pulse Finanziario</span>
-            </div>
-            <div className="mc-pulse-grid">
-              <div className="mc-pulse-item">
-                <span className="mc-pulse-value">
-                  &euro;{(liveClients.reduce((s, c) => s + (c.fatturato || 0), 0) / 1000).toFixed(0)}K
-                </span>
-                <span className="mc-pulse-label">Portafoglio</span>
-              </div>
-              <div className="mc-pulse-item">
-                <span className="mc-pulse-value" style={{ color: 'var(--green)' }}>
-                  {kpi.completionRate}%
-                </span>
-                <span className="mc-pulse-label">Delivery</span>
-              </div>
-              <div className="mc-pulse-item">
-                <span className="mc-pulse-value" style={{ color: kpi.clientiAttivi > 0 ? 'var(--blue)' : 'var(--muted)' }}>
-                  {kpi.clientiAttivi}
-                </span>
-                <span className="mc-pulse-label">Clienti attivi</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Decisions */}
-          <div className="mc-panel mc-decisions">
-            <div className="mc-panel-label">
-              <AlertTriangle className="w-3 h-3" style={{ opacity: 0.6 }} />
-              <span>Decisioni</span>
-            </div>
-            {decisions.length === 0 ? (
-              <p className="mc-empty">Nessuna decisione urgente</p>
-            ) : (
-              <div className="mc-decisions-list">
-                {decisions.map((d, i) => (
-                  <button key={i} className="mc-decision-row" onClick={d.action}>
-                    <div className={`mc-decision-indicator ${d.urgent ? 'mc-decision-indicator--urgent' : ''}`} />
-                    <div className="mc-decision-content">
-                      <span className="mc-decision-text">{d.text}</span>
-                      <span className="mc-decision-consequence">{d.consequence}</span>
-                    </div>
-                    <ArrowRight className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--muted)', opacity: 0.4 }} />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right column */}
-        <div className="mc-grid-right">
-          {/* Carico Team */}
-          <div className="mc-panel mc-team">
-            <div className="mc-panel-label">
-              <Users className="w-3 h-3" style={{ opacity: 0.6 }} />
-              <span>Carico Team</span>
-            </div>
-            {teamWorkload.length === 0 ? (
-              <p className="mc-empty">Nessun dato team</p>
-            ) : (
-              <div className="mc-team-list">
-                {teamWorkload.map((member, i) => (
-                  <div key={i} className="mc-team-row">
-                    <span className="mc-team-name" title={member.fullName}>{member.name}</span>
-                    <div className="mc-team-bar-wrapper">
-                      <div
-                        className="mc-team-bar"
-                        style={{
-                          width: `${Math.min(member.load, 100)}%`,
-                          background: member.load > 80 ? 'var(--red2)' : member.load > 50 ? 'var(--yellow)' : 'var(--green)',
-                        }}
-                      />
-                    </div>
-                    <span className="mc-team-count">{member.openTasks}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Quick access */}
-          <div className="mc-panel mc-quicklinks">
-            <button onClick={() => navigate('/eventi')} className="mc-quicklink">
-              <Calendar className="w-3.5 h-3.5" />
-              <span>{kpi.eventiImminenti} eventi</span>
-            </button>
-            <button onClick={() => navigate('/task')} className="mc-quicklink">
-              <CheckSquare className="w-3.5 h-3.5" />
-              <span>{kpi.taskAperti} task</span>
-            </button>
-            <button onClick={() => navigate('/archivio')} className="mc-quicklink">
-              <Archive className="w-3.5 h-3.5" />
-              <span>{archiveCount} doc</span>
-            </button>
-          </div>
-        </div>
+      {/* ═══ ACTION RAIL — Quick Navigation ═══ */}
+      <div className="cc-action-rail animate-fade-in" style={{ animationDelay: '180ms' }}>
+        <button onClick={() => navigate('/eventi')} className="cc-rail-item">
+          <Calendar className="w-3.5 h-3.5" />
+          <span>{kpi.eventiImminenti} eventi</span>
+        </button>
+        <button onClick={() => navigate('/task')} className="cc-rail-item">
+          <CheckSquare className="w-3.5 h-3.5" />
+          <span>{kpi.taskAperti} task</span>
+        </button>
+        <button onClick={() => navigate('/archivio')} className="cc-rail-item">
+          <Archive className="w-3.5 h-3.5" />
+          <span>{archiveCount} doc</span>
+        </button>
       </div>
     </div>
   )
