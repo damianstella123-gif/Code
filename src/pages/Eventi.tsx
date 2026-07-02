@@ -373,7 +373,7 @@ function EventEconomicSummary({ event }: { event: Event }) {
         supabase.from('event_restaurant_details').select('budget_per_persona,budget_totale,costo_per_persona,costo_totale_reale,pax_confermati,pax_previsti').eq('event_id', event.id),
         supabase.from('event_experience_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,pax').eq('event_id', event.id),
         supabase.from('event_catering_details').select('venduto_per_persona,venduto_totale,costo_per_persona,costo_totale,pax').eq('event_id', event.id),
-        supabase.from('event_staff_interno_details').select('venduto_totale,costo_giornaliero,costo_totale').eq('event_id', event.id),
+        supabase.from('event_staff_interno_details').select('venduto_unitario,venduto_totale,costo_giornaliero,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
         supabase.from('event_staff_esterno_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
         supabase.from('event_varie_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
         supabase.from('event_audio_video_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
@@ -407,8 +407,9 @@ function EventEconomicSummary({ event }: { event: Event }) {
         costo += c.costo_totale ?? (c.costo_per_persona ? c.costo_per_persona * pax : 0)
       }
       for (const si of (staffIntRes.data ?? [])) {
-        venduto += si.venduto_totale ? Number(si.venduto_totale) : 0
-        costo += si.costo_totale ? Number(si.costo_totale) : (si.costo_giornaliero ? Number(si.costo_giornaliero) : 0)
+        const qty = si.quantita ?? 1
+        venduto += si.venduto_totale ? Number(si.venduto_totale) : (si.venduto_unitario ? Number(si.venduto_unitario) * qty : 0)
+        costo += si.costo_totale ? Number(si.costo_totale) : (si.costo_giornaliero ? Number(si.costo_giornaliero) : (si.costo_unitario ? Number(si.costo_unitario) * qty : 0))
       }
       for (const se of (staffExtRes.data ?? [])) {
         const qty = se.quantita ?? 1
@@ -1094,6 +1095,7 @@ interface StaffInternoDetail {
   id: string
   event_id: string
   profile_id: string | null
+  supplier_id: string | null
   risorsa: string
   ruolo: string
   data: string | null
@@ -2067,7 +2069,7 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
       if (si.data && si.ora_inizio) {
         const nome = [(si as any).nome, (si as any).cognome].filter(Boolean).join(' ') || si.risorsa || ''
         const label = si.ruolo ? (nome ? `${si.ruolo} - ${nome}` : si.ruolo) : (nome || 'Staff Simmetria')
-        program.push({ id: si.id, supplier_id: '', titolo: label, categoria: 'Staff Simmetria', data: si.data, ora_inizio: si.ora_inizio, ora_fine: si.ora_fine, luogo: '', note: si.note || '' })
+        program.push({ id: si.id, supplier_id: si.supplier_id ?? '', titolo: label, categoria: 'Staff Simmetria', data: si.data, ora_inizio: si.ora_inizio, ora_fine: si.ora_fine, luogo: '', note: si.note || '' })
       }
     }
 
