@@ -111,7 +111,7 @@ body {
 }
 
 .panel:hover {
-  border-color: rgba(255, 255, 255, 0.55);
+  border-color: rgba(255, 255, 255, 0.48);
 }
 
 [data-theme="light"] .panel {
@@ -124,12 +124,12 @@ body {
 }
 
 [data-theme="light"] .panel:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow:
-    4px 8px 32px rgba(38, 41, 46, 0.08),
-    2px 4px 10px rgba(38, 41, 46, 0.04),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.90),
-    inset -1px -1px 0 rgba(38, 41, 46, 0.025);
+    3px 6px 24px rgba(38, 41, 46, 0.07),
+    2px 3px 8px rgba(38, 41, 46, 0.035),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.85),
+    inset -1px -1px 0 rgba(38, 41, 46, 0.02);
 }
 
 [data-theme="dark"] .panel {
@@ -442,17 +442,17 @@ textarea::placeholder {
 /* ─── HOVER CARD ───────────────────────────────────────────────────────────── */
 
 .hover-card {
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.35s ease;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.4s ease;
 }
 
 .hover-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow:
-    3px 8px 32px rgba(38, 41, 46, 0.07),
-    2px 4px 10px rgba(38, 41, 46, 0.04),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.90),
-    inset -1px -1px 0 rgba(38, 41, 46, 0.02);
-  border-color: rgba(255, 255, 255, 0.55);
+    3px 6px 24px rgba(38, 41, 46, 0.06),
+    2px 3px 8px rgba(38, 41, 46, 0.03),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.85),
+    inset -1px -1px 0 rgba(38, 41, 46, 0.015);
+  border-color: rgba(255, 255, 255, 0.50);
 }
 
 [data-theme="dark"] .hover-card:hover {
@@ -637,7 +637,7 @@ textarea::placeholder {
 /* ─── ANIMATIONS ───────────────────────────────────────────────────────────── */
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -656,7 +656,7 @@ textarea::placeholder {
   100% { background-position: -200% 0; }
 }
 
-.animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.animate-fade-in { animation: fadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 .animate-slide-in-right { animation: slideInRight 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
