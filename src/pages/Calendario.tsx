@@ -19,6 +19,9 @@ import {
   Zap,
   FileText,
   Plus,
+  Bell,
+  Trash2,
+  Edit3,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { daysLeft, fmtShort, fmtLong, toISO, addDays } from '@/lib/format'
@@ -32,6 +35,71 @@ import { fetchPractices, upsertPractice } from '@/lib/practices-service'
 import { fetchBudgets } from '@/lib/budgets-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
 import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
+import { supabase } from '@/lib/supabase'
+
+// ─── Calendar Item type ──────────────────────────────────────────────────────
+
+export interface CalendarItem {
+  id: string
+  user_id: string
+  title: string
+  description: string
+  item_type: 'promemoria' | 'evento' | 'scadenza' | 'task'
+  start_date: string
+  end_date: string | null
+  alert: 'none' | '10min' | '1h' | '1d' | '1w'
+  created_at: string
+}
+
+const ALERT_LABELS: Record<string, string> = {
+  none: 'Nessun alert',
+  '10min': '10 minuti prima',
+  '1h': '1 ora prima',
+  '1d': '1 giorno prima',
+  '1w': '1 settimana prima',
+}
+
+const ITEM_TYPE_LABELS: Record<string, string> = {
+  promemoria: 'Promemoria',
+  evento: 'Evento',
+  scadenza: 'Scadenza',
+  task: 'Task',
+}
+
+async function fetchCalendarItems(): Promise<CalendarItem[]> {
+  const { data, error } = await supabase
+    .from('calendar_items')
+    .select('*')
+    .order('start_date', { ascending: true })
+  if (error) { console.error('fetchCalendarItems:', error.message); return [] }
+  return (data ?? []) as CalendarItem[]
+}
+
+async function upsertCalendarItem(item: Partial<CalendarItem> & { title: string; start_date: string }): Promise<CalendarItem | null> {
+  if (item.id) {
+    const { data, error } = await supabase
+      .from('calendar_items')
+      .update({ ...item, updated_at: new Date().toISOString() })
+      .eq('id', item.id)
+      .select()
+      .maybeSingle()
+    if (error) { console.error('upsertCalendarItem update:', error.message); return null }
+    return data as CalendarItem
+  }
+  const { data, error } = await supabase
+    .from('calendar_items')
+    .insert(item)
+    .select()
+    .maybeSingle()
+  if (error) { console.error('upsertCalendarItem insert:', error.message); return null }
+  return data as CalendarItem
+}
+
+async function deleteCalendarItem(id: string): Promise<boolean> {
+  const { error } = await supabase.from('calendar_items').delete().eq('id', id)
+  if (error) { console.error('deleteCalendarItem:', error.message); return false }
+  return true
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -82,6 +150,15 @@ function socialColor(s: SocialContent): string {
   if (s.status === 'in_lavorazione') return '#ffc24b'
   return '#f97316'
 }
+function memoColor(m: CalendarItem): string {
+  switch (m.item_type) {
+    case 'promemoria': return '#a78bfa'
+    case 'evento': return '#4db4ff'
+    case 'scadenza': return '#ffc24b'
+    case 'task': return '#38d27d'
+    default: return '#a78bfa'
+  }
+}
 function statoTaskLabel(s: string) {
   return { da_fare: 'Da fare', in_corso: 'In corso', completato: 'Completato' }[s] ?? s
 }
@@ -98,16 +175,84 @@ type CalItem =
   | { type: 'pratica'; data: Pratica }
   | { type: 'creative'; data: CreativeProject }
   | { type: 'social'; data: SocialContent }
+  | { type: 'memo'; data: CalendarItem }
 
 // ─── Detail popup ─────────────────────────────────────────────────────────────
 
-function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange }: {
+function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, onMemoEdit, onMemoDelete }: {
   item: CalItem
   allTasks: Task[]
   allUscite: Uscita[]
   onClose: () => void
   onTaskStateChange: (id: string, stato: Task['stato']) => void
+  onMemoEdit: (item: CalendarItem) => void
+  onMemoDelete: (id: string) => void
 }) {
+  if (item.type === 'memo') {
+    const m = item.data as CalendarItem
+    const color = memoColor(m)
+    const dl = daysLeft(m.start_date)
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+        onClick={onClose}>
+        <div className="w-full max-w-md rounded-2xl overflow-hidden animate-fade-in"
+          style={{ background: 'var(--panel)', border: `1px solid ${color}30`, boxShadow: `0 24px 80px rgba(0,0,0,0.7), 0 0 40px ${color}15` }}
+          onClick={e => e.stopPropagation()}>
+          <div className="p-5"
+            style={{ background: `linear-gradient(135deg, ${color}12 0%, transparent 70%)`, borderBottom: '1px solid var(--line)' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <Bell className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} />
+                  <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{ITEM_TYPE_LABELS[m.item_type]}</span>
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{m.title}</h3>
+                {m.description && <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>{m.description}</p>}
+              </div>
+              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0">
+                <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+              </button>
+            </div>
+            {dl <= 3 && dl >= 0 && (
+              <div className="flex items-center gap-2 mt-3">
+                <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(255,194,75,0.12)', color: 'var(--yellow)' }}>
+                  <AlertTriangle className="w-3 h-3 inline mr-1 -mt-0.5" />{dl === 0 ? 'Oggi' : `tra ${dl}g`}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="p-5 space-y-3">
+            <div className="flex items-center gap-3">
+              <Clock className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+              <span className="text-sm" style={{ color: 'var(--text)' }}>
+                {fmtLong(m.start_date)}{m.end_date ? ` \u2192 ${fmtLong(m.end_date)}` : ''}
+              </span>
+            </div>
+            {m.alert !== 'none' && (
+              <div className="flex items-center gap-3">
+                <Bell className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                <span className="text-sm" style={{ color: 'var(--text)' }}>{ALERT_LABELS[m.alert]}</span>
+              </div>
+            )}
+          </div>
+          <div className="px-5 pb-5 flex gap-2">
+            <button onClick={() => { onMemoEdit(m); onClose() }}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all"
+              style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+              <Edit3 className="w-3.5 h-3.5" /> Modifica
+            </button>
+            <button onClick={() => { onMemoDelete(m.id); onClose() }}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
+              style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }}>
+              <Trash2 className="w-3.5 h-3.5" /> Elimina
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (item.type === 'event') {
     const ev = item.data as Event
     const color = eventColor(ev)
@@ -450,7 +595,9 @@ function CalPill({ item, onClick, onDragStart }: {
         ? creativeColor(item.data as CreativeProject)
         : item.type === 'social'
           ? socialColor(item.data as SocialContent)
-          : praticaColor(item.data as Pratica)
+          : item.type === 'memo'
+            ? memoColor(item.data as CalendarItem)
+            : praticaColor(item.data as Pratica)
   const label = item.type === 'event'
     ? (item.data as Event).nome
     : item.type === 'task'
@@ -459,7 +606,9 @@ function CalPill({ item, onClick, onDragStart }: {
         ? (item.data as CreativeProject).title
         : item.type === 'social'
           ? (item.data as SocialContent).title
-          : (item.data as Pratica).titolo
+          : item.type === 'memo'
+            ? (item.data as CalendarItem).title
+            : (item.data as Pratica).titolo
   const urgent = item.type === 'task' && (item.data as Task).priorita === 'alta' && (item.data as Task).stato !== 'completato'
   const dl = item.type === 'event'
     ? daysLeft((item.data as Event).dataInizio)
@@ -469,7 +618,9 @@ function CalPill({ item, onClick, onDragStart }: {
         ? daysLeft((item.data as CreativeProject).due_date!)
         : item.type === 'social'
           ? daysLeft((item.data as SocialContent).publish_date!)
-          : daysLeft((item.data as Pratica).scadenza)
+          : item.type === 'memo'
+            ? daysLeft((item.data as CalendarItem).start_date)
+            : daysLeft((item.data as Pratica).scadenza)
   const isDone = item.type === 'event'
     ? (item.data as Event).stato === 'completato'
     : item.type === 'task'
@@ -478,7 +629,9 @@ function CalPill({ item, onClick, onDragStart }: {
         ? (item.data as CreativeProject).status === 'completato'
         : item.type === 'social'
           ? (item.data as SocialContent).status === 'pubblicato'
-          : (item.data as Pratica).stato === 'completata'
+          : item.type === 'memo'
+            ? false
+            : (item.data as Pratica).stato === 'completata'
   const isOverdue = dl < 0 && !isDone
 
   return (
@@ -533,6 +686,13 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
         const s = item.data as SocialContent
         return s.publish_date ? sameDay(day, new Date(s.publish_date)) : false
       }
+      if (item.type === 'memo') {
+        const m = item.data as CalendarItem
+        if (m.end_date) {
+          return day >= new Date(m.start_date) && day <= new Date(m.end_date)
+        }
+        return sameDay(day, new Date(m.start_date))
+      }
       return sameDay(day, new Date((item.data as Task).scadenza))
     })
   }
@@ -580,12 +740,13 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
               </div>
               <div className="px-1 pb-1 space-y-0.5 mt-0.5">
                 {dayItems.slice(0, 3).map(item => {
-                  const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : item.type === 'creative' ? (item.data as CreativeProject).id : item.type === 'social' ? (item.data as SocialContent).id : (item.data as Pratica).id
+                  const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : item.type === 'creative' ? (item.data as CreativeProject).id : item.type === 'social' ? (item.data as SocialContent).id : item.type === 'memo' ? (item.data as CalendarItem).id : (item.data as Pratica).id
+                  const draggable = item.type === 'event' || item.type === 'task' || item.type === 'memo'
                   return (
                     <CalPill key={id} item={item}
                       onClick={() => onItemClick(item)}
-                      onDragStart={item.type !== 'pratica' ? e => {
-                        setDragging({ id, type: item.type as 'event' | 'task' })
+                      onDragStart={draggable ? e => {
+                        setDragging({ id, type: item.type === 'event' ? 'event' : 'task' })
                         e.dataTransfer.setData('text/plain', `${item.type}:${id}`)
                       } : undefined} />
                   )
@@ -632,6 +793,11 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
       if (item.type === 'social') {
         const s = item.data as SocialContent
         return s.publish_date ? sameDay(day, new Date(s.publish_date)) : false
+      }
+      if (item.type === 'memo') {
+        const m = item.data as CalendarItem
+        if (m.end_date) return day >= new Date(m.start_date) && day <= new Date(m.end_date)
+        return sameDay(day, new Date(m.start_date))
       }
       return sameDay(day, new Date((item.data as Task).scadenza))
     })
@@ -680,12 +846,13 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
                 setDragging(null)
               }}>
               {dayItems.map(item => {
-                const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : (item.data as Pratica).id
+                const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : item.type === 'memo' ? (item.data as CalendarItem).id : (item.data as Pratica).id
+                const draggable = item.type === 'event' || item.type === 'task' || item.type === 'memo'
                 return (
                   <CalPill key={id} item={item}
                     onClick={() => onItemClick(item)}
-                    onDragStart={item.type !== 'pratica' ? e => {
-                      setDragging({ id, type: item.type as 'event' | 'task' })
+                    onDragStart={draggable ? e => {
+                      setDragging({ id, type: item.type === 'event' ? 'event' : 'task' })
                       e.dataTransfer.setData('text/plain', `${item.type}:${id}`)
                     } : undefined} />
                 )
@@ -722,6 +889,11 @@ function DayView(props: {
     if (item.type === 'social') {
       const s = item.data as SocialContent
       return s.publish_date ? sameDay(day, new Date(s.publish_date)) : false
+    }
+    if (item.type === 'memo') {
+      const m = item.data as CalendarItem
+      if (m.end_date) return day >= new Date(m.start_date) && day <= new Date(m.end_date)
+      return sameDay(day, new Date(m.start_date))
     }
     return sameDay(day, new Date((item.data as Task).scadenza))
   })
@@ -839,6 +1011,7 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
     if (item.type === 'pratica') return (item.data as Pratica).scadenza
     if (item.type === 'creative') return (item.data as CreativeProject).due_date!
     if (item.type === 'social') return (item.data as SocialContent).publish_date!
+    if (item.type === 'memo') return (item.data as CalendarItem).start_date
     return (item.data as Task).scadenza
   }
   function isItemDone(item: CalItem): boolean {
@@ -846,6 +1019,7 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
     if (item.type === 'pratica') return (item.data as Pratica).stato === 'completata'
     if (item.type === 'creative') return (item.data as CreativeProject).status === 'completato'
     if (item.type === 'social') return (item.data as SocialContent).status === 'pubblicato'
+    if (item.type === 'memo') return false
     return (item.data as Task).stato === 'completato'
   }
 
@@ -1008,15 +1182,15 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
 
 // ─── Quick Create Modal ───────────────────────────────────────────────────────
 
-type CreateType = 'event' | 'task' | 'pratica'
+type CreateType = 'event' | 'task' | 'pratica' | 'memo'
 
 function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
   defaultDate: string
   events: Event[]
   onClose: () => void
-  onCreate: (type: CreateType, data: Event | Task | Pratica) => void
+  onCreate: (type: CreateType, data: Event | Task | Pratica | CalendarItem) => void
 }) {
-  const [type, setType] = useState<CreateType>('task')
+  const [type, setType] = useState<CreateType>('memo')
   const [titolo, setTitolo] = useState('')
   const [desc, setDesc] = useState('')
   const [dataInizio, setDataInizio] = useState(defaultDate)
@@ -1024,11 +1198,26 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
   const [eventoId, setEventoId] = useState('')
   const [priorita, setPriorita] = useState<'alta' | 'media' | 'bassa'>('media')
   const [location, setLocation] = useState('')
+  const [alert, setAlert] = useState<'none' | '10min' | '1h' | '1d' | '1w'>('none')
+  const [memoType, setMemoType] = useState<'promemoria' | 'evento' | 'scadenza' | 'task'>('promemoria')
 
   function handleSubmit() {
     if (!titolo.trim()) return
     const id = `${type.slice(0, 3)}_${Date.now()}`
-    if (type === 'event') {
+    if (type === 'memo') {
+      const m: CalendarItem = {
+        id,
+        user_id: '',
+        title: titolo,
+        description: desc,
+        item_type: memoType,
+        start_date: dataInizio,
+        end_date: dataFine !== dataInizio ? dataFine : null,
+        alert,
+        created_at: new Date().toISOString(),
+      }
+      onCreate('memo', m)
+    } else if (type === 'event') {
       const ev: Event = {
         id,
         nome: titolo,
@@ -1087,21 +1276,22 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
       <div className="relative w-full max-w-md rounded-2xl p-6 space-y-4"
         style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Nuova attivita</h3>
+          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Nuovo elemento</h3>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10">
             <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
           </button>
         </div>
 
         {/* Type selector */}
-        <div className="flex gap-2">
+        <div className="grid grid-cols-4 gap-1.5">
           {([
+            { id: 'memo' as CreateType, label: 'Promemoria', icon: Bell },
             { id: 'task' as CreateType, label: 'Task', icon: CheckSquare },
             { id: 'event' as CreateType, label: 'Evento', icon: Calendar },
             { id: 'pratica' as CreateType, label: 'Pratica', icon: FileText },
           ]).map(t => (
             <button key={t.id} onClick={() => setType(t.id)}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+              className="flex flex-col items-center gap-1 px-2 py-2 rounded-lg text-[11px] font-medium transition-all"
               style={{
                 background: type === t.id ? 'var(--red)' : 'transparent',
                 color: type === t.id ? 'white' : 'var(--muted)',
@@ -1117,7 +1307,7 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
         <div className="space-y-3">
           <input
             value={titolo} onChange={e => setTitolo(e.target.value)}
-            placeholder={type === 'event' ? 'Nome evento' : 'Titolo'}
+            placeholder={type === 'event' ? 'Nome evento' : type === 'memo' ? 'Titolo promemoria' : 'Titolo'}
             className="w-full px-3 py-2.5 rounded-xl text-sm"
             style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
           />
@@ -1131,14 +1321,14 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>
-                {type === 'event' ? 'Data inizio' : 'Scadenza'}
+                {type === 'event' || type === 'memo' ? 'Data inizio' : 'Scadenza'}
               </label>
               <input type="date" value={dataInizio} onChange={e => setDataInizio(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl text-sm"
                 style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
               />
             </div>
-            {type === 'event' && (
+            {(type === 'event' || type === 'memo') && (
               <div>
                 <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Data fine</label>
                 <input type="date" value={dataFine} onChange={e => setDataFine(e.target.value)}
@@ -1147,7 +1337,7 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
                 />
               </div>
             )}
-            {type !== 'event' && (
+            {type !== 'event' && type !== 'memo' && (
               <div>
                 <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Priorita</label>
                 <select value={priorita} onChange={e => setPriorita(e.target.value as 'alta' | 'media' | 'bassa')}
@@ -1160,6 +1350,34 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
               </div>
             )}
           </div>
+
+          {type === 'memo' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Tipo</label>
+                <select value={memoType} onChange={e => setMemoType(e.target.value as typeof memoType)}
+                  className="w-full px-3 py-2 rounded-xl text-sm"
+                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                  <option value="promemoria">Promemoria</option>
+                  <option value="evento">Evento</option>
+                  <option value="scadenza">Scadenza</option>
+                  <option value="task">Task</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Alert</label>
+                <select value={alert} onChange={e => setAlert(e.target.value as typeof alert)}
+                  className="w-full px-3 py-2 rounded-xl text-sm"
+                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                  <option value="none">Nessun alert</option>
+                  <option value="10min">10 minuti prima</option>
+                  <option value="1h">1 ora prima</option>
+                  <option value="1d">1 giorno prima</option>
+                  <option value="1w">1 settimana prima</option>
+                </select>
+              </div>
+            </div>
+          )}
 
           {type === 'event' && (
             <input value={location} onChange={e => setLocation(e.target.value)}
@@ -1187,7 +1405,108 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
         <button onClick={handleSubmit} disabled={!titolo.trim()}
           className="w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
           style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
-          Crea {type === 'event' ? 'Evento' : type === 'task' ? 'Task' : 'Pratica'}
+          Crea {type === 'memo' ? 'Promemoria' : type === 'event' ? 'Evento' : type === 'task' ? 'Task' : 'Pratica'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Memo Edit Modal ─────────────────────────────────────────────────────────
+
+function MemoEditModal({ item, onClose, onSave }: {
+  item: CalendarItem
+  onClose: () => void
+  onSave: (updated: CalendarItem) => void
+}) {
+  const [title, setTitle] = useState(item.title)
+  const [description, setDescription] = useState(item.description || '')
+  const [startDate, setStartDate] = useState(item.start_date)
+  const [endDate, setEndDate] = useState(item.end_date || item.start_date)
+  const [itemType, setItemType] = useState(item.item_type)
+  const [alertVal, setAlertVal] = useState(item.alert)
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    if (!title.trim()) return
+    setSaving(true)
+    const updated = await upsertCalendarItem({
+      id: item.id,
+      title,
+      description,
+      item_type: itemType,
+      start_date: startDate,
+      end_date: endDate !== startDate ? endDate : null,
+      alert: alertVal,
+    })
+    setSaving(false)
+    if (updated) onSave(updated)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-md rounded-2xl p-6 space-y-4"
+        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Modifica elemento</h3>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10">
+            <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+          </button>
+        </div>
+        <div className="space-y-3">
+          <input value={title} onChange={e => setTitle(e.target.value)}
+            placeholder="Titolo" className="w-full px-3 py-2.5 rounded-xl text-sm"
+            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          <textarea value={description} onChange={e => setDescription(e.target.value)}
+            placeholder="Descrizione (opzionale)" rows={2}
+            className="w-full px-3 py-2.5 rounded-xl text-sm resize-none"
+            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Data inizio</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Data fine</label>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Tipo</label>
+              <select value={itemType} onChange={e => setItemType(e.target.value as typeof itemType)}
+                className="w-full px-3 py-2 rounded-xl text-sm"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <option value="promemoria">Promemoria</option>
+                <option value="evento">Evento</option>
+                <option value="scadenza">Scadenza</option>
+                <option value="task">Task</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Alert</label>
+              <select value={alertVal} onChange={e => setAlertVal(e.target.value as typeof alertVal)}
+                className="w-full px-3 py-2 rounded-xl text-sm"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <option value="none">Nessun alert</option>
+                <option value="10min">10 minuti prima</option>
+                <option value="1h">1 ora prima</option>
+                <option value="1d">1 giorno prima</option>
+                <option value="1w">1 settimana prima</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <button onClick={handleSave} disabled={!title.trim() || saving}
+          className="w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
+          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+          {saving ? 'Salvataggio...' : 'Salva modifiche'}
         </button>
       </div>
     </div>
@@ -1203,25 +1522,28 @@ export default function Calendario() {
   const [allUscite, setAllUscite] = useState<Uscita[]>([])
   const [allCreative, setAllCreative] = useState<CreativeProject[]>([])
   const [allSocial, setAllSocial] = useState<SocialContent[]>([])
+  const [allMemos, setAllMemos] = useState<CalendarItem[]>([])
   const [view, setView] = useState<ViewMode>('month')
   const [cursor, setCursor] = useState(() => {
     const t = new Date(); t.setHours(0, 0, 0, 0); return t
   })
   const [selectedItem, setSelectedItem] = useState<CalItem | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [editingMemo, setEditingMemo] = useState<CalendarItem | null>(null)
   const today = useMemo(() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t }, [])
 
   const currentUser = loadUser()
   const ruolo = currentUser?.ruolo ?? 'Admin'
 
   const refresh = useCallback(async () => {
-    const [t, e, p, u, cr, so] = await Promise.all([fetchTasks(), fetchEvents(), fetchPractices(), fetchBudgets(), fetchCreativeProjects(), fetchSocialContents()])
+    const [t, e, p, u, cr, so, memos] = await Promise.all([fetchTasks(), fetchEvents(), fetchPractices(), fetchBudgets(), fetchCreativeProjects(), fetchSocialContents(), fetchCalendarItems()])
     setAllTasks(t)
     setAllEvents(e)
     setAllPratiche(p)
     setAllUscite(u)
     setAllCreative(cr)
     setAllSocial(so)
+    setAllMemos(memos)
   }, [])
 
   useEffect(() => {
@@ -1266,8 +1588,9 @@ export default function Calendario() {
       ...visiblePratiche.map(p => ({ type: 'pratica' as const, data: p })),
       ...visibleCreative.map(c => ({ type: 'creative' as const, data: c })),
       ...visibleSocial.map(s => ({ type: 'social' as const, data: s })),
+      ...allMemos.map(m => ({ type: 'memo' as const, data: m })),
     ]
-  }, [allTasks, allEvents, allPratiche, allCreative, allSocial, ruolo, currentUser])
+  }, [allTasks, allEvents, allPratiche, allCreative, allSocial, allMemos, ruolo, currentUser])
 
   async function handleTaskStateChange(id: string, stato: Task['stato']) {
     setAllTasks(prev => prev.map(t => t.id === id ? { ...t, stato } : t))
@@ -1278,7 +1601,16 @@ export default function Calendario() {
   async function handleMoveItem(id: string, type: 'event' | 'task', newDate: string) {
     if (type === 'task') {
       const target = allTasks.find(t => t.id === id)
-      if (!target) return
+      if (!target) {
+        const memo = allMemos.find(m => m.id === id)
+        if (memo) {
+          const updated = { ...memo, start_date: newDate }
+          setAllMemos(prev => prev.map(m => m.id === id ? updated : m))
+          await upsertCalendarItem({ id, title: memo.title, start_date: newDate, end_date: memo.end_date, alert: memo.alert, item_type: memo.item_type, description: memo.description })
+          await refresh()
+        }
+        return
+      }
       const updated = { ...target, scadenza: newDate }
       setAllTasks(prev => prev.map(t => t.id === id ? updated : t))
       await upsertTask(updated)
@@ -1297,11 +1629,27 @@ export default function Calendario() {
     await refresh()
   }
 
-  async function handleCreate(type: CreateType, data: Event | Task | Pratica) {
+  async function handleCreate(type: CreateType, data: Event | Task | Pratica | CalendarItem) {
     if (type === 'event') await upsertEvent(data as Event)
     else if (type === 'task') await upsertTask(data as Task)
-    else await upsertPractice(data as Pratica)
+    else if (type === 'pratica') await upsertPractice(data as Pratica)
+    else if (type === 'memo') {
+      const m = data as CalendarItem
+      await upsertCalendarItem({ title: m.title, description: m.description, item_type: m.item_type, start_date: m.start_date, end_date: m.end_date, alert: m.alert })
+    }
     setShowCreate(false)
+    await refresh()
+  }
+
+  async function handleMemoDelete(id: string) {
+    setAllMemos(prev => prev.filter(m => m.id !== id))
+    await deleteCalendarItem(id)
+    await refresh()
+  }
+
+  async function handleMemoSave(updated: CalendarItem) {
+    setAllMemos(prev => prev.map(m => m.id === updated.id ? updated : m))
+    setEditingMemo(null)
     await refresh()
   }
 
@@ -1327,12 +1675,16 @@ export default function Calendario() {
       ? (item.data as Event).dataInizio
       : item.type === 'task'
         ? (item.data as Task).scadenza
-        : (item.data as Pratica).scadenza
+        : item.type === 'memo'
+          ? (item.data as CalendarItem).start_date
+          : (item.data as Pratica).scadenza
     const done = item.type === 'event'
       ? (item.data as Event).stato === 'completato'
       : item.type === 'task'
         ? (item.data as Task).stato === 'completato'
-        : (item.data as Pratica).stato === 'completata'
+        : item.type === 'memo'
+          ? false
+          : (item.data as Pratica).stato === 'completata'
     return new Date(d) < today && !done
   })
   const thisWeekItems = visibleItems.filter(item => {
@@ -1340,7 +1692,9 @@ export default function Calendario() {
       ? (item.data as Event).dataInizio
       : item.type === 'task'
         ? (item.data as Task).scadenza
-        : (item.data as Pratica).scadenza
+        : item.type === 'memo'
+          ? (item.data as CalendarItem).start_date
+          : (item.data as Pratica).scadenza
     const di = new Date(d)
     return di >= today && di <= addDays(today, 7)
   })
@@ -1471,6 +1825,17 @@ export default function Calendario() {
           allUscite={allUscite}
           onClose={() => setSelectedItem(null)}
           onTaskStateChange={handleTaskStateChange}
+          onMemoEdit={m => { setSelectedItem(null); setEditingMemo(m) }}
+          onMemoDelete={id => { setSelectedItem(null); handleMemoDelete(id) }}
+        />
+      )}
+
+      {/* Memo edit modal */}
+      {editingMemo && (
+        <MemoEditModal
+          item={editingMemo}
+          onClose={() => setEditingMemo(null)}
+          onSave={handleMemoSave}
         />
       )}
 
