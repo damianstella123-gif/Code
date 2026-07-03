@@ -66,6 +66,7 @@ interface BudgetLine {
   margine: number
   marginePct: number
   stato_conferma: StatoConferma
+  dateLabel: string
 }
 
 const STATO_CONFIG: Record<StatoConferma, { label: string; color: string; icon: typeof CheckCircle2 }> = {
@@ -105,6 +106,13 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   function getSupName(id: string | null | undefined) {
     if (!id) return ''
     return suppliers.find(s => s.id === id)?.nome ?? ''
+  }
+
+  function fmtDate(d: unknown): string {
+    if (!d || typeof d !== 'string') return ''
+    const [y, m, day] = d.split('-')
+    if (!y || !m || !day) return ''
+    return `${day}/${m}/${y}`
   }
 
   const loadData = useCallback(async () => {
@@ -152,6 +160,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       sotto?: string
       commissione_pct?: number | null
       commissione_importo?: number | null
+      dateLabel?: string
     }) {
       const margine = opts.venduto - opts.costo
       const marginePct = opts.venduto > 0 ? (margine / opts.venduto) * 100 : 0
@@ -175,6 +184,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         margine,
         marginePct,
         stato_conferma: resolveStato(row.supplier_id as string),
+        dateLabel: opts.dateLabel || '',
       })
     }
 
@@ -186,6 +196,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       if (!venduto && !costo) continue
       pushLine(s, resolveCat(s.supplier_id as string, 'TRANSFER'), 'event_supplier_services', {
         descrizione: (s.titolo as string) || 'Transfer', qty, venduto, costo,
+        dateLabel: fmtDate(s.data),
       })
     }
 
@@ -198,6 +209,10 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const roomsSimmetria = (h.rooms_simmetria_count as number) || 0
       const roomRateClient = (h.room_rate_client as number) || 0
       const roomCostSimmetria = (h.room_cost_simmetria as number) || 0
+
+      const hotelDateLabel = (fmtDate(h.check_in_date) && fmtDate(h.check_out_date))
+        ? `${fmtDate(h.check_in_date)} \u2192 ${fmtDate(h.check_out_date)}`
+        : fmtDate(h.data)
 
       if (tipo === 'pernottamento' && paymentMode) {
         const totalRoomsQty = roomsClient + roomsSimmetria || 1
@@ -215,6 +230,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
           descrizione, qty: totalRoomsQty, venduto, costo,
           commissione_pct: (h.commissione_pct as number) ?? null,
           commissione_importo: (h.commissione_importo as number) ?? null,
+          dateLabel: hotelDateLabel,
         })
       } else {
         const qty = (h.quantita as number) ?? 1
@@ -224,6 +240,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         pushLine(h, resolveCat(h.supplier_id as string, 'HOTEL'), 'event_hotel_details', {
           descrizione: (h.titolo as string) || (h.tipo as string) || 'Hotel', qty, venduto, costo,
           commissione_pct: (h.commissione_pct as number) ?? null,
+          dateLabel: hotelDateLabel,
         })
       }
     }
@@ -236,6 +253,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       if (!venduto && !costo) continue
       pushLine(r, resolveCat(r.supplier_id as string, 'RISTORANTE'), 'event_restaurant_details', {
         descrizione: (r.tipologia_servizio as string) || 'Ristorante', qty: pax, venduto, costo,
+        dateLabel: fmtDate(r.data),
       })
     }
 
@@ -247,6 +265,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       if (!venduto && !costo) continue
       pushLine(e, resolveCat(e.supplier_id as string, 'LOCATION / EXPERIENCE'), 'event_experience_details', {
         descrizione: (e.nome_attivita as string) || 'Experience', qty: pax, venduto, costo,
+        dateLabel: fmtDate(e.data),
       })
     }
 
@@ -258,6 +277,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       if (!venduto && !costo) continue
       pushLine(c, resolveCat(c.supplier_id as string, 'CATERING'), 'event_catering_details', {
         descrizione: (c.tipologia as string) || 'Catering', qty: pax, venduto, costo,
+        dateLabel: fmtDate(c.data),
       })
     }
 
@@ -271,6 +291,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       pushLine(si, resolveCat(si.supplier_id as string, 'STAFF'), 'event_staff_interno_details', {
         descrizione: nome ? `${nome} - ${(si.ruolo as string) || 'Staff'}` : (si.ruolo as string) || 'Staff Simmetria',
         qty, venduto, costo, sotto: 'staff_simmetria',
+        dateLabel: fmtDate(si.data),
       })
     }
 
@@ -284,6 +305,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       pushLine(se, resolveCat(se.supplier_id as string, 'STAFF'), 'event_staff_esterno_details', {
         descrizione: nome ? `${nome} - ${(se.ruolo as string) || 'Staff'}` : (se.ruolo as string) || 'Staff Esterno',
         qty, venduto, costo, sotto: 'staff_esterno',
+        dateLabel: fmtDate(se.data),
       })
     }
 
@@ -293,8 +315,14 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const venduto = (av.venduto_totale as number) ?? ((av.venduto_unitario as number) ? (av.venduto_unitario as number) * qty : 0)
       const costo = (av.costo_totale as number) ?? ((av.costo_unitario as number) ? (av.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
+      const avDates: string[] = []
+      if (av.data_montaggio) avDates.push(`Mont. ${fmtDate(av.data_montaggio)}`)
+      if (av.data_prove) avDates.push(`Prove ${fmtDate(av.data_prove)}`)
+      if (av.data_evento) avDates.push(`Evt. ${fmtDate(av.data_evento)}`)
+      if (av.data_smontaggio) avDates.push(`Smont. ${fmtDate(av.data_smontaggio)}`)
       pushLine(av, resolveCat(av.supplier_id as string, 'AUDIO VIDEO'), 'event_audio_video_details', {
         descrizione: (av.tipologia_servizio as string) || (av.descrizione as string) || 'Audio Video', qty, venduto, costo,
+        dateLabel: avDates.join(' | '),
       })
     }
 
@@ -304,8 +332,12 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const venduto = (al.venduto_totale as number) ?? ((al.venduto_unitario as number) ? (al.venduto_unitario as number) * qty : 0)
       const costo = (al.costo_totale as number) ?? ((al.costo_unitario as number) ? (al.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
+      const alDates: string[] = []
+      if (al.data_montaggio) alDates.push(`Mont. ${fmtDate(al.data_montaggio)}`)
+      if (al.data_smontaggio) alDates.push(`Smont. ${fmtDate(al.data_smontaggio)}`)
       pushLine(al, resolveCat(al.supplier_id as string, 'ALLESTIMENTI'), 'event_allestimenti_details', {
         descrizione: (al.descrizione as string) || 'Allestimento', qty, venduto, costo,
+        dateLabel: alDates.join(' | '),
       })
     }
 
@@ -317,6 +349,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       if (!venduto && !costo) continue
       pushLine(g, resolveCat(g.supplier_id as string, 'GRAFICA'), 'event_grafica_stampa_details', {
         descrizione: (g.tipo_materiale as string) || (g.descrizione as string) || 'Grafica', qty, venduto, costo,
+        dateLabel: fmtDate(g.data_consegna),
       })
     }
 
@@ -328,6 +361,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       if (!venduto && !costo) continue
       pushLine(v, resolveCat(v.supplier_id as string, 'VARIE'), 'event_varie_details', {
         descrizione: (v.tipologia as string) ? `${v.tipologia} — ${(v.descrizione as string) || 'Voce'}` : (v.descrizione as string) || 'Voce varia', qty, venduto, costo,
+        dateLabel: fmtDate(v.data),
       })
     }
 
@@ -782,7 +816,10 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         >
           <ChevronDown className={`w-3.5 h-3.5 transition-transform flex-shrink-0 ${isExpanded ? '' : '-rotate-90'}`} style={{ color: 'var(--muted)' }} />
           <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: statoConf.color }} />
-          <span className="flex-1 text-xs font-medium truncate" style={{ color: 'var(--text)' }}>{item.descrizione}</span>
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-medium truncate block" style={{ color: 'var(--text)' }}>{item.descrizione}</span>
+            {item.dateLabel && <span className="text-[10px] truncate block" style={{ color: 'var(--muted)' }}>{item.dateLabel}</span>}
+          </div>
           <span className="w-24 text-xs truncate hidden md:block" style={{ color: 'var(--muted)' }}>{item.fornitore || '-'}</span>
           <span className="w-10 text-xs text-right" style={{ color: 'var(--text)' }}>{item.qty}</span>
           <span className="w-20 text-xs text-right" style={{ color: 'var(--text)' }}>{fmt(item.venduto)}</span>
@@ -800,6 +837,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
           <div className="px-4 pb-4 pt-2" style={{ background: 'var(--bg)' }}>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 mb-3">
               <Detail label="Descrizione" value={item.descrizione} />
+              {item.dateLabel && <Detail label="Data" value={item.dateLabel} />}
               {item.sotto_categoria && item.sotto_categoria !== 'staff_simmetria' && item.sotto_categoria !== 'staff_esterno' && (
                 <Detail label="Sotto-categoria" value={SOTTO_LABELS[item.sotto_categoria] || item.sotto_categoria} />
               )}

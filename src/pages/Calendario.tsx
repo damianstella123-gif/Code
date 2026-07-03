@@ -1809,11 +1809,12 @@ export default function Calendario() {
     } else {
       const target = allEvents.find(e => e.id === id)
       if (!target) return
-      const diffMs = new Date(newDate).getTime() - new Date(target.dataInizio).getTime()
+      const diffMs = new Date(newDate + 'T00:00:00Z').getTime() - new Date(target.dataInizio + 'T00:00:00Z').getTime()
       const deltaDays = Math.round(diffMs / 86400000)
       if (deltaDays === 0) return
       const newStart = newDate
-      const newEnd = new Date(new Date(target.dataFine).getTime() + diffMs).toISOString().slice(0, 10)
+      const [ey, em, ed] = target.dataFine.split('-').map(Number)
+      const newEnd = new Date(Date.UTC(ey, em - 1, ed + deltaDays)).toISOString().slice(0, 10)
       setAllEvents(prev => prev.map(e => e.id === id ? { ...e, dataInizio: newStart, dataFine: newEnd } : e))
       await updateEvent(id, { dataInizio: newStart, dataFine: newEnd })
       const result = await shiftEventTimeline(id, deltaDays)

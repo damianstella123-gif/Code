@@ -178,8 +178,8 @@ export async function shiftEventTimeline(eventId: string, deltaDays: number): Pr
   const skipped: string[] = []
 
   const shiftDate = (d: string): string => {
-    const dt = new Date(d + 'T00:00:00')
-    dt.setDate(dt.getDate() + deltaDays)
+    const [y, m, day] = d.split('-').map(Number)
+    const dt = new Date(Date.UTC(y, m - 1, day + deltaDays))
     return dt.toISOString().slice(0, 10)
   }
 
