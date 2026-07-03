@@ -3,6 +3,7 @@ export interface Event {
   nome: string
   descrizione: string
   cliente: string
+  clientId?: string | null
   dataInizio: string
   dataFine: string
   location: string

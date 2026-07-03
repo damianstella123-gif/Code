@@ -6,6 +6,7 @@ interface EventRow {
   title: string
   description: string
   client: string
+  client_id: string | null
   location: string
   start_date: string
   end_date: string
@@ -27,6 +28,7 @@ function rowToEvent(r: EventRow): Event {
     nome: r.title,
     descrizione: r.description ?? '',
     cliente: r.client ?? '',
+    clientId: r.client_id ?? null,
     dataInizio: r.start_date,
     dataFine: r.end_date,
     location: r.location ?? '',
@@ -47,6 +49,7 @@ function eventToRow(e: Event): Omit<EventRow, 'created_at' | 'updated_at'> {
     title: e.nome,
     description: e.descrizione ?? '',
     client: e.cliente ?? '',
+    client_id: e.clientId ?? null,
     location: e.location ?? '',
     start_date: e.dataInizio,
     end_date: e.dataFine,
@@ -139,4 +142,18 @@ export async function deleteEvent(id: string): Promise<boolean> {
     return false
   }
   return true
+}
+
+export async function fetchEventsByClientName(clientName: string): Promise<Event[]> {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .ilike('client', clientName)
+    .order('start_date', { ascending: false })
+    .limit(50)
+  if (error) {
+    console.error('fetchEventsByClientName error:', error.message)
+    return []
+  }
+  return ((data ?? []) as EventRow[]).map(rowToEvent)
 }

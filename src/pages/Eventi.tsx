@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   Calendar,
   MapPin,
@@ -477,13 +477,14 @@ function EventEconomicSummary({ event }: { event: Event }) {
   )
 }
 
-function TabOverview({ event, progress, completedTasks, totalTasks, budgets, clients }: {
+function TabOverview({ event, progress, completedTasks, totalTasks, budgets, clients, onClientClick }: {
   event: Event
   progress: number
   completedTasks: number
   totalTasks: number
   budgets: Uscita[]
   clients: Client[]
+  onClientClick?: (clientName: string) => void
 }) {
   const eventUscite = budgets.filter(u => u.eventoId === event.id)
   const totUscite = eventUscite.reduce((s, u) => s + u.importo, 0)
@@ -494,13 +495,18 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets, cli
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {cliente && (
-        <div className="panel p-5">
+        <div
+          className="panel p-5 cursor-pointer transition-all hover:translate-x-0.5"
+          onClick={() => onClientClick?.(cliente.nome)}
+          style={{ border: '1px solid var(--line)' }}
+        >
           <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Cliente</p>
           <div>
-            <p className="font-semibold" style={{ color: 'var(--text)' }}>{cliente.nome}</p>
+            <p className="font-semibold" style={{ color: 'var(--blue)' }}>{cliente.nome}</p>
             <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>{cliente.settore}</p>
             <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>{cliente.referente}</p>
           </div>
+          <p className="text-[10px] mt-2" style={{ color: 'var(--muted)', opacity: 0.6 }}>Clicca per aprire nel CRM</p>
         </div>
       )}
 
@@ -2547,6 +2553,11 @@ interface EventDetailProps {
 function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni, internalUsers, clients }: EventDetailProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [eventTasks, setEventTasks] = useState<Task[]>([])
+  const navigateRouter = useNavigate()
+
+  const navigateToCrm = (clientName: string) => {
+    navigateRouter(`/crm?client=${encodeURIComponent(clientName)}`)
+  }
 
   useEffect(() => { fetchTasksByEvent(event.id).then(setEventTasks) }, [event.id])
 
@@ -2628,9 +2639,15 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
                   {statoLabel(event.stato)}
                 </span>
                 {clients.find(c => c.id === event.cliente) && (
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                    Cliente: <span style={{ color: 'var(--text)' }}>{clients.find(c => c.id === event.cliente)!.nome}</span>
-                  </span>
+                  <button
+                    onClick={() => {
+                      const clientObj = clients.find(c => c.id === event.cliente)
+                      if (clientObj) navigateToCrm(clientObj.nome)
+                    }}
+                    className="text-xs hover:underline transition-all cursor-pointer"
+                    style={{ color: 'var(--muted)' }}>
+                    Cliente: <span style={{ color: 'var(--blue)' }}>{clients.find(c => c.id === event.cliente)!.nome}</span>
+                  </button>
                 )}
                 {clients.find(c => c.id === event.cliente)?.referente && (
                   <span className="text-xs" style={{ color: 'var(--muted)' }}>
@@ -2731,7 +2748,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
       {/* Tab Content */}
       <div key={activeTab} className="animate-fade-in">
         {activeTab === 'overview' && (
-          <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} clients={clients} />
+          <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} clients={clients} onClientClick={navigateToCrm} />
         )}
         {activeTab === 'task' && <TabTask event={event} suppliers={suppliers} internalUsers={internalUsers} />}
         {activeTab === 'team' && <TabTeam event={event} internalUsers={internalUsers} />}

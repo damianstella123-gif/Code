@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Users,
   Search,
@@ -11,9 +12,14 @@ import {
   Building2,
   Pencil,
   Upload,
+  Calendar,
+  ChevronRight,
+  Sparkles,
 } from 'lucide-react'
 import type { Client } from '@/data/clients'
+import type { Event } from '@/data/events'
 import { fetchClients, updateClient, uploadCompanyLogo, setCompanyLogo } from '@/lib/clients-service'
+import { fetchEventsByClientName } from '@/lib/events-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { setFlyContext } from '@/lib/fly'
 
@@ -76,6 +82,34 @@ function buildGroups(clients: Client[]): CompanyGroup[] {
   }
   groups.sort((a, b) => a.companyName.localeCompare(b.companyName))
   return groups
+}
+
+function evtStatoColor(stato: string) {
+  switch (stato) {
+    case 'in_corso': return 'var(--red2)'
+    case 'pianificazione': return 'var(--blue)'
+    case 'completato': return 'var(--green)'
+    case 'bozza': return 'var(--yellow)'
+    default: return 'var(--muted)'
+  }
+}
+
+function evtStatoLabel(stato: string) {
+  switch (stato) {
+    case 'in_corso': return 'In Corso'
+    case 'pianificazione': return 'Pianificazione'
+    case 'completato': return 'Completato'
+    case 'bozza': return 'Bozza'
+    default: return stato
+  }
+}
+
+function formatEventDate(start: string, end: string): string {
+  const s = new Date(start)
+  const e = new Date(end)
+  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }
+  if (start === end) return s.toLocaleDateString('it-IT', opts)
+  return `${s.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} - ${e.toLocaleDateString('it-IT', opts)}`
 }
 
 interface EditReferenteModalProps {
@@ -178,14 +212,29 @@ interface CompanyDetailProps {
   group: CompanyGroup
   onBack: () => void
   onRefresh: () => void
+  onNavigateToEvent?: (eventId: string) => void
 }
 
-function CompanyDetail({ group, onBack, onRefresh }: CompanyDetailProps) {
+function CompanyDetail({ group, onBack, onRefresh, onNavigateToEvent }: CompanyDetailProps) {
   const [referenteSearch, setReferenteSearch] = useState('')
   const [editTarget, setEditTarget] = useState<Client | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [clientEvents, setClientEvents] = useState<Event[]>([])
+  const [eventsLoading, setEventsLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setEventsLoading(true)
+    fetchEventsByClientName(group.companyName).then(evts => {
+      if (!cancelled) {
+        setClientEvents(evts)
+        setEventsLoading(false)
+      }
+    })
+    return () => { cancelled = true }
+  }, [group.companyName])
 
   const filteredRefs = useMemo(() => {
     if (!referenteSearch.trim()) return group.rows
@@ -371,6 +420,65 @@ function CompanyDetail({ group, onBack, onRefresh }: CompanyDetailProps) {
         )}
       </div>
 
+      {/* Events section */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>
+          Eventi{!eventsLoading && clientEvents.length > 0 && ` (${clientEvents.length})`}
+        </h2>
+
+        {eventsLoading ? (
+          <div className="panel p-6 text-center">
+            <div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento eventi...</div>
+          </div>
+        ) : clientEvents.length === 0 ? (
+          <div className="panel p-10 text-center" style={{ border: '1px dashed var(--line)' }}>
+            <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-20" style={{ color: 'var(--muted)' }} />
+            <p className="text-sm font-medium" style={{ color: 'var(--muted)' }}>
+              Nessun evento per questa azienda
+            </p>
+            <p className="text-xs mt-1" style={{ color: 'var(--muted)', opacity: 0.7 }}>
+              Gli eventi associati appariranno qui automaticamente
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {clientEvents.map((evt, i) => (
+              <div
+                key={evt.id}
+                className="panel p-4 flex items-center gap-4 group cursor-pointer transition-all hover:translate-x-0.5 animate-fade-in"
+                style={{ animationDelay: `${i * 40}ms`, border: '1px solid var(--line)' }}
+                onClick={() => onNavigateToEvent?.(evt.id)}
+              >
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: `${evtStatoColor(evt.stato)}12` }}>
+                  <Calendar className="w-4.5 h-4.5" style={{ color: evtStatoColor(evt.stato) }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-semibold truncate block" style={{ color: 'var(--text)' }}>
+                    {evt.nome}
+                  </span>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                      {formatEventDate(evt.dataInizio, evt.dataFine)}
+                    </span>
+                    {evt.location && (
+                      <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                        <MapPin className="w-3 h-3" /> {evt.location}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-full font-semibold flex-shrink-0"
+                  style={{ background: `${evtStatoColor(evt.stato)}15`, color: evtStatoColor(evt.stato), border: `1px solid ${evtStatoColor(evt.stato)}30` }}>
+                  {evtStatoLabel(evt.stato)}
+                </span>
+                <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" style={{ color: 'var(--muted)' }} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {editTarget && (
         <EditReferenteModal
           row={editTarget}
@@ -387,6 +495,8 @@ export default function CRM() {
   const [selectedName, setSelectedName] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterStato>('Tutti')
   const [search, setSearch] = useState('')
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const refresh = useCallback(async () => {
     const list = await fetchClients()
@@ -395,6 +505,15 @@ export default function CRM() {
 
   useEffect(() => { refresh() }, [refresh])
   useRealtimeTable('clients', refresh)
+
+  // Handle deep-link from Events page: /crm?client=CompanyName
+  useEffect(() => {
+    const clientParam = searchParams.get('client')
+    if (clientParam && !selectedName) {
+      setSelectedName(clientParam)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, selectedName, setSearchParams])
 
   const groups = useMemo(() => buildGroups(clientList), [clientList])
 
@@ -435,6 +554,7 @@ export default function CRM() {
         group={selectedGroup}
         onBack={() => setSelectedName(null)}
         onRefresh={refresh}
+        onNavigateToEvent={(eventId) => navigate(`/eventi?id=${eventId}`)}
       />
     )
   }
