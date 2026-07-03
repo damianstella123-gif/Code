@@ -1455,18 +1455,21 @@ function EventDateEditModal({ event, onClose, onSave }: {
     setWarning('')
   }
 
+  function addDaysToISODate(iso: string, days: number): string {
+    const [y, m, d] = iso.split('-').map(Number)
+    const dt = new Date(Date.UTC(y, m - 1, d + days))
+    return dt.toISOString().slice(0, 10)
+  }
+
   function addDayToEnd() {
-    const d = new Date(endDate + 'T00:00:00')
-    d.setDate(d.getDate() + 1)
-    setEndDate(d.toISOString().slice(0, 10))
+    setEndDate(addDaysToISODate(endDate, 1))
     setWarning('')
   }
 
   function removeDayFromEnd() {
-    const d = new Date(endDate + 'T00:00:00')
-    d.setDate(d.getDate() - 1)
-    if (d >= new Date(startDate + 'T00:00:00')) {
-      setEndDate(d.toISOString().slice(0, 10))
+    const prev = addDaysToISODate(endDate, -1)
+    if (prev >= startDate) {
+      setEndDate(prev)
       setWarning('')
     }
   }
