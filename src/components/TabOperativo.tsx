@@ -809,10 +809,10 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
         <div className="pt-3 mt-3" style={{ borderTop: '1px dashed var(--line)' }}>
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
-              Extra ({extras.length})
+              Voci extra ({extras.length})
             </p>
             <button onClick={startAddExtra} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
-              <Plus className="w-3 h-3" /> Extra
+              <Plus className="w-3 h-3" /> Aggiungi extra
             </button>
           </div>
 
@@ -829,11 +829,22 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
                 </div>
                 <div>
                   <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Quantita</label>
-                  <input type="number" value={String(extraForm.quantita || '')} onChange={e => setExtraForm(f => ({ ...f, quantita: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                  <input type="number" value={String(extraForm.quantita || '')} onChange={e => {
+                    const qty = Number(e.target.value) || 1
+                    setExtraForm(f => {
+                      const vu = Number(f.venduto_unitario) || 0
+                      const cu = Number(f.costo_unitario) || 0
+                      return { ...f, quantita: e.target.value, venduto_totale: vu ? String(vu * qty) : '', costo_totale: cu ? String(cu * qty) : '' }
+                    })
+                  }} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
                 </div>
                 <div>
                   <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Venduto/unit.</label>
-                  <input type="number" value={String(extraForm.venduto_unitario || '')} onChange={e => setExtraForm(f => ({ ...f, venduto_unitario: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                  <input type="number" value={String(extraForm.venduto_unitario || '')} onChange={e => {
+                    const vu = Number(e.target.value) || 0
+                    const qty = Number(extraForm.quantita) || 1
+                    setExtraForm(f => ({ ...f, venduto_unitario: e.target.value, venduto_totale: vu ? String(vu * qty) : '' }))
+                  }} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
                 </div>
                 <div>
                   <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Venduto totale</label>
@@ -841,7 +852,11 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
                 </div>
                 <div>
                   <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Costo/unit.</label>
-                  <input type="number" value={String(extraForm.costo_unitario || '')} onChange={e => setExtraForm(f => ({ ...f, costo_unitario: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                  <input type="number" value={String(extraForm.costo_unitario || '')} onChange={e => {
+                    const cu = Number(e.target.value) || 0
+                    const qty = Number(extraForm.quantita) || 1
+                    setExtraForm(f => ({ ...f, costo_unitario: e.target.value, costo_totale: cu ? String(cu * qty) : '' }))
+                  }} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
                 </div>
                 <div>
                   <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Costo totale</label>
@@ -876,9 +891,13 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--line)', color: 'var(--muted)' }}>Extra</span>
                         <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{(item.descrizione as string) || 'Extra'}</span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+                        {venduto > 0 && <span>Venduto: {'\u20AC'}{venduto.toLocaleString('it-IT')}</span>}
+                        {costo > 0 && <span>Costo: {'\u20AC'}{costo.toLocaleString('it-IT')}</span>}
                         {(venduto > 0 || costo > 0) && (
-                          <span className="text-xs" style={{ color: margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>
-                            {'\u20AC'}{margine.toLocaleString('it-IT', { minimumFractionDigits: 0 })}
+                          <span style={{ color: margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>
+                            Margine: {'\u20AC'}{margine.toLocaleString('it-IT')}
                           </span>
                         )}
                       </div>
