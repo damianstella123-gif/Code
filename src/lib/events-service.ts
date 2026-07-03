@@ -145,10 +145,18 @@ export async function deleteEvent(id: string): Promise<boolean> {
 }
 
 export async function fetchEventsByClientName(clientName: string): Promise<Event[]> {
+  const { data: clientRows } = await supabase
+    .from('clients')
+    .select('id')
+    .ilike('name', clientName)
+  if (!clientRows || clientRows.length === 0) return []
+
+  const ids = clientRows.map(r => r.id)
+
   const { data, error } = await supabase
     .from('events')
     .select('*')
-    .ilike('client', clientName)
+    .or(`client.in.(${ids.join(',')}),client_id.in.(${ids.join(',')})`)
     .order('start_date', { ascending: false })
     .limit(50)
   if (error) {
