@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Minus, GripVertical, Clock, Users, Euro } from 'lucide-react'
+import { ArrowLeft, Plus, Minus, GripVertical, Clock, Users, Euro, Calendar, MapPin, Hash } from 'lucide-react'
 import { useEventTimeline, type TimelineService, type DayData } from '../lib/use-event-timeline'
 
 const DAYS_FULL = ['Domenica', 'Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato']
@@ -35,7 +35,7 @@ function categoriaLabel(cat: string): string {
 
 function categoriaColor(cat: string): string {
   const map: Record<string, string> = {
-    programma: '#4db4ff',
+    programma: 'var(--blue)',
     transfer: '#9b59b6',
     hotel: '#e67e22',
     ristorante: '#e74c3c',
@@ -44,15 +44,15 @@ function categoriaColor(cat: string): string {
     staff_interno: '#3498db',
     staff_esterno: '#2980b9',
     audio_video: '#8e44ad',
-    allestimenti: '#27ae60',
+    allestimenti: 'var(--green)',
     grafica_stampa: '#d35400',
-    varie: '#7f8c8d',
+    varie: 'var(--gray)',
   }
-  return map[cat] ?? '#95a5a6'
+  return map[cat] ?? 'var(--gray)'
 }
 
 function formatCurrency(n: number): string {
-  if (!n) return ''
+  if (!n) return '-'
   return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
 }
 
@@ -88,6 +88,7 @@ export default function EventTimeline() {
   const totalCosto = days.reduce((sum, d) => sum + d.services.reduce((s, svc) => s + svc.costo, 0), 0)
   const totalMargine = totalVenduto - totalCosto
   const marginePct = totalVenduto > 0 ? (totalMargine / totalVenduto) * 100 : 0
+  const totalServices = days.reduce((s, d) => s + d.services.length, 0)
 
   const lastDayServices = days.length > 0 ? days[days.length - 1].services : []
 
@@ -100,47 +101,83 @@ export default function EventTimeline() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-4 p-4 md:p-6">
-      {/* Header */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <button
-          onClick={() => navigate('/calendario')}
-          className="flex items-center gap-1.5 text-sm font-medium transition-colors hover:opacity-80"
-          style={{ color: 'var(--muted)' }}
-        >
-          <ArrowLeft size={16} />
-          Calendario
-        </button>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold truncate" style={{ color: 'var(--text)' }}>{event.nome}</h1>
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>
-            {event.cliente} &middot; {days.length} {days.length === 1 ? 'giornata' : 'giornate'} &middot; {event.partecipanti} pax &middot; {event.location}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <div className="h-full flex flex-col gap-5 p-5 md:p-6">
+      {/* Header — cockpit identity */}
+      <div
+        className="rounded-2xl px-5 py-4"
+        style={{
+          background: 'var(--cc-glass)',
+          backdropFilter: `blur(var(--cc-blur))`,
+          WebkitBackdropFilter: `blur(var(--cc-blur))`,
+          border: '1px solid var(--cc-glass-border)',
+          boxShadow: 'var(--cc-shadow)',
+        }}
+      >
+        <div className="flex items-center gap-4 flex-wrap">
           <button
-            onClick={addDay}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all hover:brightness-110"
-            style={{ background: 'var(--red)', color: 'white' }}
+            onClick={() => navigate('/calendario')}
+            className="flex items-center gap-1.5 text-xs font-medium transition-all rounded-lg px-2.5 py-1.5"
+            style={{ color: 'var(--muted)', background: 'var(--panel)', border: '1px solid var(--line)' }}
           >
-            <Plus size={14} />
-            Giornata
+            <ArrowLeft size={13} />
+            Calendario
           </button>
-          <button
-            onClick={handleRemoveDay}
-            disabled={days.length <= 1}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all hover:brightness-110 disabled:opacity-30"
-            style={{ background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--line)' }}
-          >
-            <Minus size={14} />
-            Rimuovi
-          </button>
+
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg font-bold truncate" style={{ color: 'var(--text)', letterSpacing: '-0.01em' }}>
+              {event.nome}
+            </h1>
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
+              <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                <Calendar size={11} /> {days.length} {days.length === 1 ? 'giornata' : 'giornate'}
+              </span>
+              {event.cliente && (
+                <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                  <Hash size={11} /> {event.cliente}
+                </span>
+              )}
+              {event.location && (
+                <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                  <MapPin size={11} /> {event.location}
+                </span>
+              )}
+              {event.partecipanti > 0 && (
+                <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                  <Users size={11} /> {event.partecipanti} pax
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={addDay}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all"
+              style={{
+                background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)',
+                color: 'white',
+                boxShadow: 'var(--shadow-red)',
+              }}
+            >
+              <Plus size={13} />
+              Giornata
+            </button>
+            <button
+              onClick={handleRemoveDay}
+              disabled={days.length <= 1}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-30"
+              style={{ background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--line)' }}
+            >
+              <Minus size={13} />
+              Rimuovi
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Timeline columns */}
-      <div className="flex-1 overflow-x-auto">
-        <div className="flex gap-3 min-h-[400px] pb-4" style={{ minWidth: days.length * 220 }}>
+      {/* Timeline columns — the operational core */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden" style={{ scrollBehavior: 'smooth' }}>
+        <div className="flex gap-3 h-full pb-2" style={{ minWidth: days.length * 240 }}>
           {days.map((day, idx) => (
             <DayColumnComponent
               key={day.date}
@@ -163,27 +200,39 @@ export default function EventTimeline() {
         </div>
       </div>
 
-      {/* Summary bar */}
+      {/* Summary bar — cockpit instrument */}
       <div
-        className="flex items-center justify-between px-4 py-3 rounded-lg text-sm"
-        style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
+        className="flex items-center justify-between px-5 py-3.5 rounded-2xl text-sm"
+        style={{
+          background: 'var(--cc-glass)',
+          backdropFilter: `blur(var(--cc-blur))`,
+          WebkitBackdropFilter: `blur(var(--cc-blur))`,
+          border: '1px solid var(--cc-glass-border)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
       >
-        <div className="flex items-center gap-6">
-          <span style={{ color: 'var(--muted)' }}>
-            Venduto <strong style={{ color: 'var(--text)' }}>{formatCurrency(totalVenduto)}</strong>
-          </span>
-          <span style={{ color: 'var(--muted)' }}>
-            Costi <strong style={{ color: 'var(--text)' }}>{formatCurrency(totalCosto)}</strong>
-          </span>
-          <span style={{ color: 'var(--muted)' }}>
-            Margine <strong style={{ color: totalMargine >= 0 ? '#38d27d' : '#ff315f' }}>
+        <div className="flex items-center gap-5 flex-wrap">
+          <div className="flex flex-col">
+            <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Venduto</span>
+            <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>{formatCurrency(totalVenduto)}</span>
+          </div>
+          <div className="w-px h-6" style={{ background: 'var(--line)' }} />
+          <div className="flex flex-col">
+            <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Costi</span>
+            <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>{formatCurrency(totalCosto)}</span>
+          </div>
+          <div className="w-px h-6" style={{ background: 'var(--line)' }} />
+          <div className="flex flex-col">
+            <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Margine</span>
+            <span className="text-sm font-bold" style={{ color: totalMargine >= 0 ? 'var(--green)' : 'var(--red)' }}>
               {formatCurrency(totalMargine)} ({marginePct.toFixed(1)}%)
-            </strong>
-          </span>
+            </span>
+          </div>
         </div>
-        <span className="text-xs" style={{ color: 'var(--muted)' }}>
-          {days.reduce((s, d) => s + d.services.length, 0)} servizi totali
-        </span>
+        <div className="flex flex-col items-end">
+          <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Servizi</span>
+          <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>{totalServices}</span>
+        </div>
       </div>
 
       {/* Remove dialog */}
@@ -214,42 +263,53 @@ function DayColumnComponent({
   onServiceDragStart: (svc: TimelineService) => void
 }) {
   const { dayName, dayNum, month } = formatDayHeader(day.date)
-  const dayVenduto = day.services.reduce((s, svc) => s + svc.venduto, 0)
   const dayCosto = day.services.reduce((s, svc) => s + svc.costo, 0)
 
   return (
     <div
-      className="flex-1 min-w-[200px] max-w-[280px] flex flex-col rounded-lg transition-all"
+      className="flex-1 min-w-[220px] max-w-[300px] flex flex-col rounded-2xl transition-all"
       style={{
-        background: isDragOver ? 'rgba(208,0,58,0.06)' : 'var(--surface)',
-        border: isDragOver ? '2px solid rgba(208,0,58,0.4)' : '1px solid var(--line)',
+        background: isDragOver ? 'var(--cc-glass-deep)' : 'var(--cc-glass)',
+        backdropFilter: `blur(var(--cc-blur))`,
+        WebkitBackdropFilter: `blur(var(--cc-blur))`,
+        border: isDragOver ? '2px solid var(--red)' : '1px solid var(--cc-glass-border)',
+        boxShadow: isDragOver ? 'var(--shadow-red)' : 'var(--shadow-sm)',
       }}
       onDragOver={e => { e.preventDefault(); onDragOver() }}
       onDragLeave={onDragLeave}
       onDrop={e => { e.preventDefault(); onDrop() }}
     >
       {/* Day header */}
-      <div className="px-3 py-3 border-b" style={{ borderColor: 'var(--line)' }}>
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{dayNum}</span>
-          <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{month}</span>
+      <div className="px-4 py-3.5" style={{ borderBottom: '1px solid var(--cc-divider)' }}>
+        <div className="flex items-baseline justify-between">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold" style={{ color: 'var(--text)', letterSpacing: '-0.04em' }}>{dayNum}</span>
+            <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: 'var(--muted)' }}>{month.slice(0, 3)}</span>
+          </div>
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md" style={{ background: 'var(--panel)', color: 'var(--muted)' }}>
+            {dayIndex + 1}/{totalDays}
+          </span>
         </div>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-          {dayName} &middot; Giorno {dayIndex + 1} di {totalDays}
+        <p className="text-[11px] mt-1" style={{ color: 'var(--muted)' }}>
+          {dayName}
         </p>
-        {(dayVenduto > 0 || dayCosto > 0) && (
-          <p className="text-xs mt-1 flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-            <Euro size={10} />
-            {formatCurrency(dayCosto)} costi
+        {dayCosto > 0 && (
+          <p className="text-[10px] mt-1.5 flex items-center gap-1 font-medium" style={{ color: 'var(--muted)' }}>
+            <Euro size={9} />
+            {formatCurrency(dayCosto)}
           </p>
         )}
       </div>
 
       {/* Services list */}
-      <div className="flex-1 p-2 space-y-1.5 overflow-y-auto">
+      <div className="flex-1 p-2.5 space-y-2 overflow-y-auto">
         {day.services.length === 0 && (
-          <div className="flex items-center justify-center h-20 text-xs" style={{ color: 'var(--muted)' }}>
-            Nessun servizio
+          <div
+            className="flex flex-col items-center justify-center h-24 rounded-xl"
+            style={{ border: '1px dashed var(--line)' }}
+          >
+            <span className="text-[10px]" style={{ color: 'var(--muted)' }}>Nessun servizio</span>
+            <span className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>Trascina qui</span>
           </div>
         )}
         {day.services.map(svc => (
@@ -258,7 +318,7 @@ function DayColumnComponent({
       </div>
 
       {/* Day footer */}
-      <div className="px-3 py-2 border-t text-xs" style={{ borderColor: 'var(--line)', color: 'var(--muted)' }}>
+      <div className="px-4 py-2.5 text-[10px] font-medium" style={{ borderTop: '1px solid var(--cc-divider)', color: 'var(--muted)' }}>
         {day.services.length} {day.services.length === 1 ? 'elemento' : 'elementi'}
       </div>
     </div>
@@ -276,33 +336,40 @@ function ServiceBlockComponent({ service, onDragStart }: { service: TimelineServ
         e.dataTransfer.effectAllowed = 'move'
         e.dataTransfer.setData('text/plain', service.id)
       }}
-      className="group rounded-md px-2.5 py-2 cursor-grab active:cursor-grabbing transition-all hover:brightness-105"
+      className="group rounded-xl px-3 py-2.5 cursor-grab active:cursor-grabbing transition-all active:scale-[1.02]"
       style={{
-        background: `${color}12`,
+        background: 'var(--panel)',
+        border: '1px solid var(--line)',
         borderLeft: `3px solid ${color}`,
-        border: `1px solid ${color}25`,
-        borderLeftWidth: 3,
+        boxShadow: 'var(--shadow-sm)',
       }}
     >
-      <div className="flex items-start gap-1.5">
-        <GripVertical size={12} className="mt-0.5 opacity-0 group-hover:opacity-40 transition-opacity shrink-0" style={{ color }} />
+      <div className="flex items-start gap-2">
+        <GripVertical
+          size={12}
+          className="mt-0.5 opacity-0 group-hover:opacity-50 transition-opacity shrink-0"
+          style={{ color: 'var(--muted)' }}
+        />
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium truncate" style={{ color: 'var(--text)' }}>
+          <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text)' }}>
             {service.titolo}
           </p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[10px] px-1 py-0.5 rounded" style={{ background: `${color}20`, color }}>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span
+              className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md"
+              style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, color }}
+            >
               {categoriaLabel(service.categoria)}
             </span>
             {service.ora && (
               <span className="text-[10px] flex items-center gap-0.5" style={{ color: 'var(--muted)' }}>
-                <Clock size={8} />
+                <Clock size={9} />
                 {service.ora.slice(0, 5)}
               </span>
             )}
             {service.pax && (
               <span className="text-[10px] flex items-center gap-0.5" style={{ color: 'var(--muted)' }}>
-                <Users size={8} />
+                <Users size={9} />
                 {service.pax}
               </span>
             )}
@@ -322,47 +389,61 @@ function RemoveDayDialog({ day, onClose, onConfirm }: {
   const categories = [...new Set(day.services.map(s => categoriaLabel(s.categoria)))]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="rounded-xl p-6 max-w-md w-full mx-4" style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}>
-        <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text)' }}>
-          Rimuovi giornata {dayNum} {month}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="rounded-2xl p-6 max-w-md w-full"
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-lg)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <h3 className="text-base font-bold mb-1.5" style={{ color: 'var(--text)' }}>
+          Rimuovi giornata
         </h3>
-        <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
-          Questa giornata contiene {day.services.length} {day.services.length === 1 ? 'elemento' : 'elementi'}:
+        <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
+          Il giorno {dayNum} {month} contiene {day.services.length} {day.services.length === 1 ? 'elemento' : 'elementi'}:
         </p>
-        <ul className="text-xs mb-5 space-y-1 pl-4" style={{ color: 'var(--text)' }}>
+        <div className="flex flex-wrap gap-1.5 mb-5">
           {categories.map(cat => (
-            <li key={cat}>&bull; {cat} ({day.services.filter(s => categoriaLabel(s.categoria) === cat).length})</li>
+            <span
+              key={cat}
+              className="text-[10px] font-medium px-2 py-1 rounded-lg"
+              style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}
+            >
+              {cat} ({day.services.filter(s => categoriaLabel(s.categoria) === cat).length})
+            </span>
           ))}
-        </ul>
-        <p className="text-sm font-medium mb-3" style={{ color: 'var(--text)' }}>Come vuoi procedere?</p>
+        </div>
+        <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text)' }}>Come vuoi procedere?</p>
         <div className="space-y-2">
           <button
             onClick={() => onConfirm('move_prev')}
-            className="w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover:brightness-110"
-            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+            className="w-full text-left px-4 py-3 rounded-xl text-xs font-medium transition-all hover:brightness-105"
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
           >
             Sposta tutto al giorno precedente
           </button>
           <button
             onClick={() => onConfirm('move_next')}
-            className="w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover:brightness-110"
-            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+            className="w-full text-left px-4 py-3 rounded-xl text-xs font-medium transition-all hover:brightness-105"
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
           >
             Sposta tutto al giorno successivo
           </button>
           <button
             onClick={() => onConfirm('delete_all')}
-            className="w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover:brightness-110"
-            style={{ background: 'rgba(208,0,58,0.08)', border: '1px solid rgba(208,0,58,0.2)', color: '#ff315f' }}
+            className="w-full text-left px-4 py-3 rounded-xl text-xs font-medium transition-all hover:brightness-105"
+            style={{ background: 'rgba(211,28,48,0.06)', border: '1px solid rgba(211,28,48,0.15)', color: 'var(--red)' }}
           >
             Elimina tutto
           </button>
         </div>
         <button
           onClick={onClose}
-          className="w-full mt-3 px-3 py-2 rounded-md text-sm text-center"
-          style={{ color: 'var(--muted)' }}
+          className="w-full mt-3 px-4 py-2.5 rounded-xl text-xs text-center font-medium transition-all hover:brightness-105"
+          style={{ color: 'var(--muted)', background: 'var(--bg)' }}
         >
           Annulla
         </button>
