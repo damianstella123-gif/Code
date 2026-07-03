@@ -16,7 +16,7 @@ const CATEGORIES: { key: CategoryType; label: string; table: string }[] = [
   { key: 'staff_interno', label: 'Staff Simmetria', table: 'event_staff_interno_details' },
   { key: 'staff_esterno', label: 'Staff Esterno', table: 'event_staff_esterno_details' },
   { key: 'grafica_stampa', label: 'Grafica / Stampa', table: 'event_grafica_stampa_details' },
-  { key: 'varie', label: 'Varie / Extra', table: 'event_varie_details' },
+  { key: 'varie', label: 'Varie', table: 'event_varie_details' },
 ]
 
 const IVA_OPTIONS = ['22', '10', '5', '4', '0', 'Esente', 'Fuori campo']
@@ -70,7 +70,7 @@ export function calcIva(imponibile: number, aliquota: string): number {
 export const CATEGORY_LABELS: Record<CategoryType, string> = {
   hotel: 'Hotel', transfer: 'Transfer', ristorante: 'Ristorante', experience: 'Location / Experience',
   catering: 'Catering', audio_video: 'Audio Video', allestimenti: 'Allestimenti',
-  staff_interno: 'Staff Simmetria', staff_esterno: 'Staff Esterno', grafica_stampa: 'Grafica / Stampa', varie: 'Varie / Extra',
+  staff_interno: 'Staff Simmetria', staff_esterno: 'Staff Esterno', grafica_stampa: 'Grafica / Stampa', varie: 'Varie',
 }
 
 export function detectSupplierCategory(supplierCategory: string): CategoryType {
@@ -90,15 +90,21 @@ export function detectSupplierCategory(supplierCategory: string): CategoryType {
 
 export function SupplierCategoryPanel({ event, supplierId, category }: { event: { id: string }; supplierId: string; category: CategoryType }) {
   const [items, setItems] = useState<Record<string, unknown>[]>([])
+  const [extras, setExtras] = useState<Record<string, unknown>[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [showExtraForm, setShowExtraForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingExtraId, setEditingExtraId] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, string | number | boolean>>({})
+  const [extraForm, setExtraForm] = useState<Record<string, string | number | boolean>>({})
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deletingExtraId, setDeletingExtraId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
 
   const catMeta = CATEGORIES.find(c => c.key === category)!
+  const showExtras = category !== 'varie'
 
   const loadItems = useCallback(async () => {
     setLoading(true)
@@ -108,8 +114,12 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
     }
     const { data } = await query.order('created_at', { ascending: true })
     setItems(data ?? [])
+    if (showExtras) {
+      const { data: extData } = await supabase.from('event_varie_details').select('*').eq('event_id', event.id).eq('supplier_id', supplierId).order('created_at', { ascending: true })
+      setExtras(extData ?? [])
+    }
     setLoading(false)
-  }, [event.id, supplierId, category, catMeta.table])
+  }, [event.id, supplierId, category, catMeta.table, showExtras])
 
   useEffect(() => { loadItems() }, [loadItems])
 
@@ -303,6 +313,62 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
     if (!deletingId) return
     await supabase.from(catMeta.table).delete().eq('id', deletingId)
     setDeletingId(null)
+    await loadItems()
+  }
+
+  function resetExtraForm() {
+    setExtraForm({ descrizione: '', quantita: '1', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', note: '' })
+  }
+
+  function startAddExtra() { resetExtraForm(); setEditingExtraId(null); setShowExtraForm(true) }
+
+  function startEditExtra(item: Record<string, unknown>) {
+    const f: Record<string, string | number | boolean> = {}
+    for (const [k, v] of Object.entries(item)) {
+      if (v === null || v === undefined) f[k] = ''
+      else if (typeof v === 'boolean') f[k] = v
+      else f[k] = String(v)
+    }
+    setExtraForm(f)
+    setEditingExtraId(item.id as string)
+    setShowExtraForm(true)
+  }
+
+  async function handleSaveExtra() {
+    setSaving(true); setSaveError(null)
+    const qty = Number(extraForm.quantita) || 1
+    const vu = extraForm.venduto_unitario ? Number(extraForm.venduto_unitario) : null
+    const cu = extraForm.costo_unitario ? Number(extraForm.costo_unitario) : null
+    const record: Record<string, unknown> = {
+      event_id: event.id,
+      supplier_id: supplierId,
+      descrizione: String(extraForm.descrizione || ''),
+      quantita: qty,
+      venduto_unitario: vu,
+      venduto_totale: extraForm.venduto_totale ? Number(extraForm.venduto_totale) : (vu ? vu * qty : null),
+      costo_unitario: cu,
+      costo_totale: extraForm.costo_totale ? Number(extraForm.costo_totale) : (cu ? cu * qty : null),
+      note: String(extraForm.note || '') || null,
+    }
+    let error: { message: string } | null = null
+    if (editingExtraId) {
+      const res = await supabase.from('event_varie_details').update(record).eq('id', editingExtraId)
+      error = res.error
+    } else {
+      record.id = crypto.randomUUID()
+      const res = await supabase.from('event_varie_details').insert(record)
+      error = res.error
+    }
+    setSaving(false)
+    if (error) { setSaveError(error.message); return }
+    setShowExtraForm(false); setEditingExtraId(null)
+    await loadItems()
+  }
+
+  async function handleDeleteExtra() {
+    if (!deletingExtraId) return
+    await supabase.from('event_varie_details').delete().eq('id', deletingExtraId)
+    setDeletingExtraId(null)
     await loadItems()
   }
 
@@ -736,6 +802,114 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
               <button className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--red2)', color: '#fff' }} onClick={handleDelete}>Elimina</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {showExtras && (
+        <div className="pt-3 mt-3" style={{ borderTop: '1px dashed var(--line)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+              Extra ({extras.length})
+            </p>
+            <button onClick={startAddExtra} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+              <Plus className="w-3 h-3" /> Extra
+            </button>
+          </div>
+
+          {showExtraForm && (
+            <div className="p-4 rounded-xl space-y-3 mb-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{editingExtraId ? 'Modifica extra' : 'Nuovo extra'}</p>
+                <button onClick={() => { setShowExtraForm(false); setEditingExtraId(null) }}><X className="w-4 h-4" style={{ color: 'var(--muted)' }} /></button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Descrizione</label>
+                  <input value={String(extraForm.descrizione || '')} onChange={e => setExtraForm(f => ({ ...f, descrizione: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Quantita</label>
+                  <input type="number" value={String(extraForm.quantita || '')} onChange={e => setExtraForm(f => ({ ...f, quantita: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Venduto/unit.</label>
+                  <input type="number" value={String(extraForm.venduto_unitario || '')} onChange={e => setExtraForm(f => ({ ...f, venduto_unitario: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Venduto totale</label>
+                  <input type="number" value={String(extraForm.venduto_totale || '')} onChange={e => setExtraForm(f => ({ ...f, venduto_totale: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Costo/unit.</label>
+                  <input type="number" value={String(extraForm.costo_unitario || '')} onChange={e => setExtraForm(f => ({ ...f, costo_unitario: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Costo totale</label>
+                  <input type="number" value={String(extraForm.costo_totale || '')} onChange={e => setExtraForm(f => ({ ...f, costo_totale: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Note</label>
+                  <input value={String(extraForm.note || '')} onChange={e => setExtraForm(f => ({ ...f, note: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                </div>
+              </div>
+              {saveError && <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626' }}>Errore: {saveError}</p>}
+              <div className="flex items-center gap-2 pt-2 justify-end" style={{ borderTop: '1px solid var(--line)' }}>
+                <button onClick={() => { setShowExtraForm(false); setEditingExtraId(null); setSaveError(null) }} className="px-4 py-2 rounded-lg text-xs font-medium" style={{ color: 'var(--muted)' }}>Annulla</button>
+                <button disabled={saving} onClick={handleSaveExtra} className="px-4 py-2 rounded-lg text-xs font-medium" style={{ background: 'var(--red2)', color: '#fff', opacity: saving ? 0.6 : 1 }}>
+                  {saving ? 'Salvataggio...' : editingExtraId ? 'Salva' : 'Aggiungi'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {extras.length > 0 && (
+            <div className="space-y-2">
+              {extras.map(item => {
+                const id = item.id as string
+                const qty = (item.quantita as number) ?? 1
+                const venduto = (item.venduto_totale as number) ?? ((item.venduto_unitario as number) ? (item.venduto_unitario as number) * qty : 0)
+                const costo = (item.costo_totale as number) ?? ((item.costo_unitario as number) ? (item.costo_unitario as number) * qty : 0)
+                const margine = venduto - costo
+                return (
+                  <div key={id} className="flex items-start gap-3 p-3 rounded-lg" style={{ background: 'var(--panel2)', border: '1px dashed var(--line)' }}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--line)', color: 'var(--muted)' }}>Extra</span>
+                        <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{(item.descrizione as string) || 'Extra'}</span>
+                        {(venduto > 0 || costo > 0) && (
+                          <span className="text-xs" style={{ color: margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>
+                            {'\u20AC'}{margine.toLocaleString('it-IT', { minimumFractionDigits: 0 })}
+                          </span>
+                        )}
+                      </div>
+                      {(item.note as string) && <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{item.note as string}</p>}
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button onClick={() => startEditExtra(item)} className="p-1.5 rounded hover:bg-white/10">
+                        <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                      </button>
+                      <button onClick={() => setDeletingExtraId(id)} className="p-1.5 rounded hover:bg-white/10">
+                        <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {deletingExtraId && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDeletingExtraId(null)}>
+              <div className="panel p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+                <p className="font-semibold mb-2" style={{ color: 'var(--text)' }}>Elimina extra</p>
+                <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Questa azione elimina la voce extra.</p>
+                <div className="flex gap-3 justify-end">
+                  <button className="px-4 py-2 rounded-lg text-sm" style={{ background: 'var(--panel2)', color: 'var(--text)' }} onClick={() => setDeletingExtraId(null)}>Annulla</button>
+                  <button className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--red2)', color: '#fff' }} onClick={handleDeleteExtra}>Elimina</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1160,7 +1160,7 @@ const LINK_CATEGORIES: { value: CategoryType; label: string }[] = [
   { value: 'staff_interno', label: 'Staff Simmetria' },
   { value: 'staff_esterno', label: 'Staff Esterno' },
   { value: 'grafica_stampa', label: 'Grafica / Stampa' },
-  { value: 'varie', label: 'Varie / Extra' },
+  { value: 'varie', label: 'Varie' },
 ]
 
 const STATO_CONFERMA_CONFIG = {
