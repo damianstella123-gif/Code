@@ -28,7 +28,7 @@ import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Pratica } from '@/data/pratiche'
 import type { Uscita } from '@/data/amministrazione'
-import { fetchEvents, upsertEvent, updateEvent } from '@/lib/events-service'
+import { fetchEvents, upsertEvent, updateEvent, shiftEventTimeline } from '@/lib/events-service'
 import { fetchTasks, upsertTask, changeTaskStatus } from '@/lib/tasks-service'
 import { fetchPractices, upsertPractice } from '@/lib/practices-service'
 import { fetchBudgets } from '@/lib/budgets-service'
@@ -1643,6 +1643,7 @@ export default function Calendario() {
   const [showCreate, setShowCreate] = useState(false)
   const [editingMemo, setEditingMemo] = useState<CalendarItem | null>(null)
   const [editingEventDates, setEditingEventDates] = useState<Event | null>(null)
+  const [shiftToast, setShiftToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null)
   const today = useMemo(() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t }, [])
 
   const currentUser = loadUser()
@@ -1731,10 +1732,19 @@ export default function Calendario() {
       const target = allEvents.find(e => e.id === id)
       if (!target) return
       const diffMs = new Date(newDate).getTime() - new Date(target.dataInizio).getTime()
+      const deltaDays = Math.round(diffMs / 86400000)
+      if (deltaDays === 0) return
       const newStart = newDate
       const newEnd = new Date(new Date(target.dataFine).getTime() + diffMs).toISOString().slice(0, 10)
       setAllEvents(prev => prev.map(e => e.id === id ? { ...e, dataInizio: newStart, dataFine: newEnd } : e))
       await updateEvent(id, { dataInizio: newStart, dataFine: newEnd })
+      const result = await shiftEventTimeline(id, deltaDays)
+      if (result.skipped.length > 0) {
+        setShiftToast({ message: 'Evento spostato. Alcune scadenze non sono state aggiornate automaticamente.', type: 'warning' })
+      } else {
+        setShiftToast({ message: 'Evento spostato. Programma e servizi collegati aggiornati.', type: 'success' })
+      }
+      setTimeout(() => setShiftToast(null), 5000)
     }
     await refresh()
   }
@@ -1987,6 +1997,27 @@ export default function Calendario() {
           onClose={() => setShowCreate(false)}
           onCreate={handleCreate}
         />
+      )}
+
+      {/* Shift toast */}
+      {shiftToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <div className="flex items-center gap-3 px-5 py-3 rounded-xl shadow-xl"
+            style={{
+              background: 'var(--panel)',
+              border: `1px solid ${shiftToast.type === 'success' ? 'rgba(56,210,125,0.3)' : 'rgba(255,194,75,0.3)'}`,
+              boxShadow: `0 12px 40px rgba(0,0,0,0.5), 0 0 20px ${shiftToast.type === 'success' ? 'rgba(56,210,125,0.1)' : 'rgba(255,194,75,0.1)'}`,
+            }}>
+            {shiftToast.type === 'success'
+              ? <Check className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--green)' }} />
+              : <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--yellow)' }} />
+            }
+            <span className="text-sm" style={{ color: 'var(--text)' }}>{shiftToast.message}</span>
+            <button onClick={() => setShiftToast(null)} className="ml-2 p-1 rounded hover:bg-white/10">
+              <X className="w-3 h-3" style={{ color: 'var(--muted)' }} />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )

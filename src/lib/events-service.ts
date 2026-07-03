@@ -165,3 +165,75 @@ export async function fetchEventsByClientName(clientName: string): Promise<Event
   }
   return ((data ?? []) as EventRow[]).map(rowToEvent)
 }
+
+export interface ShiftResult {
+  shifted: string[]
+  skipped: string[]
+}
+
+export async function shiftEventTimeline(eventId: string, deltaDays: number): Promise<ShiftResult> {
+  if (deltaDays === 0) return { shifted: [], skipped: [] }
+
+  const shifted: string[] = []
+  const skipped: string[] = []
+
+  const shiftDate = (d: string): string => {
+    const dt = new Date(d + 'T00:00:00')
+    dt.setDate(dt.getDate() + deltaDays)
+    return dt.toISOString().slice(0, 10)
+  }
+
+  async function shiftTable(table: string, dateColumns: string[]): Promise<boolean> {
+    const { data: rows, error: fetchErr } = await supabase
+      .from(table)
+      .select('*')
+      .eq('event_id', eventId)
+    if (fetchErr) { console.warn(`shiftEventTimeline fetch ${table}:`, fetchErr.message); return false }
+    if (!rows || rows.length === 0) return true
+
+    for (const row of rows) {
+      const r = row as Record<string, unknown>
+      const patch: Record<string, string | null> = {}
+      for (const col of dateColumns) {
+        const val = r[col]
+        if (val && typeof val === 'string') {
+          patch[col] = shiftDate(val)
+        }
+      }
+      if (Object.keys(patch).length > 0) {
+        const { error } = await supabase.from(table).update(patch).eq('id', r.id as string)
+        if (error) { console.warn(`shiftEventTimeline update ${table}:`, error.message); return false }
+      }
+    }
+    return true
+  }
+
+  const tableTasks: { table: string; columns: string[] }[] = [
+    { table: 'event_program', columns: ['data'] },
+    { table: 'event_supplier_services', columns: ['data'] },
+    { table: 'event_hotel_details', columns: ['data', 'check_in_date', 'check_out_date'] },
+    { table: 'event_restaurant_details', columns: ['data'] },
+    { table: 'event_experience_details', columns: ['data'] },
+    { table: 'event_catering_details', columns: ['data'] },
+    { table: 'event_staff_esterno_details', columns: ['data'] },
+    { table: 'event_staff_interno_details', columns: ['data'] },
+    { table: 'event_audio_video_details', columns: ['data_montaggio', 'data_prove', 'data_evento', 'data_smontaggio'] },
+    { table: 'event_allestimenti_details', columns: ['data_montaggio', 'data_smontaggio'] },
+    { table: 'event_grafica_stampa_details', columns: ['data_consegna'] },
+    { table: 'event_varie_details', columns: ['data'] },
+  ]
+
+  const results = await Promise.all(
+    tableTasks.map(async t => {
+      const ok = await shiftTable(t.table, t.columns)
+      return { table: t.table, ok }
+    })
+  )
+
+  for (const r of results) {
+    if (r.ok) shifted.push(r.table)
+    else skipped.push(r.table)
+  }
+
+  return { shifted, skipped }
+}
