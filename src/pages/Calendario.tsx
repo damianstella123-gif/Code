@@ -18,7 +18,6 @@ import {
   Tag,
   Zap,
   FileText,
-  Plus,
   Bell,
   Trash2,
   Edit3,
@@ -648,6 +647,7 @@ function CalPill({ item, onClick, onDragStart }: {
         outline: isOverdue ? `1px dashed ${color}60` : 'none',
       }}>
       {urgent && <Zap style={{ display: 'inline', width: 9, height: 9, marginRight: 2, marginBottom: 1 }} />}
+      {item.type === 'memo' && <Bell style={{ display: 'inline', width: 9, height: 9, marginRight: 2, marginBottom: 1 }} />}
       {label}
     </div>
   )
@@ -1276,7 +1276,9 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
       <div className="relative w-full max-w-md rounded-2xl p-6 space-y-4"
         style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Nuovo elemento</h3>
+          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>
+            {type === 'memo' ? 'Nuovo Promemoria' : type === 'event' ? 'Nuovo Evento' : type === 'task' ? 'Nuovo Task' : 'Nuova Pratica'}
+          </h3>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10">
             <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
           </button>
@@ -1669,7 +1671,6 @@ export default function Calendario() {
     else if (view === 'day') setCursor(d => addDays(d, dir))
   }
 
-  const urgentTasks = allTasks.filter(t => t.priorita === 'alta' && t.stato !== 'completato')
   const overdueItems = visibleItems.filter(item => {
     const d = item.type === 'event'
       ? (item.data as Event).dataInizio
@@ -1714,30 +1715,38 @@ export default function Calendario() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-          {([
-            { id: 'month' as ViewMode, icon: LayoutGrid, label: 'Mese' },
-            { id: 'week' as ViewMode, icon: Calendar, label: 'Settimana' },
-            { id: 'day' as ViewMode, icon: Clock, label: 'Giorno' },
-            { id: 'agenda' as ViewMode, icon: List, label: 'Agenda' },
-          ]).map(v => (
-            <button key={v.id} onClick={() => setView(v.id)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
-              style={{
-                background: view === v.id ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'transparent',
-                color: view === v.id ? 'white' : 'var(--muted)',
-              }}>
-              <v.icon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{v.label}</span>
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-105"
+            style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white', boxShadow: '0 4px 16px rgba(208,0,58,0.3)' }}>
+            <Bell className="w-4 h-4" />
+            + Promemoria
+          </button>
+          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+            {([
+              { id: 'month' as ViewMode, icon: LayoutGrid, label: 'Mese' },
+              { id: 'week' as ViewMode, icon: Calendar, label: 'Settimana' },
+              { id: 'day' as ViewMode, icon: Clock, label: 'Giorno' },
+              { id: 'agenda' as ViewMode, icon: List, label: 'Agenda' },
+            ]).map(v => (
+              <button key={v.id} onClick={() => setView(v.id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  background: view === v.id ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'transparent',
+                  color: view === v.id ? 'white' : 'var(--muted)',
+                }}>
+                <v.icon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{v.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Task urgenti', value: urgentTasks.length, color: urgentTasks.length > 0 ? 'var(--red2)' : 'var(--green)', icon: Zap },
+          { label: 'Promemoria attivi', value: allMemos.length, color: '#a78bfa', icon: Bell },
           { label: 'Scaduti', value: overdueItems.length, color: overdueItems.length > 0 ? 'var(--yellow)' : 'var(--muted)', icon: AlertTriangle },
           { label: 'Questa settimana', value: thisWeekItems.length, color: 'var(--blue)', icon: Calendar },
           { label: 'Attività visibili', value: visibleItems.length, color: 'var(--text)', icon: Tag },
@@ -1758,6 +1767,7 @@ export default function Calendario() {
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1">
         {[
+          { label: 'Promemoria', color: '#a78bfa' },
           { label: 'Evento in corso', color: '#ff315f' },
           { label: 'Pianificazione', color: '#4db4ff' },
           { label: 'Completato', color: '#38d27d' },
@@ -1838,14 +1848,6 @@ export default function Calendario() {
           onSave={handleMemoSave}
         />
       )}
-
-      {/* FAB create button */}
-      <button
-        onClick={() => setShowCreate(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110 z-40"
-        style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
-        <Plus className="w-6 h-6 text-white" />
-      </button>
 
       {/* Quick create modal */}
       {showCreate && (
