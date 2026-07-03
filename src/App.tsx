@@ -21,6 +21,7 @@ const Archivio = lazy(() => import('./pages/Archivio'))
 const Utenti = lazy(() => import('./pages/Utenti'))
 const Impostazioni = lazy(() => import('./pages/Impostazioni'))
 const FeedbackBeta = lazy(() => import('./pages/FeedbackBeta'))
+const EventTimeline = lazy(() => import('./pages/EventTimeline'))
 
 function PageLoader() {
   return (
@@ -134,6 +135,7 @@ export default function App() {
       <Route path="/utenti" element={<AuthGuard><Layout><LazyPage><Utenti /></LazyPage></Layout></AuthGuard>} />
       <Route path="/impostazioni" element={<AuthGuard><Layout><LazyPage><Impostazioni /></LazyPage></Layout></AuthGuard>} />
       <Route path="/feedback-beta" element={<AuthGuard><Layout><LazyPage><FeedbackBeta /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/timeline/:eventId" element={<AuthGuard><Layout><LazyPage><EventTimeline /></LazyPage></Layout></AuthGuard>} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

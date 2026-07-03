@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft,
   ChevronRight,
@@ -21,6 +22,7 @@ import {
   Bell,
   Trash2,
   Edit3,
+  Layers,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { daysLeft, fmtShort, fmtLong, toISO, addDays } from '@/lib/format'
@@ -178,7 +180,7 @@ type CalItem =
 
 // ─── Detail popup ─────────────────────────────────────────────────────────────
 
-function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, onMemoEdit, onMemoDelete, onEventEditDates }: {
+function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, onMemoEdit, onMemoDelete, onEventEditDates, onOpenTimeline }: {
   item: CalItem
   allTasks: Task[]
   allUscite: Uscita[]
@@ -187,6 +189,7 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
   onMemoEdit: (item: CalendarItem) => void
   onMemoDelete: (id: string) => void
   onEventEditDates: (ev: Event) => void
+  onOpenTimeline: (ev: Event) => void
 }) {
   if (item.type === 'memo') {
     const m = item.data as CalendarItem
@@ -319,10 +322,15 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
               </div>
             )}
           </div>
-          <div className="px-5 pb-5">
+          <div className="px-5 pb-5 space-y-2">
+            <button onClick={() => { onOpenTimeline(ev); onClose() }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all hover:brightness-110"
+              style={{ background: `${color}18`, color, border: `1px solid ${color}35` }}>
+              <Layers className="w-3.5 h-3.5" /> Timeline Operativa
+            </button>
             <button onClick={() => { onEventEditDates(ev); onClose() }}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all hover:brightness-110"
-              style={{ background: `${color}12`, color, border: `1px solid ${color}30` }}>
+              style={{ background: 'var(--panel2)', color: 'var(--muted)', border: `1px solid var(--line)` }}>
               <Clock className="w-3.5 h-3.5" /> Durata evento
             </button>
           </div>
@@ -1821,6 +1829,7 @@ function MemoEditModal({ item, onClose, onSave }: {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Calendario() {
+  const nav = useNavigate()
   const [allTasks, setAllTasks] = useState<Task[]>([])
   const [allEvents, setAllEvents] = useState<Event[]>([])
   const [allPratiche, setAllPratiche] = useState<Pratica[]>([])
@@ -2170,6 +2179,7 @@ export default function Calendario() {
           onMemoEdit={m => { setSelectedItem(null); setEditingMemo(m) }}
           onMemoDelete={id => { setSelectedItem(null); handleMemoDelete(id) }}
           onEventEditDates={ev => { setSelectedItem(null); setEditingEventDates(ev) }}
+          onOpenTimeline={ev => { setSelectedItem(null); nav(`/timeline/${ev.id}`) }}
         />
       )}
 
