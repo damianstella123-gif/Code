@@ -342,13 +342,13 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
     const record: Record<string, unknown> = {
       event_id: event.id,
       supplier_id: supplierId,
-      descrizione: String(extraForm.descrizione || ''),
+      descrizione: String(extraForm.descrizione || '') || 'Extra',
       quantita: qty,
-      venduto_unitario: vu,
-      venduto_totale: extraForm.venduto_totale ? Number(extraForm.venduto_totale) : (vu ? vu * qty : null),
-      costo_unitario: cu,
-      costo_totale: extraForm.costo_totale ? Number(extraForm.costo_totale) : (cu ? cu * qty : null),
-      note: String(extraForm.note || '') || null,
+      venduto_unitario: vu ?? 0,
+      venduto_totale: extraForm.venduto_totale ? Number(extraForm.venduto_totale) : (vu ? vu * qty : 0),
+      costo_unitario: cu ?? 0,
+      costo_totale: extraForm.costo_totale ? Number(extraForm.costo_totale) : (cu ? cu * qty : 0),
+      note: String(extraForm.note || ''),
     }
     let error: { message: string } | null = null
     if (editingExtraId) {
