@@ -28,7 +28,7 @@ import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Pratica } from '@/data/pratiche'
 import type { Uscita } from '@/data/amministrazione'
-import { fetchEvents, upsertEvent } from '@/lib/events-service'
+import { fetchEvents, upsertEvent, updateEvent } from '@/lib/events-service'
 import { fetchTasks, upsertTask, changeTaskStatus } from '@/lib/tasks-service'
 import { fetchPractices, upsertPractice } from '@/lib/practices-service'
 import { fetchBudgets } from '@/lib/budgets-service'
@@ -178,7 +178,7 @@ type CalItem =
 
 // ─── Detail popup ─────────────────────────────────────────────────────────────
 
-function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, onMemoEdit, onMemoDelete }: {
+function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, onMemoEdit, onMemoDelete, onEventEditDates }: {
   item: CalItem
   allTasks: Task[]
   allUscite: Uscita[]
@@ -186,6 +186,7 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
   onTaskStateChange: (id: string, stato: Task['stato']) => void
   onMemoEdit: (item: CalendarItem) => void
   onMemoDelete: (id: string) => void
+  onEventEditDates: (ev: Event) => void
 }) {
   if (item.type === 'memo') {
     const m = item.data as CalendarItem
@@ -317,6 +318,13 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
                 </div>
               </div>
             )}
+          </div>
+          <div className="px-5 pb-5">
+            <button onClick={() => { onEventEditDates(ev); onClose() }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all hover:brightness-110"
+              style={{ background: `${color}12`, color, border: `1px solid ${color}30` }}>
+              <Edit3 className="w-3.5 h-3.5" /> Modifica date
+            </button>
           </div>
         </div>
       </div>
@@ -1414,6 +1422,106 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
   )
 }
 
+// ─── Event Date Edit Modal ───────────────────────────────────────────────────
+
+function EventDateEditModal({ event, onClose, onSave }: {
+  event: Event
+  onClose: () => void
+  onSave: (id: string, dataInizio: string, dataFine: string) => void
+}) {
+  const [startDate, setStartDate] = useState(event.dataInizio)
+  const [endDate, setEndDate] = useState(event.dataFine)
+  const [saving, setSaving] = useState(false)
+
+  const duration = Math.max(0, Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000))
+  const originalDuration = Math.max(0, Math.ceil((new Date(event.dataFine).getTime() - new Date(event.dataInizio).getTime()) / 86400000))
+  const hasChanged = startDate !== event.dataInizio || endDate !== event.dataFine
+  const isValid = startDate && endDate && new Date(endDate) >= new Date(startDate)
+
+  function handleStartChange(val: string) {
+    setStartDate(val)
+    if (new Date(val) > new Date(endDate)) {
+      setEndDate(val)
+    }
+  }
+
+  async function handleSave() {
+    if (!isValid || !hasChanged) return
+    setSaving(true)
+    onSave(event.id, startDate, endDate)
+    setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-md rounded-2xl overflow-hidden"
+        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+        <div className="p-5" style={{ borderBottom: '1px solid var(--line)', background: 'rgba(77,180,255,0.04)' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Calendar className="w-4 h-4" style={{ color: 'var(--blue)' }} />
+            <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Modifica date</span>
+          </div>
+          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{event.nome}</h3>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
+            Date attuali: {fmtLong(event.dataInizio)} {event.dataInizio !== event.dataFine ? `\u2192 ${fmtLong(event.dataFine)}` : '(giornata singola)'}
+            {originalDuration > 0 && ` (${originalDuration + 1} giorni)`}
+          </p>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Data inizio</label>
+              <input type="date" value={startDate} onChange={e => handleStartChange(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Data fine</label>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                min={startDate}
+                className="w-full px-3 py-2.5 rounded-xl text-sm"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            </div>
+          </div>
+          {hasChanged && isValid && (
+            <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: 'rgba(77,180,255,0.06)', border: '1px solid rgba(77,180,255,0.15)' }}>
+              <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--blue)' }} />
+              <div className="text-xs" style={{ color: 'var(--text)' }}>
+                <span className="font-medium">Nuova durata:</span> {duration + 1} giorn{duration === 0 ? 'o' : 'i'}
+                {duration !== originalDuration && (
+                  <span style={{ color: duration > originalDuration ? 'var(--green)' : 'var(--yellow)' }}>
+                    {' '}({duration > originalDuration ? '+' : ''}{duration - originalDuration} giorn{Math.abs(duration - originalDuration) === 1 ? 'o' : 'i'})
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          {!isValid && startDate && endDate && (
+            <p className="text-xs" style={{ color: 'var(--red2)' }}>La data fine non puo essere prima della data inizio.</p>
+          )}
+          <div className="flex gap-2">
+            <button onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
+              style={{ background: 'var(--panel2)', color: 'var(--muted)', border: '1px solid var(--line)' }}>
+              Annulla
+            </button>
+            <button onClick={handleSave} disabled={!hasChanged || !isValid || saving}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
+              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+              {saving ? 'Salvataggio...' : 'Salva date'}
+            </button>
+          </div>
+          <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
+            Modifica solo le date. Budget, task e fornitori non vengono alterati.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Memo Edit Modal ─────────────────────────────────────────────────────────
 
 function MemoEditModal({ item, onClose, onSave }: {
@@ -1532,6 +1640,7 @@ export default function Calendario() {
   const [selectedItem, setSelectedItem] = useState<CalItem | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [editingMemo, setEditingMemo] = useState<CalendarItem | null>(null)
+  const [editingEventDates, setEditingEventDates] = useState<Event | null>(null)
   const today = useMemo(() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t }, [])
 
   const currentUser = loadUser()
@@ -1652,6 +1761,13 @@ export default function Calendario() {
   async function handleMemoSave(updated: CalendarItem) {
     setAllMemos(prev => prev.map(m => m.id === updated.id ? updated : m))
     setEditingMemo(null)
+    await refresh()
+  }
+
+  async function handleEventDateSave(id: string, dataInizio: string, dataFine: string) {
+    setAllEvents(prev => prev.map(e => e.id === id ? { ...e, dataInizio, dataFine } : e))
+    setEditingEventDates(null)
+    await updateEvent(id, { dataInizio, dataFine })
     await refresh()
   }
 
@@ -1837,6 +1953,16 @@ export default function Calendario() {
           onTaskStateChange={handleTaskStateChange}
           onMemoEdit={m => { setSelectedItem(null); setEditingMemo(m) }}
           onMemoDelete={id => { setSelectedItem(null); handleMemoDelete(id) }}
+          onEventEditDates={ev => { setSelectedItem(null); setEditingEventDates(ev) }}
+        />
+      )}
+
+      {/* Event date edit modal */}
+      {editingEventDates && (
+        <EventDateEditModal
+          event={editingEventDates}
+          onClose={() => setEditingEventDates(null)}
+          onSave={handleEventDateSave}
         />
       )}
 
