@@ -2,9 +2,10 @@ import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Calendar, CheckSquare, Users, ArrowRight,
-  AlertTriangle, TrendingUp, Archive,
+  AlertTriangle, TrendingUp, Archive, Sun, Moon,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
+import { useTheme } from '@/lib/theme'
 import { daysLeft, eventColorByStato } from '@/lib/format'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
@@ -38,6 +39,7 @@ type Referente = {
 export default function Dashboard() {
   const navigate = useNavigate()
   const currentUser = loadUser()
+  const { resolved, toggleTheme } = useTheme()
 
   const [liveTasks, setLiveTasks] = useState<Task[]>([])
   const [liveEvents, setLiveEvents] = useState<Event[]>([])
@@ -257,6 +259,46 @@ export default function Dashboard() {
     <div className="cc-cockpit">
       {/* ═══ PRIMARY DISPLAY — The Main Screen ═══ */}
       <div className="cc-primary-display animate-fade-in">
+        {/* Theme pill toggle — top right of display */}
+        <button
+          onClick={toggleTheme}
+          className="absolute top-4 right-4 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full transition-all"
+          style={{
+            background: 'var(--cc-glass)',
+            backdropFilter: 'blur(var(--cc-blur))',
+            WebkitBackdropFilter: 'blur(var(--cc-blur))',
+            border: '1px solid var(--cc-glass-border)',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+          title={resolved === 'dark' ? 'Passa a Light' : 'Passa a Dark'}
+        >
+          <div className="relative w-4 h-4 overflow-hidden">
+            <Sun
+              size={14}
+              className="absolute inset-0 m-auto transition-all"
+              style={{
+                color: 'var(--yellow)',
+                opacity: resolved === 'light' ? 1 : 0,
+                transform: resolved === 'light' ? 'rotate(0deg) scale(1)' : 'rotate(-90deg) scale(0.5)',
+                transition: 'opacity 200ms ease, transform 200ms ease',
+              }}
+            />
+            <Moon
+              size={14}
+              className="absolute inset-0 m-auto transition-all"
+              style={{
+                color: 'var(--blue)',
+                opacity: resolved === 'dark' ? 1 : 0,
+                transform: resolved === 'dark' ? 'rotate(0deg) scale(1)' : 'rotate(90deg) scale(0.5)',
+                transition: 'opacity 200ms ease, transform 200ms ease',
+              }}
+            />
+          </div>
+          <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
+            {resolved === 'dark' ? 'Dark' : 'Light'}
+          </span>
+        </button>
+
         <div className="cc-display-content">
           <div className={`cc-status-beacon cc-status-beacon--${briefStatus}`} />
           <div className="cc-display-text">

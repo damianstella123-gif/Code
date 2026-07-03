@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './styles/theme.css'
 import './index.css'
-import { initTheme } from './lib/theme'
+import { initTheme, ThemeProvider } from './lib/theme'
 
 initTheme()
 
@@ -40,7 +40,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
-        <App />
+        <ThemeProvider>
+          <App />
+        </ThemeProvider>
       </BrowserRouter>
     </ErrorBoundary>
   </React.StrictMode>,

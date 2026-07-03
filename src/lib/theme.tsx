@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { supabase } from './supabase'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
@@ -21,7 +21,7 @@ function applyTheme(mode: ThemeMode) {
 export function loadThemePreference(): ThemeMode {
   const stored = localStorage.getItem(STORAGE_KEY)
   if (stored === 'light' || stored === 'dark' || stored === 'system') return stored
-  return 'system'
+  return 'dark'
 }
 
 function saveLocal(mode: ThemeMode) {
@@ -35,6 +35,14 @@ async function saveRemote(mode: ThemeMode) {
     .from('profiles')
     .update({ theme_preference: mode })
     .eq('id', session.user.id)
+}
+
+export function initTheme() {
+  applyTheme(loadThemePreference())
+}
+
+export function getResolvedTheme(): 'light' | 'dark' {
+  return resolveTheme(loadThemePreference())
 }
 
 export async function syncThemeFromProfile() {
@@ -52,16 +60,18 @@ export async function syncThemeFromProfile() {
   }
 }
 
-export function getResolvedTheme(): 'light' | 'dark' {
-  return resolveTheme(loadThemePreference())
+interface ThemeContextValue {
+  theme: ThemeMode
+  resolved: 'light' | 'dark'
+  setTheme: (mode: ThemeMode) => void
+  toggleTheme: () => void
 }
 
-export function initTheme() {
-  applyTheme(loadThemePreference())
-}
+const ThemeContext = createContext<ThemeContextValue | null>(null)
 
-export function useTheme() {
+export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeMode>(loadThemePreference)
+  const resolved = resolveTheme(theme)
 
   const setTheme = useCallback((mode: ThemeMode) => {
     setThemeState(mode)
@@ -70,16 +80,35 @@ export function useTheme() {
     saveRemote(mode)
   }, [])
 
+  const toggleTheme = useCallback(() => {
+    const current = resolveTheme(loadThemePreference())
+    const next: ThemeMode = current === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+  }, [setTheme])
+
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = () => {
       if (loadThemePreference() === 'system') {
         applyTheme('system')
+        setThemeState('system')
       }
     }
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
 
-  return { theme, setTheme }
+  return (
+    <ThemeContext.Provider value={{ theme, resolved, setTheme, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  )
+}
+
+export function useTheme(): ThemeContextValue {
+  const ctx = useContext(ThemeContext)
+  if (!ctx) {
+    throw new Error('useTheme must be used within ThemeProvider')
+  }
+  return ctx
 }
