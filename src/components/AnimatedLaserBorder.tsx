@@ -9,8 +9,8 @@ interface AnimatedLaserBorderProps {
 }
 
 export default function AnimatedLaserBorder({
-  active = false,
-  loading = false,
+  active = true,
+  loading = true,
   children,
   className = '',
   style,
