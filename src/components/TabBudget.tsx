@@ -327,7 +327,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const costo = (v.costo_totale as number) ?? ((v.costo_unitario as number) ? (v.costo_unitario as number) * qty : 0)
       if (!venduto && !costo) continue
       pushLine(v, resolveCat(v.supplier_id as string, 'VARIE'), 'event_varie_details', {
-        descrizione: (v.descrizione as string) || 'Voce varia', qty, venduto, costo,
+        descrizione: (v.tipologia as string) ? `${v.tipologia} — ${(v.descrizione as string) || 'Voce'}` : (v.descrizione as string) || 'Voce varia', qty, venduto, costo,
       })
     }
 

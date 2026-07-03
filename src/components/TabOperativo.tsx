@@ -16,7 +16,7 @@ const CATEGORIES: { key: CategoryType; label: string; table: string }[] = [
   { key: 'staff_interno', label: 'Staff Simmetria', table: 'event_staff_interno_details' },
   { key: 'staff_esterno', label: 'Staff Esterno', table: 'event_staff_esterno_details' },
   { key: 'grafica_stampa', label: 'Grafica / Stampa', table: 'event_grafica_stampa_details' },
-  { key: 'varie', label: 'Varie', table: 'event_varie_details' },
+  { key: 'varie', label: 'Varie / Extra', table: 'event_varie_details' },
 ]
 
 const IVA_OPTIONS = ['22', '10', '5', '4', '0', 'Esente', 'Fuori campo']
@@ -27,6 +27,7 @@ const STAFF_EXT_RUOLI = ['Hostess', 'Steward', 'Tour Leader', 'Promoter', 'Guard
 const RISTORANTE_TIPOLOGIE = ['Pranzo', 'Cena', 'Aperitivo', 'Aperitivo Rinforzato', 'Cocktail', 'Cena di Gala']
 const RISTORANTE_MENU_TYPES = ['2 Portate', '3 Portate', '4 Portate', 'Menu Personalizzato']
 const GRAFICA_TIPI = ['Badge', 'Menu', 'Cartelli', 'Segnaletica', 'Materiale Stampato', 'Altro']
+const VARIE_TIPOLOGIE = ['Assicurazione', 'Permessi / SIAE', 'Spedizioni', 'Gadget / Omaggi', 'Consulenza', 'Voli / Viaggi', 'Licenze / Diritti', 'Commissioni', 'Materiale consumabile', 'Altro']
 
 const HOTEL_SERVIZI: { key: string; label: string; group: 'alloggio' | 'meeting' | 'fb' | 'servizi' }[] = [
   { key: 'pernottamento', label: 'Pernottamento', group: 'alloggio' },
@@ -69,7 +70,7 @@ export function calcIva(imponibile: number, aliquota: string): number {
 export const CATEGORY_LABELS: Record<CategoryType, string> = {
   hotel: 'Hotel', transfer: 'Transfer', ristorante: 'Ristorante', experience: 'Location / Experience',
   catering: 'Catering', audio_video: 'Audio Video', allestimenti: 'Allestimenti',
-  staff_interno: 'Staff Simmetria', staff_esterno: 'Staff Esterno', grafica_stampa: 'Grafica / Stampa', varie: 'Varie',
+  staff_interno: 'Staff Simmetria', staff_esterno: 'Staff Esterno', grafica_stampa: 'Grafica / Stampa', varie: 'Varie / Extra',
 }
 
 export function detectSupplierCategory(supplierCategory: string): CategoryType {
@@ -277,7 +278,7 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
       Object.assign(record, { tipo_materiale: strOrEmpty('tipo_materiale'), quantita: qty, formato: strOrEmpty('formato'), data_consegna: strOrNull('data_consegna'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
     } else {
       const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
-      Object.assign(record, { descrizione: strOrEmpty('descrizione'), quantita: qty, data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), note: strOrEmpty('note'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
+      Object.assign(record, { tipologia: strOrEmpty('tipologia') || null, descrizione: strOrEmpty('descrizione'), quantita: qty, data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), note: strOrEmpty('note'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
     }
 
     let error: { message: string } | null = null
@@ -317,7 +318,7 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
       case 'staff_interno': { const sn = [(item.nome as string), (item.cognome as string)].filter(Boolean).join(' ') || (item.risorsa as string); return sn ? `${sn} - ${(item.ruolo as string) || 'Staff'}` : (item.ruolo as string) || 'Staff Simmetria' }
       case 'staff_esterno': { const sn = [(item.nome as string), (item.cognome as string)].filter(Boolean).join(' '); return sn ? `${sn} - ${(item.ruolo as string) || 'Staff'}` : (item.ruolo as string) || 'Staff Esterno' }
       case 'grafica_stampa': return (item.tipo_materiale as string) || 'Grafica'
-      default: return (item.descrizione as string) || 'Voce'
+      default: { const tip = (item.tipologia as string); const desc = (item.descrizione as string) || 'Voce'; return tip ? `${tip} — ${desc}` : desc }
     }
   }
 
@@ -639,6 +640,13 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
     )
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div>
+          <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Tipologia</label>
+          <select value={String(form.tipologia || '')} onChange={e => upd('tipologia', e.target.value)} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+            <option value="">— Generica —</option>
+            {VARIE_TIPOLOGIE.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
         {inp('descrizione', 'Descrizione')}{inp('quantita', 'Quantita', 'number')}
         {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora', 'time')}
         {inp('venduto_unitario', 'Venduto/unit.', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
