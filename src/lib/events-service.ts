@@ -237,3 +237,25 @@ export async function shiftEventTimeline(eventId: string, deltaDays: number): Pr
 
   return { shifted, skipped }
 }
+
+export async function moveEventWithTimelineShift(eventId: string, newStartDate: string): Promise<{ event: Event | null; shift: ShiftResult }> {
+  const { data: row } = await supabase.from('events').select('*').eq('id', eventId).maybeSingle()
+  if (!row) return { event: null, shift: { shifted: [], skipped: [] } }
+  const oldStart = (row as EventRow).start_date
+  const oldEnd = (row as EventRow).end_date
+  const [oy, om, od] = oldStart.split('-').map(Number)
+  const [ny, nm, nd] = newStartDate.split('-').map(Number)
+  const deltaDays = Math.round(
+    (Date.UTC(ny, nm - 1, nd) - Date.UTC(oy, om - 1, od)) / 86400000
+  )
+  if (deltaDays === 0) return { event: rowToEvent(row as EventRow), shift: { shifted: [], skipped: [] } }
+  const [ey, em2, ed2] = oldEnd.split('-').map(Number)
+  const newEnd = new Date(Date.UTC(ey, em2 - 1, ed2 + deltaDays)).toISOString().slice(0, 10)
+  const event = await updateEvent(eventId, { dataInizio: newStartDate, dataFine: newEnd })
+  const shift = await shiftEventTimeline(eventId, deltaDays)
+  return { event, shift }
+}
+
+export async function resizeEventOnly(eventId: string, newStartDate: string, newEndDate: string): Promise<Event | null> {
+  return await updateEvent(eventId, { dataInizio: newStartDate, dataFine: newEndDate })
+}

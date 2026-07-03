@@ -28,7 +28,7 @@ import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Pratica } from '@/data/pratiche'
 import type { Uscita } from '@/data/amministrazione'
-import { fetchEvents, upsertEvent, updateEvent, shiftEventTimeline } from '@/lib/events-service'
+import { fetchEvents, upsertEvent, moveEventWithTimelineShift, resizeEventOnly } from '@/lib/events-service'
 import { fetchTasks, upsertTask, changeTaskStatus } from '@/lib/tasks-service'
 import { fetchPractices, upsertPractice } from '@/lib/practices-service'
 import { fetchBudgets } from '@/lib/budgets-service'
@@ -1812,12 +1812,10 @@ export default function Calendario() {
       const diffMs = new Date(newDate + 'T00:00:00Z').getTime() - new Date(target.dataInizio + 'T00:00:00Z').getTime()
       const deltaDays = Math.round(diffMs / 86400000)
       if (deltaDays === 0) return
-      const newStart = newDate
       const [ey, em, ed] = target.dataFine.split('-').map(Number)
       const newEnd = new Date(Date.UTC(ey, em - 1, ed + deltaDays)).toISOString().slice(0, 10)
-      setAllEvents(prev => prev.map(e => e.id === id ? { ...e, dataInizio: newStart, dataFine: newEnd } : e))
-      await updateEvent(id, { dataInizio: newStart, dataFine: newEnd })
-      const result = await shiftEventTimeline(id, deltaDays)
+      setAllEvents(prev => prev.map(e => e.id === id ? { ...e, dataInizio: newDate, dataFine: newEnd } : e))
+      const { shift: result } = await moveEventWithTimelineShift(id, newDate)
       if (result.skipped.length > 0) {
         setShiftToast({ message: 'Evento spostato. Alcune scadenze non sono state aggiornate automaticamente.', type: 'warning' })
       } else {
@@ -1855,7 +1853,7 @@ export default function Calendario() {
   async function handleEventDateSave(id: string, dataInizio: string, dataFine: string) {
     setAllEvents(prev => prev.map(e => e.id === id ? { ...e, dataInizio, dataFine } : e))
     setEditingEventDates(null)
-    await updateEvent(id, { dataInizio, dataFine })
+    await resizeEventOnly(id, dataInizio, dataFine)
     await refresh()
   }
 
