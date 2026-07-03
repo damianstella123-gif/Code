@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -589,10 +589,12 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
 
 // ─── Calendar pill ────────────────────────────────────────────────────────────
 
-function CalPill({ item, onClick, onDragStart }: {
+function CalPill({ item, onClick, onDragStart, isLastDay, onResizeStart }: {
   item: CalItem
   onClick: () => void
   onDragStart?: (e: React.DragEvent) => void
+  isLastDay?: boolean
+  onResizeStart?: (e: React.MouseEvent) => void
 }) {
   const color = item.type === 'event'
     ? eventColor(item.data as Event)
@@ -644,7 +646,7 @@ function CalPill({ item, onClick, onDragStart }: {
   return (
     <div draggable={!!onDragStart} onDragStart={onDragStart}
       onClick={e => { e.stopPropagation(); onClick() }}
-      className={`truncate rounded px-1.5 py-0.5 text-xs font-medium transition-all hover:brightness-110 select-none ${onDragStart ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+      className={`relative truncate rounded px-1.5 py-0.5 text-xs font-medium transition-all hover:brightness-110 select-none ${onDragStart ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} group/pill`}
       style={{
         background: `${color}20`,
         color,
@@ -657,20 +659,61 @@ function CalPill({ item, onClick, onDragStart }: {
       {urgent && <Zap style={{ display: 'inline', width: 9, height: 9, marginRight: 2, marginBottom: 1 }} />}
       {item.type === 'memo' && <Bell style={{ display: 'inline', width: 9, height: 9, marginRight: 2, marginBottom: 1 }} />}
       {label}
+      {isLastDay && item.type === 'event' && onResizeStart && (
+        <div
+          className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize opacity-0 group-hover/pill:opacity-100 transition-opacity"
+          style={{ background: `linear-gradient(90deg, transparent, ${color}80)`, borderRadius: '0 3px 3px 0' }}
+          onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onResizeStart(e) }}
+        />
+      )}
     </div>
   )
 }
 
 // ─── Monthly view ─────────────────────────────────────────────────────────────
 
-function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem }: {
+function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem, onResizeEvent }: {
   current: Date; items: CalItem[]; today: Date
   onItemClick: (item: CalItem) => void
   onDayClick: (d: Date) => void
   onMoveItem: (id: string, type: 'event' | 'task', newDate: string) => void
+  onResizeEvent: (id: string, newEndDate: string) => void
 }) {
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [dragging, setDragging] = useState<{ id: string; type: 'event' | 'task' } | null>(null)
+  const [resizing, setResizing] = useState<{ id: string; startX: number; startDate: string; endDate: string } | null>(null)
+  const [resizePreview, setResizePreview] = useState<string | null>(null)
+  const cellRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  useEffect(() => {
+    if (!resizing) return
+    const currentResizing = resizing
+    function onMove(e: MouseEvent) {
+      const cells = cellRefs.current
+      let closest: string | null = null
+      let minDist = Infinity
+      for (const [iso, el] of Object.entries(cells)) {
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        const cx = rect.left + rect.width / 2
+        const dist = Math.abs(e.clientX - cx) + Math.abs(e.clientY - (rect.top + rect.height / 2))
+        if (dist < minDist) { minDist = dist; closest = iso }
+      }
+      if (closest && closest >= currentResizing.startDate) {
+        setResizePreview(closest)
+      }
+    }
+    function onUp() {
+      if (resizePreview && resizePreview !== currentResizing.endDate) {
+        onResizeEvent(currentResizing.id, resizePreview)
+      }
+      setResizing(null)
+      setResizePreview(null)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+  }, [resizing, resizePreview])
 
   const monthStart = startOfMonth(current)
   const calStart = startOfWeek(monthStart)
@@ -722,14 +765,16 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
           const iso = toISO(day)
           const isWeekend = day.getDay() === 0 || day.getDay() === 6
           const isOver = dragOver === iso
+          const isResizeHighlight = resizing && resizePreview && iso > resizing.endDate && iso <= resizePreview
 
           return (
             <div key={idx}
+              ref={el => { cellRefs.current[iso] = el }}
               className="min-h-[90px] border-b border-r last-of-type:border-r-0 relative cursor-pointer"
               style={{
                 borderColor: 'var(--line)',
-                background: isOver ? 'rgba(208,0,58,0.12)' : isToday ? 'rgba(77,180,255,0.04)' : 'transparent',
-                boxShadow: isOver ? 'inset 0 0 0 2px rgba(208,0,58,0.4)' : 'none',
+                background: isResizeHighlight ? 'rgba(208,0,58,0.08)' : isOver ? 'rgba(208,0,58,0.12)' : isToday ? 'rgba(77,180,255,0.04)' : 'transparent',
+                boxShadow: isResizeHighlight ? 'inset 0 0 0 1px rgba(208,0,58,0.3)' : isOver ? 'inset 0 0 0 2px rgba(208,0,58,0.4)' : 'none',
               }}
               onDragOver={e => { e.preventDefault(); setDragOver(iso) }}
               onDragLeave={() => setDragOver(null)}
@@ -751,9 +796,16 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
                 {dayItems.slice(0, 3).map(item => {
                   const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : item.type === 'creative' ? (item.data as CreativeProject).id : item.type === 'social' ? (item.data as SocialContent).id : item.type === 'memo' ? (item.data as CalendarItem).id : (item.data as Pratica).id
                   const draggable = item.type === 'event' || item.type === 'task' || item.type === 'memo'
+                  const isEvtLastDay = item.type === 'event' && sameDay(day, new Date((item.data as Event).dataFine))
                   return (
                     <CalPill key={id} item={item}
                       onClick={() => onItemClick(item)}
+                      isLastDay={isEvtLastDay}
+                      onResizeStart={isEvtLastDay ? () => {
+                        const ev = item.data as Event
+                        setResizing({ id: ev.id, startX: 0, startDate: ev.dataInizio, endDate: ev.dataFine })
+                        setResizePreview(ev.dataFine)
+                      } : undefined}
                       onDragStart={draggable ? e => {
                         setDragging({ id, type: item.type === 'event' ? 'event' : 'task' })
                         e.dataTransfer.setData('text/plain', `${item.type}:${id}`)
@@ -768,23 +820,67 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
           )
         })}
       </div>
+      {resizing && resizePreview && (
+        <div className="flex items-center justify-center py-1.5 text-xs font-semibold" style={{ color: 'var(--red2)' }}>
+          {(() => {
+            const [sy, sm, sd] = resizing.startDate.split('-').map(Number)
+            const [ey, em, ed] = resizePreview.split('-').map(Number)
+            const days = Math.round((Date.UTC(ey, em - 1, ed) - Date.UTC(sy, sm - 1, sd)) / 86400000) + 1
+            return `${days} ${days === 1 ? 'giorno' : 'giorni'}`
+          })()}
+        </div>
+      )}
     </div>
-  </div> 
+  </div>
   )
 }
 
 // ─── Weekly view ──────────────────────────────────────────────────────────────
 
-function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
+function WeekView({ weekStart, items, today, onItemClick, onMoveItem, onResizeEvent }: {
   weekStart: Date;
   items: CalItem[];
   today: Date;
   onItemClick: (item: CalItem) => void;
   onMoveItem: (id: string, type: 'event' | 'task', newDate: string) => void;
+  onResizeEvent: (id: string, newEndDate: string) => void;
 }) {
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [dragging, setDragging] = useState<{ id: string; type: 'event' | 'task' } | null>(null)
+  const [resizing, setResizing] = useState<{ id: string; startDate: string; endDate: string } | null>(null)
+  const [resizePreview, setResizePreview] = useState<string | null>(null)
+  const cellRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+
+  useEffect(() => {
+    if (!resizing) return
+    const currentResizing = resizing
+    function onMove(e: MouseEvent) {
+      const cells = cellRefs.current
+      let closest: string | null = null
+      let minDist = Infinity
+      for (const [iso, el] of Object.entries(cells)) {
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        const cx = rect.left + rect.width / 2
+        const dist = Math.abs(e.clientX - cx)
+        if (dist < minDist) { minDist = dist; closest = iso }
+      }
+      if (closest && closest >= currentResizing.startDate) {
+        setResizePreview(closest)
+      }
+    }
+    function onUp() {
+      if (resizePreview && resizePreview !== currentResizing.endDate) {
+        onResizeEvent(currentResizing.id, resizePreview)
+      }
+      setResizing(null)
+      setResizePreview(null)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+  }, [resizing, resizePreview])
 
   function getForDay(day: Date): CalItem[] {
     return items.filter(item => {
@@ -840,12 +936,14 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
           const dayItems = getForDay(day)
           const isToday = sameDay(day, today)
           const isOver = dragOver === iso
+          const isResizeHighlight = resizing && resizePreview && iso > resizing.endDate && iso <= resizePreview
           return (
-            <div key={i} className="border-r last:border-r-0 p-1.5 space-y-1"
+            <div key={i} ref={el => { cellRefs.current[iso] = el }}
+              className="border-r last:border-r-0 p-1.5 space-y-1"
               style={{
                 borderColor: 'var(--line)',
-                background: isOver ? 'rgba(208,0,58,0.12)' : isToday ? 'rgba(77,180,255,0.03)' : 'transparent',
-                boxShadow: isOver ? 'inset 0 0 0 2px rgba(208,0,58,0.4)' : 'none',
+                background: isResizeHighlight ? 'rgba(208,0,58,0.08)' : isOver ? 'rgba(208,0,58,0.12)' : isToday ? 'rgba(77,180,255,0.03)' : 'transparent',
+                boxShadow: isResizeHighlight ? 'inset 0 0 0 1px rgba(208,0,58,0.3)' : isOver ? 'inset 0 0 0 2px rgba(208,0,58,0.4)' : 'none',
                 minHeight: 200,
               }}
               onDragOver={e => { e.preventDefault(); setDragOver(iso) }}
@@ -858,9 +956,16 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
               {dayItems.map(item => {
                 const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : item.type === 'memo' ? (item.data as CalendarItem).id : (item.data as Pratica).id
                 const draggable = item.type === 'event' || item.type === 'task' || item.type === 'memo'
+                const isEvtLastDay = item.type === 'event' && sameDay(day, new Date((item.data as Event).dataFine))
                 return (
                   <CalPill key={id} item={item}
                     onClick={() => onItemClick(item)}
+                    isLastDay={isEvtLastDay}
+                    onResizeStart={isEvtLastDay ? () => {
+                      const ev = item.data as Event
+                      setResizing({ id: ev.id, startDate: ev.dataInizio, endDate: ev.dataFine })
+                      setResizePreview(ev.dataFine)
+                    } : undefined}
                     onDragStart={draggable ? e => {
                       setDragging({ id, type: item.type === 'event' ? 'event' : 'task' })
                       e.dataTransfer.setData('text/plain', `${item.type}:${id}`)
@@ -871,6 +976,16 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
           )
         })}
       </div>
+      {resizing && resizePreview && (
+        <div className="flex items-center justify-center py-1.5 text-xs font-semibold" style={{ color: 'var(--red2)' }}>
+          {(() => {
+            const [sy, sm, sd] = resizing.startDate.split('-').map(Number)
+            const [ey, em, ed] = resizePreview.split('-').map(Number)
+            const days = Math.round((Date.UTC(ey, em - 1, ed) - Date.UTC(sy, sm - 1, sd)) / 86400000) + 1
+            return `${days} ${days === 1 ? 'giorno' : 'giorni'}`
+          })()}
+        </div>
+      )}
       </div>
     </div>
   )
@@ -1857,6 +1972,14 @@ export default function Calendario() {
     await refresh()
   }
 
+  async function handleResizeEvent(id: string, newEndDate: string) {
+    const target = allEvents.find(e => e.id === id)
+    if (!target || newEndDate === target.dataFine) return
+    setAllEvents(prev => prev.map(e => e.id === id ? { ...e, dataFine: newEndDate } : e))
+    await resizeEventOnly(id, target.dataInizio, newEndDate)
+    await refresh()
+  }
+
   const weekStart = useMemo(() => startOfWeek(cursor), [cursor])
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart])
 
@@ -2018,6 +2141,7 @@ export default function Calendario() {
           onItemClick={setSelectedItem}
           onDayClick={d => { setCursor(d); setView('day') }}
           onMoveItem={handleMoveItem}
+          onResizeEvent={handleResizeEvent}
         />
       )}
       {view === 'week' && (
@@ -2025,6 +2149,7 @@ export default function Calendario() {
           weekStart={weekStart} items={visibleItems} today={today}
           onItemClick={setSelectedItem}
           onMoveItem={handleMoveItem}
+          onResizeEvent={handleResizeEvent}
         />
       )}
       {view === 'day' && (
