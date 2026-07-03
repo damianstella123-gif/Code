@@ -644,7 +644,7 @@ function CalPill({ item, onClick, onDragStart }: {
   return (
     <div draggable={!!onDragStart} onDragStart={onDragStart}
       onClick={e => { e.stopPropagation(); onClick() }}
-      className="truncate rounded px-1.5 py-0.5 text-xs font-medium cursor-pointer transition-all hover:brightness-110 select-none"
+      className={`truncate rounded px-1.5 py-0.5 text-xs font-medium transition-all hover:brightness-110 select-none ${onDragStart ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
       style={{
         background: `${color}20`,
         color,
@@ -728,7 +728,8 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem 
               className="min-h-[90px] border-b border-r last-of-type:border-r-0 relative cursor-pointer"
               style={{
                 borderColor: 'var(--line)',
-                background: isOver ? 'rgba(208,0,58,0.07)' : isToday ? 'rgba(77,180,255,0.04)' : 'transparent',
+                background: isOver ? 'rgba(208,0,58,0.12)' : isToday ? 'rgba(77,180,255,0.04)' : 'transparent',
+                boxShadow: isOver ? 'inset 0 0 0 2px rgba(208,0,58,0.4)' : 'none',
               }}
               onDragOver={e => { e.preventDefault(); setDragOver(iso) }}
               onDragLeave={() => setDragOver(null)}
@@ -843,7 +844,8 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
             <div key={i} className="border-r last:border-r-0 p-1.5 space-y-1"
               style={{
                 borderColor: 'var(--line)',
-                background: isOver ? 'rgba(208,0,58,0.07)' : isToday ? 'rgba(77,180,255,0.03)' : 'transparent',
+                background: isOver ? 'rgba(208,0,58,0.12)' : isToday ? 'rgba(77,180,255,0.03)' : 'transparent',
+                boxShadow: isOver ? 'inset 0 0 0 2px rgba(208,0,58,0.4)' : 'none',
                 minHeight: 200,
               }}
               onDragOver={e => { e.preventDefault(); setDragOver(iso) }}
@@ -1729,13 +1731,10 @@ export default function Calendario() {
       const target = allEvents.find(e => e.id === id)
       if (!target) return
       const diffMs = new Date(newDate).getTime() - new Date(target.dataInizio).getTime()
-      const updated: Event = {
-        ...target,
-        dataInizio: newDate,
-        dataFine: new Date(new Date(target.dataFine).getTime() + diffMs).toISOString().slice(0, 10),
-      }
-      setAllEvents(prev => prev.map(e => e.id === id ? updated : e))
-      await upsertEvent(updated)
+      const newStart = newDate
+      const newEnd = new Date(new Date(target.dataFine).getTime() + diffMs).toISOString().slice(0, 10)
+      setAllEvents(prev => prev.map(e => e.id === id ? { ...e, dataInizio: newStart, dataFine: newEnd } : e))
+      await updateEvent(id, { dataInizio: newStart, dataFine: newEnd })
     }
     await refresh()
   }
@@ -1896,6 +1895,11 @@ export default function Calendario() {
             <span className="text-xs" style={{ color: 'var(--muted)' }}>{l.label}</span>
           </div>
         ))}
+        {(view === 'month' || view === 'week') && (
+          <div className="flex items-center gap-1.5 ml-2 pl-2" style={{ borderLeft: '1px solid var(--line)' }}>
+            <span className="text-xs" style={{ color: 'var(--muted)' }}>Trascina eventi e task per spostarli</span>
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
