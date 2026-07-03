@@ -323,7 +323,7 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
             <button onClick={() => { onEventEditDates(ev); onClose() }}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all hover:brightness-110"
               style={{ background: `${color}12`, color, border: `1px solid ${color}30` }}>
-              <Edit3 className="w-3.5 h-3.5" /> Modifica date
+              <Clock className="w-3.5 h-3.5" /> Durata evento
             </button>
           </div>
         </div>
@@ -589,12 +589,10 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
 
 // ─── Calendar pill ────────────────────────────────────────────────────────────
 
-function CalPill({ item, onClick, onDragStart, onResizeStart, showResizeHandle }: {
+function CalPill({ item, onClick, onDragStart }: {
   item: CalItem
   onClick: () => void
   onDragStart?: (e: React.DragEvent) => void
-  onResizeStart?: (e: React.DragEvent) => void
-  showResizeHandle?: boolean
 }) {
   const color = item.type === 'event'
     ? eventColor(item.data as Event)
@@ -646,7 +644,7 @@ function CalPill({ item, onClick, onDragStart, onResizeStart, showResizeHandle }
   return (
     <div draggable={!!onDragStart} onDragStart={onDragStart}
       onClick={e => { e.stopPropagation(); onClick() }}
-      className={`relative truncate rounded px-1.5 py-0.5 text-xs font-medium transition-all hover:brightness-110 select-none ${onDragStart ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+      className={`truncate rounded px-1.5 py-0.5 text-xs font-medium transition-all hover:brightness-110 select-none ${onDragStart ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
       style={{
         background: `${color}20`,
         color,
@@ -659,31 +657,20 @@ function CalPill({ item, onClick, onDragStart, onResizeStart, showResizeHandle }
       {urgent && <Zap style={{ display: 'inline', width: 9, height: 9, marginRight: 2, marginBottom: 1 }} />}
       {item.type === 'memo' && <Bell style={{ display: 'inline', width: 9, height: 9, marginRight: 2, marginBottom: 1 }} />}
       {label}
-      {showResizeHandle && onResizeStart && (
-        <div draggable
-          onDragStart={e => { e.stopPropagation(); onResizeStart(e) }}
-          onClick={e => e.stopPropagation()}
-          className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
-          style={{ background: `${color}40`, borderRadius: '0 3px 3px 0' }}
-          title="Trascina per cambiare durata">
-          <div className="w-0.5 h-3 rounded" style={{ background: color }} />
-        </div>
-      )}
     </div>
   )
 }
 
 // ─── Monthly view ─────────────────────────────────────────────────────────────
 
-function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem, onResizeEvent }: {
+function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem }: {
   current: Date; items: CalItem[]; today: Date
   onItemClick: (item: CalItem) => void
   onDayClick: (d: Date) => void
   onMoveItem: (id: string, type: 'event' | 'task', newDate: string) => void
-  onResizeEvent: (id: string, newEndDate: string) => void
 }) {
   const [dragOver, setDragOver] = useState<string | null>(null)
-  const [dragging, setDragging] = useState<{ id: string; type: 'event' | 'task'; mode: 'move' | 'resize' } | null>(null)
+  const [dragging, setDragging] = useState<{ id: string; type: 'event' | 'task' } | null>(null)
 
   const monthStart = startOfMonth(current)
   const calStart = startOfWeek(monthStart)
@@ -748,10 +735,7 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem,
               onDragLeave={() => setDragOver(null)}
               onDrop={e => {
                 e.preventDefault(); setDragOver(null)
-                if (dragging) {
-                  if (dragging.mode === 'resize') onResizeEvent(dragging.id, iso)
-                  else onMoveItem(dragging.id, dragging.type, iso)
-                }
+                if (dragging) onMoveItem(dragging.id, dragging.type, iso)
                 setDragging(null)
               }}
               onClick={() => onDayClick(day)}>
@@ -767,19 +751,11 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem,
                 {dayItems.slice(0, 3).map(item => {
                   const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : item.type === 'creative' ? (item.data as CreativeProject).id : item.type === 'social' ? (item.data as SocialContent).id : item.type === 'memo' ? (item.data as CalendarItem).id : (item.data as Pratica).id
                   const draggable = item.type === 'event' || item.type === 'task' || item.type === 'memo'
-                  const isMultiDayEvent = item.type === 'event' && (item.data as Event).dataInizio !== (item.data as Event).dataFine
-                  const isLastDayOfEvent = isMultiDayEvent && sameDay(day, new Date((item.data as Event).dataFine))
                   return (
                     <CalPill key={id} item={item}
                       onClick={() => onItemClick(item)}
-                      showResizeHandle={isLastDayOfEvent}
-                      onResizeStart={isLastDayOfEvent ? e => {
-                        setDragging({ id, type: 'event', mode: 'resize' })
-                        e.dataTransfer.setData('text/plain', `resize:${id}`)
-                        e.dataTransfer.effectAllowed = 'move'
-                      } : undefined}
                       onDragStart={draggable ? e => {
-                        setDragging({ id, type: item.type === 'event' ? 'event' : 'task', mode: 'move' })
+                        setDragging({ id, type: item.type === 'event' ? 'event' : 'task' })
                         e.dataTransfer.setData('text/plain', `${item.type}:${id}`)
                       } : undefined} />
                   )
@@ -799,16 +775,15 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem,
 
 // ─── Weekly view ──────────────────────────────────────────────────────────────
 
-function WeekView({ weekStart, items, today, onItemClick, onMoveItem, onResizeEvent }: {
+function WeekView({ weekStart, items, today, onItemClick, onMoveItem }: {
   weekStart: Date;
   items: CalItem[];
   today: Date;
   onItemClick: (item: CalItem) => void;
   onMoveItem: (id: string, type: 'event' | 'task', newDate: string) => void;
-  onResizeEvent: (id: string, newEndDate: string) => void;
 }) {
   const [dragOver, setDragOver] = useState<string | null>(null)
-  const [dragging, setDragging] = useState<{ id: string; type: 'event' | 'task'; mode: 'move' | 'resize' } | null>(null)
+  const [dragging, setDragging] = useState<{ id: string; type: 'event' | 'task' } | null>(null)
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
   function getForDay(day: Date): CalItem[] {
@@ -877,28 +852,17 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem, onResizeEv
               onDragLeave={() => setDragOver(null)}
               onDrop={e => {
                 e.preventDefault(); setDragOver(null)
-                if (dragging) {
-                  if (dragging.mode === 'resize') onResizeEvent(dragging.id, iso)
-                  else onMoveItem(dragging.id, dragging.type, iso)
-                }
+                if (dragging) onMoveItem(dragging.id, dragging.type, iso)
                 setDragging(null)
               }}>
               {dayItems.map(item => {
                 const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : item.type === 'memo' ? (item.data as CalendarItem).id : (item.data as Pratica).id
                 const draggable = item.type === 'event' || item.type === 'task' || item.type === 'memo'
-                const isMultiDayEvent = item.type === 'event' && (item.data as Event).dataInizio !== (item.data as Event).dataFine
-                const isLastDayOfEvent = isMultiDayEvent && sameDay(day, new Date((item.data as Event).dataFine))
                 return (
                   <CalPill key={id} item={item}
                     onClick={() => onItemClick(item)}
-                    showResizeHandle={isLastDayOfEvent}
-                    onResizeStart={isLastDayOfEvent ? e => {
-                      setDragging({ id, type: 'event', mode: 'resize' })
-                      e.dataTransfer.setData('text/plain', `resize:${id}`)
-                      e.dataTransfer.effectAllowed = 'move'
-                    } : undefined}
                     onDragStart={draggable ? e => {
-                      setDragging({ id, type: item.type === 'event' ? 'event' : 'task', mode: 'move' })
+                      setDragging({ id, type: item.type === 'event' ? 'event' : 'task' })
                       e.dataTransfer.setData('text/plain', `${item.type}:${id}`)
                     } : undefined} />
                 )
@@ -1470,6 +1434,7 @@ function EventDateEditModal({ event, onClose, onSave }: {
   const [startDate, setStartDate] = useState(event.dataInizio)
   const [endDate, setEndDate] = useState(event.dataFine)
   const [saving, setSaving] = useState(false)
+  const [warning, setWarning] = useState('')
 
   const duration = Math.max(0, Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000))
   const originalDuration = Math.max(0, Math.ceil((new Date(event.dataFine).getTime() - new Date(event.dataInizio).getTime()) / 86400000))
@@ -1481,13 +1446,59 @@ function EventDateEditModal({ event, onClose, onSave }: {
     if (new Date(val) > new Date(endDate)) {
       setEndDate(val)
     }
+    setWarning('')
+  }
+
+  function handleEndChange(val: string) {
+    if (new Date(val) < new Date(startDate)) return
+    setEndDate(val)
+    setWarning('')
+  }
+
+  function addDayToEnd() {
+    const d = new Date(endDate + 'T00:00:00')
+    d.setDate(d.getDate() + 1)
+    setEndDate(d.toISOString().slice(0, 10))
+    setWarning('')
+  }
+
+  function removeDayFromEnd() {
+    const d = new Date(endDate + 'T00:00:00')
+    d.setDate(d.getDate() - 1)
+    if (d >= new Date(startDate + 'T00:00:00')) {
+      setEndDate(d.toISOString().slice(0, 10))
+      setWarning('')
+    }
   }
 
   async function handleSave() {
     if (!isValid || !hasChanged) return
     setSaving(true)
+
+    if (new Date(endDate) < new Date(event.dataFine)) {
+      const hasOOR = await checkOutOfRange(event.id, startDate, endDate)
+      if (hasOOR) {
+        setWarning('Alcuni elementi potrebbero trovarsi fuori dal nuovo intervallo evento. Verifica il dettaglio evento.')
+      }
+    }
+
     onSave(event.id, startDate, endDate)
     setSaving(false)
+  }
+
+  async function checkOutOfRange(eventId: string, start: string, end: string): Promise<boolean> {
+    const tables = ['event_program', 'event_supplier_services', 'event_restaurant_details', 'event_experience_details', 'event_catering_details', 'event_staff_esterno_details', 'event_staff_interno_details', 'event_varie_details']
+    const results = await Promise.all(
+      tables.map(t => supabase.from(t).select('id,data').eq('event_id', eventId).not('data', 'is', null))
+    )
+    for (const { data: rows } of results) {
+      if (!rows) continue
+      for (const row of rows) {
+        const d = (row as Record<string, unknown>).data as string
+        if (d && (d < start || d > end)) return true
+      }
+    }
+    return false
   }
 
   return (
@@ -1499,7 +1510,7 @@ function EventDateEditModal({ event, onClose, onSave }: {
         <div className="p-5" style={{ borderBottom: '1px solid var(--line)', background: 'rgba(77,180,255,0.04)' }}>
           <div className="flex items-center gap-2 mb-1">
             <Calendar className="w-4 h-4" style={{ color: 'var(--blue)' }} />
-            <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Modifica date</span>
+            <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Durata evento</span>
           </div>
           <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{event.nome}</h3>
           <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
@@ -1517,12 +1528,34 @@ function EventDateEditModal({ event, onClose, onSave }: {
             </div>
             <div>
               <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Data fine</label>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+              <input type="date" value={endDate} onChange={e => handleEndChange(e.target.value)}
                 min={startDate}
                 className="w-full px-3 py-2.5 rounded-xl text-sm"
                 style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
             </div>
           </div>
+
+          {/* Quick duration buttons */}
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Durata fine:</span>
+            <div className="flex items-center gap-2">
+              <button onClick={removeDayFromEnd}
+                disabled={endDate === startDate}
+                className="flex items-center justify-center w-8 h-8 rounded-lg text-sm font-bold transition-all disabled:opacity-30 hover:brightness-110"
+                style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+                -1
+              </button>
+              <span className="text-sm font-semibold px-2 min-w-[60px] text-center" style={{ color: 'var(--text)' }}>
+                {duration + 1} giorn{duration === 0 ? 'o' : 'i'}
+              </span>
+              <button onClick={addDayToEnd}
+                className="flex items-center justify-center w-8 h-8 rounded-lg text-sm font-bold transition-all hover:brightness-110"
+                style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+                +1
+              </button>
+            </div>
+          </div>
+
           {hasChanged && isValid && (
             <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: 'rgba(77,180,255,0.06)', border: '1px solid rgba(77,180,255,0.15)' }}>
               <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--blue)' }} />
@@ -1539,6 +1572,12 @@ function EventDateEditModal({ event, onClose, onSave }: {
           {!isValid && startDate && endDate && (
             <p className="text-xs" style={{ color: 'var(--red2)' }}>La data fine non puo essere prima della data inizio.</p>
           )}
+          {warning && (
+            <div className="flex items-start gap-2 p-3 rounded-xl" style={{ background: 'rgba(255,194,75,0.08)', border: '1px solid rgba(255,194,75,0.2)' }}>
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--yellow)' }} />
+              <p className="text-xs" style={{ color: 'var(--yellow)' }}>{warning}</p>
+            </div>
+          )}
           <div className="flex gap-2">
             <button onClick={onClose}
               className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
@@ -1548,7 +1587,7 @@ function EventDateEditModal({ event, onClose, onSave }: {
             <button onClick={handleSave} disabled={!hasChanged || !isValid || saving}
               className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
               style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
-              {saving ? 'Salvataggio...' : 'Salva date'}
+              {saving ? 'Salvataggio...' : 'Salva modifiche'}
             </button>
           </div>
           <p className="text-xs text-center" style={{ color: 'var(--muted)' }}>
@@ -1748,31 +1787,6 @@ export default function Calendario() {
     await refresh()
   }
 
-  async function checkServicesOutOfRange(eventId: string, startDate: string, endDate: string): Promise<boolean> {
-    const tables = ['event_program', 'event_supplier_services', 'event_restaurant_details', 'event_experience_details', 'event_catering_details', 'event_staff_esterno_details', 'event_staff_interno_details', 'event_varie_details']
-    const results = await Promise.all(
-      tables.map(t => supabase.from(t).select('id,data').eq('event_id', eventId).not('data', 'is', null))
-    )
-    for (const { data: rows } of results) {
-      if (!rows) continue
-      for (const row of rows) {
-        const d = (row as Record<string, unknown>).data as string
-        if (d && (d < startDate || d > endDate)) return true
-      }
-    }
-    const { data: hotelRows } = await supabase.from('event_hotel_details').select('id,data,check_in_date,check_out_date').eq('event_id', eventId)
-    if (hotelRows) {
-      for (const row of hotelRows) {
-        const r = row as Record<string, unknown>
-        for (const col of ['data', 'check_in_date', 'check_out_date']) {
-          const d = r[col] as string
-          if (d && (d < startDate || d > endDate)) return true
-        }
-      }
-    }
-    return false
-  }
-
   async function handleMoveItem(id: string, type: 'event' | 'task', newDate: string) {
     if (type === 'task') {
       const target = allTasks.find(t => t.id === id)
@@ -1807,25 +1821,6 @@ export default function Calendario() {
       }
       setTimeout(() => setShiftToast(null), 5000)
     }
-    await refresh()
-  }
-
-  async function handleResizeEvent(id: string, newEndDate: string) {
-    const target = allEvents.find(e => e.id === id)
-    if (!target) return
-    if (new Date(newEndDate) < new Date(target.dataInizio)) return
-    if (newEndDate === target.dataFine) return
-
-    setAllEvents(prev => prev.map(e => e.id === id ? { ...e, dataFine: newEndDate } : e))
-    await updateEvent(id, { dataFine: newEndDate })
-
-    const hasOutOfRange = await checkServicesOutOfRange(id, target.dataInizio, newEndDate)
-    if (hasOutOfRange) {
-      setShiftToast({ message: 'Durata evento aggiornata. Alcuni elementi potrebbero trovarsi fuori dal nuovo intervallo. Verifica il dettaglio.', type: 'warning' })
-    } else {
-      setShiftToast({ message: 'Durata evento aggiornata.', type: 'success' })
-    }
-    setTimeout(() => setShiftToast(null), 5000)
     await refresh()
   }
 
@@ -2021,7 +2016,6 @@ export default function Calendario() {
           onItemClick={setSelectedItem}
           onDayClick={d => { setCursor(d); setView('day') }}
           onMoveItem={handleMoveItem}
-          onResizeEvent={handleResizeEvent}
         />
       )}
       {view === 'week' && (
@@ -2029,7 +2023,6 @@ export default function Calendario() {
           weekStart={weekStart} items={visibleItems} today={today}
           onItemClick={setSelectedItem}
           onMoveItem={handleMoveItem}
-          onResizeEvent={handleResizeEvent}
         />
       )}
       {view === 'day' && (
