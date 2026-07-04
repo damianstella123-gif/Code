@@ -1,6 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo, useCallback, memo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Minus, GripVertical, Clock, Users, Euro, Calendar, MapPin, Hash } from 'lucide-react'
+import {
+  ArrowLeft, Plus, Minus, GripVertical, Clock, Users,
+  Calendar, MapPin, Hash, Search, ChevronRight, Truck, Building2,
+  UtensilsCrossed, Sparkles, Music, Palette, Hammer, UserCheck, Package, X,
+} from 'lucide-react'
 import { useEventTimeline, type TimelineService, type DayData } from '../lib/use-event-timeline'
 
 const DAYS_FULL = ['Domenica', 'Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato']
@@ -23,37 +27,49 @@ function categoriaLabel(cat: string): string {
     ristorante: 'Ristorante',
     experience: 'Experience',
     catering: 'Catering',
-    staff_interno: 'Staff Interno',
-    staff_esterno: 'Staff Esterno',
+    staff_interno: 'Staff Int.',
+    staff_esterno: 'Staff Est.',
     audio_video: 'Audio/Video',
     allestimenti: 'Allestimenti',
-    grafica_stampa: 'Grafica/Stampa',
+    grafica_stampa: 'Grafica',
     varie: 'Varie',
   }
   return map[cat] ?? cat
 }
 
-function categoriaColor(cat: string): string {
-  const map: Record<string, string> = {
-    programma: 'var(--blue)',
-    transfer: '#9b59b6',
-    hotel: '#e67e22',
-    ristorante: '#e74c3c',
-    experience: '#1abc9c',
-    catering: '#f39c12',
-    staff_interno: '#3498db',
-    staff_esterno: '#2980b9',
-    audio_video: '#8e44ad',
-    allestimenti: 'var(--green)',
-    grafica_stampa: '#d35400',
-    varie: 'var(--gray)',
+interface CategoriaStyle {
+  color: string
+  bg: string
+  icon: React.ElementType
+}
+
+function categoriaStyles(cat: string): CategoriaStyle {
+  const styles: Record<string, CategoriaStyle> = {
+    programma: { color: 'var(--blue)', bg: 'rgba(59,130,246,0.10)', icon: Calendar },
+    transfer: { color: '#8b5cf6', bg: 'rgba(139,92,246,0.10)', icon: Truck },
+    hotel: { color: '#f59e0b', bg: 'rgba(245,158,11,0.10)', icon: Building2 },
+    ristorante: { color: '#ef4444', bg: 'rgba(239,68,68,0.10)', icon: UtensilsCrossed },
+    experience: { color: '#10b981', bg: 'rgba(16,185,129,0.10)', icon: Sparkles },
+    catering: { color: '#f97316', bg: 'rgba(249,115,22,0.10)', icon: UtensilsCrossed },
+    staff_interno: { color: '#3b82f6', bg: 'rgba(59,130,246,0.10)', icon: UserCheck },
+    staff_esterno: { color: '#6366f1', bg: 'rgba(99,102,241,0.10)', icon: Users },
+    audio_video: { color: '#a855f7', bg: 'rgba(168,85,247,0.10)', icon: Music },
+    allestimenti: { color: 'var(--green)', bg: 'rgba(34,197,94,0.10)', icon: Hammer },
+    grafica_stampa: { color: '#ec4899', bg: 'rgba(236,72,153,0.10)', icon: Palette },
+    varie: { color: 'var(--muted)', bg: 'rgba(128,128,128,0.08)', icon: Package },
   }
-  return map[cat] ?? 'var(--gray)'
+  return styles[cat] ?? { color: 'var(--muted)', bg: 'rgba(128,128,128,0.08)', icon: Package }
 }
 
 function formatCurrency(n: number): string {
   if (!n) return '-'
   return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+}
+
+function formatCurrencyCompact(n: number): string {
+  if (!n) return '-'
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
+  return n.toFixed(0)
 }
 
 export default function EventTimeline() {
@@ -64,6 +80,34 @@ export default function EventTimeline() {
   const [dragItem, setDragItem] = useState<TimelineService | null>(null)
   const [dragOverDay, setDragOverDay] = useState<string | null>(null)
   const [showRemoveDialog, setShowRemoveDialog] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
+
+  const toggleCollapse = useCallback((date: string) => {
+    setCollapsedDays(prev => {
+      const next = new Set(prev)
+      if (next.has(date)) next.delete(date)
+      else next.add(date)
+      return next
+    })
+  }, [])
+
+  const filteredDays = useMemo(() => {
+    if (!searchQuery.trim()) return days
+    const q = searchQuery.toLowerCase()
+    return days.map(day => ({
+      ...day,
+      services: day.services.filter(svc =>
+        svc.titolo.toLowerCase().includes(q) ||
+        categoriaLabel(svc.categoria).toLowerCase().includes(q)
+      ),
+    }))
+  }, [days, searchQuery])
+
+  const matchCount = useMemo(() => {
+    if (!searchQuery.trim()) return null
+    return filteredDays.reduce((s, d) => s + d.services.length, 0)
+  }, [filteredDays, searchQuery])
 
   if (loading) {
     return (
@@ -101,7 +145,7 @@ export default function EventTimeline() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-5 p-5 md:p-6">
+    <div className="h-full flex flex-col gap-4 p-5 md:p-6">
       {/* Header — cockpit identity */}
       <div
         className="rounded-2xl px-5 py-4"
@@ -173,30 +217,93 @@ export default function EventTimeline() {
             </button>
           </div>
         </div>
+
+        {/* Search bar */}
+        <div className="mt-3 relative">
+          <Search
+            size={13}
+            className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ color: 'var(--muted)' }}
+          />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Cerca servizio, categoria..."
+            className="w-full pl-8 pr-8 py-2 rounded-xl text-xs outline-none transition-all"
+            style={{
+              background: 'var(--panel)',
+              border: '1px solid var(--line)',
+              color: 'var(--text)',
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 transition-opacity"
+              style={{ color: 'var(--muted)' }}
+            >
+              <X size={12} />
+            </button>
+          )}
+          {matchCount !== null && (
+            <span
+              className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] font-medium"
+              style={{ color: matchCount > 0 ? 'var(--blue)' : 'var(--red)' }}
+            >
+              {matchCount} {matchCount === 1 ? 'risultato' : 'risultati'}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Timeline columns — the operational core */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden" style={{ scrollBehavior: 'smooth' }}>
         <div className="flex gap-3 h-full pb-2" style={{ minWidth: days.length * 240 }}>
-          {days.map((day, idx) => (
-            <DayColumnComponent
-              key={day.date}
-              day={day}
-              dayIndex={idx}
-              totalDays={days.length}
-              isDragOver={dragOverDay === day.date}
-              onDragOver={() => setDragOverDay(day.date)}
-              onDragLeave={() => setDragOverDay(null)}
-              onDrop={() => {
-                if (dragItem && dragItem.data !== day.date) {
-                  moveService(dragItem, day.date)
-                }
-                setDragItem(null)
-                setDragOverDay(null)
-              }}
-              onServiceDragStart={svc => setDragItem(svc)}
-            />
-          ))}
+          {filteredDays.map((day, idx) => {
+            const isCollapsed = collapsedDays.has(day.date)
+            const originalDay = days[idx]
+            return isCollapsed ? (
+              <CollapsedDayColumn
+                key={day.date}
+                day={originalDay}
+                dayIndex={idx}
+                totalDays={days.length}
+                onExpand={() => toggleCollapse(day.date)}
+                isDragOver={dragOverDay === day.date}
+                onDragOver={() => setDragOverDay(day.date)}
+                onDragLeave={() => setDragOverDay(null)}
+                onDrop={() => {
+                  if (dragItem && dragItem.data !== day.date) {
+                    moveService(dragItem, day.date)
+                  }
+                  setDragItem(null)
+                  setDragOverDay(null)
+                }}
+              />
+            ) : (
+              <DayColumnComponent
+                key={day.date}
+                day={day}
+                originalDay={originalDay}
+                dayIndex={idx}
+                totalDays={days.length}
+                isDragOver={dragOverDay === day.date}
+                onDragOver={() => setDragOverDay(day.date)}
+                onDragLeave={() => setDragOverDay(null)}
+                onDrop={() => {
+                  if (dragItem && dragItem.data !== day.date) {
+                    moveService(dragItem, day.date)
+                  }
+                  setDragItem(null)
+                  setDragOverDay(null)
+                }}
+                onServiceDragStart={svc => setDragItem(svc)}
+                onCollapse={() => toggleCollapse(day.date)}
+                isFiltering={!!searchQuery.trim()}
+              />
+            )
+          })}
         </div>
       </div>
 
@@ -250,10 +357,59 @@ export default function EventTimeline() {
   )
 }
 
-function DayColumnComponent({
-  day, dayIndex, totalDays, isDragOver, onDragOver, onDragLeave, onDrop, onServiceDragStart,
+/* ═══ COLLAPSED DAY ═══ */
+function CollapsedDayColumn({ day, dayIndex, totalDays, onExpand, isDragOver, onDragOver, onDragLeave, onDrop }: {
+  day: DayData
+  dayIndex: number
+  totalDays: number
+  onExpand: () => void
+  isDragOver: boolean
+  onDragOver: () => void
+  onDragLeave: () => void
+  onDrop: () => void
+}) {
+  const { dayNum, month } = formatDayHeader(day.date)
+
+  return (
+    <div
+      className="w-12 flex flex-col items-center rounded-2xl cursor-pointer transition-all hover:w-14"
+      style={{
+        background: isDragOver ? 'var(--cc-glass-deep)' : 'var(--cc-glass)',
+        backdropFilter: `blur(var(--cc-blur))`,
+        WebkitBackdropFilter: `blur(var(--cc-blur))`,
+        border: isDragOver ? '2px solid var(--red)' : '1px solid var(--cc-glass-border)',
+        boxShadow: isDragOver ? 'var(--shadow-red)' : 'var(--shadow-sm)',
+      }}
+      onClick={onExpand}
+      onDragOver={e => { e.preventDefault(); onDragOver() }}
+      onDragLeave={onDragLeave}
+      onDrop={e => { e.preventDefault(); onDrop() }}
+    >
+      <div className="flex flex-col items-center py-4 gap-2">
+        <ChevronRight size={12} style={{ color: 'var(--muted)' }} />
+        <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>{dayNum}</span>
+        <span className="text-[8px] uppercase tracking-widest" style={{ color: 'var(--muted)' }}>{month.slice(0, 3)}</span>
+        <span className="text-[9px] font-medium" style={{ color: 'var(--muted)' }}>{dayIndex + 1}/{totalDays}</span>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center gap-1.5 pb-4">
+        <span
+          className="text-[10px] font-bold w-6 h-6 flex items-center justify-center rounded-full"
+          style={{ background: 'var(--panel)', color: 'var(--text)' }}
+        >
+          {day.services.length}
+        </span>
+        <span className="text-[8px] text-center" style={{ color: 'var(--muted)' }}>srv</span>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ DAY COLUMN — with indicators ═══ */
+const DayColumnComponent = memo(function DayColumnComponent({
+  day, originalDay, dayIndex, totalDays, isDragOver, onDragOver, onDragLeave, onDrop, onServiceDragStart, onCollapse, isFiltering,
 }: {
   day: DayData
+  originalDay: DayData
   dayIndex: number
   totalDays: number
   isDragOver: boolean
@@ -261,9 +417,20 @@ function DayColumnComponent({
   onDragLeave: () => void
   onDrop: () => void
   onServiceDragStart: (svc: TimelineService) => void
+  onCollapse: () => void
+  isFiltering: boolean
 }) {
   const { dayName, dayNum, month } = formatDayHeader(day.date)
-  const dayCosto = day.services.reduce((s, svc) => s + svc.costo, 0)
+
+  const indicators = useMemo(() => {
+    const svcs = originalDay.services
+    const costo = svcs.reduce((s, svc) => s + svc.costo, 0)
+    const venduto = svcs.reduce((s, svc) => s + svc.venduto, 0)
+    const margine = venduto - costo
+    const fornitori = new Set(svcs.filter(s => s.fornitore_id).map(s => s.fornitore_id)).size
+    const categorie = new Set(svcs.map(s => s.categoria)).size
+    return { count: svcs.length, costo, venduto, margine, fornitori, categorie }
+  }, [originalDay.services])
 
   return (
     <div
@@ -280,24 +447,44 @@ function DayColumnComponent({
       onDrop={e => { e.preventDefault(); onDrop() }}
     >
       {/* Day header */}
-      <div className="px-4 py-3.5" style={{ borderBottom: '1px solid var(--cc-divider)' }}>
-        <div className="flex items-baseline justify-between">
+      <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--cc-divider)' }}>
+        <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-1.5">
             <span className="text-2xl font-bold" style={{ color: 'var(--text)', letterSpacing: '-0.04em' }}>{dayNum}</span>
             <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: 'var(--muted)' }}>{month.slice(0, 3)}</span>
           </div>
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md" style={{ background: 'var(--panel)', color: 'var(--muted)' }}>
-            {dayIndex + 1}/{totalDays}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-md" style={{ background: 'var(--panel)', color: 'var(--muted)' }}>
+              {dayIndex + 1}/{totalDays}
+            </span>
+            <button
+              onClick={onCollapse}
+              className="p-1 rounded-md transition-all hover:scale-110"
+              style={{ color: 'var(--muted)' }}
+              title="Chiudi giornata"
+            >
+              <ChevronRight size={12} className="rotate-180" />
+            </button>
+          </div>
         </div>
-        <p className="text-[11px] mt-1" style={{ color: 'var(--muted)' }}>
+        <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
           {dayName}
         </p>
-        {dayCosto > 0 && (
-          <p className="text-[10px] mt-1.5 flex items-center gap-1 font-medium" style={{ color: 'var(--muted)' }}>
-            <Euro size={9} />
-            {formatCurrency(dayCosto)}
-          </p>
+
+        {/* Day indicators — compact instrument row */}
+        {indicators.count > 0 && (
+          <div className="mt-2 grid grid-cols-3 gap-1.5">
+            <IndicatorPill label="Srv" value={String(indicators.count)} />
+            <IndicatorPill label="Forn" value={String(indicators.fornitori)} />
+            <IndicatorPill label="Cat" value={String(indicators.categorie)} />
+            <IndicatorPill label="Costo" value={formatCurrencyCompact(indicators.costo)} />
+            <IndicatorPill label="Vend" value={formatCurrencyCompact(indicators.venduto)} />
+            <IndicatorPill
+              label="Marg"
+              value={formatCurrencyCompact(indicators.margine)}
+              color={indicators.margine >= 0 ? 'var(--green)' : 'var(--red)'}
+            />
+          </div>
         )}
       </div>
 
@@ -308,8 +495,12 @@ function DayColumnComponent({
             className="flex flex-col items-center justify-center h-24 rounded-xl"
             style={{ border: '1px dashed var(--line)' }}
           >
-            <span className="text-[10px]" style={{ color: 'var(--muted)' }}>Nessun servizio</span>
-            <span className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>Trascina qui</span>
+            <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+              {isFiltering ? 'Nessun risultato' : 'Nessun servizio'}
+            </span>
+            {!isFiltering && (
+              <span className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>Trascina qui</span>
+            )}
           </div>
         )}
         {day.services.map(svc => (
@@ -318,15 +509,33 @@ function DayColumnComponent({
       </div>
 
       {/* Day footer */}
-      <div className="px-4 py-2.5 text-[10px] font-medium" style={{ borderTop: '1px solid var(--cc-divider)', color: 'var(--muted)' }}>
-        {day.services.length} {day.services.length === 1 ? 'elemento' : 'elementi'}
+      <div className="px-4 py-2 text-[10px] font-medium" style={{ borderTop: '1px solid var(--cc-divider)', color: 'var(--muted)' }}>
+        {isFiltering && day.services.length !== originalDay.services.length
+          ? `${day.services.length}/${originalDay.services.length} visibili`
+          : `${day.services.length} ${day.services.length === 1 ? 'elemento' : 'elementi'}`
+        }
       </div>
+    </div>
+  )
+})
+
+/* ═══ INDICATOR PILL ═══ */
+function IndicatorPill({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div
+      className="flex flex-col items-center py-1 px-1 rounded-lg"
+      style={{ background: 'var(--panel)' }}
+    >
+      <span className="text-[8px] uppercase tracking-wider font-medium" style={{ color: 'var(--muted)' }}>{label}</span>
+      <span className="text-[10px] font-bold" style={{ color: color ?? 'var(--text)' }}>{value}</span>
     </div>
   )
 }
 
-function ServiceBlockComponent({ service, onDragStart }: { service: TimelineService; onDragStart: () => void }) {
-  const color = categoriaColor(service.categoria)
+/* ═══ SERVICE BLOCK — with improved badge ═══ */
+const ServiceBlockComponent = memo(function ServiceBlockComponent({ service, onDragStart }: { service: TimelineService; onDragStart: () => void }) {
+  const style = categoriaStyles(service.categoria)
+  const Icon = style.icon
 
   return (
     <div
@@ -340,7 +549,7 @@ function ServiceBlockComponent({ service, onDragStart }: { service: TimelineServ
       style={{
         background: 'var(--panel)',
         border: '1px solid var(--line)',
-        borderLeft: `3px solid ${color}`,
+        borderLeft: `3px solid ${style.color}`,
         boxShadow: 'var(--shadow-sm)',
       }}
     >
@@ -354,11 +563,13 @@ function ServiceBlockComponent({ service, onDragStart }: { service: TimelineServ
           <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text)' }}>
             {service.titolo}
           </p>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
+          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+            {/* Category badge with icon */}
             <span
-              className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md"
-              style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, color }}
+              className="inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md"
+              style={{ background: style.bg, color: style.color }}
             >
+              <Icon size={9} />
               {categoriaLabel(service.categoria)}
             </span>
             {service.ora && (
@@ -374,12 +585,28 @@ function ServiceBlockComponent({ service, onDragStart }: { service: TimelineServ
               </span>
             )}
           </div>
+          {/* Economics micro-line */}
+          {(service.venduto > 0 || service.costo > 0) && (
+            <div className="flex items-center gap-2 mt-1">
+              {service.venduto > 0 && (
+                <span className="text-[9px] font-medium" style={{ color: 'var(--green)' }}>
+                  +{formatCurrencyCompact(service.venduto)}
+                </span>
+              )}
+              {service.costo > 0 && (
+                <span className="text-[9px] font-medium" style={{ color: 'var(--red)' }}>
+                  -{formatCurrencyCompact(service.costo)}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
   )
-}
+})
 
+/* ═══ REMOVE DAY DIALOG ═══ */
 function RemoveDayDialog({ day, onClose, onConfirm }: {
   day: DayData
   onClose: () => void
