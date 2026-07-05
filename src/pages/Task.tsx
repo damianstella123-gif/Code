@@ -9,6 +9,9 @@ import {
   Circle,
   CircleDot,
   CheckCircle2,
+  Calendar,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { cacheTasksSnapshot } from '@/lib/storage'
@@ -198,6 +201,7 @@ export default function TaskPage() {
   const [filterAssegnatario, setFilterAssegnatario] = useState('Tutti')
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [allUsers, setAllUsers] = useState<Profile[]>([])
   const [allEvents, setAllEvents] = useState<{ id: string; nome: string }[]>([])
 
@@ -232,8 +236,7 @@ export default function TaskPage() {
     if (!targetId || taskList.length === 0) return
     const found = taskList.find(t => t.id === targetId)
     if (found) {
-      setEditingTask(found)
-      setShowForm(true)
+      setSelectedTaskId(found.id)
       setSearchParams({}, { replace: true })
     }
   }, [taskList, searchParams, setSearchParams])
@@ -333,6 +336,8 @@ export default function TaskPage() {
     moveTask(task.id, next)
   }
 
+  const selectedTask = selectedTaskId ? taskList.find(t => t.id === selectedTaskId) ?? null : null
+
   return (
     <div style={{ maxWidth: '900px' }}>
       {/* Masthead */}
@@ -408,8 +413,7 @@ export default function TaskPage() {
                 getInitials={getProfileInitials}
                 getFullName={getProfileName}
                 onCycleStatus={() => cycleStatus(task)}
-                onEdit={() => { setEditingTask(task); setShowForm(true) }}
-                onDelete={() => deleteTask(task.id)}
+                onRowClick={() => setSelectedTaskId(task.id)}
                 onNavigateEvent={evtId => navigate(`/eventi?id=${evtId}`)}
               />
             ))}
@@ -432,8 +436,7 @@ export default function TaskPage() {
                     getInitials={getProfileInitials}
                     getFullName={getProfileName}
                     onCycleStatus={() => cycleStatus(task)}
-                    onEdit={() => { setEditingTask(task); setShowForm(true) }}
-                    onDelete={() => deleteTask(task.id)}
+                    onRowClick={() => setSelectedTaskId(task.id)}
                     onNavigateEvent={evtId => navigate(`/eventi?id=${evtId}`)}
                   />
                 ))}
@@ -446,24 +449,36 @@ export default function TaskPage() {
       {showForm && (
         <TaskFormModal task={editingTask} onSave={saveTask} onClose={() => { setShowForm(false); setEditingTask(undefined) }} users={allUsers} events={allEvents} />
       )}
+
+      {selectedTask && (
+        <TaskDetailPanel
+          task={selectedTask}
+          events={allEvents}
+          getInitials={getProfileInitials}
+          getFullName={getProfileName}
+          onClose={() => setSelectedTaskId(null)}
+          onEdit={() => { setEditingTask(selectedTask); setSelectedTaskId(null); setShowForm(true) }}
+          onDelete={() => { deleteTask(selectedTask.id); setSelectedTaskId(null) }}
+          onStatusChange={(to) => moveTask(selectedTask.id, to)}
+          onNavigateEvent={evtId => navigate(`/eventi?id=${evtId}`)}
+        />
+      )}
     </div>
   )
 }
 
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus, onEdit, onDelete, onNavigateEvent }: {
+function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus, onRowClick, onNavigateEvent }: {
   task: Task
   index: number
   events: { id: string; nome: string }[]
   getInitials: (id: string) => string
   getFullName: (id: string) => string
   onCycleStatus: () => void
-  onEdit: () => void
-  onDelete: () => void
+  onRowClick: () => void
   onNavigateEvent: (evtId: string) => void
 }) {
-  const [confirmDel, setConfirmDel] = useState(false)
   const evento = task.evento ? events.find(e => e.id === task.evento) : null
   const dl = deadlineLabel(task.scadenza, task.stato)
   const isCompleted = task.stato === 'completato'
@@ -472,17 +487,21 @@ function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus,
   return (
     <div
       className="animate-fade-in"
+      onClick={onRowClick}
       style={{
         display: 'flex', alignItems: 'center', gap: '12px',
         padding: '10px 4px',
         borderBottom: '1px solid var(--line)',
         opacity: isCompleted ? 0.55 : 1,
-        transition: 'opacity 0.15s ease',
+        cursor: 'pointer',
+        transition: 'opacity 0.15s ease, background 0.12s ease',
       }}
+      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--panel)' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
     >
       {/* Status toggle - 44px touch target */}
       <button
-        onClick={onCycleStatus}
+        onClick={e => { e.stopPropagation(); onCycleStatus() }}
         style={{
           width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0,
@@ -551,29 +570,231 @@ function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus,
       }}>
         {dl.text}
       </span>
-
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
-        <button onClick={onEdit}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--muted)', transition: 'color 0.12s' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}>
-          <Edit3 className="w-3.5 h-3.5" />
-        </button>
-        {!confirmDel ? (
-          <button onClick={() => setConfirmDel(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--muted)', transition: 'color 0.12s' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}>
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        ) : (
-          <button onClick={() => { onDelete(); setConfirmDel(false) }}
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--red2)', fontWeight: 700 }}>
-            OK
-          </button>
-        )}
-      </div>
     </div>
+  )
+}
+
+// ─── Task Detail Panel ────────────────────────────────────────────────────────
+
+function TaskDetailPanel({ task, events, getInitials, getFullName, onClose, onEdit, onDelete, onStatusChange, onNavigateEvent }: {
+  task: Task
+  events: { id: string; nome: string }[]
+  getInitials: (id: string) => string
+  getFullName: (id: string) => string
+  onClose: () => void
+  onEdit: () => void
+  onDelete: () => void
+  onStatusChange: (to: Task['stato']) => void
+  onNavigateEvent: (evtId: string) => void
+}) {
+  const [confirmDel, setConfirmDel] = useState(false)
+  const evento = task.evento ? events.find(e => e.id === task.evento) : null
+  const dl = daysLeft(task.scadenza)
+  const isOverdue = dl < 0 && task.stato !== 'completato'
+  const statiSeq: Task['stato'][] = ['da_fare', 'in_corso', 'completato']
+  const currentIdx = statiSeq.indexOf(task.stato)
+  const prevStato = currentIdx > 0 ? statiSeq[currentIdx - 1] : null
+  const nextStato = currentIdx < statiSeq.length - 1 ? statiSeq[currentIdx + 1] : null
+
+  function statoLbl(s: Task['stato']) {
+    switch (s) { case 'da_fare': return 'DA FARE'; case 'in_corso': return 'IN CORSO'; case 'completato': return 'COMPLETATO' }
+  }
+
+  function statoClr(s: Task['stato']) {
+    switch (s) { case 'da_fare': return 'var(--yellow)'; case 'in_corso': return 'var(--blue)'; case 'completato': return 'var(--green)' }
+  }
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 50,
+          background: 'rgba(0,0,0,0.3)',
+          animation: 'fadeIn 0.2s ease',
+        }}
+      />
+      {/* Panel */}
+      <div style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 51,
+        width: '420px', maxWidth: '100vw',
+        background: 'var(--panel-solid)',
+        borderLeft: '1px solid var(--line)',
+        overflowY: 'auto',
+        animation: 'slideInRight 0.25s ease',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--line)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 600,
+                textTransform: 'uppercase', letterSpacing: '0.04em',
+                padding: '3px 8px', borderRadius: '4px',
+                color: statoClr(task.stato),
+                background: `color-mix(in srgb, ${statoClr(task.stato)} 12%, transparent)`,
+              }}>
+                {statoLbl(task.stato)}
+              </span>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 600,
+                textTransform: 'uppercase', letterSpacing: '0.04em',
+                padding: '3px 8px', borderRadius: '4px',
+                color: prioritaColor(task.priorita),
+                background: `color-mix(in srgb, ${prioritaColor(task.priorita)} 12%, transparent)`,
+              }}>
+                {task.priorita}
+              </span>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.3, margin: 0 }}>
+            {task.titolo}
+          </h2>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, padding: '20px 24px' }}>
+          {task.descrizione && (
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '6px' }}>DESCRIZIONE</p>
+              <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>{task.descrizione}</p>
+            </div>
+          )}
+
+          {evento && (
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '6px' }}>EVENTO COLLEGATO</p>
+              <button
+                onClick={() => onNavigateEvent(evento.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '8px 12px', borderRadius: '8px',
+                  background: 'color-mix(in srgb, var(--blue) 8%, transparent)',
+                  border: '1px solid var(--blue)',
+                  cursor: 'pointer', color: 'var(--blue)',
+                  fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 500,
+                }}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                {evento.nome}
+              </button>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+            <div>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '6px' }}>ASSEGNATARIO</p>
+              {task.assegnatario ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '24px', height: '24px', borderRadius: '50%',
+                    background: 'var(--panel2)', border: '1px solid var(--line)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 700, color: 'var(--text)',
+                  }}>
+                    {getInitials(task.assegnatario)}
+                  </div>
+                  <span style={{ fontSize: '13px', color: 'var(--text)' }}>{getFullName(task.assegnatario)}</span>
+                </div>
+              ) : (
+                <span style={{ fontSize: '13px', color: 'var(--muted)' }}>&mdash;</span>
+              )}
+            </div>
+            <div>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '6px' }}>SCADENZA</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Calendar className="w-3.5 h-3.5" style={{ color: isOverdue ? 'var(--red2)' : 'var(--muted)' }} />
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600, color: isOverdue ? 'var(--red2)' : 'var(--text)' }}>
+                  {new Date(task.scadenza).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
+              {isOverdue && <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--red2)', marginTop: '2px' }}>{Math.abs(dl)} giorni in ritardo</p>}
+            </div>
+            <div>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '6px' }}>CREATO IL</p>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text)' }}>
+                {task.creatoIl ? new Date(task.creatoIl).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }) : '\u2014'}
+              </span>
+            </div>
+            <div>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '6px' }}>PRIORITA</p>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600, color: prioritaColor(task.priorita), textTransform: 'capitalize' }}>
+                {task.priorita}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>CAMBIA STATO</p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {prevStato && (
+                <button onClick={() => onStatusChange(prevStato)}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    padding: '8px 12px', borderRadius: '8px', border: `1px solid ${statoClr(prevStato)}`,
+                    background: `color-mix(in srgb, ${statoClr(prevStato)} 8%, transparent)`,
+                    cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 600,
+                    color: statoClr(prevStato),
+                  }}>
+                  <ArrowLeft className="w-3 h-3" /> {statoLbl(prevStato)}
+                </button>
+              )}
+              {nextStato && (
+                <button onClick={() => onStatusChange(nextStato)}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    padding: '8px 12px', borderRadius: '8px', border: `1px solid ${statoClr(nextStato)}`,
+                    background: `color-mix(in srgb, ${statoClr(nextStato)} 8%, transparent)`,
+                    cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 600,
+                    color: statoClr(nextStato),
+                  }}>
+                  {statoLbl(nextStato)} <ArrowRight className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: '8px' }}>
+          <button onClick={onEdit}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              padding: '10px', borderRadius: '8px', border: '1px solid var(--line)',
+              background: 'none', cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, color: 'var(--text)',
+            }}>
+            <Edit3 className="w-3.5 h-3.5" /> MODIFICA
+          </button>
+          {!confirmDel ? (
+            <button onClick={() => setConfirmDel(true)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--red2)',
+                background: 'none', cursor: 'pointer',
+                fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, color: 'var(--red2)',
+              }}>
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <button onClick={onDelete}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                padding: '10px 16px', borderRadius: '8px', border: 'none',
+                background: 'var(--red2)', cursor: 'pointer',
+                fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 700, color: '#fff',
+              }}>
+              CONFERMA
+            </button>
+          )}
+        </div>
+      </div>
+    </>
   )
 }
