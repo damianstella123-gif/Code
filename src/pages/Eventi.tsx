@@ -184,7 +184,7 @@ function EventFormModal({ event, internalUsers, allClients, onSave, onCancel }: 
           <h2 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
             {event ? 'Modifica Evento' : 'Nuovo Evento'}
           </h2>
-          <button onClick={onCancel} className="p-2 rounded-lg transition-all hover:bg-white/5">
+          <button onClick={onCancel} className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
             <X className="w-5 h-5" style={{ color: 'var(--muted)' }} />
           </button>
         </div>
@@ -296,9 +296,9 @@ function EventFormModal({ event, internalUsers, allClients, onSave, onCancel }: 
                 <button key={u.id} type="button" onClick={() => toggleTeamMember(u.id)}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all"
                   style={{
-                    background: teamIds.includes(u.id) ? 'rgba(208,0,58,0.12)' : 'var(--panel)',
+                    background: teamIds.includes(u.id) ? 'color-mix(in srgb, var(--red2) 12%, transparent)' : 'var(--panel)',
                     color: teamIds.includes(u.id) ? 'var(--red2)' : 'var(--muted)',
-                    border: `1px solid ${teamIds.includes(u.id) ? 'rgba(208,0,58,0.3)' : 'var(--line)'}`,
+                    border: `1px solid ${teamIds.includes(u.id) ? 'var(--red2)' : 'var(--line)'}`,
                   }}>
                   <img src={u.avatar} alt="" className="w-5 h-5 rounded-full object-cover" />
                   {u.nome.split(' ')[0]}
@@ -332,7 +332,7 @@ function DeleteConfirm({ eventName, onConfirm, onCancel }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
       <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,49,95,0.12)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)' }}>
             <Trash2 className="w-5 h-5" style={{ color: 'var(--red2)' }} />
           </div>
           <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Elimina evento</h3>
@@ -703,9 +703,9 @@ function TabTask({ event, suppliers, internalUsers }: { event: Event; suppliers:
             <button key={f.id} onClick={() => setFilter(f.id)}
               className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
               style={{
-                background: filter === f.id ? 'rgba(208,0,58,0.12)' : 'var(--panel)',
+                background: filter === f.id ? 'color-mix(in srgb, var(--red2) 12%, transparent)' : 'var(--panel)',
                 color: filter === f.id ? 'var(--red2)' : 'var(--muted)',
-                border: `1px solid ${filter === f.id ? 'rgba(208,0,58,0.35)' : 'var(--line)'}`,
+                border: `1px solid ${filter === f.id ? 'var(--red2)' : 'var(--line)'}`,
               }}>
               {f.label}
             </button>
@@ -722,7 +722,7 @@ function TabTask({ event, suppliers, internalUsers }: { event: Event; suppliers:
           )}
           <button onClick={() => { resetForm(); setShowForm(true) }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-            style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.35)' }}>
+            style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)', border: '1px solid var(--red2)' }}>
             <Plus className="w-3.5 h-3.5" /> Aggiungi task
           </button>
         </div>
@@ -730,12 +730,12 @@ function TabTask({ event, suppliers, internalUsers }: { event: Event; suppliers:
 
       {/* Full form */}
       {showForm && (
-        <div className="panel p-5 space-y-4" style={{ border: '1px solid rgba(208,0,58,0.2)' }}>
+        <div className="panel p-5 space-y-4" style={{ border: '1px solid var(--red2)' }}>
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
               {editingTask ? 'Modifica task' : 'Nuovo task'}
             </p>
-            <button onClick={resetForm} className="p-1 rounded hover:bg-white/10">
+            <button onClick={resetForm} className="p-1 rounded hover:bg-[var(--line)]">
               <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
             </button>
           </div>
@@ -832,7 +832,7 @@ function TabTask({ event, suppliers, internalUsers }: { event: Event; suppliers:
             const isOverdue = dl < 0 && task.stato !== 'completato'
             const priColor = task.priorita === 'alta' ? 'var(--red2)' : task.priorita === 'media' ? 'var(--yellow)' : 'var(--muted)'
             const sColor = task.stato === 'completato' ? 'var(--green)' : task.stato === 'in_corso' ? 'var(--blue)' : 'var(--yellow)'
-            const statoBg = task.stato === 'completato' ? 'rgba(56,210,125,0.12)' : task.stato === 'in_corso' ? 'rgba(77,180,255,0.12)' : 'rgba(255,194,75,0.12)'
+            const statoBg = task.stato === 'completato' ? 'color-mix(in srgb, var(--green) 12%, transparent)' : task.stato === 'in_corso' ? 'color-mix(in srgb, var(--blue) 12%, transparent)' : 'color-mix(in srgb, var(--yellow) 12%, transparent)'
             const supplierName = task.supplier_id ? suppliers.find(s => s.id === task.supplier_id)?.nome : null
             return (
               <div key={task.id} className="panel p-4 flex items-center gap-3">
@@ -868,10 +868,10 @@ function TabTask({ event, suppliers, internalUsers }: { event: Event; suppliers:
                     <Clock className="w-3 h-3" />
                     {isOverdue ? `${Math.abs(dl)}gg ritardo` : `${dl}gg`}
                   </span>
-                  <button onClick={() => startEdit(task)} className="p-1 rounded hover:bg-white/10">
+                  <button onClick={() => startEdit(task)} className="p-1 rounded hover:bg-[var(--line)]">
                     <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
                   </button>
-                  <button onClick={() => setDeletingId(task.id)} className="p-1 rounded hover:bg-white/10">
+                  <button onClick={() => setDeletingId(task.id)} className="p-1 rounded hover:bg-[var(--line)]">
                     <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
                   </button>
                 </div>
@@ -917,7 +917,7 @@ function TabTeam({ event, internalUsers }: { event: Event; internalUsers: Intern
   return (
     <div className="space-y-3">
       {responsabile && (
-        <div className="panel p-4 flex items-center gap-4" style={{ border: '1px solid rgba(208,0,58,0.2)' }}>
+        <div className="panel p-4 flex items-center gap-4" style={{ border: '1px solid var(--red2)' }}>
           <img src={responsabile.avatar} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="font-medium text-sm" style={{ color: 'var(--text)' }}>{responsabile.nome}</p>
@@ -1160,9 +1160,9 @@ const LINK_CATEGORIES: { value: CategoryType; label: string }[] = [
 ]
 
 const STATO_CONFERMA_CONFIG = {
-  richiesto: { label: 'Richiesto', color: 'var(--yellow)', bg: 'rgba(255,194,75,0.12)', border: 'rgba(255,194,75,0.4)' },
-  confermato: { label: 'Confermato', color: 'var(--blue)', bg: 'rgba(77,180,255,0.12)', border: 'rgba(77,180,255,0.4)' },
-  contrattualizzato: { label: 'Contrattualizzato', color: 'var(--green)', bg: 'rgba(56,210,125,0.12)', border: 'rgba(56,210,125,0.4)' },
+  richiesto: { label: 'Richiesto', color: 'var(--yellow)', bg: 'color-mix(in srgb, var(--yellow) 12%, transparent)', border: 'var(--yellow)' },
+  confermato: { label: 'Confermato', color: 'var(--blue)', bg: 'color-mix(in srgb, var(--blue) 12%, transparent)', border: 'var(--blue)' },
+  contrattualizzato: { label: 'Contrattualizzato', color: 'var(--green)', bg: 'color-mix(in srgb, var(--green) 12%, transparent)', border: 'var(--green)' },
 } as const
 
 function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
@@ -1283,7 +1283,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
             Fornitori collegati ({linkedSuppliers.length})
           </p>
           {withWarnings > 0 && (
-            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,194,75,0.15)', color: 'var(--yellow)' }}>
+            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--yellow) 15%, transparent)', color: 'var(--yellow)' }}>
               <AlertTriangle className="w-3 h-3" /> {withWarnings} da completare
             </span>
           )}
@@ -1291,7 +1291,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
         {!adding && (
           <button onClick={() => setAdding(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-            style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.35)' }}>
+            style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)', border: '1px solid var(--red2)' }}>
             <Plus className="w-3.5 h-3.5" /> Collega fornitore
           </button>
         )}
@@ -1299,7 +1299,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
 
       {/* Search panel for linking */}
       {adding && (
-        <div className="panel p-4 space-y-3" style={{ border: '1px solid rgba(208,0,58,0.2)' }}>
+        <div className="panel p-4 space-y-3" style={{ border: '1px solid var(--red2)' }}>
           <div className="flex items-center gap-2">
             <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
             <input type="text" value={search} onChange={e => setSearch(e.target.value)}
@@ -1319,7 +1319,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
               </p>
             ) : availableSuppliers.slice(0, 10).map(s => (
               <button key={s.id} onClick={() => beginLink(s.id)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all hover:bg-white/5"
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all hover:bg-[var(--line)]"
                 style={{ border: '1px solid var(--line)' }}>
                 <Truck className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--red2)' }} />
                 <div className="flex-1 min-w-0">
@@ -1345,7 +1345,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                 <button key={cat.value} onClick={() => setLinkCategory(cat.value)}
                   className="px-3 py-2 rounded-lg text-xs font-medium text-left transition-all"
                   style={{
-                    background: linkCategory === cat.value ? 'rgba(208,0,58,0.15)' : 'var(--panel2)',
+                    background: linkCategory === cat.value ? 'color-mix(in srgb, var(--red2) 15%, transparent)' : 'var(--panel2)',
                     border: `1px solid ${linkCategory === cat.value ? 'var(--red2)' : 'var(--line)'}`,
                     color: linkCategory === cat.value ? 'var(--red2)' : 'var(--text)',
                   }}>
@@ -1384,7 +1384,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
             const isEditingContact = editingContact === sup.id
 
             return (
-              <div key={sup.id} className="panel overflow-hidden" style={{ border: `1px solid ${hasWarning ? 'rgba(255,194,75,0.4)' : 'var(--line)'}` }}>
+              <div key={sup.id} className="panel overflow-hidden" style={{ border: `1px solid ${hasWarning ? 'var(--yellow)' : 'var(--line)'}` }}>
                 {/* Header row */}
                 <div className="p-4">
                   <div className="flex items-start gap-3">
@@ -1405,12 +1405,12 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                           {statoConf.label}
                         </span>
                         {hasWarning && !summary?.hasServices && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,194,75,0.15)', color: 'var(--yellow)' }}>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--yellow) 15%, transparent)', color: 'var(--yellow)' }}>
                             Nessun servizio
                           </span>
                         )}
                         {hasWarning && summary?.hasServices && summary?.hasMissingCosts && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,194,75,0.15)', color: 'var(--yellow)' }}>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--yellow) 15%, transparent)', color: 'var(--yellow)' }}>
                             Costi mancanti
                           </span>
                         )}
@@ -1421,7 +1421,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                         {sup.location && <span>· {sup.location}</span>}
                         {totals.count > 0 && (
                           <>
-                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium" style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium" style={{ background: 'color-mix(in srgb, var(--red2) 10%, transparent)', color: 'var(--red2)' }}>
                               {totals.count} {totals.count === 1 ? 'servizio' : 'servizi'}
                             </span>
                             <span style={{ color: totals.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>
@@ -1439,7 +1439,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                           {link.telefono_operativo && <span>· {link.telefono_operativo}</span>}
                           {link.email_operativo && <span>· {link.email_operativo}</span>}
                           <button onClick={() => { setEditingContact(sup.id); setContactForm({ contatto_operativo: link.contatto_operativo || '', telefono_operativo: link.telefono_operativo || '', email_operativo: link.email_operativo || '' }) }}
-                            className="p-0.5 rounded hover:bg-white/10">
+                            className="p-0.5 rounded hover:bg-[var(--line)]">
                             <Edit3 className="w-3 h-3" />
                           </button>
                         </div>
@@ -1460,12 +1460,12 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                       <button
                         onClick={() => setExpandedSupplier(isExpanded ? null : sup.id)}
                         className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
-                        style={{ background: isExpanded ? 'rgba(208,0,58,0.15)' : 'rgba(208,0,58,0.08)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.25)' }}>
+                        style={{ background: isExpanded ? 'color-mix(in srgb, var(--red2) 15%, transparent)' : 'color-mix(in srgb, var(--red2) 8%, transparent)', color: 'var(--red2)', border: '1px solid var(--red2)' }}>
                         <Plus className="w-3.5 h-3.5 inline mr-1" />
                         Servizi
                       </button>
                       <button onClick={() => setConfirmUnlink(sup.id)}
-                        className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi fornitore dall'evento">
+                        className="p-1.5 rounded-lg transition-all hover:bg-[var(--line)]" title="Rimuovi fornitore dall'evento">
                         <Trash2 className="w-4 h-4" style={{ color: 'var(--muted)' }} />
                       </button>
                     </div>
@@ -1533,7 +1533,7 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
 
       {/* Undo toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-lg" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-sm" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
           <p className="text-sm" style={{ color: 'var(--text)' }}>Fornitore rimosso dall'evento</p>
           <button onClick={() => handleUndoUnlink(toast.supplierId)} className="text-sm font-medium px-2 py-1 rounded-lg hover:opacity-80" style={{ color: 'var(--blue)' }}>Annulla</button>
         </div>
@@ -1571,7 +1571,7 @@ function DistanceLogistics({ linkedSuppliers, eventLocation }: { linkedSuppliers
   return (
     <div className="panel p-5 mt-4">
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.1)' }}>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--blue) 10%, transparent)' }}>
           <MapPin className="w-4 h-4" style={{ color: 'var(--blue)' }} />
         </div>
         <div>
@@ -1644,7 +1644,7 @@ function TabComunicazioni({ event, comunicazioni }: { event: Event; comunicazion
         const priColor = msg.priorita === 'alta' ? 'var(--red2)' : msg.priorita === 'media' ? 'var(--yellow)' : 'var(--muted)'
         return (
           <div key={msg.id} className="panel p-5"
-            style={{ border: unread ? '1px solid rgba(77,180,255,0.3)' : '1px solid var(--line)' }}>
+            style={{ border: unread ? '1px solid var(--blue)' : '1px solid var(--line)' }}>
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: 'var(--panel2)' }} />
               <div className="flex-1 min-w-0">
@@ -1826,7 +1826,7 @@ function TabDocumenti({ event }: { event: Event }) {
             {DOC_CATEGORIE.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer"
-            style={{ background: 'rgba(208,0,58,0.12)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.35)' }}>
+            style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)', border: '1px solid var(--red2)' }}>
             <Upload className="w-3.5 h-3.5" />
             {uploading ? 'Caricamento...' : 'Carica'}
             <input type="file" className="hidden" onChange={handleUpload} multiple disabled={uploading}
@@ -1860,15 +1860,15 @@ function TabDocumenti({ event }: { event: Event }) {
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button onClick={() => handlePreview(doc)} title="Apri"
-                    className="p-2 rounded-lg transition-all hover:bg-white/10">
+                    className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
                     <Eye className="w-4 h-4" style={{ color: 'var(--green)' }} />
                   </button>
                   <button onClick={() => handleDownload(doc)} title="Scarica"
-                    className="p-2 rounded-lg transition-all hover:bg-white/10">
+                    className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
                     <Download className="w-4 h-4" style={{ color: 'var(--blue)' }} />
                   </button>
                   <button onClick={() => setDeletingDoc(doc.id)} title="Elimina"
-                    className="p-2 rounded-lg transition-all hover:bg-white/10">
+                    className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
                     <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
                   </button>
                 </div>
@@ -1896,7 +1896,7 @@ function TabDocumenti({ event }: { event: Event }) {
           <div className="flex items-center justify-between px-4 py-3" style={{ background: 'var(--panel)', borderBottom: '1px solid var(--line)' }}>
             <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{previewName}</p>
             <button onClick={() => { setPreviewUrl(null); setPreviewName('') }}
-              className="p-2 rounded-lg hover:bg-white/10">
+              className="p-2 rounded-lg hover:bg-[var(--line)]">
               <X className="w-5 h-5" style={{ color: 'var(--muted)' }} />
             </button>
           </div>
@@ -2202,7 +2202,7 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
           Programma evento
         </p>
         <div className="flex items-center gap-3">
-          <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
+          <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'color-mix(in srgb, var(--red2) 10%, transparent)', color: 'var(--red2)' }}>
             {allEntries.length} attivita
           </span>
           <button
@@ -2221,7 +2221,7 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
             <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
               {editingId ? 'Modifica voce programma' : 'Nuova voce programma'}
             </p>
-            <button onClick={resetForm} className="p-1 rounded hover:bg-black/10"><X className="w-4 h-4" style={{ color: 'var(--muted)' }} /></button>
+            <button onClick={resetForm} className="p-1 rounded hover:bg-[var(--line)]"><X className="w-4 h-4" style={{ color: 'var(--muted)' }} /></button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2381,7 +2381,7 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
                   <div key={entry.id} className="relative flex items-start gap-3">
                     <div className="absolute left-[-18px] top-2.5 w-2.5 h-2.5 rounded-full border-2"
                       style={{ borderColor: entry.manual ? 'var(--blue)' : 'var(--red2)', background: 'var(--bg)' }} />
-                    <div className="flex-1 panel p-4" style={{ border: entry.manual ? '1px solid rgba(59,130,246,0.3)' : undefined }}>
+                    <div className="flex-1 panel p-4" style={{ border: entry.manual ? '1px solid var(--blue)' : undefined }}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -2390,7 +2390,7 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
                               {entry.ora_fine ? ` - ${entry.ora_fine.slice(0, 5)}` : ''}
                             </span>
                             <span className="text-xs px-2 py-0.5 rounded-full"
-                              style={{ background: entry.manual ? 'rgba(59,130,246,0.1)' : 'rgba(208,0,58,0.1)', color: entry.manual ? 'var(--blue)' : 'var(--red2)' }}>
+                              style={{ background: entry.manual ? 'color-mix(in srgb, var(--blue) 10%, transparent)' : 'color-mix(in srgb, var(--red2) 10%, transparent)', color: entry.manual ? 'var(--blue)' : 'var(--red2)' }}>
                               {entry.categoria}
                             </span>
                             {entry.pax && (
@@ -2421,7 +2421,7 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
                         </div>
                         {entry.manual && (
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <button onClick={() => openEdit(entry)} className="p-1.5 rounded-lg hover:bg-black/5 transition-colors">
+                            <button onClick={() => openEdit(entry)} className="p-1.5 rounded-lg hover:bg-[var(--line)] transition-colors">
                               <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
                             </button>
                             <button onClick={() => handleDelete(entry.id)} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors">
@@ -2475,7 +2475,7 @@ function TabTimeline({ event }: { event: Event }) {
                     </p>
                     {(milestone as { current?: boolean }).current && (
                       <span className="text-xs px-2 py-0.5 rounded-full animate-pulse"
-                        style={{ background: 'rgba(208,0,58,0.2)', color: 'var(--red2)' }}>
+                        style={{ background: 'var(--red2)', color: 'var(--red2)' }}>
                         In corso
                       </span>
                     )}
@@ -2938,8 +2938,8 @@ export default function Eventi() {
       )}
       {errorMessage && (
         <div
-          className="fixed top-6 right-6 z-[60] px-4 py-3 rounded-xl text-sm font-medium shadow-lg"
-          style={{ background: 'var(--panel)', border: '1px solid var(--red2)', color: 'var(--red2)' }}
+          className="fixed top-6 right-6 z-[60] px-4 py-3 rounded-xl text-sm font-medium shadow-sm"
+          style={{ background: 'var(--panel-solid)', border: '1px solid var(--red2)', color: 'var(--red2)' }}
         >
           {errorMessage}
         </div>

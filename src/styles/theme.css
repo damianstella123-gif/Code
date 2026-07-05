@@ -3,10 +3,10 @@
 :root,
 [data-theme="light"] {
   --bg: #eef0f4;
-  --panel: rgba(255, 255, 255, 0.38);
+  --panel: #f8f9fb;
   --panel-solid: #ffffff;
-  --panel2: rgba(255, 255, 255, 0.50);
-  --line: rgba(38, 41, 46, 0.06);
+  --panel2: #f3f4f6;
+  --line: #e5e7eb;
 
   --text: #26292E;
   --muted: #5f666d;
@@ -47,10 +47,10 @@
 
 [data-theme="dark"] {
   --bg: #0a0c10;
-  --panel: rgba(18, 22, 30, 0.55);
+  --panel: #12161e;
   --panel-solid: #0e1218;
-  --panel2: rgba(24, 30, 40, 0.60);
-  --line: rgba(255, 255, 255, 0.06);
+  --panel2: #181e28;
+  --line: #1f2937;
 
   --text: #f0f1f3;
   --muted: #9ba3aa;
@@ -373,47 +373,32 @@ body {
 /* ─── PANEL / CARD ─────────────────────────────────────────────────────────── */
 
 .panel {
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, 0.40);
-  border-radius: var(--radius-lg);
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  border-radius: 14px;
   transition: all var(--transition-normal);
 }
 
 .panel:hover {
-  border-color: rgba(255, 255, 255, 0.44);
+  border-color: var(--line);
 }
 
 [data-theme="light"] .panel {
-  background-image: linear-gradient(160deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0) 40%);
-  box-shadow:
-    0 2px 12px rgba(38, 41, 46, 0.04),
-    0 1px 3px rgba(38, 41, 46, 0.02),
-    inset 0 1px 0 rgba(255, 255, 255, 0.80);
+  box-shadow: var(--shadow-sm);
 }
 
 [data-theme="light"] .panel:hover {
-  box-shadow:
-    0 4px 16px rgba(38, 41, 46, 0.05),
-    0 1px 4px rgba(38, 41, 46, 0.025),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  box-shadow: var(--shadow-sm);
 }
 
 [data-theme="dark"] .panel {
-  border-color: rgba(255, 255, 255, 0.06);
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.35),
-    0 1px 4px rgba(0, 0, 0, 0.20),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-color: var(--line);
+  box-shadow: none;
 }
 
 [data-theme="dark"] .panel:hover {
-  border-color: rgba(255, 255, 255, 0.09);
-  box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.40),
-    0 2px 8px rgba(0, 0, 0, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border-color: var(--line);
+  box-shadow: none;
 }
 
 .panel-2 {
