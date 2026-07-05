@@ -2995,15 +2995,17 @@ export default function Eventi() {
     )
   }
 
-  const statoTagClass = (stato: string) => {
-    if (stato === 'in_corso') return 'wire-story-tag--urgente'
-    if (stato === 'pianificazione') return 'wire-story-tag--corso'
-    if (stato === 'completato') return 'wire-story-tag--buona'
-    return 'wire-story-tag'
+  const statoBadgeStyle = (stato: string): React.CSSProperties => {
+    switch (stato) {
+      case 'in_corso': return { color: '#fff', background: 'var(--red2)' }
+      case 'pianificazione': return { color: 'var(--blue)', background: 'color-mix(in srgb, var(--blue) 12%, transparent)' }
+      case 'completato': return { color: 'var(--green)', background: 'color-mix(in srgb, var(--green) 12%, transparent)' }
+      default: return { color: 'var(--muted)', background: 'var(--line)' }
+    }
   }
 
   return (
-    <div className="wire-page">
+    <div className="wire-page" style={{ maxWidth: '1100px' }}>
       {overlays}
 
       <div className="wire-masthead">
@@ -3049,47 +3051,98 @@ export default function Eventi() {
           <p>Nessun evento trovato</p>
         </div>
       ) : (
-        filtered.map((event, i) => {
-          const cliente = clientsList.find(c => c.id === event.cliente)
-          const responsabile = internalUsers.find(u => u.id === event.responsabile)
-          const allTasks = loadTasksFromStorage()
-          const eventTaskList = allTasks.filter(t => t.evento === event.id)
-          const completedCount = eventTaskList.filter(t => t.stato === 'completato').length
-          const progressPct = eventTaskList.length > 0
-            ? Math.round((completedCount / eventTaskList.length) * 100) : 0
-          const days = daysLeft(event.dataInizio)
-          const isOver = daysLeft(event.dataFine) < 0
-          const readinessNote = eventTaskList.length > 0
-            ? ` Pronto al ${progressPct}%.`
-            : ''
-          const timingNote = isOver
-            ? 'Evento concluso.'
-            : days === 0 ? 'In scena oggi.'
-            : days === 1 ? 'Va in scena domani.'
-            : days > 0 ? `Va in scena tra ${days} giorni.`
-            : 'In corso ora.'
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px', marginTop: '18px' }}>
+          {filtered.map((event) => {
+            const cliente = clientsList.find(c => c.id === event.cliente)
+            const allTasks = loadTasksFromStorage()
+            const eventTaskList = allTasks.filter(t => t.evento === event.id)
+            const completedCount = eventTaskList.filter(t => t.stato === 'completato').length
+            const progressPct = eventTaskList.length > 0
+              ? Math.round((completedCount / eventTaskList.length) * 100) : 0
+            const days = daysLeft(event.dataInizio)
+            const daysEnd = daysLeft(event.dataFine)
+            const isLive = days <= 0 && daysEnd >= 0
+            const isOver = daysEnd < 0
 
-          return (
-            <button
-              key={event.id}
-              className="wire-story"
-              style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
-              onClick={() => setSelectedEvent(event)}
-            >
-              <span className={`wire-story-tag ${statoTagClass(event.stato)}`}>{statoLabel(event.stato)}</span>
-              <span className="wire-story-body">
-                <p className="wire-story-headline">{event.nome}</p>
-                <p className="wire-story-dek">
-                  {event.location} · {event.partecipanti} partecipanti{cliente ? ` · ${cliente.nome}` : ''}. {timingNote}{readinessNote}
+            let countdownLabel: string
+            let countdownColor: string
+            if (isOver) { countdownLabel = '\u2014'; countdownColor = 'var(--muted)' }
+            else if (isLive) { countdownLabel = 'LIVE'; countdownColor = 'var(--red2)' }
+            else { countdownLabel = `T-${days}`; countdownColor = days <= 7 ? 'var(--red2)' : 'var(--muted)' }
+
+            const progressColor = progressPct >= 80 ? 'var(--green)' : progressPct >= 50 ? 'var(--blue)' : 'var(--red2)'
+
+            return (
+              <div
+                key={event.id}
+                onClick={() => setSelectedEvent(event)}
+                style={{
+                  background: 'var(--panel-solid)',
+                  border: '1px solid var(--line)',
+                  borderRadius: '14px',
+                  padding: '16px',
+                  cursor: 'pointer',
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)' }}
+              >
+                {/* Row 1: badge + countdown */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 600,
+                    letterSpacing: '0.04em', textTransform: 'uppercase',
+                    padding: '3px 8px', borderRadius: '4px',
+                    ...statoBadgeStyle(event.stato),
+                  }}>
+                    {statoLabel(event.stato)}
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600,
+                    color: countdownColor,
+                    animation: isLive ? 'wireLivePulse 2.2s ease-in-out infinite' : undefined,
+                  }}>
+                    {countdownLabel}
+                  </span>
+                </div>
+
+                {/* Row 2: name */}
+                <p style={{
+                  fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600,
+                  color: 'var(--text)', lineHeight: 1.3, margin: 0,
+                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                }}>
+                  {event.nome}
                 </p>
-                <p className="wire-story-meta">
-                  {responsabile ? `responsabile ${responsabile.nome.split(' ')[0]} · ` : ''}
-                  budget €{event.budget.toLocaleString('it-IT')} · {fmtShort(event.dataInizio)}–{fmtShort(event.dataFine)}
+
+                {/* Row 3: location + client */}
+                <p style={{ fontSize: '11.5px', color: 'var(--muted)', margin: 0, lineHeight: 1.4 }}>
+                  {event.location}{cliente ? ` · ${cliente.nome}` : ''}
                 </p>
-              </span>
-            </button>
-          )
-        })
+
+                {/* Row 4: data, pax, budget */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
+                  <span>{fmtShort(event.dataInizio)}</span>
+                  <span>{event.partecipanti} pax</span>
+                  <span style={{ color: 'var(--text)', fontWeight: 600 }}>{'\u20AC'}{Math.round(event.budget / 1000)}K</span>
+                </div>
+
+                {/* Row 5: progress bar */}
+                {eventTaskList.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ flex: 1, height: '4px', borderRadius: '2px', background: 'var(--line)', overflow: 'hidden' }}>
+                      <div style={{ width: `${progressPct}%`, height: '100%', borderRadius: '2px', background: progressColor, transition: 'width 0.3s ease' }} />
+                    </div>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', flexShrink: 0 }}>{progressPct}%</span>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )
