@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, ArrowLeft, Send, Check, CheckCheck, MessageSquare, Archive } from 'lucide-react'
+import { Search, Plus, ArrowLeft, Send, Check, CheckCheck, MessageSquare, Archive, Users, X } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { fetchAllProfiles, type Profile } from '@/lib/profiles'
 import {
@@ -10,6 +10,7 @@ import {
   markMessagesRead,
   createConversation,
   findDirectConversation,
+  updateConversationParticipants,
   type ChatConversation,
   type ChatMessage,
 } from '@/lib/chat-service'
@@ -88,7 +89,7 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
   const [searchConv, setSearchConv] = useState('')
   const [msgInput, setMsgInput] = useState('')
   const [showNewChat, setShowNewChat] = useState(false)
-  const [newChatSearch, setNewChatSearch] = useState('')
+  const [showMembersPanel, setShowMembersPanel] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -114,7 +115,6 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
     markMessagesRead(activeConvId, currentUserId)
   }, [activeConvId, currentUserId, loadMessages])
 
-  // Realtime subscriptions
   useEffect(() => {
     let msgChannelId = 0
     const convChannel = supabase
@@ -175,12 +175,6 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
     return getInitials(other ? profileMap.get(other) : undefined, other)
   }
 
-  function unreadCount(_conv: ChatConversation): number {
-    // We track this client-side from messages if active, else from a simple heuristic
-    // For now return 0; real unread tracking would need a separate query per conv
-    return 0
-  }
-
   const filteredConvs = useMemo(() => {
     if (!searchConv.trim()) return conversations
     const q = searchConv.toLowerCase()
@@ -210,7 +204,15 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
       }
     }
     setShowNewChat(false)
-    setNewChatSearch('')
+  }
+
+  async function startGroupChat(participantIds: string[], title: string, eventId?: string) {
+    const conv = await createConversation(participantIds, title, eventId)
+    if (conv) {
+      setConversations(prev => [conv, ...prev])
+      setActiveConvId(conv.id)
+    }
+    setShowNewChat(false)
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -227,10 +229,24 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
     el.style.height = Math.min(el.scrollHeight, 120) + 'px'
   }
 
+  async function handleAddMember(userId: string) {
+    if (!activeConv) return
+    const newIds = [...activeConv.participant_ids, userId]
+    const ok = await updateConversationParticipants(activeConv.id, newIds)
+    if (ok) loadConversations()
+  }
+
+  async function handleRemoveMember(userId: string) {
+    if (!activeConv || userId === currentUserId) return
+    const newIds = activeConv.participant_ids.filter(id => id !== userId)
+    const ok = await updateConversationParticipants(activeConv.id, newIds)
+    if (ok) loadConversations()
+  }
+
   const activeConv = conversations.find(c => c.id === activeConvId)
   const activeEvent = activeConv?.event_id ? eventMap.get(activeConv.event_id) : undefined
+  const allParticipants = activeConv?.participant_ids ?? []
 
-  // Group consecutive messages by sender
   const groupedMessages = useMemo(() => {
     const groups: { senderId: string; messages: ChatMessage[] }[] = []
     messages.forEach(msg => {
@@ -244,18 +260,8 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
     return groups
   }, [messages])
 
-  const filteredNewChatUsers = useMemo(() => {
-    const q = newChatSearch.toLowerCase()
-    return profiles
-      .filter(p => p.id !== currentUserId && p.is_active)
-      .filter(p => !q || `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) || p.email.toLowerCase().includes(q))
-  }, [profiles, newChatSearch, currentUserId])
-
-  const allParticipants = activeConv?.participant_ids ?? []
-
   return (
     <div>
-      {/* Top bar with archive link */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
         <span className="wire-masthead-title">COMUNICAZIONI</span>
         <button
@@ -285,45 +291,15 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
             </button>
           </div>
 
-          {/* New chat user picker */}
           {showNewChat && (
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', letterSpacing: '0.04em' }}>NUOVA CHAT</span>
-                <button onClick={() => setShowNewChat(false)} style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>CHIUDI</button>
-              </div>
-              <input
-                type="text"
-                placeholder="Cerca utente..."
-                value={newChatSearch}
-                onChange={e => setNewChatSearch(e.target.value)}
-                className="chat-sidebar-search"
-                style={{ marginBottom: '8px', width: '100%' }}
-                autoFocus
-              />
-              <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                {filteredNewChatUsers.slice(0, 10).map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => startDirectChat(p.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 4px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', borderRadius: '6px' }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--line)' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
-                  >
-                    <div className="chat-conv-avatar" style={{ width: '32px', height: '32px', fontSize: '11px' }}>
-                      {getInitials(p)}
-                    </div>
-                    <div>
-                      <div style={{ fontFamily: 'var(--font-serif)', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{p.first_name} {p.last_name}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--muted)' }}>{p.email}</div>
-                    </div>
-                  </button>
-                ))}
-                {filteredNewChatUsers.length === 0 && (
-                  <p style={{ fontSize: '12px', color: 'var(--muted)', padding: '8px 0' }}>Nessun utente trovato</p>
-                )}
-              </div>
-            </div>
+            <NewChatPanel
+              currentUserId={currentUserId}
+              profiles={profiles}
+              events={events}
+              onClose={() => setShowNewChat(false)}
+              onStartDirect={startDirectChat}
+              onStartGroup={startGroupChat}
+            />
           )}
 
           <div className="chat-sidebar-list">
@@ -333,26 +309,34 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
                 Nessuna conversazione
               </div>
             ) : (
-              filteredConvs.map(conv => {
-                const unread = unreadCount(conv)
-                return (
-                  <button
-                    key={conv.id}
-                    className={`chat-conv-item ${activeConvId === conv.id ? 'chat-conv-item--active' : ''}`}
-                    onClick={() => setActiveConvId(conv.id)}
-                  >
-                    <div className="chat-conv-avatar">{getConvInitials(conv)}</div>
-                    <div className="chat-conv-body">
-                      <div className="chat-conv-name">{getConvName(conv)}</div>
-                      <div className="chat-conv-preview">{conv.last_message_preview ?? 'Nessun messaggio'}</div>
-                    </div>
-                    <div className="chat-conv-meta">
-                      {conv.last_message_at && <span className="chat-conv-time">{formatChatTime(conv.last_message_at)}</span>}
-                      {unread > 0 && <span className="chat-conv-badge">{unread}</span>}
-                    </div>
-                  </button>
-                )
-              })
+              filteredConvs.map(conv => (
+                <button
+                  key={conv.id}
+                  className={`chat-conv-item ${activeConvId === conv.id ? 'chat-conv-item--active' : ''}`}
+                  onClick={() => setActiveConvId(conv.id)}
+                >
+                  <div className="chat-conv-avatar" style={{ position: 'relative' }}>
+                    {getConvInitials(conv)}
+                    {conv.is_group && (
+                      <span style={{
+                        position: 'absolute', bottom: '-2px', right: '-2px',
+                        fontFamily: 'var(--font-mono)', fontSize: '8px', fontWeight: 700,
+                        background: 'var(--line)', borderRadius: '6px', padding: '1px 3px',
+                        color: 'var(--muted)',
+                      }}>
+                        {conv.participant_ids.length}
+                      </span>
+                    )}
+                  </div>
+                  <div className="chat-conv-body">
+                    <div className="chat-conv-name">{getConvName(conv)}</div>
+                    <div className="chat-conv-preview">{conv.last_message_preview ?? 'Nessun messaggio'}</div>
+                  </div>
+                  <div className="chat-conv-meta">
+                    {conv.last_message_at && <span className="chat-conv-time">{formatChatTime(conv.last_message_at)}</span>}
+                  </div>
+                </button>
+              ))
             )}
           </div>
         </div>
@@ -373,17 +357,32 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
                 <div className="chat-conv-avatar" style={{ width: '34px', height: '34px', fontSize: '12px' }}>
                   {getConvInitials(activeConv)}
                 </div>
-                <div>
+                <div style={{ flex: 1, cursor: activeConv.is_group ? 'pointer' : 'default' }} onClick={() => { if (activeConv.is_group) setShowMembersPanel(true) }}>
                   <div className="chat-main-header-name">{getConvName(activeConv)}</div>
-                  {activeEvent && (
-                    <span
-                      className="chat-main-header-event"
-                      onClick={() => navigate(`/eventi?id=${activeEvent.id}`)}
-                    >
-                      {activeEvent.nome}
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {activeConv.is_group && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
+                        {activeConv.participant_ids.length} partecipanti
+                      </span>
+                    )}
+                    {activeEvent && (
+                      <span
+                        className="chat-main-header-event"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/eventi?id=${activeEvent.id}`) }}
+                      >
+                        {activeEvent.nome}
+                      </span>
+                    )}
+                  </div>
                 </div>
+                {activeConv.is_group && (
+                  <button
+                    onClick={() => setShowMembersPanel(true)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '4px' }}
+                  >
+                    <Users className="w-4 h-4" />
+                  </button>
+                )}
               </div>
 
               <div className="chat-messages">
@@ -401,7 +400,8 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
                         <span className="chat-bubble-sender">{getDisplayName(senderProfile, group.senderId)}</span>
                       )}
                       {group.messages.map(msg => {
-                        const allRead = allParticipants.every(pid => msg.read_by.includes(pid))
+                        const othersInConv = allParticipants.filter(pid => pid !== msg.sender_id)
+                        const allRead = othersInConv.length > 0 && othersInConv.every(pid => msg.read_by.includes(pid))
                         return (
                           <div key={msg.id}>
                             <div className={`chat-bubble ${isMine ? 'chat-bubble--mine' : 'chat-bubble--other'}`}>
@@ -446,11 +446,387 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
           )}
         </div>
       </div>
+
+      {/* Members panel overlay */}
+      {showMembersPanel && activeConv?.is_group && (
+        <MembersPanel
+          conversation={activeConv}
+          currentUserId={currentUserId}
+          profiles={profiles}
+          profileMap={profileMap}
+          onClose={() => setShowMembersPanel(false)}
+          onAddMember={handleAddMember}
+          onRemoveMember={handleRemoveMember}
+        />
+      )}
     </div>
   )
 }
 
-// ─── LEGACY ARCHIVE (old communications system) ─────────────────────────────
+// ─── NEW CHAT PANEL ─────────────────────────────────────────────────────────
+
+interface NewChatPanelProps {
+  currentUserId: string
+  profiles: Profile[]
+  events: Event[]
+  onClose: () => void
+  onStartDirect: (userId: string) => void
+  onStartGroup: (participantIds: string[], title: string, eventId?: string) => void
+}
+
+function NewChatPanel({ currentUserId, profiles, events, onClose, onStartDirect, onStartGroup }: NewChatPanelProps) {
+  const [mode, setMode] = useState<'direct' | 'group'>('direct')
+  const [search, setSearch] = useState('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [groupTitle, setGroupTitle] = useState('')
+  const [linkedEventId, setLinkedEventId] = useState('')
+
+  const activeUsers = useMemo(() =>
+    profiles.filter(p => p.id !== currentUserId && p.is_active),
+    [profiles, currentUserId]
+  )
+
+  const filteredUsers = useMemo(() => {
+    const q = search.toLowerCase()
+    return activeUsers.filter(p =>
+      !q || `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)
+    )
+  }, [activeUsers, search])
+
+  function toggleUser(id: string) {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  function handleEventLink(eventId: string) {
+    setLinkedEventId(eventId)
+    if (eventId) {
+      const ev = events.find(e => e.id === eventId)
+      if (ev) {
+        if (!groupTitle) setGroupTitle(ev.nome)
+        const teamIds = (ev.team ?? []).filter(id => id !== currentUserId)
+        if (teamIds.length > 0 && selectedIds.length === 0) {
+          setSelectedIds(teamIds)
+        }
+      }
+    }
+  }
+
+  function handleCreate() {
+    if (mode === 'direct' && selectedIds.length === 1) {
+      onStartDirect(selectedIds[0])
+    } else if (selectedIds.length >= 1) {
+      const allIds = [currentUserId, ...selectedIds]
+      const title = groupTitle.trim() || selectedIds.map(id => {
+        const p = profiles.find(pr => pr.id === id)
+        return p ? p.first_name : id.slice(0, 6)
+      }).join(', ')
+      onStartGroup(allIds, title, linkedEventId || undefined)
+    }
+  }
+
+  const canCreate = mode === 'direct'
+    ? selectedIds.length === 1
+    : selectedIds.length >= 2 && groupTitle.trim().length > 0
+
+  return (
+    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', background: 'var(--panel)', maxHeight: '400px', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', letterSpacing: '0.04em' }}>NUOVA CHAT</span>
+        <button onClick={onClose} style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>CHIUDI</button>
+      </div>
+
+      {/* Mode toggle */}
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '10px' }}>
+        <button
+          onClick={() => { setMode('direct'); setSelectedIds([]); setGroupTitle(''); setLinkedEventId('') }}
+          style={{
+            flex: 1, padding: '6px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+            fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase',
+            background: mode === 'direct' ? 'var(--red2)' : 'var(--line)',
+            color: mode === 'direct' ? '#fff' : 'var(--muted)',
+          }}
+        >
+          Diretta
+        </button>
+        <button
+          onClick={() => { setMode('group'); setSelectedIds([]) }}
+          style={{
+            flex: 1, padding: '6px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+            fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase',
+            background: mode === 'group' ? 'var(--red2)' : 'var(--line)',
+            color: mode === 'group' ? '#fff' : 'var(--muted)',
+          }}
+        >
+          Gruppo
+        </button>
+      </div>
+
+      {/* Group-specific fields */}
+      {mode === 'group' && (
+        <div style={{ marginBottom: '10px' }}>
+          <input
+            type="text"
+            placeholder="Nome del gruppo *"
+            value={groupTitle}
+            onChange={e => setGroupTitle(e.target.value)}
+            className="chat-sidebar-search"
+            style={{ width: '100%', marginBottom: '6px' }}
+          />
+          <select
+            value={linkedEventId}
+            onChange={e => handleEventLink(e.target.value)}
+            style={{
+              width: '100%', padding: '7px 10px', borderRadius: '8px',
+              background: 'var(--panel)', border: '1px solid var(--line)',
+              color: linkedEventId ? 'var(--text)' : 'var(--muted)',
+              fontFamily: 'var(--font-mono)', fontSize: '11px',
+            }}
+          >
+            <option value="">Collega a un evento (opzionale)</option>
+            {events.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* Selected users chips */}
+      {selectedIds.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
+          {selectedIds.map(id => {
+            const p = profiles.find(pr => pr.id === id)
+            return (
+              <span key={id} style={{
+                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                padding: '3px 8px', borderRadius: '12px', fontSize: '10px',
+                background: 'color-mix(in srgb, var(--red2) 12%, transparent)',
+                color: 'var(--red2)', fontFamily: 'var(--font-mono)',
+              }}>
+                {p ? `${p.first_name} ${p.last_name?.[0]}.` : id.slice(0, 8)}
+                <button onClick={() => toggleUser(id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red2)', fontSize: '12px', lineHeight: 1, padding: 0 }}>x</button>
+              </span>
+            )
+          })}
+        </div>
+      )}
+
+      {/* User search */}
+      <input
+        type="text"
+        placeholder="Cerca utente..."
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        className="chat-sidebar-search"
+        style={{ marginBottom: '8px', width: '100%' }}
+        autoFocus
+      />
+
+      {/* User list */}
+      <div style={{ maxHeight: '160px', overflowY: 'auto' }}>
+        {filteredUsers.slice(0, 20).map(p => {
+          const isSelected = selectedIds.includes(p.id)
+          return (
+            <button
+              key={p.id}
+              onClick={() => {
+                if (mode === 'direct') {
+                  setSelectedIds([p.id])
+                  onStartDirect(p.id)
+                } else {
+                  toggleUser(p.id)
+                }
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '10px', width: '100%',
+                padding: '7px 4px', background: isSelected ? 'color-mix(in srgb, var(--red2) 8%, transparent)' : 'none',
+                border: 'none', cursor: 'pointer', textAlign: 'left', borderRadius: '6px',
+              }}
+            >
+              {mode === 'group' && (
+                <div style={{
+                  width: '16px', height: '16px', borderRadius: '4px', flexShrink: 0,
+                  border: isSelected ? 'none' : '1.5px solid var(--line)',
+                  background: isSelected ? 'var(--red2)' : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {isSelected && <Check className="w-2.5 h-2.5" style={{ color: '#fff' }} />}
+                </div>
+              )}
+              <div className="chat-conv-avatar" style={{ width: '28px', height: '28px', fontSize: '10px' }}>
+                {getInitials(p)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: 'var(--font-serif)', fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{p.first_name} {p.last_name}</div>
+                <div style={{ fontSize: '10px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.email}</div>
+              </div>
+            </button>
+          )
+        })}
+        {filteredUsers.length === 0 && (
+          <p style={{ fontSize: '11px', color: 'var(--muted)', padding: '8px 0' }}>Nessun utente trovato</p>
+        )}
+      </div>
+
+      {/* Create group button */}
+      {mode === 'group' && (
+        <button
+          onClick={handleCreate}
+          disabled={!canCreate}
+          style={{
+            width: '100%', marginTop: '10px', padding: '8px', borderRadius: '8px',
+            background: canCreate ? 'var(--red2)' : 'var(--line)',
+            color: canCreate ? '#fff' : 'var(--muted)',
+            border: 'none', cursor: canCreate ? 'pointer' : 'default',
+            fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600,
+          }}
+        >
+          CREA GRUPPO ({selectedIds.length} selezionati)
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── MEMBERS PANEL ──────────────────────────────────────────────────────────
+
+interface MembersPanelProps {
+  conversation: ChatConversation
+  currentUserId: string
+  profiles: Profile[]
+  profileMap: Map<string, Profile>
+  onClose: () => void
+  onAddMember: (userId: string) => void
+  onRemoveMember: (userId: string) => void
+}
+
+function MembersPanel({ conversation, currentUserId, profiles, profileMap, onClose, onAddMember, onRemoveMember }: MembersPanelProps) {
+  const [addSearch, setAddSearch] = useState('')
+  const [showAdd, setShowAdd] = useState(false)
+
+  const members = conversation.participant_ids
+
+  const addableUsers = useMemo(() => {
+    const q = addSearch.toLowerCase()
+    return profiles
+      .filter(p => p.is_active && !members.includes(p.id))
+      .filter(p => !q || `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) || p.email.toLowerCase().includes(q))
+  }, [profiles, members, addSearch])
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.5)',
+    }} onClick={onClose}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: '380px', maxHeight: '80vh', overflow: 'hidden',
+          background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px',
+          display: 'flex', flexDirection: 'column',
+        }}
+        className="chat-members-panel"
+      >
+        {/* Header */}
+        <div style={{ padding: '16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)' }}>
+              {conversation.title ?? 'Gruppo'}
+            </div>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
+              {members.length} PARTECIPANTI
+            </span>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Member list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px' }}>
+          {members.map(id => {
+            const p = profileMap.get(id)
+            const isMe = id === currentUserId
+            return (
+              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
+                <div className="chat-conv-avatar" style={{ width: '32px', height: '32px', fontSize: '11px' }}>
+                  {getInitials(p, id)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: 'var(--font-serif)', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
+                    {getDisplayName(p, id)}
+                    {isMe && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', marginLeft: '6px' }}>(tu)</span>}
+                  </div>
+                  {p && <div style={{ fontSize: '10px', color: 'var(--muted)' }}>{p.email}</div>}
+                </div>
+                {!isMe && (
+                  <button
+                    onClick={() => onRemoveMember(id)}
+                    style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--red2)',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                    }}
+                  >
+                    RIMUOVI
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Add member section */}
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--line)' }}>
+          {!showAdd ? (
+            <button
+              onClick={() => setShowAdd(true)}
+              style={{
+                width: '100%', padding: '8px', borderRadius: '8px',
+                background: 'var(--panel)', border: '1px solid var(--line)',
+                color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              }}
+            >
+              <Plus className="w-3.5 h-3.5" /> AGGIUNGI MEMBRO
+            </button>
+          ) : (
+            <div>
+              <input
+                type="text"
+                placeholder="Cerca utente da aggiungere..."
+                value={addSearch}
+                onChange={e => setAddSearch(e.target.value)}
+                className="chat-sidebar-search"
+                style={{ width: '100%', marginBottom: '8px' }}
+                autoFocus
+              />
+              <div style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                {addableUsers.slice(0, 8).map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => { onAddMember(p.id); setAddSearch('') }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                      padding: '6px 4px', background: 'none', border: 'none', cursor: 'pointer',
+                      textAlign: 'left', borderRadius: '6px',
+                    }}
+                  >
+                    <div className="chat-conv-avatar" style={{ width: '26px', height: '26px', fontSize: '9px' }}>
+                      {getInitials(p)}
+                    </div>
+                    <span style={{ fontFamily: 'var(--font-serif)', fontSize: '12px', color: 'var(--text)' }}>{p.first_name} {p.last_name}</span>
+                  </button>
+                ))}
+                {addableUsers.length === 0 && (
+                  <p style={{ fontSize: '10px', color: 'var(--muted)', padding: '4px 0' }}>Nessun utente disponibile</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── LEGACY ARCHIVE ─────────────────────────────────────────────────────────
 
 function LegacyArchive() {
   const currentUser = loadUser()

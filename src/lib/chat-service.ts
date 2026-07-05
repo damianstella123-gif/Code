@@ -125,3 +125,15 @@ export async function findDirectConversation(userId1: string, userId2: string): 
   )
   return (match as ChatConversation) ?? null
 }
+
+export async function updateConversationParticipants(conversationId: string, participantIds: string[]): Promise<boolean> {
+  const { error } = await supabase
+    .from('chat_conversations')
+    .update({ participant_ids: participantIds, updated_at: new Date().toISOString() })
+    .eq('id', conversationId)
+  if (error) {
+    console.error('updateConversationParticipants error:', error.message)
+    return false
+  }
+  return true
+}

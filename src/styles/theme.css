@@ -2656,6 +2656,7 @@ textarea::placeholder {
   .chat-back-btn { display: flex; }
   .chat-bubble-group { max-width: 85%; }
   .chat-input-area { padding-bottom: env(safe-area-inset-bottom, 12px); }
+  .chat-members-panel { max-width: 100% !important; max-height: 100vh !important; border-radius: 0 !important; height: 100vh; }
 }
 
 /* ═══ REDUCED MOTION ═══ */
