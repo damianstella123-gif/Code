@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, ArrowLeft, Send, Check, CheckCheck, MessageSquare, Archive, Users, X } from 'lucide-react'
+import { Search, Plus, ArrowLeft, Send, Check, CheckCheck, MessageSquare, Archive, Users, X, Pin } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { fetchAllProfiles, type Profile } from '@/lib/profiles'
+import { useChatNotifications } from '@/lib/chat-notifications'
 import {
   fetchConversations,
   fetchMessages,
@@ -81,6 +82,7 @@ interface ChatViewProps {
 
 function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
   const navigate = useNavigate()
+  const { unread: globalUnread, togglePin, refreshUnread } = useChatNotifications()
   const [conversations, setConversations] = useState<ChatConversation[]>([])
   const [activeConvId, setActiveConvId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -90,6 +92,7 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
   const [msgInput, setMsgInput] = useState('')
   const [showNewChat, setShowNewChat] = useState(false)
   const [showMembersPanel, setShowMembersPanel] = useState(false)
+  const [showNotifBanner, setShowNotifBanner] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -107,13 +110,18 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
     loadConversations()
     fetchAllProfiles().then(setProfiles)
     fetchEvents().then(setEvents)
+    // Check if we should show notification permission banner
+    const dismissed = localStorage.getItem('chat_notif_dismissed')
+    if (!dismissed && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      setShowNotifBanner(true)
+    }
   }, [loadConversations])
 
   useEffect(() => {
     if (!activeConvId) return
     loadMessages(activeConvId)
-    markMessagesRead(activeConvId, currentUserId)
-  }, [activeConvId, currentUserId, loadMessages])
+    markMessagesRead(activeConvId, currentUserId).then(() => refreshUnread())
+  }, [activeConvId, currentUserId, loadMessages, refreshUnread])
 
   useEffect(() => {
     let msgChannelId = 0
@@ -262,6 +270,43 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
 
   return (
     <div>
+      {/* Notification permission banner */}
+      {showNotifBanner && (
+        <div style={{
+          marginBottom: '12px', padding: '10px 16px', borderRadius: '10px',
+          background: 'var(--panel-solid)', border: '1px solid var(--line)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+        }}>
+          <span style={{ fontSize: '12px', color: 'var(--text)' }}>Vuoi ricevere notifiche per i nuovi messaggi?</span>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button
+              onClick={() => {
+                Notification.requestPermission()
+                setShowNotifBanner(false)
+              }}
+              style={{
+                padding: '4px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                background: 'var(--red2)', color: '#fff', fontFamily: 'var(--font-mono)', fontSize: '10px',
+              }}
+            >
+              ATTIVA
+            </button>
+            <button
+              onClick={() => {
+                localStorage.setItem('chat_notif_dismissed', '1')
+                setShowNotifBanner(false)
+              }}
+              style={{
+                padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--line)', cursor: 'pointer',
+                background: 'none', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px',
+              }}
+            >
+              NON ORA
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
         <span className="wire-masthead-title">COMUNICAZIONI</span>
         <button
@@ -309,34 +354,53 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
                 Nessuna conversazione
               </div>
             ) : (
-              filteredConvs.map(conv => (
-                <button
-                  key={conv.id}
-                  className={`chat-conv-item ${activeConvId === conv.id ? 'chat-conv-item--active' : ''}`}
-                  onClick={() => setActiveConvId(conv.id)}
-                >
-                  <div className="chat-conv-avatar" style={{ position: 'relative' }}>
-                    {getConvInitials(conv)}
-                    {conv.is_group && (
-                      <span style={{
-                        position: 'absolute', bottom: '-2px', right: '-2px',
-                        fontFamily: 'var(--font-mono)', fontSize: '8px', fontWeight: 700,
-                        background: 'var(--line)', borderRadius: '6px', padding: '1px 3px',
-                        color: 'var(--muted)',
-                      }}>
-                        {conv.participant_ids.length}
-                      </span>
-                    )}
+              filteredConvs.map(conv => {
+                const isPinned = globalUnread.pinnedIds.includes(conv.id)
+                return (
+                  <div key={conv.id} style={{ position: 'relative' }}>
+                    <button
+                      className={`chat-conv-item ${activeConvId === conv.id ? 'chat-conv-item--active' : ''}`}
+                      onClick={() => setActiveConvId(conv.id)}
+                    >
+                      <div className="chat-conv-avatar" style={{ position: 'relative' }}>
+                        {getConvInitials(conv)}
+                        {conv.is_group && (
+                          <span style={{
+                            position: 'absolute', bottom: '-2px', right: '-2px',
+                            fontFamily: 'var(--font-mono)', fontSize: '8px', fontWeight: 700,
+                            background: 'var(--line)', borderRadius: '6px', padding: '1px 3px',
+                            color: 'var(--muted)',
+                          }}>
+                            {conv.participant_ids.length}
+                          </span>
+                        )}
+                      </div>
+                      <div className="chat-conv-body">
+                        <div className="chat-conv-name">{getConvName(conv)}</div>
+                        <div className="chat-conv-preview">{conv.last_message_preview ?? 'Nessun messaggio'}</div>
+                      </div>
+                      <div className="chat-conv-meta">
+                        {conv.last_message_at && <span className="chat-conv-time">{formatChatTime(conv.last_message_at)}</span>}
+                      </div>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); togglePin(conv.id) }}
+                      title={isPinned ? 'Rimuovi appuntamento' : 'Appunta'}
+                      style={{
+                        position: 'absolute', top: '8px', right: '8px',
+                        background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
+                        color: isPinned ? 'var(--red2)' : 'var(--muted)',
+                        opacity: isPinned ? 1 : 0.4,
+                        transition: 'all 0.12s ease',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1' }}
+                      onMouseLeave={e => { if (!isPinned) (e.currentTarget as HTMLButtonElement).style.opacity = '0.4' }}
+                    >
+                      <Pin className="w-3 h-3" style={{ transform: isPinned ? 'rotate(45deg)' : 'none' }} />
+                    </button>
                   </div>
-                  <div className="chat-conv-body">
-                    <div className="chat-conv-name">{getConvName(conv)}</div>
-                    <div className="chat-conv-preview">{conv.last_message_preview ?? 'Nessun messaggio'}</div>
-                  </div>
-                  <div className="chat-conv-meta">
-                    {conv.last_message_at && <span className="chat-conv-time">{formatChatTime(conv.last_message_at)}</span>}
-                  </div>
-                </button>
-              ))
+                )
+              })
             )}
           </div>
         </div>

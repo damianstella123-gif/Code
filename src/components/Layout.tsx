@@ -25,6 +25,8 @@ import {
   BookOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
+import PinnedChats from '@/components/PinnedChats'
 import { loadUser, getAllowedNavForRole, signOutEverywhere } from '@/lib/auth'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
@@ -117,6 +119,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                 <div className="shell-nav-indicator" />
                 <Icon className="shell-nav-icon" />
                 <span className="shell-nav-label">{item.name}</span>
+                {item.href === '/comunicazioni' && <ChatBadge />}
               </Link>
             )
           })}
@@ -463,6 +466,21 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
   )
 }
 
+function ChatBadge() {
+  const { unread } = useChatNotifications()
+  if (unread.total === 0) return null
+  return (
+    <span style={{
+      marginLeft: 'auto', minWidth: '18px', height: '18px', borderRadius: '9px',
+      background: 'var(--red2)', color: '#fff', fontFamily: 'var(--font-mono)',
+      fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center',
+      justifyContent: 'center', padding: '0 5px',
+    }}>
+      {unread.total > 99 ? '99+' : unread.total}
+    </span>
+  )
+}
+
 export default function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -479,20 +497,23 @@ export default function Layout({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <div className="shell-environment">
-      {/* Ambient environment — directional light from top-left */}
-      <div className="shell-ambient" aria-hidden="true">
-        <div className="shell-light-primary" />
-        <div className="shell-light-secondary" />
+    <ChatNotificationsProvider>
+      <div className="shell-environment">
+        {/* Ambient environment — directional light from top-left */}
+        <div className="shell-ambient" aria-hidden="true">
+          <div className="shell-light-primary" />
+          <div className="shell-light-secondary" />
+        </div>
+        <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+        <div className="shell-main lg:pl-[232px]">
+          <Topbar setOpen={setSidebarOpen} />
+          <main className="shell-content">
+            {children}
+          </main>
+        </div>
+        <FlyAssistant />
+        <PinnedChats />
       </div>
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-      <div className="shell-main lg:pl-[232px]">
-        <Topbar setOpen={setSidebarOpen} />
-        <main className="shell-content">
-          {children}
-        </main>
-      </div>
-      <FlyAssistant />
-    </div>
+    </ChatNotificationsProvider>
   )
 }

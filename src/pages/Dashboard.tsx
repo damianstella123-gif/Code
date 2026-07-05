@@ -8,6 +8,7 @@ import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchClients } from '@/lib/clients-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
+import { useChatNotifications } from '@/lib/chat-notifications'
 import CommandBar from '@/components/CommandBar'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
@@ -270,22 +271,62 @@ export default function Dashboard() {
       {filteredStories.length === 0 ? (
         <div className="wire-empty">Nessuna notizia in questa sezione, per ora.</div>
       ) : (
-        filteredStories.map((s, i) => (
-          <button
-            key={s.id}
-            className="wire-story"
-            style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
-            onClick={s.action}
-          >
-            <span className={`wire-story-tag wire-story-tag--${s.tag}`}>{s.tagLabel}</span>
-            <span className="wire-story-body">
-              <p className="wire-story-headline">{s.headline}</p>
-              <p className="wire-story-dek">{s.dek}</p>
-              <p className="wire-story-meta">{s.meta}</p>
-            </span>
-          </button>
-        ))
+        <>
+          <UnreadMessagesCard />
+          {filteredStories.map((s, i) => (
+            <button
+              key={s.id}
+              className="wire-story"
+              style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+              onClick={s.action}
+            >
+              <span className={`wire-story-tag wire-story-tag--${s.tag}`}>{s.tagLabel}</span>
+              <span className="wire-story-body">
+                <p className="wire-story-headline">{s.headline}</p>
+                <p className="wire-story-dek">{s.dek}</p>
+                <p className="wire-story-meta">{s.meta}</p>
+              </span>
+            </button>
+          ))}
+        </>
       )}
     </div>
+  )
+}
+
+function UnreadMessagesCard() {
+  const navigate = useNavigate()
+  const { unread } = useChatNotifications()
+
+  if (unread.total === 0) return null
+
+  const convNames = Array.from(unread.byConversation.keys())
+    .slice(0, 3)
+    .map(id => {
+      const conv = unread.conversations.find(c => c.id === id)
+      if (!conv) return null
+      if (conv.title) return conv.title
+      const user = loadUser()
+      const others = conv.participant_ids.filter(pid => pid !== user?.id)
+      const p = unread.profiles.find(pr => pr.id === others[0])
+      return p ? `${p.first_name} ${p.last_name}` : null
+    })
+    .filter(Boolean)
+
+  const extra = unread.byConversation.size - 3
+  const subtitle = convNames.join(', ') + (extra > 0 ? ` e altre ${extra}` : '')
+
+  return (
+    <button
+      className="wire-story"
+      onClick={() => navigate('/comunicazioni')}
+    >
+      <span className="wire-story-tag" style={{ color: 'var(--blue)', borderColor: 'var(--blue)' }}>MESSAGGI</span>
+      <span className="wire-story-body">
+        <p className="wire-story-headline">Hai {unread.total} messagg{unread.total === 1 ? 'io' : 'i'} non lett{unread.total === 1 ? 'o' : 'i'}</p>
+        <p className="wire-story-dek">{subtitle}</p>
+        <p className="wire-story-meta">adesso</p>
+      </span>
+    </button>
   )
 }
