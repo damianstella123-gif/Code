@@ -1020,7 +1020,6 @@ export default function Fornitori() {
 
   async function handleDelete() {
     if (!deletingSupplier) return
-    console.log('DELETE SUPPLIER', { id: deletingSupplier.id, name: deletingSupplier.nome })
     const ok = await deleteSupplierRemote(deletingSupplier.id)
     if (!ok) console.error('SUPABASE DELETE ERROR', { id: deletingSupplier.id, name: deletingSupplier.nome })
     await loadData()
@@ -1118,16 +1117,6 @@ export default function Fornitori() {
     if (!searchQuery.trim()) return []
     const parsed = parseSearchQuery(searchQuery)
     const results = supplierList.filter(s => supplierMatchesSearch(s, parsed))
-    console.log('SEARCH FORNITORI', {
-      query: searchQuery,
-      textTokens: parsed.textTokens,
-      minCapacity: parsed.minCapacity || null,
-      minRooms: parsed.minRooms || null,
-      minMeetingRooms: parsed.minMeetingRooms || null,
-      categoryHint: parsed.categoryHint,
-      tipoNumero: parsed.minCapacity ? 'pax' : parsed.minRooms ? 'camere' : parsed.minMeetingRooms ? 'sale' : null,
-      risultati: results.length,
-    })
     return results
   }, [supplierList, searchQuery])
 
