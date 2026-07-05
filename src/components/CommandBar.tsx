@@ -91,9 +91,6 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
           placeholder="Chiedi o cerca qualsiasi cosa..."
           className="cmd-bar-input"
         />
-        <span className="cmd-bar-shortcut">
-          {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+K
-        </span>
       </div>
 
       {showDropdown && (
