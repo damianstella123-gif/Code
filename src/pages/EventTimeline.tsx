@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, memo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Minus, GripVertical, Clock, Users,
-  Calendar, MapPin, Hash, Search, ChevronRight, Truck, Building2,
+  Calendar, MapPin, Hash, Search, ChevronRight, ChevronDown, Truck, Building2,
   UtensilsCrossed, Sparkles, Music, Palette, Hammer, UserCheck, Package, X,
 } from 'lucide-react'
 import { useEventTimeline, type TimelineService, type DayData } from '../lib/use-event-timeline'
@@ -145,10 +145,10 @@ export default function EventTimeline() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-4 p-5 md:p-6">
-      {/* Header — cockpit identity */}
+    <div className="h-full flex flex-col gap-3 p-3 md:gap-4 md:p-5 lg:p-6">
+      {/* Header */}
       <div
-        className="rounded-2xl px-5 py-4"
+        className="rounded-2xl px-4 py-3 md:px-5 md:py-4"
         style={{
           background: 'var(--cc-glass)',
           backdropFilter: `blur(var(--cc-blur))`,
@@ -157,69 +157,70 @@ export default function EventTimeline() {
           boxShadow: 'var(--cc-shadow)',
         }}
       >
-        <div className="flex items-center gap-4 flex-wrap">
+        {/* Top row: back + title + actions */}
+        <div className="flex items-start gap-3">
           <button
             onClick={() => navigate('/calendario')}
-            className="flex items-center gap-1.5 text-xs font-medium transition-all rounded-lg px-2.5 py-1.5"
+            className="flex items-center gap-1 text-xs font-medium transition-all rounded-lg px-2 py-1.5 shrink-0"
             style={{ color: 'var(--muted)', background: 'var(--panel)', border: '1px solid var(--line)' }}
           >
-            <ArrowLeft size={13} />
-            Calendario
+            <ArrowLeft size={12} />
+            <span className="hidden sm:inline">Calendario</span>
           </button>
 
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold truncate" style={{ color: 'var(--text)', letterSpacing: '-0.01em' }}>
+            <h1 className="text-base md:text-lg font-bold truncate" style={{ color: 'var(--text)', letterSpacing: '-0.01em' }}>
               {event.nome}
             </h1>
-            <div className="flex items-center gap-3 mt-1 flex-wrap">
-              <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-                <Calendar size={11} /> {days.length} {days.length === 1 ? 'giornata' : 'giornate'}
+            <div className="flex items-center gap-2 md:gap-3 mt-1 flex-wrap">
+              <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                <Calendar size={10} /> {days.length}g
               </span>
               {event.cliente && (
-                <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-                  <Hash size={11} /> {event.cliente}
+                <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                  <Hash size={10} /> {event.cliente}
                 </span>
               )}
               {event.location && (
-                <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-                  <MapPin size={11} /> {event.location}
+                <span className="text-[11px] flex items-center gap-1 hidden sm:flex" style={{ color: 'var(--muted)' }}>
+                  <MapPin size={10} /> {event.location}
                 </span>
               )}
               {event.partecipanti > 0 && (
-                <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-                  <Users size={11} /> {event.partecipanti} pax
+                <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--muted)' }}>
+                  <Users size={10} /> {event.partecipanti}
                 </span>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={addDay}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all"
+              className="flex items-center gap-1 px-2.5 md:px-3.5 py-1.5 md:py-2 rounded-xl text-xs font-semibold transition-all"
               style={{
                 background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)',
                 color: 'white',
                 boxShadow: 'var(--shadow-red)',
               }}
             >
-              <Plus size={13} />
-              Giornata
+              <Plus size={12} />
+              <span className="hidden sm:inline">Giornata</span>
             </button>
             <button
               onClick={handleRemoveDay}
               disabled={days.length <= 1}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-30"
+              className="flex items-center gap-1 px-2.5 md:px-3.5 py-1.5 md:py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-30"
               style={{ background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--line)' }}
             >
-              <Minus size={13} />
-              Rimuovi
+              <Minus size={12} />
+              <span className="hidden sm:inline">Rimuovi</span>
             </button>
           </div>
         </div>
 
         {/* Search bar */}
-        <div className="mt-3 relative">
+        <div className="mt-2.5 relative">
           <Search
             size={13}
             className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -229,7 +230,7 @@ export default function EventTimeline() {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Cerca servizio, categoria..."
+            placeholder="Cerca servizio..."
             className="w-full pl-8 pr-8 py-2 rounded-xl text-xs outline-none transition-all"
             style={{
               background: 'var(--panel)',
@@ -248,7 +249,7 @@ export default function EventTimeline() {
           )}
           {matchCount !== null && (
             <span
-              className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] font-medium"
+              className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] font-medium hidden sm:inline"
               style={{ color: matchCount > 0 ? 'var(--blue)' : 'var(--red)' }}
             >
               {matchCount} {matchCount === 1 ? 'risultato' : 'risultati'}
@@ -257,8 +258,8 @@ export default function EventTimeline() {
         </div>
       </div>
 
-      {/* Timeline columns — the operational core */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden" style={{ scrollBehavior: 'smooth' }}>
+      {/* ═══ DESKTOP: Horizontal columns ═══ */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden hidden md:block" style={{ scrollBehavior: 'smooth' }}>
         <div className="flex gap-3 h-full pb-2" style={{ minWidth: days.length * 240 }}>
           {filteredDays.map((day, idx) => {
             const isCollapsed = collapsedDays.has(day.date)
@@ -307,9 +308,29 @@ export default function EventTimeline() {
         </div>
       </div>
 
-      {/* Summary bar — cockpit instrument */}
+      {/* ═══ MOBILE: Vertical accordion ═══ */}
+      <div className="flex-1 overflow-y-auto md:hidden space-y-2 pb-2">
+        {filteredDays.map((day, idx) => {
+          const isCollapsed = collapsedDays.has(day.date)
+          const originalDay = days[idx]
+          return (
+            <MobileDaySection
+              key={day.date}
+              day={day}
+              originalDay={originalDay}
+              dayIndex={idx}
+              totalDays={days.length}
+              isCollapsed={isCollapsed}
+              onToggle={() => toggleCollapse(day.date)}
+              isFiltering={!!searchQuery.trim()}
+            />
+          )
+        })}
+      </div>
+
+      {/* Summary bar */}
       <div
-        className="flex items-center justify-between px-5 py-3.5 rounded-2xl text-sm"
+        className="flex items-center justify-between px-3 py-2.5 md:px-5 md:py-3.5 rounded-2xl"
         style={{
           background: 'var(--cc-glass)',
           backdropFilter: `blur(var(--cc-blur))`,
@@ -318,27 +339,27 @@ export default function EventTimeline() {
           boxShadow: 'var(--shadow-sm)',
         }}
       >
-        <div className="flex items-center gap-5 flex-wrap">
+        <div className="flex items-center gap-3 md:gap-5 flex-wrap">
           <div className="flex flex-col">
-            <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Venduto</span>
-            <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>{formatCurrency(totalVenduto)}</span>
+            <span className="text-[9px] md:text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Venduto</span>
+            <span className="text-xs md:text-sm font-bold" style={{ color: 'var(--text)' }}>{formatCurrency(totalVenduto)}</span>
           </div>
-          <div className="w-px h-6" style={{ background: 'var(--line)' }} />
+          <div className="w-px h-5 md:h-6" style={{ background: 'var(--line)' }} />
           <div className="flex flex-col">
-            <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Costi</span>
-            <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>{formatCurrency(totalCosto)}</span>
+            <span className="text-[9px] md:text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Costi</span>
+            <span className="text-xs md:text-sm font-bold" style={{ color: 'var(--text)' }}>{formatCurrency(totalCosto)}</span>
           </div>
-          <div className="w-px h-6" style={{ background: 'var(--line)' }} />
+          <div className="w-px h-5 md:h-6" style={{ background: 'var(--line)' }} />
           <div className="flex flex-col">
-            <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Margine</span>
-            <span className="text-sm font-bold" style={{ color: totalMargine >= 0 ? 'var(--green)' : 'var(--red)' }}>
-              {formatCurrency(totalMargine)} ({marginePct.toFixed(1)}%)
+            <span className="text-[9px] md:text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Margine</span>
+            <span className="text-xs md:text-sm font-bold" style={{ color: totalMargine >= 0 ? 'var(--green)' : 'var(--red)' }}>
+              {formatCurrencyCompact(totalMargine)} <span className="hidden sm:inline">({marginePct.toFixed(1)}%)</span>
             </span>
           </div>
         </div>
         <div className="flex flex-col items-end">
-          <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Servizi</span>
-          <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>{totalServices}</span>
+          <span className="text-[9px] md:text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Srv</span>
+          <span className="text-xs md:text-sm font-bold" style={{ color: 'var(--text)' }}>{totalServices}</span>
         </div>
       </div>
 
@@ -357,7 +378,184 @@ export default function EventTimeline() {
   )
 }
 
-/* ═══ COLLAPSED DAY ═══ */
+/* ═══ MOBILE DAY SECTION — vertical accordion ═══ */
+function MobileDaySection({ day, originalDay, dayIndex, totalDays, isCollapsed, onToggle, isFiltering }: {
+  day: DayData
+  originalDay: DayData
+  dayIndex: number
+  totalDays: number
+  isCollapsed: boolean
+  onToggle: () => void
+  isFiltering: boolean
+}) {
+  const { dayName, dayNum, month } = formatDayHeader(day.date)
+
+  const indicators = useMemo(() => {
+    const svcs = originalDay.services
+    const costo = svcs.reduce((s, svc) => s + svc.costo, 0)
+    const venduto = svcs.reduce((s, svc) => s + svc.venduto, 0)
+    const margine = venduto - costo
+    const fornitori = new Set(svcs.filter(s => s.fornitore_id).map(s => s.fornitore_id)).size
+    return { count: svcs.length, costo, venduto, margine, fornitori }
+  }, [originalDay.services])
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden transition-all"
+      style={{
+        background: 'var(--cc-glass)',
+        backdropFilter: `blur(var(--cc-blur))`,
+        WebkitBackdropFilter: `blur(var(--cc-blur))`,
+        border: '1px solid var(--cc-glass-border)',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
+      {/* Tappable header */}
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left"
+        style={{ borderBottom: isCollapsed ? 'none' : '1px solid var(--cc-divider)' }}
+      >
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="text-xl font-bold" style={{ color: 'var(--text)', letterSpacing: '-0.03em' }}>{dayNum}</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'var(--muted)' }}>
+              {month.slice(0, 3)} - {dayName}
+            </span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-[10px] font-medium" style={{ color: 'var(--muted)' }}>
+                {indicators.count} srv
+              </span>
+              {indicators.fornitori > 0 && (
+                <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                  {indicators.fornitori} forn
+                </span>
+              )}
+              {indicators.margine !== 0 && (
+                <span className="text-[10px] font-medium" style={{ color: indicators.margine >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                  {formatCurrencyCompact(indicators.margine)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md shrink-0" style={{ background: 'var(--panel)', color: 'var(--muted)' }}>
+          {dayIndex + 1}/{totalDays}
+        </span>
+
+        {isCollapsed ? (
+          <ChevronRight size={14} style={{ color: 'var(--muted)' }} />
+        ) : (
+          <ChevronDown size={14} style={{ color: 'var(--muted)' }} />
+        )}
+      </button>
+
+      {/* Expanded content */}
+      {!isCollapsed && (
+        <div className="px-3 py-2 space-y-2">
+          {/* Indicators row */}
+          {indicators.count > 0 && (
+            <div className="grid grid-cols-4 gap-1.5 mb-2">
+              <IndicatorPill label="Srv" value={String(indicators.count)} />
+              <IndicatorPill label="Costo" value={formatCurrencyCompact(indicators.costo)} />
+              <IndicatorPill label="Vend" value={formatCurrencyCompact(indicators.venduto)} />
+              <IndicatorPill
+                label="Marg"
+                value={formatCurrencyCompact(indicators.margine)}
+                color={indicators.margine >= 0 ? 'var(--green)' : 'var(--red)'}
+              />
+            </div>
+          )}
+
+          {/* Service cards */}
+          {day.services.length === 0 && (
+            <div
+              className="flex items-center justify-center py-6 rounded-xl"
+              style={{ border: '1px dashed var(--line)' }}
+            >
+              <span className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                {isFiltering ? 'Nessun risultato' : 'Nessun servizio'}
+              </span>
+            </div>
+          )}
+          {day.services.map(svc => (
+            <MobileServiceCard key={svc.id} service={svc} />
+          ))}
+
+          {/* Footer */}
+          {isFiltering && day.services.length !== originalDay.services.length && (
+            <p className="text-[10px] text-center py-1" style={{ color: 'var(--muted)' }}>
+              {day.services.length}/{originalDay.services.length} visibili
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ═══ MOBILE SERVICE CARD ═══ */
+function MobileServiceCard({ service }: { service: TimelineService }) {
+  const style = categoriaStyles(service.categoria)
+  const Icon = style.icon
+
+  return (
+    <div
+      className="rounded-xl px-3 py-2.5"
+      style={{
+        background: 'var(--panel)',
+        border: '1px solid var(--line)',
+        borderLeft: `3px solid ${style.color}`,
+      }}
+    >
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-[12px] font-semibold truncate" style={{ color: 'var(--text)' }}>
+            {service.titolo}
+          </p>
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <span
+              className="inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md"
+              style={{ background: style.bg, color: style.color }}
+            >
+              <Icon size={9} />
+              {categoriaLabel(service.categoria)}
+            </span>
+            {service.ora && (
+              <span className="text-[10px] flex items-center gap-0.5" style={{ color: 'var(--muted)' }}>
+                <Clock size={9} />
+                {service.ora.slice(0, 5)}
+              </span>
+            )}
+            {service.pax && (
+              <span className="text-[10px] flex items-center gap-0.5" style={{ color: 'var(--muted)' }}>
+                <Users size={9} />
+                {service.pax}
+              </span>
+            )}
+            {(service.venduto > 0 || service.costo > 0) && (
+              <>
+                {service.venduto > 0 && (
+                  <span className="text-[9px] font-medium" style={{ color: 'var(--green)' }}>
+                    +{formatCurrencyCompact(service.venduto)}
+                  </span>
+                )}
+                {service.costo > 0 && (
+                  <span className="text-[9px] font-medium" style={{ color: 'var(--red)' }}>
+                    -{formatCurrencyCompact(service.costo)}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ COLLAPSED DAY (desktop only) ═══ */
 function CollapsedDayColumn({ day, dayIndex, totalDays, onExpand, isDragOver, onDragOver, onDragLeave, onDrop }: {
   day: DayData
   dayIndex: number
@@ -404,7 +602,7 @@ function CollapsedDayColumn({ day, dayIndex, totalDays, onExpand, isDragOver, on
   )
 }
 
-/* ═══ DAY COLUMN — with indicators ═══ */
+/* ═══ DAY COLUMN (desktop) ═══ */
 const DayColumnComponent = memo(function DayColumnComponent({
   day, originalDay, dayIndex, totalDays, isDragOver, onDragOver, onDragLeave, onDrop, onServiceDragStart, onCollapse, isFiltering,
 }: {
@@ -471,7 +669,7 @@ const DayColumnComponent = memo(function DayColumnComponent({
           {dayName}
         </p>
 
-        {/* Day indicators — compact instrument row */}
+        {/* Day indicators */}
         {indicators.count > 0 && (
           <div className="mt-2 grid grid-cols-3 gap-1.5">
             <IndicatorPill label="Srv" value={String(indicators.count)} />
@@ -532,7 +730,7 @@ function IndicatorPill({ label, value, color }: { label: string; value: string; 
   )
 }
 
-/* ═══ SERVICE BLOCK — with improved badge ═══ */
+/* ═══ SERVICE BLOCK (desktop — draggable) ═══ */
 const ServiceBlockComponent = memo(function ServiceBlockComponent({ service, onDragStart }: { service: TimelineService; onDragStart: () => void }) {
   const style = categoriaStyles(service.categoria)
   const Icon = style.icon
@@ -564,7 +762,6 @@ const ServiceBlockComponent = memo(function ServiceBlockComponent({ service, onD
             {service.titolo}
           </p>
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-            {/* Category badge with icon */}
             <span
               className="inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md"
               style={{ background: style.bg, color: style.color }}
@@ -585,7 +782,6 @@ const ServiceBlockComponent = memo(function ServiceBlockComponent({ service, onD
               </span>
             )}
           </div>
-          {/* Economics micro-line */}
           {(service.venduto > 0 || service.costo > 0) && (
             <div className="flex items-center gap-2 mt-1">
               {service.venduto > 0 && (
@@ -622,7 +818,7 @@ function RemoveDayDialog({ day, onClose, onConfirm }: {
       onClick={onClose}
     >
       <div
-        className="rounded-2xl p-6 max-w-md w-full"
+        className="rounded-2xl p-5 md:p-6 max-w-md w-full"
         style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-lg)' }}
         onClick={e => e.stopPropagation()}
       >

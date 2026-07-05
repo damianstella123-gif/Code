@@ -20,6 +20,7 @@
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
 
   --radius-sm: 12px;
   --radius-md: 16px;
@@ -1981,4 +1982,211 @@ textarea::placeholder {
 
 @keyframes laser-spin {
   to { --laser-angle: 360deg; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SIMMETRIA WIRE — Live news feed dashboard
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.wire-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 8px 40px;
+}
+
+.wire-masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1.5px solid var(--text);
+  padding: 28px 0 14px;
+}
+
+.wire-masthead-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+
+.wire-masthead-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.wire-clock {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.wire-theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.wire-ticker {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.wire-ticker strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.wire-tabs {
+  display: flex;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.wire-tab {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.wire-tab:hover { opacity: 0.9; }
+
+.wire-tab--active {
+  color: var(--text);
+  opacity: 1;
+  position: relative;
+}
+
+.wire-tab--active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -15px;
+  height: 2px;
+  background: var(--red2);
+}
+
+.wire-story {
+  display: flex;
+  gap: 16px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  transition: opacity 0.15s ease;
+  animation: wireStoryIn 0.35s cubic-bezier(0.22,1,0.36,1) forwards;
+  opacity: 0;
+}
+
+.wire-story:hover .wire-story-headline { color: var(--red2); }
+
+@keyframes wireStoryIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.wire-story-tag {
+  flex-shrink: 0;
+  height: fit-content;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  color: var(--muted);
+  background: var(--panel2);
+  white-space: nowrap;
+  margin-top: 3px;
+}
+
+.wire-story-tag--urgente {
+  color: #fff;
+  background: var(--red2);
+}
+
+.wire-story-tag--corso {
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 14%, transparent);
+}
+
+.wire-story-tag--buona {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+}
+
+.wire-story-tag--attesa {
+  color: var(--yellow);
+  background: color-mix(in srgb, var(--yellow) 16%, transparent);
+}
+
+.wire-story-body { flex: 1; min-width: 0; }
+
+.wire-story-headline {
+  font-family: var(--font-serif);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--text);
+  margin: 0 0 5px;
+  transition: color 0.15s ease;
+}
+
+.wire-story-dek {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0 0 8px;
+  max-width: 56ch;
+}
+
+.wire-story-meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  opacity: 0.6;
+  letter-spacing: 0.02em;
+}
+
+.wire-empty {
+  padding: 60px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .wire-story-headline { font-size: 17px; }
+  .wire-ticker { gap: 14px; }
+  .wire-tabs { gap: 14px; overflow-x: auto; }
 }

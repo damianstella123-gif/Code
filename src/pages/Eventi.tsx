@@ -12,8 +12,6 @@ import {
   Search,
   X,
   ArrowLeft,
-  TrendingUp,
-  AlertCircle,
   AlertTriangle,
   MessageSquare,
   GitBranch,
@@ -44,7 +42,6 @@ import { fetchAllProfiles } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { detectSupplierCategory, SupplierCategoryPanel, type CategoryType } from '@/components/TabOperativo'
-import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import TabBudget from '@/components/TabBudget'
 import { setFlyContext } from '@/lib/fly'
 import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
@@ -2998,178 +2995,101 @@ export default function Eventi() {
     )
   }
 
+  const statoTagClass = (stato: string) => {
+    if (stato === 'in_corso') return 'wire-story-tag--urgente'
+    if (stato === 'pianificazione') return 'wire-story-tag--corso'
+    if (stato === 'completato') return 'wire-story-tag--buona'
+    return 'wire-story-tag'
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="wire-page">
       {overlays}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Eventi</h1>
-          <p className="mt-1" style={{ color: 'var(--muted)' }}>
-            {filtered.length} evento{filtered.length !== 1 ? 'i' : ''} visibili
-          </p>
-        </div>
+      <div className="wire-masthead">
+        <span className="wire-masthead-title">EVENTI — {filtered.length} VISIBILI</span>
         <button onClick={() => { setEditingEvent(undefined); setShowForm(true) }}
-          className="btn-primary flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold">
-          <Plus className="w-4 h-4" /> Nuovo evento
+          className="wire-theme-toggle" style={{ borderRadius: '8px' }}>
+          <Plus className="w-3.5 h-3.5" style={{ color: 'var(--text)' }} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>Nuovo evento</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Totali', value: visibleEvents.length, color: 'var(--text)' },
-          { label: 'In Corso', value: visibleEvents.filter(e => e.stato === 'in_corso').length, color: 'var(--red2)' },
-          { label: 'Pianificazione', value: visibleEvents.filter(e => e.stato === 'pianificazione').length, color: 'var(--blue)' },
-          { label: 'Completati', value: visibleEvents.filter(e => e.stato === 'completato').length, color: 'var(--green)' },
-        ].map((kpi, i) => (
-          <div key={i} className="panel p-4 text-center">
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>{kpi.label}</p>
-            <p className="text-2xl font-bold mt-1" style={{ color: kpi.color }}>{kpi.value}</p>
-          </div>
-        ))}
+      <div className="wire-ticker">
+        <span><strong>{visibleEvents.length}</strong> totali</span>
+        <span><strong>{visibleEvents.filter(e => e.stato === 'in_corso').length}</strong> in corso</span>
+        <span><strong>{visibleEvents.filter(e => e.stato === 'pianificazione').length}</strong> in pianificazione</span>
+        <span><strong>{visibleEvents.filter(e => e.stato === 'completato').length}</strong> completati</span>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl flex-1"
-          style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-          <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+      <div className="wire-tabs" style={{ flexWrap: 'wrap', alignItems: 'center', gap: '16px' }}>
+        {STATI.map(stato => (
+          <button key={stato} onClick={() => setFilterStato(stato)}
+            className={`wire-tab ${filterStato === stato ? 'wire-tab--active' : ''}`}>
+            {stato === 'Tutti' ? 'Tutti' : statoLabel(stato)}
+          </button>
+        ))}
+        <div style={{ flex: 1, minWidth: '160px', display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+          <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--muted)' }} />
           <input type="text" placeholder="Cerca evento o location..." value={search}
             onChange={e => setSearch(e.target.value)}
-            className="flex-1 bg-transparent text-sm focus:outline-none" style={{ color: 'var(--text)' }} />
+            className="flex-1 bg-transparent focus:outline-none"
+            style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }} />
           {search && (
             <button onClick={() => setSearch('')}>
-              <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+              <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
             </button>
           )}
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {STATI.map(stato => (
-            <button key={stato} onClick={() => setFilterStato(stato)}
-              className="px-4 py-3 rounded-xl text-sm font-medium transition-all"
-              style={{
-                background: filterStato === stato
-                  ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)'
-                  : 'var(--panel)',
-                color: filterStato === stato ? 'white' : 'var(--muted)',
-                border: '1px solid var(--line)',
-              }}>
-              {stato === 'Tutti' ? 'Tutti' : statoLabel(stato)}
-            </button>
-          ))}
         </div>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="panel p-12 text-center" style={{ color: 'var(--muted)' }}>
-          <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+        <div className="wire-empty">
+          <Calendar className="w-8 h-8 mx-auto mb-3 opacity-30" />
           <p>Nessun evento trovato</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((event, i) => {
-            const cliente = clientsList.find(c => c.id === event.cliente)
-            const responsabile = internalUsers.find(u => u.id === event.responsabile)
-            const teamMembers = internalUsers.filter(u => event.team.includes(u.id)).slice(0, 4)
-            const allTasks = loadTasksFromStorage()
-            const eventTaskList = allTasks.filter(t => t.evento === event.id)
-            const completedCount = eventTaskList.filter(t => t.stato === 'completato').length
-            const progressPct = eventTaskList.length > 0
-              ? Math.round((completedCount / eventTaskList.length) * 100) : 0
-            const days = daysLeft(event.dataInizio)
-            const isOver = daysLeft(event.dataFine) < 0
+        filtered.map((event, i) => {
+          const cliente = clientsList.find(c => c.id === event.cliente)
+          const responsabile = internalUsers.find(u => u.id === event.responsabile)
+          const allTasks = loadTasksFromStorage()
+          const eventTaskList = allTasks.filter(t => t.evento === event.id)
+          const completedCount = eventTaskList.filter(t => t.stato === 'completato').length
+          const progressPct = eventTaskList.length > 0
+            ? Math.round((completedCount / eventTaskList.length) * 100) : 0
+          const days = daysLeft(event.dataInizio)
+          const isOver = daysLeft(event.dataFine) < 0
+          const readinessNote = eventTaskList.length > 0
+            ? ` Pronto al ${progressPct}%.`
+            : ''
+          const timingNote = isOver
+            ? 'Evento concluso.'
+            : days === 0 ? 'In scena oggi.'
+            : days === 1 ? 'Va in scena domani.'
+            : days > 0 ? `Va in scena tra ${days} giorni.`
+            : 'In corso ora.'
 
-            return (
-              <AnimatedLaserBorder key={event.id} active={event.stato === 'in_corso'}>
-              <div
-                className="panel hover-card p-5 cursor-pointer animate-fade-in"
-                style={{ animationDelay: `${i * 60}ms` }}
-                onClick={() => setSelectedEvent(event)}>
-                <div className="flex items-start gap-4">
-                  <div className="w-1.5 rounded-full flex-shrink-0 self-stretch"
-                    style={{ background: statoColor(event.stato), minHeight: '60px' }} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <span className="text-xs px-2 py-0.5 rounded font-medium"
-                            style={{ background: `${statoColor(event.stato)}15`, color: statoColor(event.stato) }}>
-                            {statoLabel(event.stato)}
-                          </span>
-                          {cliente && (
-                            <span className="text-xs" style={{ color: 'var(--muted)' }}>{cliente.nome}</span>
-                          )}
-                        </div>
-                        <h3 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{event.nome}</h3>
-                        <div className="flex flex-wrap gap-3 mt-2 text-sm">
-                          <span className="flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
-                            <MapPin className="w-3.5 h-3.5" />{event.location}
-                          </span>
-                          <span className="flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
-                            <Calendar className="w-3.5 h-3.5" />
-                            {fmtShort(event.dataInizio)} – {fmtShort(event.dataFine)}
-                          </span>
-                          <span className="flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
-                            <Users className="w-3.5 h-3.5" />{event.partecipanti}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                        <p className="text-lg font-bold" style={{ color: 'var(--green)' }}>
-                          €{event.budget.toLocaleString('it-IT')}
-                        </p>
-                        <div className="flex items-center gap-1">
-                          {isOver ? (
-                            <span className="text-xs" style={{ color: 'var(--muted)' }}>Concluso</span>
-                          ) : days > 0 ? (
-                            <span className="text-xs flex items-center gap-1" style={{ color: 'var(--blue)' }}>
-                              <Clock className="w-3 h-3" />{days}gg
-                            </span>
-                          ) : (
-                            <span className="text-xs flex items-center gap-1 animate-pulse" style={{ color: 'var(--red2)' }}>
-                              <AlertCircle className="w-3 h-3" />Live
-                            </span>
-                          )}
-                        </div>
-                        <ChevronRight className="w-5 h-5" style={{ color: 'var(--muted)' }} />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between mt-4 pt-3"
-                      style={{ borderTop: '1px solid var(--line)' }}>
-                      <div className="flex items-center gap-3">
-                        <div className="flex -space-x-2">
-                          {teamMembers.map(m => (
-                            <img key={m.id} src={m.avatar} alt={m.nome}
-                              className="w-7 h-7 rounded-lg object-cover border-2"
-                              style={{ borderColor: 'var(--panel)' }} title={m.nome} />
-                          ))}
-                        </div>
-                        {responsabile && (
-                          <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                            Resp: {responsabile.nome.split(' ')[0]}
-                          </span>
-                        )}
-                      </div>
-                      {eventTaskList.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-                          <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
-                            <div className="h-full rounded-full"
-                              style={{
-                                width: `${progressPct}%`,
-                                background: progressPct >= 80 ? 'var(--green)' : progressPct >= 50 ? 'var(--blue)' : 'var(--red2)',
-                              }} />
-                          </div>
-                          <span className="text-xs" style={{ color: 'var(--muted)' }}>{progressPct}%</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              </AnimatedLaserBorder>
-            )
-          })}
-        </div>
+          return (
+            <button
+              key={event.id}
+              className="wire-story"
+              style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+              onClick={() => setSelectedEvent(event)}
+            >
+              <span className={`wire-story-tag ${statoTagClass(event.stato)}`}>{statoLabel(event.stato)}</span>
+              <span className="wire-story-body">
+                <p className="wire-story-headline">{event.nome}</p>
+                <p className="wire-story-dek">
+                  {event.location} · {event.partecipanti} partecipanti{cliente ? ` · ${cliente.nome}` : ''}. {timingNote}{readinessNote}
+                </p>
+                <p className="wire-story-meta">
+                  {responsabile ? `responsabile ${responsabile.nome.split(' ')[0]} · ` : ''}
+                  budget €{event.budget.toLocaleString('it-IT')} · {fmtShort(event.dataInizio)}–{fmtShort(event.dataFine)}
+                </p>
+              </span>
+            </button>
+          )
+        })
       )}
     </div>
   )
