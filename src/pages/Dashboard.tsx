@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sun, Moon } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
@@ -7,6 +7,8 @@ import { daysLeft } from '@/lib/format'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchClients } from '@/lib/clients-service'
+import { useRealtimeTable } from '@/lib/use-realtime'
+import CommandBar from '@/components/CommandBar'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Client } from '@/data/clients'
@@ -50,6 +52,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'tutto' | Category>('tutto')
   const [now, setNow] = useState(new Date())
+  const [feedFilter, setFeedFilter] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -60,9 +63,13 @@ export default function Dashboard() {
       setLoading(false)
     }
     load()
-    const clock = setInterval(() => setNow(new Date()), 30000)
+    const clock = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(clock)
   }, [])
+
+  useRealtimeTable('events', () => { fetchEvents().then(setLiveEvents) })
+  useRealtimeTable('tasks', () => { fetchTasks().then(setLiveTasks) })
+  useRealtimeTable('clients', () => { fetchClients().then(setLiveClients) })
 
   const firstName = currentUser?.first_name ?? currentUser?.nome?.split(' ')[0] ?? ''
 
@@ -170,7 +177,25 @@ export default function Dashboard() {
     return items.sort((a, b) => b.score - a.score)
   }, [liveTasks, liveEvents, liveClients, eventById, navigate])
 
-  const filteredStories = tab === 'tutto' ? stories : stories.filter(s => s.category === tab)
+  const filteredByTab = tab === 'tutto' ? stories : stories.filter(s => s.category === tab)
+
+  const filteredStories = useMemo(() => {
+    if (!feedFilter) return filteredByTab
+    if (feedFilter === 'scade_oggi') {
+      return filteredByTab.filter(s => s.tag === 'urgente' || s.tag === 'attesa')
+    }
+    if (feedFilter === 'eventi_in_corso') {
+      return filteredByTab.filter(s => s.category === 'eventi')
+    }
+    if (feedFilter === 'clienti_attivi') {
+      return filteredByTab.filter(s => s.category === 'clienti')
+    }
+    return filteredByTab
+  }, [filteredByTab, feedFilter])
+
+  const handleFilter = useCallback((filter: string) => {
+    setFeedFilter(prev => prev === filter ? null : filter)
+  }, [])
 
   const kpi = useMemo(() => {
     const taskAperti = liveTasks.filter(t => t.stato !== 'completato').length
@@ -199,13 +224,21 @@ export default function Dashboard() {
         <span className="wire-masthead-title">SIMMETRIA WIRE{firstName ? ` — ${firstName.toUpperCase()}` : ''}</span>
         <div className="wire-masthead-right">
           <span className="wire-clock">
-            {now.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase()} · {now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+            {now.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase()} · {now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
+          <span className="wire-live-dot" />
           <button onClick={toggleTheme} className="wire-theme-toggle" title={resolved === 'dark' ? 'Passa a Light' : 'Passa a Dark'}>
             {resolved === 'dark' ? <Moon size={13} style={{ color: 'var(--blue)' }} /> : <Sun size={13} style={{ color: 'var(--yellow)' }} />}
           </button>
         </div>
       </div>
+
+      <CommandBar
+        events={liveEvents}
+        tasks={liveTasks}
+        clients={liveClients}
+        onFilter={handleFilter}
+      />
 
       <div className="wire-ticker">
         <span><strong>{kpi.taskAperti}</strong> task aperti</span>
@@ -218,11 +251,20 @@ export default function Dashboard() {
           <button
             key={t}
             className={`wire-tab ${tab === t ? 'wire-tab--active' : ''}`}
-            onClick={() => setTab(t)}
+            onClick={() => { setTab(t); setFeedFilter(null) }}
           >
             {t}
           </button>
         ))}
+        {feedFilter && (
+          <button
+            className="wire-tab"
+            style={{ opacity: 1, color: 'var(--red2)' }}
+            onClick={() => setFeedFilter(null)}
+          >
+            × reset filtro
+          </button>
+        )}
       </div>
 
       {filteredStories.length === 0 ? (
