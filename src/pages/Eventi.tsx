@@ -442,32 +442,32 @@ function EventEconomicSummary({ event }: { event: Event }) {
 
   if (!totals.venduto && !totals.costo) {
     return (
-      <div className="panel p-5 md:col-span-2">
-        <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Controllo Economico</p>
-        <p className="text-sm" style={{ color: 'var(--muted)' }}>Inserisci venduto e costo nei servizi operativi per visualizzare il riepilogo.</p>
+      <div className="md:col-span-2" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '12px' }}>Controllo Economico</p>
+        <p style={{ fontSize: '13px', color: 'var(--muted)' }}>Inserisci venduto e costo nei servizi operativi per visualizzare il riepilogo.</p>
       </div>
     )
   }
 
   return (
-    <div className="panel p-5 md:col-span-2">
-      <p className="text-xs uppercase tracking-wide mb-4" style={{ color: 'var(--muted)' }}>Controllo Economico</p>
+    <div className="md:col-span-2" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '16px' }}>Controllo Economico</p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Venduto</p>
-          <p className="text-lg font-bold mt-1" style={{ color: 'var(--text)' }}>{'\u20AC'}{totals.venduto.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</p>
+        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>VENDUTO</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', fontWeight: 700, color: 'var(--text)', marginTop: '4px' }}>{'\u20AC'}{totals.venduto.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</p>
         </div>
-        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Costi</p>
-          <p className="text-lg font-bold mt-1" style={{ color: 'var(--yellow)' }}>{'\u20AC'}{totals.costo.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</p>
+        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>COSTI</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', fontWeight: 700, color: 'var(--yellow)', marginTop: '4px' }}>{'\u20AC'}{totals.costo.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</p>
         </div>
-        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Margine</p>
-          <p className="text-lg font-bold mt-1" style={{ color: totals.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{'\u20AC'}{totals.margine.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</p>
+        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>MARGINE</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', fontWeight: 700, color: totals.margine >= 0 ? 'var(--green)' : 'var(--red2)', marginTop: '4px' }}>{'\u20AC'}{totals.margine.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</p>
         </div>
-        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel2)' }}>
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Margine %</p>
-          <p className="text-lg font-bold mt-1" style={{ color: totals.marginePct >= 20 ? 'var(--green)' : totals.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{totals.marginePct.toFixed(1)}%</p>
+        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>MARGINE %</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', fontWeight: 700, color: totals.marginePct >= 20 ? 'var(--green)' : totals.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)', marginTop: '4px' }}>{totals.marginePct.toFixed(1)}%</p>
         </div>
       </div>
     </div>
@@ -493,50 +493,49 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets, cli
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {cliente && (
         <div
-          className="panel p-5 cursor-pointer transition-all hover:translate-x-0.5"
+          className="cursor-pointer transition-all hover:translate-x-0.5"
           onClick={() => onClientClick?.(cliente.nome)}
-          style={{ border: '1px solid var(--line)' }}
+          style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}
         >
-          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Cliente</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '12px' }}>Cliente</p>
           <div>
-            <p className="font-semibold" style={{ color: 'var(--blue)' }}>{cliente.nome}</p>
+            <p style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, color: 'var(--blue)' }}>{cliente.nome}</p>
             <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>{cliente.settore}</p>
             <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>{cliente.referente}</p>
           </div>
-          <p className="text-[10px] mt-2" style={{ color: 'var(--muted)', opacity: 0.6 }}>Clicca per aprire nel CRM</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', marginTop: '10px', color: 'var(--muted)', opacity: 0.6 }}>CLICCA PER APRIRE NEL CRM</p>
         </div>
       )}
 
       <EventEconomicSummary event={event} />
 
       {totalTasks > 0 && (
-        <div className="panel p-5">
-          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Avanzamento Task</p>
+        <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '12px' }}>Avanzamento Task</p>
           <div className="flex items-end gap-4">
-            <div className="text-4xl font-bold" style={{ color: progress >= 80 ? 'var(--green)' : progress >= 50 ? 'var(--blue)' : 'var(--red2)' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '36px', fontWeight: 700, color: progress >= 80 ? 'var(--green)' : progress >= 50 ? 'var(--blue)' : 'var(--red2)' }}>
               {progress}%
             </div>
             <div className="flex-1 pb-1">
-              <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>{completedTasks}/{totalTasks} completati</p>
-              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
-                <div className="h-full rounded-full transition-all"
-                  style={{ width: `${progress}%`, background: progress >= 80 ? 'var(--green)' : progress >= 50 ? 'var(--blue)' : 'var(--red2)' }} />
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '8px' }}>{completedTasks}/{totalTasks} completati</p>
+              <div style={{ height: '4px', borderRadius: '2px', background: 'var(--line)', overflow: 'hidden' }}>
+                <div style={{ width: `${progress}%`, height: '100%', borderRadius: '2px', background: progress >= 80 ? 'var(--green)' : progress >= 50 ? 'var(--blue)' : 'var(--red2)', transition: 'width 0.3s ease' }} />
               </div>
             </div>
           </div>
         </div>
       )}
 
-      <div className="panel p-5">
-        <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Flusso Finanziario</p>
+      <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '12px' }}>Flusso Finanziario</p>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ArrowDownLeft className="w-4 h-4" style={{ color: 'var(--green)' }} />
               <span className="text-sm" style={{ color: 'var(--muted)' }}>Budget evento</span>
             </div>
-            <span className="font-semibold text-sm" style={{ color: event.budget > 0 ? 'var(--green)' : 'var(--muted)' }}>
-              {event.budget > 0 ? `€${event.budget.toLocaleString('it-IT')}` : 'Non inserito'}
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600, color: event.budget > 0 ? 'var(--green)' : 'var(--muted)' }}>
+              {event.budget > 0 ? `\u20AC${event.budget.toLocaleString('it-IT')}` : 'Non inserito'}
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -544,8 +543,8 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets, cli
               <ArrowUpRight className="w-4 h-4" style={{ color: 'var(--yellow)' }} />
               <span className="text-sm" style={{ color: 'var(--muted)' }}>Uscite registrate</span>
             </div>
-            <span className="font-semibold text-sm" style={{ color: hasRealData ? 'var(--yellow)' : 'var(--muted)' }}>
-              {hasRealData ? `€${totUscite.toLocaleString('it-IT')}` : 'Nessuna'}
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600, color: hasRealData ? 'var(--yellow)' : 'var(--muted)' }}>
+              {hasRealData ? `\u20AC${totUscite.toLocaleString('it-IT')}` : 'Nessuna'}
             </span>
           </div>
         </div>
@@ -2583,159 +2582,133 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
     { id: 'timeline', label: 'Timeline' },
   ]
 
+  const daysEnd = daysLeft(event.dataFine)
+  const isLive = days <= 0 && daysEnd >= 0
+  let countdownLabel: string
+  let countdownColor: string
+  if (isOver) { countdownLabel = '\u2014'; countdownColor = 'var(--muted)' }
+  else if (isLive) { countdownLabel = 'LIVE'; countdownColor = 'var(--red2)' }
+  else { countdownLabel = `T-${days}`; countdownColor = days <= 7 ? 'var(--red2)' : 'var(--muted)' }
+
+  const statoBadge = (() => {
+    switch (event.stato) {
+      case 'in_corso': return { color: '#fff', bg: 'var(--red2)' }
+      case 'pianificazione': return { color: 'var(--blue)', bg: 'color-mix(in srgb, var(--blue) 12%, transparent)' }
+      case 'completato': return { color: 'var(--green)', bg: 'color-mix(in srgb, var(--green) 12%, transparent)' }
+      default: return { color: 'var(--muted)', bg: 'var(--line)' }
+    }
+  })()
+
+  const clienteObj = clients.find(c => c.id === event.cliente)
+  const responsabileObj = internalUsers.find(u => u.id === event.responsabile)
+  const progressColor = progress >= 80 ? 'var(--green)' : progress >= 50 ? 'var(--blue)' : 'var(--red2)'
+
   return (
-    <div className="animate-fade-in space-y-6">
-      <div className="flex items-center justify-between">
-        <button onClick={onBack}
-          className="flex items-center gap-2 text-sm transition-all hover:opacity-80"
-          style={{ color: 'var(--muted)' }}>
-          <ArrowLeft className="w-4 h-4" /> Torna agli eventi
-        </button>
-        <div className="flex items-center gap-2">
-          <button onClick={() => onEdit(event)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-            <Edit3 className="w-4 h-4" /> Modifica
-          </button>
-          <button onClick={() => onDelete(event)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5"
-            style={{ background: 'rgba(255,49,95,0.08)', border: '1px solid rgba(255,49,95,0.2)', color: 'var(--red2)' }}>
-            <Trash2 className="w-4 h-4" /> Elimina
-          </button>
+    <div className="animate-fade-in" style={{ maxWidth: '1100px' }}>
+      {/* Wire Editorial Header */}
+      <div style={{ paddingBottom: '20px', marginBottom: '20px', borderBottom: '1.5px solid var(--text)' }}>
+        {/* Row 1: Back + Badge + Countdown */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--muted)' }}>
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 600,
+              letterSpacing: '0.04em', textTransform: 'uppercase',
+              padding: '3px 8px', borderRadius: '4px',
+              color: statoBadge.color, background: statoBadge.bg,
+            }}>
+              {statoLabel(event.stato)}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600,
+              color: countdownColor,
+              animation: isLive ? 'wireLivePulse 2.2s ease-in-out infinite' : undefined,
+            }}>
+              {countdownLabel}
+            </span>
+            {/* Actions */}
+            <button onClick={() => onEdit(event)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => onDelete(event)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
+
+        {/* Row 2: Event name */}
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '28px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.2, margin: '0 0 8px 0' }}>
+          {event.nome}
+        </h1>
+
+        {/* Row 3: Context line */}
+        <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '0 0 8px 0', lineHeight: 1.5 }}>
+          {event.location}
+          {clienteObj ? ` \u00B7 ${clienteObj.nome}` : ''}
+          {' \u00B7 '}{event.partecipanti} partecipanti
+          {' \u00B7 '}{fmtShort(event.dataInizio)}\u2013{fmtShort(event.dataFine)}
+        </p>
+
+        {/* Row 4: Data line in mono */}
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+          <span style={{ color: 'var(--text)', fontWeight: 600 }}>{'\u20AC'}{event.budget.toLocaleString('it-IT')}</span>
+          {responsabileObj && <span>{' \u00B7 '}{responsabileObj.nome}</span>}
+          {totalTasks > 0 && <span>{' \u00B7 '}{progress}% completato</span>}
+        </div>
+
+        {/* Status change strip */}
+        <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto' }}>
+          {statiSequenza.map((s, i) => (
+            <button key={s} onClick={() => onStatusChange(event, s)}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em',
+                padding: '4px 10px', borderRadius: '4px', border: 'none', cursor: 'pointer',
+                background: i <= currentIdx ? (i === currentIdx ? statoColor(s) : `color-mix(in srgb, ${statoColor(s)} 15%, transparent)`) : 'var(--line)',
+                color: i === currentIdx ? '#fff' : i < currentIdx ? statoColor(s) : 'var(--muted)',
+                fontWeight: i === currentIdx ? 700 : 500,
+                transition: 'all 0.12s ease',
+              }}>
+              {statoLabel(s)}
+            </button>
+          ))}
+        </div>
+
+        {/* Progress bar */}
+        {totalTasks > 0 && (
+          <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ flex: 1, height: '4px', borderRadius: '2px', background: 'var(--line)', overflow: 'hidden' }}>
+              <div style={{ width: `${progress}%`, height: '100%', borderRadius: '2px', background: progressColor, transition: 'width 0.3s ease' }} />
+            </div>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', flexShrink: 0 }}>{completedTasks}/{totalTasks}</span>
+          </div>
+        )}
       </div>
 
-      {/* Hero panel */}
-      <div className="panel p-6 relative overflow-hidden" style={{ minHeight: '140px' }}>
-        <div className="absolute inset-0 opacity-10"
-          style={{ background: `linear-gradient(135deg, ${statoColor(event.stato)} 0%, transparent 60%)` }} />
-        {(() => {
-          const eventClient = clients.find(c => c.id === event.cliente)
-          const clientLogo = eventClient?.logoUrl
-          return clientLogo ? (
-            <img src={clientLogo} alt="" aria-hidden
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-44 h-44 object-contain pointer-events-none select-none"
-              style={{ opacity: 0.07 }} />
-          ) : (
-            <div className="absolute right-8 top-1/2 -translate-y-1/2 text-6xl font-black pointer-events-none select-none"
-              style={{ opacity: 0.04, color: statoColor(event.stato) }}>
-              {event.nome.split(' ').map(w => w[0]).join('').slice(0, 3)}
-            </div>
-          )
-        })()}
-        <div className="relative">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-3 mb-2">
-                <span className="text-xs px-3 py-1 rounded-full font-semibold"
-                  style={{
-                    background: `${statoColor(event.stato)}20`,
-                    color: statoColor(event.stato),
-                    border: `1px solid ${statoColor(event.stato)}40`,
-                  }}>
-                  {statoLabel(event.stato)}
-                </span>
-                {clients.find(c => c.id === event.cliente) && (
-                  <button
-                    onClick={() => {
-                      const clientObj = clients.find(c => c.id === event.cliente)
-                      if (clientObj) navigateToCrm(clientObj.nome)
-                    }}
-                    className="text-xs hover:underline transition-all cursor-pointer"
-                    style={{ color: 'var(--muted)' }}>
-                    Cliente: <span style={{ color: 'var(--blue)' }}>{clients.find(c => c.id === event.cliente)!.nome}</span>
-                  </button>
-                )}
-                {clients.find(c => c.id === event.cliente)?.referente && (
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                    Referente: <span style={{ color: 'var(--text)' }}>{clients.find(c => c.id === event.cliente)!.referente}</span>
-                  </span>
-                )}
-              </div>
-              <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{event.nome}</h1>
-              <p className="mt-1 text-sm max-w-xl" style={{ color: 'var(--muted)' }}>{event.descrizione}</p>
-              <div className="flex flex-wrap gap-4 mt-4 text-sm">
-                <div className="flex items-center gap-2" style={{ color: 'var(--muted)' }}>
-                  <MapPin className="w-4 h-4" />{event.location}
-                </div>
-                <div className="flex items-center gap-2" style={{ color: 'var(--muted)' }}>
-                  <Calendar className="w-4 h-4" />
-                  {fmtShort(event.dataInizio)} – {fmtShort(event.dataFine)}
-                </div>
-                <div className="flex items-center gap-2" style={{ color: 'var(--muted)' }}>
-                  <Users className="w-4 h-4" />{event.partecipanti} partecipanti
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[160px]">
-              <div className="px-4 py-3 rounded-xl text-center" style={{ background: 'var(--panel2)' }}>
-                <p className="text-xs" style={{ color: 'var(--muted)' }}>Budget</p>
-                <p className="text-xl font-bold mt-0.5" style={{ color: 'var(--green)' }}>
-                  €{event.budget.toLocaleString('it-IT')}
-                </p>
-              </div>
-              <div className="px-4 py-3 rounded-xl text-center" style={{ background: 'var(--panel2)' }}>
-                <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                  {isOver ? 'Concluso' : days > 0 ? 'Al via tra' : 'In corso'}
-                </p>
-                <p className="text-xl font-bold mt-0.5"
-                  style={{ color: isOver ? 'var(--muted)' : days > 0 ? 'var(--blue)' : 'var(--red2)' }}>
-                  {isOver ? '—' : days > 0 ? `${days}gg` : 'Live'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Status change strip */}
-          <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--line)' }}>
-            <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>Avanzamento stato</p>
-            <div className="flex items-center gap-2 overflow-x-auto">
-              {statiSequenza.map((s, i) => (
-                <button key={s} onClick={() => onStatusChange(event, s)}
-                  className="flex-1 min-w-[70px] py-2 rounded-lg text-[11px] font-medium transition-all"
-                  style={{
-                    background: i <= currentIdx
-                      ? `${statoColor(s)}20`
-                      : 'var(--panel2)',
-                    color: i <= currentIdx ? statoColor(s) : 'var(--muted)',
-                    border: `1px solid ${i === currentIdx ? statoColor(s) + '60' : 'var(--line)'}`,
-                    fontWeight: i === currentIdx ? 700 : 500,
-                  }}>
-                  {statoLabel(s)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {totalTasks > 0 && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-xs mb-2">
-                <span style={{ color: 'var(--muted)' }}>Avanzamento task ({completedTasks}/{totalTasks})</span>
-                <span style={{ color: progress >= 80 ? 'var(--green)' : 'var(--text)' }}>{progress}%</span>
-              </div>
-              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
-                <div className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${progress}%`,
-                    background: progress >= 80 ? 'var(--green)' : progress >= 50 ? 'var(--blue)' : 'linear-gradient(90deg, var(--red) 0%, var(--red2) 100%)',
-                  }} />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 overflow-x-auto p-1 rounded-xl"
-        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+      {/* Wire Tabs */}
+      <div style={{ display: 'flex', gap: '18px', overflowX: 'auto', marginBottom: '20px', paddingBottom: '8px' }}>
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap"
             style={{
-              background: activeTab === tab.id
-                ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)'
-                : 'transparent',
-              color: activeTab === tab.id ? 'white' : 'var(--muted)',
+              fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em',
+              background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+              padding: '4px 0', position: 'relative',
+              color: activeTab === tab.id ? 'var(--text)' : 'var(--muted)',
+              opacity: activeTab === tab.id ? 1 : 0.6,
+              fontWeight: activeTab === tab.id ? 600 : 400,
+              borderBottom: activeTab === tab.id ? '2px solid var(--red2)' : '2px solid transparent',
+              transition: 'all 0.12s ease',
             }}>
             {tab.label}
           </button>
