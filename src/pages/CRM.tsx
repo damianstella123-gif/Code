@@ -144,6 +144,32 @@ function CompanyLogo({ url, name, size, radius }: { url?: string; name: string; 
   )
 }
 
+function CardLogoBanner({ url, name, status }: { url?: string; name: string; status: Client['stato'] }) {
+  const [imgError, setImgError] = useState(false)
+  const initials = name.split(' ').map(w => w.charAt(0)).slice(0, 2).join('').toUpperCase()
+
+  return (
+    <div style={{ height: '64px', background: 'var(--panel2)', borderRadius: '14px 14px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px', position: 'relative' }}>
+      {url && !imgError ? (
+        <img
+          src={url}
+          alt={name}
+          onError={() => setImgError(true)}
+          style={{ maxHeight: '40px', maxWidth: '60%', objectFit: 'contain' }}
+        />
+      ) : (
+        <span style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', color: 'var(--muted)' }}>
+          {initials || '?'}
+        </span>
+      )}
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '2px 7px', borderRadius: '4px', background: statoBg(status), color: statoColor(status) }}>
+        {status === 'vip' && <Star className="w-2.5 h-2.5 inline mr-0.5 -mt-0.5" />}
+        {statoLabel(status)}
+      </span>
+    </div>
+  )
+}
+
 interface EditReferenteModalProps {
   row: Client
   onClose: () => void
@@ -335,7 +361,7 @@ function CompanyDetail({ group, onBack, onRefresh, onNavigateToEvent }: CompanyD
         </div>
 
         <div className="flex items-center gap-4">
-          <CompanyLogo url={group.logoUrl} name={group.companyName} size={52} radius={10} />
+          <CompanyLogo url={group.logoUrl} name={group.companyName} size={56} radius={10} />
           <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '26px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.2 }}>
             {group.companyName}
           </h1>
@@ -639,39 +665,36 @@ export default function CRM() {
                   background: 'var(--panel-solid)',
                   border: '1px solid var(--line)',
                   borderRadius: '14px',
-                  padding: '16px 18px',
+                  overflow: 'hidden',
                   transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                 }}
                 onClick={() => setSelectedName(group.companyName)}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-sm)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
               >
-                {/* Top row: logo left, badge right */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <CompanyLogo url={group.logoUrl} name={group.companyName} size={36} radius={8} />
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '2px 7px', borderRadius: '4px', background: statoBg(group.status), color: statoColor(group.status) }}>
-                    {group.status === 'vip' && <Star className="w-2.5 h-2.5 inline mr-0.5 -mt-0.5" />}
-                    {statoLabel(group.status)}
-                  </span>
-                </div>
+                {/* Logo banner strip */}
+                <CardLogoBanner url={group.logoUrl} name={group.companyName} status={group.status} />
 
-                {/* Company name */}
-                <h3 className="truncate" style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>
-                  {group.companyName}
-                </h3>
+                {/* Card body */}
+                <div style={{ padding: '14px 18px 16px' }}>
+                  {/* Company name */}
+                  <h3 className="truncate" style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>
+                    {group.companyName}
+                  </h3>
 
-                {/* Settore + city */}
-                {(group.city || group.country) && (
-                  <p className="truncate" style={{ fontSize: '11.5px', color: 'var(--muted)', marginTop: '3px' }}>
-                    {[group.city, group.country].filter(Boolean).join(', ')}
-                  </p>
-                )}
+                  {/* Settore + city */}
+                  {(group.city || group.country) && (
+                    <p className="truncate" style={{ fontSize: '11.5px', color: 'var(--muted)', marginTop: '3px' }}>
+                      {[group.city, group.country].filter(Boolean).join(', ')}
+                    </p>
+                  )}
 
-                {/* Data row */}
-                <div style={{ display: 'flex', gap: '12px', marginTop: '12px', alignItems: 'center' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
-                    {group.rows.length} ref.
-                  </span>
+                  {/* Data row */}
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '12px', alignItems: 'center' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
+                      {group.rows.length} ref.
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
