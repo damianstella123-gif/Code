@@ -122,6 +122,28 @@ function fmtK(value: number): string {
   return String(value)
 }
 
+function CompanyLogo({ url, name, size, radius }: { url?: string; name: string; size: number; radius: number }) {
+  const [imgError, setImgError] = useState(false)
+  const initials = name.split(' ').map(w => w.charAt(0)).slice(0, 2).join('').toUpperCase()
+
+  if (url && !imgError) {
+    return (
+      <img
+        src={url}
+        alt={name}
+        onError={() => setImgError(true)}
+        style={{ width: size, height: size, borderRadius: radius, objectFit: 'cover', border: '1px solid var(--line)', flexShrink: 0 }}
+      />
+    )
+  }
+
+  return (
+    <div style={{ width: size, height: size, borderRadius: radius, background: 'var(--panel2)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: size * 0.3, fontWeight: 600, color: 'var(--muted)' }}>
+      {initials || '?'}
+    </div>
+  )
+}
+
 interface EditReferenteModalProps {
   row: Client
   onClose: () => void
@@ -312,9 +334,12 @@ function CompanyDetail({ group, onBack, onRefresh, onNavigateToEvent }: CompanyD
           </span>
         </div>
 
-        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '26px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.2 }}>
-          {group.companyName}
-        </h1>
+        <div className="flex items-center gap-4">
+          <CompanyLogo url={group.logoUrl} name={group.companyName} size={52} radius={10} />
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '26px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.2 }}>
+            {group.companyName}
+          </h1>
+        </div>
 
         {(settore || group.city || group.country) && (
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)', marginTop: '6px' }}>
@@ -621,14 +646,17 @@ export default function CRM() {
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-sm)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
               >
-                {/* Status badge */}
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '2px 7px', borderRadius: '4px', background: statoBg(group.status), color: statoColor(group.status) }}>
-                  {group.status === 'vip' && <Star className="w-2.5 h-2.5 inline mr-0.5 -mt-0.5" />}
-                  {statoLabel(group.status)}
-                </span>
+                {/* Top row: logo left, badge right */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <CompanyLogo url={group.logoUrl} name={group.companyName} size={36} radius={8} />
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '2px 7px', borderRadius: '4px', background: statoBg(group.status), color: statoColor(group.status) }}>
+                    {group.status === 'vip' && <Star className="w-2.5 h-2.5 inline mr-0.5 -mt-0.5" />}
+                    {statoLabel(group.status)}
+                  </span>
+                </div>
 
                 {/* Company name */}
-                <h3 className="truncate" style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginTop: '8px', lineHeight: 1.3 }}>
+                <h3 className="truncate" style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>
                   {group.companyName}
                 </h3>
 
