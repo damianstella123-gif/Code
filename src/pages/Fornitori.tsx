@@ -125,19 +125,15 @@ function parseSearchQuery(raw: string): ParsedSearch {
 
   const text = raw.toLowerCase().trim()
 
-  // Extract capacity: "200 persone", "200 pax", "200 posti", "200 ospiti"
   const capacityMatch = text.match(/(\d+)\s*(person[ei]|pax|posti|coperti|ospiti)/i)
   if (capacityMatch) result.minCapacity = parseInt(capacityMatch[1])
 
-  // Extract rooms: "300 camere"
   const roomsMatch = text.match(/(\d+)\s*camer[ea]/i)
   if (roomsMatch) result.minRooms = parseInt(roomsMatch[1])
 
-  // Extract meeting rooms: "5 sale" or "5 sale meeting"
   const meetingMatch = text.match(/(\d+)\s*sal[ea](?:\s*meeting)?/i)
   if (meetingMatch) result.minMeetingRooms = parseInt(meetingMatch[1])
 
-  // Detect category hint
   for (const cat of NAV_CATEGORIES) {
     if (text.includes(cat.toLowerCase())) {
       result.categoryHint = cat
@@ -153,7 +149,6 @@ function parseSearchQuery(raw: string): ParsedSearch {
     else if (text.includes('allestiment')) result.categoryHint = 'Allestimenti'
   }
 
-  // Remaining text tokens (remove matched patterns)
   let cleaned = text
     .replace(/\d+\s*(person[ei]|pax|posti|coperti|ospiti|camer[ea]|sal[ea](?:\s*meeting)?)/gi, '')
     .replace(/\b(hotel|ristorante|ristoranti|audio\s*video|catering|location|locations|venue|trasporti|trasporto|allestimenti|allestimento|altro)\b/gi, '')
@@ -215,13 +210,14 @@ function SupplierLogo({ supplier, size = 48 }: { supplier: Supplier; size?: numb
 
 function MiniCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
-    <div className="panel p-4 flex items-center gap-3">
-      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(208,0,58,0.08)' }}>
-        <Icon className="w-4 h-4" style={{ color: 'var(--red2)' }} />
+    <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '14px 16px' }}
+      className="flex items-center gap-3">
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--panel2)' }}>
+        <Icon className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
       </div>
       <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{label}</p>
-        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>{value}</p>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>{label}</p>
+        <p className="truncate" style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text)', marginTop: '2px' }}>{value}</p>
       </div>
     </div>
   )
@@ -229,8 +225,8 @@ function MiniCard({ icon: Icon, label, value }: { icon: React.ElementType; label
 
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="panel p-5">
-      <p className="text-sm font-bold mb-4" style={{ color: 'var(--text)' }}>{title}</p>
+    <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '16px' }}>{title}</p>
       {children}
     </div>
   )
@@ -243,8 +239,8 @@ function InfoGrid({ items }: { items: { label: string; value: string | number | 
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
       {valid.map(i => (
         <div key={i.label}>
-          <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{i.label}</p>
-          <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text)' }}>{i.value}</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)' }}>{i.label}</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 500, color: 'var(--text)', marginTop: '3px' }}>{i.value}</p>
         </div>
       ))}
     </div>
@@ -257,8 +253,8 @@ function BoolGrid({ items }: { items: { label: string; value: boolean | undefine
   return (
     <div className="flex flex-wrap gap-2 mt-3">
       {valid.map(i => (
-        <span key={i.label} className="px-2.5 py-1 rounded-full text-[11px] font-medium"
-          style={{ background: 'rgba(34,197,94,0.1)', color: '#16a34a' }}>{i.label}</span>
+        <span key={i.label} className="px-2.5 py-1 rounded-full"
+          style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'color-mix(in srgb, var(--green) 10%, transparent)', color: 'var(--green)' }}>{i.label}</span>
       ))}
     </div>
   )
@@ -293,9 +289,9 @@ function HotelCard({ d }: { d: SupplierDetails }) {
       ]} />
       {sale.length > 0 && (
         <div className="mt-4">
-          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text)' }}>Sale Meeting</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>Sale Meeting</p>
           <div className="overflow-x-auto rounded-lg" style={{ border: '1px solid var(--line)' }}>
-            <table className="w-full text-[11px]">
+            <table className="w-full" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
               <thead>
                 <tr style={{ background: 'var(--panel2)' }}>
                   <th className="text-left px-3 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Sala</th>
@@ -351,13 +347,13 @@ function GenericDetailCard({ d }: { d: SupplierDetails }) {
     v !== undefined && v !== '' && v !== null && v !== false &&
     k !== 'contatti' && k !== 'sale_meeting' && k !== 'servizi_hotel' && k !== 'documenti'
   )
-  if (!entries.length) return <p className="text-xs" style={{ color: 'var(--muted)' }}>Nessun dettaglio compilato.</p>
+  if (!entries.length) return <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>Nessun dettaglio compilato.</p>
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
       {entries.slice(0, 12).map(([k, v]) => (
         <div key={k}>
-          <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{k.replace(/_/g, ' ')}</p>
-          <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text)' }}>{typeof v === 'boolean' ? 'Si' : String(v)}</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)' }}>{k.replace(/_/g, ' ')}</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 500, color: 'var(--text)', marginTop: '3px' }}>{typeof v === 'boolean' ? 'Si' : String(v)}</p>
         </div>
       ))}
     </div>
@@ -374,35 +370,39 @@ function SupplierCard({ supplier, onClick }: { supplier: Supplier; onClick: () =
 
   return (
     <div onClick={onClick}
-      className="panel p-4 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
-      style={{ border: '1px solid var(--line)' }}>
+      className="cursor-pointer transition-all"
+      style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '16px 18px' }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}>
       <div className="flex items-start gap-3 mb-3">
         <SupplierLogo supplier={supplier} size={40} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{supplier.nome}</p>
-          <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
+          <p className="truncate" style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)' }}>{supplier.nome}</p>
+          <p className="truncate" style={{ fontSize: '11.5px', color: 'var(--muted)', marginTop: '2px' }}>
             {geoLine || normalizeCategory(supplier.categoria)}
           </p>
         </div>
         {supplier.stato === 'inattivo' && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(255,49,95,0.1)', color: 'var(--red2)' }}>Inattivo</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)' }}>Inattivo</span>
         )}
       </div>
-      <div className="flex items-center justify-between">
-        <InteractiveStars rating={supplier.rating} size="sm" />
-        <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--muted)' }}>
+      <div className="flex items-center gap-2 mb-2">
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>
+          {normalizeCategory(supplier.categoria)}
+        </span>
+        <div className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
           {rooms > 0 && <span>{rooms} camere</span>}
           {capacity > 0 && <span>cap. {capacity}</span>}
           {meetingRooms > 0 && <span>{meetingRooms} sale</span>}
         </div>
       </div>
+      <InteractiveStars rating={supplier.rating} size="sm" />
       {supplier.servizi.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
           {supplier.servizi.slice(0, 3).map(s => (
-            <span key={s} className="text-[10px] px-2 py-0.5 rounded-full"
-              style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>{s}</span>
+            <span key={s} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>{s}</span>
           ))}
-          {supplier.servizi.length > 3 && <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>+{supplier.servizi.length - 3}</span>}
+          {supplier.servizi.length > 3 && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>+{supplier.servizi.length - 3}</span>}
         </div>
       )}
     </div>
@@ -449,29 +449,36 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
     setUploading(false)
   }
 
-  const geoLine = [supplier.city, supplier.province, supplier.region, supplier.country].filter(Boolean).join(', ')
+  const geoLine = [supplier.city, supplier.province, supplier.region, supplier.country].filter(Boolean).join(' \u00B7 ')
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between gap-2">
-        <button onClick={onBack} className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg" style={{ color: 'var(--muted)' }}>
-          <ArrowLeft className="w-4 h-4" /> Indietro
-        </button>
-        <div className="flex items-center gap-2">
-          <button onClick={onEdit} className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium"
-            style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>
-            <Edit3 className="w-4 h-4" /> <span className="hidden sm:inline">Modifica</span>
+      {/* Editorial header */}
+      <div style={{ paddingTop: '28px', paddingBottom: '18px', borderBottom: '1.5px solid var(--text)' }}>
+        <div className="flex items-center justify-between mb-4">
+          <button onClick={onBack}
+            className="flex items-center gap-2 transition-all hover:opacity-80"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            <ArrowLeft className="w-3.5 h-3.5" /> INDIETRO
           </button>
-          <button onClick={onDelete} className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium"
-            style={{ border: '1px solid var(--line)', color: 'var(--red2)' }}>
-            <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Elimina</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={onEdit}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+              <Edit3 className="w-3.5 h-3.5 inline mr-1" />MODIFICA
+            </button>
+            <button onClick={onDelete}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--red2)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+              <Trash2 className="w-3.5 h-3.5 inline mr-1" />ELIMINA
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div className="panel p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
-          <div className="relative group">
+        <div className="flex items-start gap-4">
+          <div className="relative group flex-shrink-0">
             <SupplierLogo supplier={supplier} size={72} />
             <button onClick={() => fileRef.current?.click()}
               className="absolute inset-0 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -482,17 +489,15 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-3 mb-1">
-              <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{supplier.nome}</h1>
-              <span className="text-xs px-2.5 py-0.5 rounded-full font-medium"
-                style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>{cat}</span>
+            <div className="flex items-center gap-3 mb-1">
+              <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '26px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.2 }}>{supplier.nome}</h1>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '2px 7px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>{cat}</span>
             </div>
-            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-4 mt-2 text-sm" style={{ color: 'var(--muted)' }}>
-              {(geoLine || supplier.location) && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{geoLine || supplier.location}</span></span>}
-              {supplier.telefono && <a href={`tel:${supplier.telefono}`} className="flex items-center gap-1"><Phone className="w-3.5 h-3.5 flex-shrink-0" />{supplier.telefono}</a>}
-              {supplier.email && <a href={`mailto:${supplier.email}`} className="flex items-center gap-1 truncate"><Mail className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{supplier.email}</span></a>}
-              {supplier.sito && <a href={supplier.sito.startsWith('http') ? supplier.sito : `https://${supplier.sito}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 truncate"><Globe className="w-3.5 h-3.5 flex-shrink-0" /><span className="truncate">{supplier.sito}</span></a>}
-            </div>
+            {(geoLine || supplier.location) && (
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)', marginTop: '4px' }}>
+                {geoLine || supplier.location}
+              </p>
+            )}
             <div className="flex items-center gap-3 mt-3">
               <div className="flex items-center gap-0.5">
                 {[1, 2, 3, 4, 5].map(i => (
@@ -502,9 +507,15 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
                     onClick={() => handleRating(i)} />
                 ))}
               </div>
-              <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{rating}/5</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>{rating}/5</span>
             </div>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 mt-4" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+          {supplier.telefono && <a href={`tel:${supplier.telefono}`} className="flex items-center gap-1 hover:opacity-80"><Phone className="w-3 h-3" />{supplier.telefono}</a>}
+          {supplier.email && <a href={`mailto:${supplier.email}`} className="flex items-center gap-1 truncate hover:opacity-80"><Mail className="w-3 h-3" /><span className="truncate">{supplier.email}</span></a>}
+          {supplier.sito && <a href={supplier.sito.startsWith('http') ? supplier.sito : `https://${supplier.sito}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 truncate hover:opacity-80"><Globe className="w-3 h-3" /><span className="truncate">{supplier.sito}</span></a>}
         </div>
       </div>
 
@@ -516,28 +527,33 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
       </div>
 
       {d && Object.keys(d).length > 0 && (
-        <DetailSection title={`Scheda ${cat}`}>
+        <DetailSection title={`SCHEDA ${cat.toUpperCase()}`}>
           {cat === 'Hotel' ? <HotelCard d={d} /> :
            cat === 'Ristorante' ? <RistoranteCard d={d} /> :
            <GenericDetailCard d={d} />}
         </DetailSection>
       )}
 
-      <div className="panel p-5">
+      <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>Note operative interne</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)' }}>NOTE OPERATIVE INTERNE</p>
           {!editingNotes ? (
-            <button onClick={() => setEditingNotes(true)} className="text-xs font-medium" style={{ color: 'var(--red2)' }}>Modifica</button>
+            <button onClick={() => setEditingNotes(true)}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+              [ MODIFICA ]
+            </button>
           ) : (
-            <button onClick={saveNotes} className="flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-lg text-white"
-              style={{ background: 'var(--red2)' }}>
-              <Save className="w-3 h-3" /> Salva
+            <button onClick={saveNotes} className="flex items-center gap-1 px-3 py-1 rounded-lg"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'var(--red2)', color: 'white' }}>
+              <Save className="w-3 h-3" /> SALVA
             </button>
           )}
         </div>
         {editingNotes ? (
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4}
-            className="w-full px-3 py-2 rounded-lg text-xs resize-none"
+            className="w-full px-3 py-2 rounded-lg text-xs resize-none focus:outline-none"
             style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }} />
         ) : (
           <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: notes ? 'var(--text)' : 'var(--muted)' }}>
@@ -547,12 +563,12 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
       </div>
 
       {supplier.servizi.length > 0 && (
-        <div className="panel p-5">
-          <p className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>Servizi</p>
+        <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '12px' }}>SERVIZI</p>
           <div className="flex flex-wrap gap-2">
             {supplier.servizi.map(s => (
-              <span key={s} className="px-3 py-1 rounded-full text-xs font-medium"
-                style={{ background: 'rgba(208,0,58,0.08)', color: 'var(--red2)' }}>{s}</span>
+              <span key={s} className="px-3 py-1 rounded-full"
+                style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>{s}</span>
             ))}
           </div>
         </div>
@@ -587,7 +603,6 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
   const [detailsError, setDetailsError] = useState<string | null>(null)
   const [showAdvancedJson, setShowAdvancedJson] = useState(false)
 
-  // Hotel-specific fields (read from existing details)
   const det = supplier?.details
   const [hotelCitta, setHotelCitta] = useState(det?.citta ?? '')
   const [hotelCatena, setHotelCatena] = useState(det?.catena ?? '')
@@ -603,19 +618,16 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
 
   function buildDetails(): SupplierDetails | undefined {
     if (isHotel) {
-      // Merge hotel fields into existing details
       let base: Record<string, unknown> = {}
       if (detailsJson.trim()) {
         try {
           base = JSON.parse(detailsJson)
         } catch {
-          // fallback: use supplier's existing details
           base = supplier?.details ? { ...supplier.details } : {}
         }
       } else if (supplier?.details) {
         base = { ...supplier.details }
       }
-      // Overlay hotel-specific fields
       base.citta = hotelCitta || undefined
       base.catena = hotelCatena || undefined
       base.numero_camere = hotelNumeroCamere !== '' ? Number(hotelNumeroCamere) : undefined
@@ -625,13 +637,11 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
       base.stelle = hotelStelle !== '' ? Number(hotelStelle) : undefined
       base.capienza_sala_massima = hotelCapienzaSalaMassima !== '' ? Number(hotelCapienzaSalaMassima) : undefined
       base.capienza_totale_meeting = hotelCapienzaTotaleMeeting !== '' ? Number(hotelCapienzaTotaleMeeting) : undefined
-      // Remove undefined keys
       for (const k of Object.keys(base)) {
         if (base[k] === undefined) delete base[k]
       }
       return base as SupplierDetails
     }
-    // Non-hotel: parse JSON as before
     if (detailsJson.trim()) {
       try {
         return JSON.parse(detailsJson)
@@ -648,7 +658,7 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
     if (!nome.trim()) return
     setDetailsError(null)
     const parsedDetails = buildDetails()
-    if (parsedDetails === null) return // JSON error for non-hotel
+    if (parsedDetails === null) return
     const updated: Supplier = {
       id: supplier?.id ?? `sup_${Date.now()}`,
       nome: nome.trim(), email: email.trim(), telefono: telefono.trim(),
@@ -669,14 +679,15 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
   }
 
   const inputCls = "w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-  const inputStyle = { background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }
+  const inputStyle = { background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }
+  const labelStyle: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', display: 'block', marginBottom: '6px' }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
       <div className="w-full sm:max-w-2xl max-h-[100vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 safe-bottom"
-        style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--text)' }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: 'var(--text)' }}>
             {supplier ? 'Modifica Fornitore' : 'Nuovo Fornitore'}
           </h2>
           <button onClick={onCancel} className="p-2 rounded-lg transition-all hover:bg-white/5">
@@ -686,12 +697,12 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Nome *</label>
+              <label style={labelStyle}>Nome *</label>
               <input type="text" value={nome} onChange={e => setNome(e.target.value)} required
                 className={inputCls} style={inputStyle} />
             </div>
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Categoria</label>
+              <label style={labelStyle}>Categoria</label>
               <select value={categoria} onChange={e => setCategoria(e.target.value)}
                 className={inputCls} style={inputStyle}>
                 <option value="">-- Seleziona --</option>
@@ -701,81 +712,81 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Email</label>
+              <label style={labelStyle}>Email</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                 className={inputCls} style={inputStyle} />
             </div>
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Telefono</label>
+              <label style={labelStyle}>Telefono</label>
               <input type="text" value={telefono} onChange={e => setTelefono(e.target.value)}
                 className={inputCls} style={inputStyle} />
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Referente</label>
+              <label style={labelStyle}>Referente</label>
               <input type="text" value={referente} onChange={e => setReferente(e.target.value)}
                 className={inputCls} style={inputStyle} />
             </div>
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Tel. referente</label>
+              <label style={labelStyle}>Tel. referente</label>
               <input type="text" value={referenteTelefono} onChange={e => setReferenteTelefono(e.target.value)}
                 className={inputCls} style={inputStyle} />
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Citta</label>
+              <label style={labelStyle}>Citta</label>
               <input type="text" value={city} onChange={e => setCity(e.target.value)}
                 className={inputCls} style={inputStyle} />
             </div>
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Provincia</label>
+              <label style={labelStyle}>Provincia</label>
               <input type="text" value={province} onChange={e => setProvince(e.target.value)}
                 className={inputCls} style={inputStyle} />
             </div>
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Regione</label>
+              <label style={labelStyle}>Regione</label>
               <input type="text" value={region} onChange={e => setRegion(e.target.value)}
                 className={inputCls} style={inputStyle} />
             </div>
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Paese</label>
+              <label style={labelStyle}>Paese</label>
               <input type="text" value={country} onChange={e => setCountry(e.target.value)}
                 className={inputCls} style={inputStyle} />
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Location (legacy)</label>
+              <label style={labelStyle}>Location (legacy)</label>
               <input type="text" value={location} onChange={e => setLocation(e.target.value)}
                 className={inputCls} style={inputStyle} />
             </div>
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Sito web</label>
+              <label style={labelStyle}>Sito web</label>
               <input type="text" value={sito} onChange={e => setSito(e.target.value)}
                 className={inputCls} style={inputStyle} />
             </div>
             <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>P.IVA</label>
+              <label style={labelStyle}>P.IVA</label>
               <input type="text" value={piva} onChange={e => setPiva(e.target.value)}
                 className={inputCls} style={inputStyle} />
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Servizi (separati da virgola)</label>
+            <label style={labelStyle}>Servizi (separati da virgola)</label>
             <input type="text" value={servizi} onChange={e => setServizi(e.target.value)}
               className={inputCls} style={inputStyle}
               placeholder="Es. Impianti audio, Video proiezione" />
           </div>
           <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Note operative</label>
+            <label style={labelStyle}>Note operative</label>
             <textarea value={noteOperative} onChange={e => setNoteOperative(e.target.value)} rows={3}
               className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
               style={inputStyle} />
           </div>
           <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Stato</label>
+            <label style={labelStyle}>Stato</label>
             <select value={stato} onChange={e => setStato(e.target.value as 'attivo' | 'inattivo')}
               className={inputCls} style={inputStyle}>
               <option value="attivo">Attivo</option>
@@ -783,7 +794,7 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Stato Contratto</label>
+            <label style={labelStyle}>Stato Contratto</label>
             <select value={statoContratto} onChange={e => setStatoContratto(e.target.value as StatoContratto)}
               className={inputCls} style={inputStyle}>
               <option value="attivo">Attivo</option>
@@ -794,25 +805,24 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
             </select>
           </div>
 
-          {/* Hotel-specific fields */}
           {isHotel && (
-            <div className="rounded-xl p-4 space-y-4" style={{ background: 'rgba(208,0,58,0.03)', border: '1px solid rgba(208,0,58,0.12)' }}>
-              <p className="text-xs font-bold uppercase tracking-wide flex items-center gap-2" style={{ color: 'var(--red2)' }}>
-                <Hotel className="w-4 h-4" /> Dati Hotel
+            <div className="rounded-xl p-4 space-y-4" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }} className="flex items-center gap-2">
+                <Hotel className="w-4 h-4" /> DATI HOTEL
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Citta (hotel)</label>
+                  <label style={labelStyle}>Citta (hotel)</label>
                   <input type="text" value={hotelCitta} onChange={e => setHotelCitta(e.target.value)}
                     className={inputCls} style={inputStyle} placeholder="Roma" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Catena</label>
+                  <label style={labelStyle}>Catena</label>
                   <input type="text" value={hotelCatena} onChange={e => setHotelCatena(e.target.value)}
                     className={inputCls} style={inputStyle} placeholder="NH Hotels" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Stelle</label>
+                  <label style={labelStyle}>Stelle</label>
                   <select value={hotelStelle} onChange={e => setHotelStelle(e.target.value ? Number(e.target.value) : '')}
                     className={inputCls} style={inputStyle}>
                     <option value="">--</option>
@@ -826,24 +836,24 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Numero camere</label>
+                  <label style={labelStyle}>Numero camere</label>
                   <input type="number" min={0} value={hotelNumeroCamere} onChange={e => setHotelNumeroCamere(e.target.value ? Number(e.target.value) : '')}
                     className={inputCls} style={inputStyle} placeholder="200" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Numero sale meeting</label>
+                  <label style={labelStyle}>Numero sale meeting</label>
                   <input type="number" min={0} value={hotelNumeroSaleMeeting} onChange={e => setHotelNumeroSaleMeeting(e.target.value ? Number(e.target.value) : '')}
                     className={inputCls} style={inputStyle} placeholder="6" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Capienza sala massima</label>
+                  <label style={labelStyle}>Capienza sala massima</label>
                   <input type="number" min={0} value={hotelCapienzaSalaMassima} onChange={e => setHotelCapienzaSalaMassima(e.target.value ? Number(e.target.value) : '')}
                     className={inputCls} style={inputStyle} placeholder="300" />
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Capienza totale meeting</label>
+                  <label style={labelStyle}>Capienza totale meeting</label>
                   <input type="number" min={0} value={hotelCapienzaTotaleMeeting} onChange={e => setHotelCapienzaTotaleMeeting(e.target.value ? Number(e.target.value) : '')}
                     className={inputCls} style={inputStyle} placeholder="800" />
                 </div>
@@ -853,7 +863,7 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
                     <div className="w-9 h-5 rounded-full peer-checked:bg-[var(--red2)] transition-colors" style={{ background: hotelParcheggio ? undefined : 'var(--panel2)' }} />
                     <div className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform peer-checked:translate-x-4" />
                   </label>
-                  <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>Parcheggio</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>Parcheggio</span>
                 </div>
                 <div className="flex items-center gap-3 pt-5">
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -861,37 +871,37 @@ function SupplierFormModal({ supplier, onSave, onCancel }: {
                     <div className="w-9 h-5 rounded-full peer-checked:bg-[var(--red2)] transition-colors" style={{ background: hotelRistoranteInterno ? undefined : 'var(--panel2)' }} />
                     <div className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform peer-checked:translate-x-4" />
                   </label>
-                  <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>Ristorante interno</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>Ristorante interno</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Advanced JSON section (collapsible) */}
           <div>
             <button type="button" onClick={() => setShowAdvancedJson(!showAdvancedJson)}
-              className="text-xs font-medium flex items-center gap-1.5 mb-2 transition-all hover:opacity-80"
-              style={{ color: 'var(--muted)' }}>
+              className="flex items-center gap-1.5 mb-2 transition-all hover:opacity-80"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
               <ChevronRight className={`w-3 h-3 transition-transform ${showAdvancedJson ? 'rotate-90' : ''}`} />
-              Dettagli avanzati (JSON)
+              DETTAGLI AVANZATI (JSON)
               {detailsError && <span style={{ color: 'var(--red2)' }}> - {detailsError}</span>}
             </button>
             {showAdvancedJson && (
               <textarea value={detailsJson} onChange={e => { setDetailsJson(e.target.value); setDetailsError(null) }} rows={5}
                 className="w-full px-4 py-3 rounded-xl text-xs font-mono focus:outline-none resize-none"
-                style={{ background: 'var(--panel)', border: `1px solid ${detailsError ? 'var(--red2)' : 'var(--line)'}`, color: 'var(--text)' }}
+                style={{ background: 'var(--panel2)', border: `1px solid ${detailsError ? 'var(--red2)' : 'var(--line)'}`, color: 'var(--text)' }}
                 placeholder='{"catena": "NH Hotels", "stelle": 4, "numero_camere": 200}' />
             )}
           </div>
 
           <div className="flex gap-3 pt-4" style={{ borderTop: '1px solid var(--line)' }}>
-            <button type="submit" className="btn-primary flex-1 py-3 rounded-xl text-sm font-semibold">
-              {supplier ? 'Salva Modifiche' : 'Crea Fornitore'}
+            <button type="submit" className="flex-1 py-3 rounded-xl"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, background: 'var(--red2)', color: 'white' }}>
+              {supplier ? 'SALVA MODIFICHE' : 'CREA FORNITORE'}
             </button>
             <button type="button" onClick={onCancel}
-              className="px-6 py-3 rounded-xl text-sm font-medium"
-              style={{ background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>
-              Annulla
+              className="px-6 py-3 rounded-xl"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'transparent', color: 'var(--muted)', border: '1px solid var(--line)' }}>
+              ANNULLA
             </button>
           </div>
         </form>
@@ -909,14 +919,14 @@ interface BreadcrumbItem {
 
 function Breadcrumb({ items }: { items: BreadcrumbItem[] }) {
   return (
-    <div className="flex items-center gap-1.5 flex-wrap text-sm">
+    <div className="flex items-center gap-1 flex-wrap" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
       {items.map((item, i) => (
-        <div key={i} className="flex items-center gap-1.5">
-          {i > 0 && <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--line)' }} />}
+        <div key={i} className="flex items-center gap-1">
+          {i > 0 && <span style={{ color: 'var(--line)' }}>/</span>}
           <button
             onClick={item.onClick}
-            className="font-medium transition-all hover:opacity-80"
-            style={{ color: i === items.length - 1 ? 'var(--text)' : 'var(--muted)' }}>
+            className="transition-all hover:opacity-100"
+            style={{ color: i === items.length - 1 ? 'var(--text)' : 'var(--muted)', opacity: i === items.length - 1 ? 1 : 0.8, background: 'none', border: 'none', cursor: 'pointer' }}>
             {item.label}
           </button>
         </div>
@@ -933,20 +943,18 @@ function NavTile({ label, count, icon: Icon, onClick }: {
   const TileIcon = Icon ?? MapPin
   return (
     <button onClick={onClick}
-      className="panel p-5 text-left transition-all hover:shadow-lg hover:-translate-y-0.5 w-full"
-      style={{ border: '1px solid var(--line)' }}>
+      className="text-left w-full transition-all"
+      style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '18px 20px' }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}>
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'rgba(208,0,58,0.08)' }}>
-          <TileIcon className="w-5 h-5" style={{ color: 'var(--red2)' }} />
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--panel2)' }}>
+          <TileIcon className="w-4 h-4" style={{ color: 'var(--muted)' }} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{label}</p>
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>
-            {count} {count === 1 ? 'fornitore' : 'fornitori'}
-          </p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)' }}>{label}</p>
+          <p style={{ fontFamily: 'var(--font-serif)', fontSize: '22px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.2, marginTop: '2px' }}>{count}</p>
         </div>
-        <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--line)' }} />
       </div>
     </button>
   )
@@ -964,17 +972,14 @@ export default function Fornitori() {
   const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  // Mode: 'navigate' or 'search'
   const [mode, setMode] = useState<'navigate' | 'search'>('navigate')
 
-  // Navigation state
   const [navCategory, setNavCategory] = useState<string | null>(null)
   const [navCountryGroup, setNavCountryGroup] = useState<string | null>(null)
   const [navRegion, setNavRegion] = useState<string | null>(null)
   const [navCity, setNavCity] = useState<string | null>(null)
   const [navChain, setNavChain] = useState<string | null>(null)
 
-  // Search state
   const [searchQuery, setSearchQuery] = useState('')
 
   const loadData = useCallback(async () => {
@@ -1079,7 +1084,6 @@ export default function Fornitori() {
     return citySuppliers.filter(s => (getSupplierCity(s) || 'Altro') === navCity)
   }, [citySuppliers, navCity])
 
-  // Category counts for landing
   const categoryCounts = useMemo(() => {
     const map: Record<string, number> = {}
     for (const s of supplierList) {
@@ -1089,7 +1093,6 @@ export default function Fornitori() {
     return map
   }, [supplierList])
 
-  // Hotel chain grouping
   const hotelChains = useMemo(() => {
     if (navCategory !== 'Hotel') return {}
     const map: Record<string, Supplier[]> = {}
@@ -1146,6 +1149,13 @@ export default function Fornitori() {
     return items
   }, [navCategory, navCountryGroup, navRegion, navCity, navChain])
 
+  // Average rating
+  const avgRating = useMemo(() => {
+    const rated = supplierList.filter(s => s.rating > 0)
+    if (!rated.length) return 0
+    return rated.reduce((a, s) => a + s.rating, 0) / rated.length
+  }, [supplierList])
+
   // ─── Detail View ────────────────────────────────────────────────────────────
 
   if (selected) {
@@ -1164,24 +1174,26 @@ export default function Fornitori() {
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl text-sm font-medium animate-fade-in flex items-center gap-3"
             style={{ background: 'rgba(208,0,58,0.95)', color: 'white', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
             <span>{saveError}</span>
-            <button onClick={() => setSaveError(null)} className="ml-2 text-white/70 hover:text-white">✕</button>
+            <button onClick={() => setSaveError(null)} className="ml-2 text-white/70 hover:text-white">&#10005;</button>
           </div>
         )}
         {deletingSupplier && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-            <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+            <div className="w-full max-w-sm p-6" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px' }}>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,49,95,0.12)' }}>
-                  <Trash2 className="w-5 h-5" style={{ color: 'var(--red2)' }} />
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)' }}>
+                  <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
                 </div>
-                <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Elimina fornitore</h3>
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', fontWeight: 600, color: 'var(--text)' }}>Elimina fornitore</h3>
               </div>
               <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>
                 Sei sicuro di voler eliminare <strong style={{ color: 'var(--text)' }}>"{deletingSupplier.nome}"</strong>?
               </p>
               <div className="flex gap-3">
-                <button onClick={handleDelete} className="flex-1 py-3 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--red2)' }}>Elimina</button>
-                <button onClick={() => setDeletingSupplier(null)} className="flex-1 py-3 rounded-xl text-sm font-medium" style={{ background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>Annulla</button>
+                <button onClick={handleDelete} className="flex-1 py-3 rounded-xl text-white"
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, background: 'var(--red2)' }}>ELIMINA</button>
+                <button onClick={() => setDeletingSupplier(null)} className="flex-1 py-3 rounded-xl"
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'transparent', color: 'var(--muted)', border: '1px solid var(--line)' }}>ANNULLA</button>
               </div>
             </div>
           </div>
@@ -1193,82 +1205,105 @@ export default function Fornitori() {
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      {/* Wire masthead */}
+      <div className="wire-masthead">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Fornitori</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-            {supplierList.length} fornitori nel database MICE
-          </p>
+          <span className="wire-masthead-title">FORNITORI</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>
+            {supplierList.length}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Mode toggle */}
-          <div className="flex p-1 rounded-xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-            <button
-              onClick={() => setMode('navigate')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
-              style={{
-                background: mode === 'navigate' ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'transparent',
-                color: mode === 'navigate' ? 'white' : 'var(--muted)',
-              }}>
-              <Navigation className="w-3.5 h-3.5" /> Naviga
-            </button>
-            <button
-              onClick={() => setMode('search')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
-              style={{
-                background: mode === 'search' ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'transparent',
-                color: mode === 'search' ? 'white' : 'var(--muted)',
-              }}>
-              <Search className="w-3.5 h-3.5" /> Cerca
-            </button>
-          </div>
+        <div className="wire-masthead-right">
           <button onClick={() => { setEditingSupplier(undefined); setShowForm(true) }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
-            style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
-            <Plus className="w-4 h-4" /> Nuovo
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+            <Plus className="w-3 h-3 inline mr-1 -mt-0.5" />NUOVO FORNITORE
           </button>
         </div>
       </div>
 
+      {/* Wire ticker */}
+      <div className="wire-ticker">
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+          <strong>{supplierList.length}</strong> totali
+        </span>
+        {(categoryCounts['Hotel'] ?? 0) > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+            <strong>{categoryCounts['Hotel']}</strong> hotel
+          </span>
+        )}
+        {(categoryCounts['Ristorante'] ?? 0) > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+            <strong>{categoryCounts['Ristorante']}</strong> ristoranti
+          </span>
+        )}
+        {(categoryCounts['Audio Video'] ?? 0) > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+            <strong>{categoryCounts['Audio Video']}</strong> audio/video
+          </span>
+        )}
+        {(categoryCounts['Location'] ?? 0) > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+            <strong>{categoryCounts['Location']}</strong> location
+          </span>
+        )}
+        {avgRating > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--yellow)' }}>
+            <Star className="w-3 h-3 inline -mt-0.5 mr-0.5" fill="var(--yellow)" /><strong>{avgRating.toFixed(1)}</strong> rating medio
+          </span>
+        )}
+      </div>
+
+      {/* Wire tabs: mode selector */}
+      <div className="wire-tabs">
+        <button onClick={() => setMode('navigate')}
+          className={`wire-tab ${mode === 'navigate' ? 'wire-tab--active' : ''}`}>
+          <Navigation className="w-3 h-3 inline mr-1 -mt-0.5" />NAVIGA
+        </button>
+        <button onClick={() => setMode('search')}
+          className={`wire-tab ${mode === 'search' ? 'wire-tab--active' : ''}`}>
+          <Search className="w-3 h-3 inline mr-1 -mt-0.5" />CERCA
+        </button>
+      </div>
+
       {/* ─── SEARCH MODE ───────────────────────────────────────────────────────── */}
       {mode === 'search' && (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-4 animate-fade-in" style={{ marginTop: '20px' }}>
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'var(--muted)' }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder='Cerca: "Milano 200 persone", "hotel Lombardia 300 camere", "audio video Torino"...'
-              className="w-full pl-12 pr-10 py-4 rounded-2xl text-sm focus:outline-none"
-              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              placeholder='Cerca: "Milano 200 persone", "hotel Lombardia", "audio video Torino"...'
+              className="w-full pl-10 pr-9 py-3 rounded-lg text-sm focus:outline-none"
+              style={{ background: 'transparent', border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
               autoFocus
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2">
-                <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
               </button>
             )}
           </div>
 
           {searchQuery.trim() && (
-            <p className="text-xs font-medium px-1" style={{ color: 'var(--muted)' }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
               {searchResults.length} fornitor{searchResults.length !== 1 ? 'i' : 'e'} trovat{searchResults.length !== 1 ? 'i' : 'o'}
             </p>
           )}
 
           {searchQuery.trim() && searchResults.length === 0 && (
-            <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
-              <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="text-sm font-medium">Nessun fornitore trovato</p>
-              <p className="text-xs mt-2">Prova a rimuovere filtri di capienza o cambiare la citta nella ricerca.</p>
+            <div className="p-10 text-center" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', color: 'var(--muted)' }}>
+              <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessun fornitore trovato</p>
             </div>
           )}
 
           {searchResults.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {searchResults.map(sup => (
                 <SupplierCard key={sup.id} supplier={sup} onClick={() => setSelected(sup)} />
               ))}
@@ -1276,14 +1311,13 @@ export default function Fornitori() {
           )}
 
           {!searchQuery.trim() && (
-            <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
-              <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">Scrivi una ricerca per trovare fornitori per citta, categoria, capienza, servizi...</p>
+            <div className="p-10 text-center" style={{ background: 'var(--panel-solid)', border: '1px dashed var(--line)', borderRadius: '14px' }}>
+              <Search className="w-8 h-8 mx-auto mb-2 opacity-20" style={{ color: 'var(--muted)' }} />
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>Scrivi una ricerca per trovare fornitori</p>
               <div className="flex flex-wrap justify-center gap-2 mt-4">
                 {['Milano 200 persone', 'hotel Lombardia', 'audio video Torino', 'ristorante Roma 100 persone', 'catering Bari'].map(ex => (
                   <button key={ex} onClick={() => setSearchQuery(ex)}
-                    className="text-xs px-3 py-1.5 rounded-full transition-all hover:opacity-80"
-                    style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+                    style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', padding: '4px 10px', borderRadius: '6px', background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)', cursor: 'pointer' }}>
                     {ex}
                   </button>
                 ))}
@@ -1295,35 +1329,24 @@ export default function Fornitori() {
 
       {/* ─── NAVIGATE MODE ─────────────────────────────────────────────────────── */}
       {mode === 'navigate' && (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-4 animate-fade-in" style={{ marginTop: '20px' }}>
           {/* Breadcrumb */}
           {navCategory && navCountryGroup !== '__chains__' && <Breadcrumb items={breadcrumbItems} />}
 
           {/* Level: Categories */}
           {!navCategory && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {NAV_CATEGORIES.map(cat => {
                 const Icon = CATEGORY_ICONS[cat] ?? MoreHorizontal
                 const count = categoryCounts[cat] ?? 0
                 return (
-                  <button key={cat} onClick={() => setNavCategory(cat)}
-                    className="panel p-5 text-center transition-all hover:shadow-lg hover:-translate-y-0.5"
-                    style={{ border: '1px solid var(--line)' }}>
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
-                      style={{ background: 'rgba(208,0,58,0.08)' }}>
-                      <Icon className="w-6 h-6" style={{ color: 'var(--red2)' }} />
-                    </div>
-                    <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{cat}</p>
-                    <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
-                      {count} {count === 1 ? 'fornitore' : 'fornitori'}
-                    </p>
-                  </button>
+                  <NavTile key={cat} label={cat} count={count} icon={Icon} onClick={() => setNavCategory(cat)} />
                 )
               })}
             </div>
           )}
 
-          {/* Level: Country groups (Catene / Italia / Estero / Altro) */}
+          {/* Level: Country groups */}
           {navCategory && !navCountryGroup && !navChain && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {navCategory === 'Hotel' && (
@@ -1372,16 +1395,16 @@ export default function Fornitori() {
           {/* Level: Hotel Chain supplier list */}
           {navCategory === 'Hotel' && navCountryGroup === '__chains__' && navChain && (
             <div className="space-y-3">
-              <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
                 {chainSuppliers.length} hotel {navChain}
               </p>
               {chainSuppliers.length === 0 ? (
-                <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
-                  <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p>Nessun hotel in questa catena</p>
+                <div className="p-10 text-center" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', color: 'var(--muted)' }}>
+                  <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessun hotel in questa catena</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {chainSuppliers.map(sup => (
                     <SupplierCard key={sup.id} supplier={sup} onClick={() => setSelected(sup)} />
                   ))}
@@ -1394,10 +1417,8 @@ export default function Fornitori() {
           {navCategory && navCountryGroup && navCountryGroup !== '__chains__' && !navRegion && (
             <>
               {Object.keys(regions).length === 1 ? (
-                // Skip region level if only one region
                 (() => {
                   const onlyRegion = Object.keys(regions)[0]
-                  // Auto-navigate to cities of that region
                   return (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {Object.entries(
@@ -1437,8 +1458,7 @@ export default function Fornitori() {
           {navCategory && navCountryGroup && navCountryGroup !== '__chains__' && navRegion && !navCity && (
             <>
               {Object.keys(cities).length === 1 ? (
-                // Only one city, show suppliers directly
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {citySuppliers.map(sup => (
                     <SupplierCard key={sup.id} supplier={sup} onClick={() => setSelected(sup)} />
                   ))}
@@ -1459,16 +1479,16 @@ export default function Fornitori() {
           {/* Level: Supplier list (final) */}
           {navCategory && navCountryGroup && navCountryGroup !== '__chains__' && (navCity || (navRegion && Object.keys(cities).length === 1)) && (
             <div className="space-y-3">
-              <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
                 {finalNavList.length} risultat{finalNavList.length !== 1 ? 'i' : 'o'}
               </p>
               {finalNavList.length === 0 ? (
-                <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
-                  <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p>Nessun fornitore in questa posizione</p>
+                <div className="p-10 text-center" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', color: 'var(--muted)' }}>
+                  <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessun fornitore in questa posizione</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {finalNavList.map(sup => (
                     <SupplierCard key={sup.id} supplier={sup} onClick={() => setSelected(sup)} />
                   ))}
@@ -1482,20 +1502,22 @@ export default function Fornitori() {
       {/* Modals */}
       {showForm && <SupplierFormModal supplier={editingSupplier} onSave={handleSave} onCancel={() => { setShowForm(false); setEditingSupplier(undefined) }} />}
       {deletingSupplier && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="w-full max-w-sm p-6" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px' }}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,49,95,0.12)' }}>
-                <Trash2 className="w-5 h-5" style={{ color: 'var(--red2)' }} />
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)' }}>
+                <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
               </div>
-              <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Elimina fornitore</h3>
+              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', fontWeight: 600, color: 'var(--text)' }}>Elimina fornitore</h3>
             </div>
             <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>
               Sei sicuro di voler eliminare <strong style={{ color: 'var(--text)' }}>"{deletingSupplier.nome}"</strong>?
             </p>
             <div className="flex gap-3">
-              <button onClick={handleDelete} className="flex-1 py-3 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--red2)' }}>Elimina</button>
-              <button onClick={() => setDeletingSupplier(null)} className="flex-1 py-3 rounded-xl text-sm font-medium" style={{ background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>Annulla</button>
+              <button onClick={handleDelete} className="flex-1 py-3 rounded-xl text-white"
+                style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, background: 'var(--red2)' }}>ELIMINA</button>
+              <button onClick={() => setDeletingSupplier(null)} className="flex-1 py-3 rounded-xl"
+                style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'transparent', color: 'var(--muted)', border: '1px solid var(--line)' }}>ANNULLA</button>
             </div>
           </div>
         </div>
