@@ -232,3 +232,76 @@ export function useEventServices(eventId: string) {
     updateLinkContact,
   }
 }
+
+export interface EventEconomicsSummary {
+  eventId: string
+  venduto: number
+  costo: number
+  fee: number
+  commissioni: number
+  ricavi: number
+  margine: number
+  marginePct: number
+  lineCount: number
+}
+
+export async function fetchAllEventsEconomics(feePctByEvent: Record<string, number>): Promise<EventEconomicsSummary[]> {
+  const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes] = await Promise.all([
+    supabase.from('event_supplier_services').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo'),
+    supabase.from('event_hotel_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, check_in_date, data, ora_inizio, commissione_pct, commissione_importo'),
+    supabase.from('event_restaurant_details').select('event_id, supplier_id, budget_totale, budget_per_persona, pax_confermati, pax_previsti, costo_totale_reale, costo_per_persona, data, ora_inizio, commissione_pct, commissione_importo'),
+    supabase.from('event_experience_details').select('event_id, supplier_id, venduto_totale, venduto_per_persona, costo_totale, costo_per_persona, pax, data, ora_inizio, ora, commissione_pct, commissione_importo'),
+    supabase.from('event_catering_details').select('event_id, supplier_id, venduto_totale, venduto_per_persona, costo_totale, costo_per_persona, pax, data, ora_inizio, ora, commissione_pct, commissione_importo'),
+    supabase.from('event_staff_interno_details').select('event_id, profile_id, venduto_totale, costo_totale, costo_giornaliero, data, ora_inizio, commissione_pct, commissione_importo'),
+    supabase.from('event_staff_esterno_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo'),
+    supabase.from('event_varie_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo'),
+    supabase.from('event_audio_video_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo'),
+    supabase.from('event_allestimenti_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo'),
+    supabase.from('event_grafica_stampa_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo'),
+  ])
+
+  const catToRows: { category: string; rows: RawRow[] }[] = [
+    { category: 'transfer', rows: (svcRes.data ?? []) as RawRow[] },
+    { category: 'hotel', rows: (hotelRes.data ?? []) as RawRow[] },
+    { category: 'ristorante', rows: (restRes.data ?? []) as RawRow[] },
+    { category: 'experience', rows: (expRes.data ?? []) as RawRow[] },
+    { category: 'catering', rows: (catRes.data ?? []) as RawRow[] },
+    { category: 'staff_interno', rows: (staffIntRes.data ?? []) as RawRow[] },
+    { category: 'staff_esterno', rows: (staffExtRes.data ?? []) as RawRow[] },
+    { category: 'varie', rows: (varieRes.data ?? []) as RawRow[] },
+    { category: 'audio_video', rows: (avRes.data ?? []) as RawRow[] },
+    { category: 'allestimenti', rows: (allestRes.data ?? []) as RawRow[] },
+    { category: 'grafica_stampa', rows: (graficaRes.data ?? []) as RawRow[] },
+  ]
+
+  const byEvent: Record<string, { venduto: number; costo: number; commissioni: number; count: number }> = {}
+
+  for (const { category, rows } of catToRows) {
+    for (const row of rows) {
+      const eid = row.event_id as string
+      if (!eid) continue
+      if (!byEvent[eid]) byEvent[eid] = { venduto: 0, costo: 0, commissioni: 0, count: 0 }
+      const econ = calcRowEconomics(row, category)
+      byEvent[eid].venduto += econ.venduto
+      byEvent[eid].costo += econ.costo
+      byEvent[eid].count += 1
+
+      const commImporto = (row.commissione_importo as number) || 0
+      const commPct = (row.commissione_pct as number) || 0
+      if (commImporto > 0) {
+        byEvent[eid].commissioni += commImporto
+      } else if (commPct > 0 && econ.costo > 0) {
+        byEvent[eid].commissioni += econ.costo * commPct / 100
+      }
+    }
+  }
+
+  return Object.entries(byEvent).map(([eventId, d]) => {
+    const feePct = feePctByEvent[eventId] ?? 6
+    const fee = d.venduto * feePct / 100
+    const ricavi = d.venduto + fee + d.commissioni
+    const margine = ricavi - d.costo
+    const marginePct = ricavi > 0 ? (margine / ricavi) * 100 : 0
+    return { eventId, venduto: d.venduto, costo: d.costo, fee, commissioni: d.commissioni, ricavi, margine, marginePct, lineCount: d.count }
+  })
+}

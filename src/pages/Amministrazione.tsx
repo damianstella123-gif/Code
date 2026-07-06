@@ -42,6 +42,7 @@ import {
   INVOICE_STATUSES, ADMIN_DOC_TYPES,
   type Invoice, type AdminDocument,
 } from '@/lib/invoices-service'
+import { fetchAllEventsEconomics, type EventEconomicsSummary } from '@/lib/use-event-services'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -365,6 +366,7 @@ export default function Amministrazione() {
   const [showDocForm, setShowDocForm] = useState(false)
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
   const [editingDoc, setEditingDoc] = useState<AdminDocument | null>(null)
+  const [eventEconomics, setEventEconomics] = useState<EventEconomicsSummary[]>([])
 
   useEffect(() => {
     if (searchParams.has('tab') || searchParams.has('id')) {
@@ -385,6 +387,12 @@ export default function Amministrazione() {
       _clients = cl.map(c => ({ id: c.id, nome: c.nome }))
       _suppliers = sp
       _events = ev
+
+      const feePctMap: Record<string, number> = {}
+      for (const e of ev) feePctMap[e.id] = e.fee_agenzia_pct ?? 6
+      fetchAllEventsEconomics(feePctMap).then(econ => {
+        if (!cancelled) setEventEconomics(econ)
+      })
     })
     return () => { cancelled = true }
   }, [])
@@ -428,10 +436,22 @@ export default function Amministrazione() {
     [fatture, isManagerOnly, allowedEventIds])
 
   // ─── KPIs ────────────────────────────────────────────────────────────────────
-  const totEntrate = visibleEntrate.reduce((s, e) => s + e.importo, 0)
-  const totUscite = visibleUscite.reduce((s, u) => s + u.importo, 0)
+  const totEntrateManuali = visibleEntrate.reduce((s, e) => s + e.importo, 0)
+  const totUsciteManuali = visibleUscite.reduce((s, u) => s + u.importo, 0)
   const totInAttesa = visibleEntrate.filter(e => e.stato === 'in_attesa').reduce((s, e) => s + e.importo, 0)
   const totScaduto = visibleEntrate.filter(e => e.stato === 'scaduto').reduce((s, e) => s + e.importo, 0)
+
+  // Event economics (filtered by allowed events for Manager)
+  const visibleEventEcon = useMemo(() =>
+    eventEconomics.filter(ec => !isManagerOnly || allowedEventIds.includes(ec.eventId)),
+    [eventEconomics, isManagerOnly, allowedEventIds])
+
+  const totRicaviEventi = visibleEventEcon.reduce((s, ec) => s + ec.ricavi, 0)
+  const totCostiEventi = visibleEventEcon.reduce((s, ec) => s + ec.costo, 0)
+
+  // Aggregated totals
+  const totEntrate = totEntrateManuali + totRicaviEventi
+  const totUscite = totUsciteManuali + totCostiEventi
   const margine = totEntrate - totUscite
   const marginePerc = totEntrate > 0 ? Math.round((margine / totEntrate) * 100) : 0
 
@@ -439,15 +459,14 @@ export default function Amministrazione() {
     .filter(e => !isManagerOnly || allowedEventIds.includes(e.id))
     .reduce((s, e) => s + e.budget, 0)
 
-  const alertBudget = visibleUscite.some(u => {
-    if (!u.eventoId) return false
-    const ev = events.find(e => e.id === u.eventoId)
-    if (!ev) return false
-    const speso = visibleUscite
-      .filter(x => x.eventoId === u.eventoId)
-      .reduce((s, x) => s + x.importo, 0)
-    return speso > ev.budget * 0.9
-  })
+  const alertBudget = events
+    .filter(e => !isManagerOnly || allowedEventIds.includes(e.id))
+    .some(ev => {
+      if (ev.budget <= 0) return false
+      const costoManuale = visibleUscite.filter(x => x.eventoId === ev.id).reduce((s, x) => s + x.importo, 0)
+      const costoServizi = eventEconomics.find(ec => ec.eventId === ev.id)?.costo ?? 0
+      return (costoManuale + costoServizi) > ev.budget * 0.9
+    })
 
   const fattureInScadenza = visibleFatture.filter(f => {
     const days = Math.ceil((new Date(f.scadenza).getTime() - Date.now()) / 86400000)
@@ -806,12 +825,12 @@ export default function Amministrazione() {
           {/* KPI grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[
-              { label: 'Budget Totale Eventi', value: formatEur(budgetEvents), sub: `${events.filter(e => !isManagerOnly || allowedEventIds.includes(e.id)).length} eventi`, color: 'var(--text)', icon: Euro },
-              { label: 'Ricavi Previsti', value: formatEur(totEntrate), sub: `${visibleEntrate.length} voci`, color: 'var(--green)', icon: ArrowUpRight },
-              { label: 'Costi Fornitori', value: formatEur(totUscite), sub: `${visibleUscite.length} voci`, color: 'var(--red2)', icon: ArrowDownRight },
-              { label: 'Margine Stimato', value: formatEur(margine), sub: `${marginePerc}% sui ricavi`, color: margine >= 0 ? 'var(--green)' : 'var(--red2)', icon: TrendingUp },
-              { label: 'Pagamenti in Sospeso', value: formatEur(totInAttesa), sub: `${visibleEntrate.filter(e => e.stato === 'in_attesa').length} movimenti`, color: 'var(--yellow)', icon: Clock },
-              { label: 'Fatture da Emettere', value: String(visibleFatture.filter(f => f.stato === 'bozza').length), sub: `Scadute: ${visibleFatture.filter(f => f.stato === 'scaduta').length}`, color: 'var(--blue)', icon: Receipt },
+              { label: 'Budget Totale Eventi', value: formatEur(budgetEvents), sub: `${events.filter(e => !isManagerOnly || allowedEventIds.includes(e.id)).length} eventi`, breakdown: null, color: 'var(--text)', icon: Euro },
+              { label: 'Ricavi Totali', value: formatEur(totEntrate), sub: `${marginePerc}% margine`, breakdown: `eventi: ${formatEur(totRicaviEventi)} · manuali: ${formatEur(totEntrateManuali)}`, color: 'var(--green)', icon: ArrowUpRight },
+              { label: 'Costi Totali', value: formatEur(totUscite), sub: `${visibleUscite.length + visibleEventEcon.reduce((s, e) => s + e.lineCount, 0)} voci`, breakdown: `eventi: ${formatEur(totCostiEventi)} · manuali: ${formatEur(totUsciteManuali)}`, color: 'var(--red2)', icon: ArrowDownRight },
+              { label: 'Margine Stimato', value: formatEur(margine), sub: `${marginePerc}% sui ricavi`, breakdown: null, color: margine >= 0 ? 'var(--green)' : 'var(--red2)', icon: TrendingUp },
+              { label: 'Pagamenti in Sospeso', value: formatEur(totInAttesa), sub: `${visibleEntrate.filter(e => e.stato === 'in_attesa').length} movimenti`, breakdown: null, color: 'var(--yellow)', icon: Clock },
+              { label: 'Fatture da Emettere', value: String(visibleFatture.filter(f => f.stato === 'bozza').length), sub: `Scadute: ${visibleFatture.filter(f => f.stato === 'scaduta').length}`, breakdown: null, color: 'var(--blue)', icon: Receipt },
             ].map((kpi, i) => {
               const Icon = kpi.icon
               return (
@@ -822,6 +841,9 @@ export default function Amministrazione() {
                   </div>
                   <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: kpi.color, lineHeight: 1.1 }}>{kpi.value}</p>
                   <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{kpi.sub}</p>
+                  {kpi.breakdown && (
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', marginTop: 4, opacity: 0.6 }}>{kpi.breakdown}</p>
+                  )}
                 </div>
               )
             })}
@@ -829,14 +851,16 @@ export default function Amministrazione() {
 
           {/* Budget per evento */}
           <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
-            <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 16 }}>Budget vs Speso per Evento</h3>
+            <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 16 }}>Costi vs Budget per Evento</h3>
             <div className="space-y-4">
               {events
                 .filter(ev => !isManagerOnly || allowedEventIds.includes(ev.id))
                 .map(ev => {
-                  const speso = uscite.filter(u => u.eventoId === ev.id).reduce((s, u) => s + u.importo, 0)
-                  const perc = Math.min(100, Math.round((speso / ev.budget) * 100))
-                  const overBudget = speso > ev.budget * 0.9
+                  const costoManuale = uscite.filter(u => u.eventoId === ev.id).reduce((s, u) => s + u.importo, 0)
+                  const costoServizi = eventEconomics.find(ec => ec.eventId === ev.id)?.costo ?? 0
+                  const speso = costoManuale + costoServizi
+                  const perc = ev.budget > 0 ? Math.min(100, Math.round((speso / ev.budget) * 100)) : 0
+                  const overBudget = ev.budget > 0 && speso > ev.budget * 0.9
                   const barColor = perc >= 100 ? 'var(--red2)' : perc >= 80 ? 'var(--yellow)' : 'var(--green)'
                   return (
                     <div key={ev.id}>
