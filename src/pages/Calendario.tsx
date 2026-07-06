@@ -1361,7 +1361,7 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
         priorita,
         stato: 'da_fare',
         scadenza: dataInizio,
-        creatoIl: new Date().toISOString().slice(0, 10),
+        creatoIl: toISO(new Date()),
       }
       onCreate('task', t)
     } else {
@@ -1374,7 +1374,7 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
         categoria: 'documento',
         stato: 'da_aprire',
         priorita,
-        creatoIl: new Date().toISOString().slice(0, 10),
+        creatoIl: toISO(new Date()),
         scadenza: dataInizio,
         note: '',
         importo: null,

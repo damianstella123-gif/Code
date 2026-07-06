@@ -44,7 +44,7 @@ import { useRealtimeTable } from '@/lib/use-realtime'
 import { detectSupplierCategory, SupplierCategoryPanel, type CategoryType } from '@/components/TabOperativo'
 import TabBudget from '@/components/TabBudget'
 import { setFlyContext } from '@/lib/fly'
-import { daysLeft, fmtShort, fmtLong } from '@/lib/format'
+import { daysLeft, fmtShort, fmtLong, toISO } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Supplier } from '@/data/suppliers'
@@ -672,7 +672,7 @@ function TabTask({ event, suppliers, internalUsers }: { event: Event; suppliers:
         evento: event.id,
         priorita: tmpl.priorita,
         stato: 'da_fare',
-        scadenza: dueDate.toISOString().slice(0, 10),
+        scadenza: toISO(dueDate),
         creatoIl: new Date().toISOString(),
         fase: tmpl.fase,
         categoria: tmpl.categoria,
@@ -2740,7 +2740,7 @@ const WF_KEY = 'simmetria_workflows'
 function createWorkflowForEvent(event: Event) {
   const existing: EventoWorkflow[] = loadWorkflowsFromStorage()
   if (existing.some(w => w.eventoId === event.id)) return
-  const now = new Date().toISOString().slice(0, 10)
+  const now = toISO(new Date())
   const wf: EventoWorkflow = {
     id: `wf_${event.id}`,
     eventoId: event.id,

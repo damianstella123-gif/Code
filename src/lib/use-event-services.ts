@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './supabase'
+import { toISO } from './format'
 
 export interface EventSupplierLink {
   id: string
@@ -205,7 +206,7 @@ export function useEventServices(eventId: string) {
   async function updateLinkStatus(linkId: string, stato: EventSupplierLink['stato_conferma'], note?: string) {
     const patch: Record<string, unknown> = { stato_conferma: stato }
     if (stato === 'confermato' || stato === 'contrattualizzato') {
-      patch.data_conferma = new Date().toISOString().slice(0, 10)
+      patch.data_conferma = toISO(new Date())
     }
     if (note !== undefined) patch.note_conferma = note
 

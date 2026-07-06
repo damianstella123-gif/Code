@@ -27,7 +27,7 @@ import {
 import { type Pratica, type CategoriaPratica, type StatoPratica, type PrioritaPratica } from '@/data/pratiche'
 import type { Event } from '@/data/events'
 import { loadUser } from '@/lib/auth'
-import { daysLeft, fmtShort } from '@/lib/format'
+import { daysLeft, fmtShort, toISO } from '@/lib/format'
 import { cachePraticheSnapshot } from '@/lib/storage'
 import { fetchPractices, upsertPractice, deletePractice as deletePracticeRemote } from '@/lib/practices-service'
 import { fetchEvents } from '@/lib/events-service'
@@ -561,7 +561,7 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
       categoria,
       stato,
       priorita,
-      creatoIl: pratica?.creatoIl ?? new Date().toISOString().slice(0, 10),
+      creatoIl: pratica?.creatoIl ?? toISO(new Date()),
       scadenza,
       note: note.trim(),
       importo: importo ? parseFloat(importo) : null,

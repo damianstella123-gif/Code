@@ -19,7 +19,7 @@ import { fetchTasks, upsertTask, deleteTask as deleteTaskRemote, changeTaskStatu
 import { fetchEvents } from '@/lib/events-service'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { useRealtimeTable } from '@/lib/use-realtime'
-import { daysLeft } from '@/lib/format'
+import { daysLeft, toISO } from '@/lib/format'
 import type { Task } from '@/data/tasks'
 import type { Profile } from '@/lib/profiles'
 
@@ -87,7 +87,7 @@ function TaskFormModal({ task, onSave, onClose, users, events }: {
       priorita,
       stato,
       scadenza,
-      creatoIl: task?.creatoIl ?? new Date().toISOString().slice(0, 10),
+      creatoIl: task?.creatoIl ?? toISO(new Date()),
     })
   }
 

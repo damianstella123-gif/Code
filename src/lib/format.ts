@@ -17,7 +17,10 @@ export function fmtFull(iso: string): string {
 }
 
 export function toISO(d: Date): string {
-  return d.toISOString().slice(0, 10)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const g = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${g}`
 }
 
 export function addDays(d: Date, n: number): Date {

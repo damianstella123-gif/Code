@@ -22,6 +22,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { loadUser, isPartnerUser } from '@/lib/auth'
+import { toISO } from '@/lib/format'
 import type {
   Entrata,
   Uscita,
@@ -522,7 +523,7 @@ export default function Amministrazione() {
   function segnaEntrataPagata(id: string) {
     setEntrate(prev => {
       const updated = prev.map(e =>
-        e.id === id ? { ...e, stato: 'pagato' as StatoPagamento, dataPagamento: new Date().toISOString().slice(0, 10) } : e
+        e.id === id ? { ...e, stato: 'pagato' as StatoPagamento, dataPagamento: toISO(new Date()) } : e
       )
       saveLocal(SK_ENTRATE, updated)
       return updated
@@ -530,7 +531,7 @@ export default function Amministrazione() {
   }
 
   function segnaUscitaPagata(id: string) {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = toISO(new Date())
     setUscite(prev => prev.map(u =>
       u.id === id ? { ...u, stato: 'pagato' as StatoPagamento, dataPagamento: today } : u
     ))
@@ -576,8 +577,8 @@ export default function Amministrazione() {
       imponibile: importo,
       iva: Math.round(importo * 0.22),
       stato: 'bozza',
-      dataEmissione: new Date().toISOString().slice(0, 10),
-      scadenza: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+      dataEmissione: toISO(new Date()),
+      scadenza: toISO(new Date(Date.now() + 30 * 86400000)),
       note: 'Fattura generata automaticamente',
     }
     setFatture(prev => {
@@ -617,7 +618,7 @@ export default function Amministrazione() {
     const wsE = XLSX.utils.json_to_sheet(entrateRows)
     XLSX.utils.book_append_sheet(wb, wsU, 'Uscite')
     XLSX.utils.book_append_sheet(wb, wsE, 'Entrate')
-    XLSX.writeFile(wb, `simmetria_budget_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    XLSX.writeFile(wb, `simmetria_budget_${toISO(new Date())}.xlsx`)
   }
 
   async function esportaPDF() {
@@ -647,11 +648,11 @@ export default function Amministrazione() {
       headStyles: { fillColor: [220, 30, 60] },
     })
 
-    doc.save(`simmetria_budget_${new Date().toISOString().slice(0, 10)}.pdf`)
+    doc.save(`simmetria_budget_${toISO(new Date())}.pdf`)
   }
 
   function handleNuovoMovimento(tipo: TipoMovimento, importo: number, note: string, eventoId: string | null, soggettoId: string, quantity: number, unitPrice: number | null) {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = toISO(new Date())
     if (tipo === 'entrata') {
       const newE: Entrata = {
         id: `ent_new_${Date.now()}`,
