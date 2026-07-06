@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Loader2, Send, X } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Client } from '@/data/clients'
@@ -11,12 +13,24 @@ interface CommandBarProps {
   onFilter?: (filter: string) => void
 }
 
+interface FlyMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export default function CommandBar({ events, tasks, clients, onFilter }: CommandBarProps) {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [focused, setFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  const [flyOpen, setFlyOpen] = useState(false)
+  const [flyHistory, setFlyHistory] = useState<FlyMessage[]>([])
+  const [flyLoading, setFlyLoading] = useState(false)
+  const [flyInput, setFlyInput] = useState('')
+  const [flyError, setFlyError] = useState<string | null>(null)
+  const flyEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -38,6 +52,10 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
   }, [])
+
+  useEffect(() => {
+    flyEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [flyHistory, flyLoading])
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -70,13 +88,68 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
     else navigate('/crm')
   }, [navigate])
 
+  const askFly = useCallback(async (text: string) => {
+    if (!text.trim() || flyLoading) return
+
+    const userMsg: FlyMessage = { role: 'user', content: text.trim() }
+    const newHistory = [...flyHistory, userMsg]
+    setFlyHistory(newHistory)
+    setFlyInput('')
+    setFlyError(null)
+    setFlyLoading(true)
+
+    try {
+      const { data, error } = await supabase.functions.invoke('fly-gateway', {
+        body: {
+          message: text.trim(),
+          history: flyHistory,
+        },
+      })
+
+      if (error) throw new Error(error.message || 'Errore di connessione')
+      if (data?.error) throw new Error(data.error)
+
+      const reply = data?.reply || '(nessuna risposta)'
+      setFlyHistory([...newHistory, { role: 'assistant', content: reply }])
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Errore imprevisto'
+      setFlyError(msg)
+    } finally {
+      setFlyLoading(false)
+    }
+  }, [flyHistory, flyLoading])
+
+  const openFlyWithQuery = useCallback((text: string) => {
+    setFlyOpen(true)
+    setFocused(false)
+    setQuery('')
+    if (text.trim()) {
+      setFlyInput(text.trim())
+      askFly(text.trim())
+    }
+  }, [askFly])
+
+  const handleFlyKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      askFly(flyInput)
+    }
+  }
+
+  const handleBarKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && query.trim()) {
+      e.preventDefault()
+      openFlyWithQuery(query)
+    }
+  }
+
   const suggestions = [
     { label: 'cosa scade oggi?', filter: 'scade_oggi' },
     { label: 'eventi in corso', filter: 'eventi_in_corso' },
     { label: 'clienti attivi', filter: 'clienti_attivi' },
   ]
 
-  const showDropdown = focused && (results || !query.trim())
+  const showDropdown = focused
 
   return (
     <div ref={containerRef} className="cmd-bar-wrapper">
@@ -88,6 +161,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
           value={query}
           onChange={e => setQuery(e.target.value)}
           onFocus={() => setFocused(true)}
+          onKeyDown={handleBarKeyDown}
           placeholder="Chiedi o cerca qualsiasi cosa..."
           className="cmd-bar-input"
         />
@@ -110,9 +184,9 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
                 </button>
               ))}
             </div>
-          ) : results ? (
+          ) : (
             <div className="cmd-results">
-              {results.events.length > 0 && (
+              {results && results.events.length > 0 && (
                 <div className="cmd-group">
                   <span className="cmd-group-label">EVENTI</span>
                   {results.events.map(e => (
@@ -123,7 +197,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
                   ))}
                 </div>
               )}
-              {results.tasks.length > 0 && (
+              {results && results.tasks.length > 0 && (
                 <div className="cmd-group">
                   <span className="cmd-group-label">TASK</span>
                   {results.tasks.map(t => (
@@ -134,7 +208,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
                   ))}
                 </div>
               )}
-              {results.clients.length > 0 && (
+              {results && results.clients.length > 0 && (
                 <div className="cmd-group">
                   <span className="cmd-group-label">CLIENTI</span>
                   {results.clients.map(c => (
@@ -145,8 +219,207 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
                   ))}
                 </div>
               )}
+
+              {/* Ask Fly - always at the bottom */}
+              <div className="cmd-group" style={{ borderTop: '1px solid var(--line)', marginTop: 4, paddingTop: 4 }}>
+                <button className="cmd-result" onClick={() => openFlyWithQuery(query)}>
+                  <span className="cmd-result-name" style={{ color: 'var(--red2)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+                    CHIEDI A FLY
+                  </span>
+                  <span className="cmd-result-ctx">"{query}"</span>
+                </button>
+              </div>
             </div>
-          ) : null}
+          )}
+        </div>
+      )}
+
+      {/* Fly Conversation Panel */}
+      {flyOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 72,
+          right: 24,
+          width: 420,
+          maxHeight: 'calc(100vh - 96px)',
+          background: 'var(--panel-solid)',
+          border: '1px solid var(--line)',
+          borderRadius: 14,
+          display: 'flex',
+          flexDirection: 'column',
+          zIndex: 1000,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        }}>
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+            borderBottom: '1px solid var(--line)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: flyLoading ? 'var(--yellow)' : 'var(--red2)',
+                animation: flyLoading ? 'fly-glow-pulse 1.2s infinite' : 'none',
+              }} />
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: 'var(--text)',
+              }}>
+                FLY
+              </span>
+              {flyLoading && (
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
+                  sta guardando i dati...
+                </span>
+              )}
+            </div>
+            <button onClick={() => setFlyOpen(false)} style={{ color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Messages */}
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: 16,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            minHeight: 200,
+            maxHeight: 'calc(100vh - 240px)',
+          }}>
+            {flyHistory.length === 0 && !flyLoading && (
+              <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Chiedi qualsiasi cosa sui tuoi dati
+                </p>
+                <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+                  {['Cosa scade questa settimana?', 'Eventi di questo mese', 'Fornitori categoria hotel'].map(s => (
+                    <button key={s} onClick={() => askFly(s)} style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '10px',
+                      padding: '4px 8px',
+                      borderRadius: 4,
+                      border: '1px solid var(--line)',
+                      background: 'transparent',
+                      color: 'var(--muted)',
+                      cursor: 'pointer',
+                    }}>{s}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {flyHistory.map((msg, i) => (
+              <div key={i} style={{
+                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                maxWidth: '85%',
+              }}>
+                {msg.role === 'user' ? (
+                  <div style={{
+                    background: 'var(--panel2)',
+                    border: '1px solid var(--line)',
+                    borderRadius: 10,
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    color: 'var(--text)',
+                  }}>
+                    {msg.content}
+                  </div>
+                ) : (
+                  <div style={{
+                    borderLeft: '2px solid var(--red2)',
+                    paddingLeft: 12,
+                    fontSize: '12px',
+                    lineHeight: '1.6',
+                    color: 'var(--text)',
+                    whiteSpace: 'pre-wrap',
+                  }}>
+                    {msg.content}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {flyLoading && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--red2)' }} />
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
+                  Fly sta guardando i dati...
+                </span>
+              </div>
+            )}
+
+            {flyError && (
+              <div style={{
+                padding: '8px 12px',
+                borderRadius: 6,
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.2)',
+                fontSize: '11px',
+                color: 'var(--red2)',
+                fontFamily: 'var(--font-mono)',
+              }}>
+                {flyError}
+              </div>
+            )}
+
+            <div ref={flyEndRef} />
+          </div>
+
+          {/* Input */}
+          <div style={{
+            padding: '12px 16px',
+            borderTop: '1px solid var(--line)',
+            display: 'flex',
+            gap: 8,
+            alignItems: 'center',
+          }}>
+            <input
+              type="text"
+              value={flyInput}
+              onChange={e => setFlyInput(e.target.value)}
+              onKeyDown={handleFlyKeyDown}
+              placeholder="Scrivi a Fly..."
+              disabled={flyLoading}
+              autoFocus
+              style={{
+                flex: 1,
+                background: 'var(--panel2)',
+                border: '1px solid var(--line)',
+                borderRadius: 8,
+                padding: '8px 12px',
+                fontSize: '12px',
+                color: 'var(--text)',
+                fontFamily: 'var(--font-mono)',
+                outline: 'none',
+              }}
+            />
+            <button
+              onClick={() => askFly(flyInput)}
+              disabled={flyLoading || !flyInput.trim()}
+              style={{
+                background: 'var(--red2)',
+                border: 'none',
+                borderRadius: 8,
+                padding: '8px 10px',
+                cursor: flyLoading || !flyInput.trim() ? 'not-allowed' : 'pointer',
+                opacity: flyLoading || !flyInput.trim() ? 0.4 : 1,
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <Send className="w-3.5 h-3.5" style={{ color: 'white' }} />
+            </button>
+          </div>
         </div>
       )}
     </div>
