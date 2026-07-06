@@ -102,6 +102,7 @@ async function deleteCalendarItem(id: string): Promise<boolean> {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const DAYS_IT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab']
+const HEADER_DAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
 const DAYS_FULL = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato']
 const MONTHS_IT = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre']
 
@@ -758,9 +759,9 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem,
     <div className="panel overflow-hidden">
       <div className="overflow-x-auto">
       <div className="grid grid-cols-7 border-b min-w-[600px]" style={{ borderColor: 'var(--line)' }}>
-        {DAYS_IT.map((d, i) => (
+        {HEADER_DAYS.map((d, i) => (
           <div key={d} className="py-2 text-center"
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', opacity: i === 0 || i === 6 ? 0.4 : 0.6 }}>{d}</div>
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', opacity: i >= 5 ? 0.4 : 0.6 }}>{d}</div>
         ))}
       </div>
       <div className="grid grid-cols-7 min-w-[600px]">
