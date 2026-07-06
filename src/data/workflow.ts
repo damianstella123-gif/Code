@@ -1,3 +1,5 @@
+import { addDaysISO } from '@/lib/format'
+
 export type FaseStato = 'bloccata' | 'in_attesa' | 'in_corso' | 'completata' | 'critica'
 
 export type LogTipo = 'avanzamento' | 'blocco' | 'commento' | 'sistema' | 'alert'
@@ -496,7 +498,7 @@ export const workflowsDemo: EventoWorkflow[] = [
       responsabileId: i === 3 ? 'usr_004' : 'usr_012',
       taskIds: i === 5 ? ['tsk_012'] : i === 6 ? ['tsk_013', 'tsk_014'] : [],
       taskCriticiIds: i === 5 ? ['tsk_012'] : [],
-      deadline: new Date(new Date('2026-05-20').getTime() + (i - 7) * 7 * 86400000).toISOString().slice(0, 10),
+      deadline: addDaysISO('2026-05-20', (i - 7) * 7),
       avanzamento: i < 7 ? 100 : 75,
       fornitoriIds: i === 5 ? ['sup_005', 'sup_007'] : i === 6 ? ['sup_005'] : [],
       note: i === 7 ? 'Rendiconto in corso. Feedback post-evento in raccolta.' : '',
@@ -525,7 +527,7 @@ export const workflowsDemo: EventoWorkflow[] = [
       responsabileId: i === 0 ? 'usr_002' : i < 3 ? 'usr_004' : 'usr_003',
       taskIds: i === 0 ? ['tsk_015'] : i === 6 ? ['tsk_016', 'tsk_017'] : [],
       taskCriticiIds: i === 0 ? ['tsk_015'] : [],
-      deadline: new Date(new Date('2026-12-05').getTime() + (i - 7) * 14 * 86400000).toISOString().slice(0, 10),
+      deadline: addDaysISO('2026-12-05', (i - 7) * 14),
       avanzamento: i === 0 ? 20 : 0,
       fornitoriIds: i === 5 ? ['sup_006'] : i === 6 ? ['sup_001', 'sup_002'] : [],
       note: i === 0 ? 'Brief iniziale avviato. Sponsor da contattare.' : '',

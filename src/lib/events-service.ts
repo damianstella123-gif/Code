@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { addDaysISO, diffDaysISO } from './format'
 import type { Event } from '@/data/events'
 
 interface EventRow {
@@ -177,11 +178,7 @@ export async function shiftEventTimeline(eventId: string, deltaDays: number): Pr
   const shifted: string[] = []
   const skipped: string[] = []
 
-  const shiftDate = (d: string): string => {
-    const [y, m, day] = d.split('-').map(Number)
-    const dt = new Date(Date.UTC(y, m - 1, day + deltaDays))
-    return dt.toISOString().slice(0, 10)
-  }
+  const shiftDate = (d: string): string => addDaysISO(d, deltaDays)
 
   async function shiftTable(table: string, dateColumns: string[]): Promise<boolean> {
     const { data: rows, error: fetchErr } = await supabase
@@ -243,14 +240,9 @@ export async function moveEventWithTimelineShift(eventId: string, newStartDate: 
   if (!row) return { event: null, shift: { shifted: [], skipped: [] } }
   const oldStart = (row as EventRow).start_date
   const oldEnd = (row as EventRow).end_date
-  const [oy, om, od] = oldStart.split('-').map(Number)
-  const [ny, nm, nd] = newStartDate.split('-').map(Number)
-  const deltaDays = Math.round(
-    (Date.UTC(ny, nm - 1, nd) - Date.UTC(oy, om - 1, od)) / 86400000
-  )
+  const deltaDays = diffDaysISO(newStartDate, oldStart)
   if (deltaDays === 0) return { event: rowToEvent(row as EventRow), shift: { shifted: [], skipped: [] } }
-  const [ey, em2, ed2] = oldEnd.split('-').map(Number)
-  const newEnd = new Date(Date.UTC(ey, em2 - 1, ed2 + deltaDays)).toISOString().slice(0, 10)
+  const newEnd = addDaysISO(oldEnd, deltaDays)
   const event = await updateEvent(eventId, { dataInizio: newStartDate, dataFine: newEnd })
   const shift = await shiftEventTimeline(eventId, deltaDays)
   return { event, shift }

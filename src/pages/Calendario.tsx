@@ -22,7 +22,7 @@ import {
   Layers,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
-import { daysLeft, fmtShort, fmtLong, toISO, addDays } from '@/lib/format'
+import { daysLeft, fmtShort, fmtLong, toISO, addDays, addDaysISO, diffDaysISO } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Pratica } from '@/data/pratiche'
@@ -1562,9 +1562,7 @@ function EventDateEditModal({ event, onClose, onSave }: {
   }
 
   function addDaysToISODate(iso: string, days: number): string {
-    const [y, m, d] = iso.split('-').map(Number)
-    const dt = new Date(Date.UTC(y, m - 1, d + days))
-    return dt.toISOString().slice(0, 10)
+    return addDaysISO(iso, days)
   }
 
   function addDayToEnd() {
@@ -1916,11 +1914,9 @@ export default function Calendario() {
     } else {
       const target = allEvents.find(e => e.id === id)
       if (!target) return
-      const diffMs = new Date(newDate + 'T00:00:00Z').getTime() - new Date(target.dataInizio + 'T00:00:00Z').getTime()
-      const deltaDays = Math.round(diffMs / 86400000)
+      const deltaDays = diffDaysISO(newDate, target.dataInizio)
       if (deltaDays === 0) return
-      const [ey, em, ed] = target.dataFine.split('-').map(Number)
-      const newEnd = new Date(Date.UTC(ey, em - 1, ed + deltaDays)).toISOString().slice(0, 10)
+      const newEnd = addDaysISO(target.dataFine, deltaDays)
       setAllEvents(prev => prev.map(e => e.id === id ? { ...e, dataInizio: newDate, dataFine: newEnd } : e))
       const { shift: result } = await moveEventWithTimelineShift(id, newDate)
       if (result.skipped.length > 0) {

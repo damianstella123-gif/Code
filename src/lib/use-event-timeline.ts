@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './supabase'
+import { addDaysISO } from './format'
 import type { Event } from '../data/events'
 import { fetchEvents, resizeEventOnly } from './events-service'
 
@@ -23,9 +24,7 @@ export interface DayData {
 }
 
 function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T00:00:00Z')
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().split('T')[0]
+  return addDaysISO(dateStr, days)
 }
 
 function generateDays(start: string, end: string): string[] {
