@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import {
   Search, Plus, FileText, Trash2, X, Upload,
-  Download, FolderOpen, Building2, Eye,
+  Download, Eye,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -214,96 +214,114 @@ export default function Archivio() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Knowledge Base</h1>
-        <div className="panel p-12 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</div></div>
+      <div>
+        <div className="wire-masthead">
+          <span className="wire-masthead-title">ARCHIVIO</span>
+        </div>
+        <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: '48px' }} className="text-center">
+          <div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+    <div>
+      {/* Wire masthead */}
+      <div className="wire-masthead">
         <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Knowledge Base</h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
-            Materiali aziendali, template, procedure e documenti istituzionali Simmetria
-          </p>
+          <span className="wire-masthead-title">ARCHIVIO</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>
+            {docs.length} DOCUMENTI
+          </span>
         </div>
         <button onClick={() => { resetForm(); setFormOpen(true) }}
-          className="px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 text-white"
-          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
-          <Plus className="w-4 h-4" /> Carica Documento
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--red2)', cursor: 'pointer' }}
+          className="flex items-center gap-2 transition-colors hover:opacity-70">
+          <Plus className="w-3.5 h-3.5" /> Carica
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {KB_CATEGORIE.slice(0, 4).map(cat => {
+      {/* Category stats */}
+      <div className="wire-ticker" style={{ marginTop: '28px', marginBottom: '28px' }}>
+        {KB_CATEGORIE.map(cat => {
           const count = docs.filter(d => d.categoria === cat).length
-          return (
-            <button key={cat} onClick={() => setFilterCategoria(filterCategoria === cat ? '' : cat)}
-              className="panel p-4 text-left transition-all hover:bg-white/[0.02]"
-              style={{ border: filterCategoria === cat ? '1px solid var(--red2)' : '1px solid var(--line)' }}>
-              <FolderOpen className="w-5 h-5 mb-2" style={{ color: 'var(--red2)' }} />
-              <p className="text-xs font-medium truncate" style={{ color: 'var(--text)' }}>{cat}</p>
-              <p className="text-lg font-bold mt-1" style={{ color: 'var(--text)' }}>{count}</p>
+          return count > 0 ? (
+            <button key={cat}
+              onClick={() => setFilterCategoria(filterCategoria === cat ? '' : cat)}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                color: filterCategoria === cat ? 'var(--red2)' : 'var(--muted)',
+                cursor: 'pointer',
+                fontWeight: filterCategoria === cat ? 600 : 400,
+              }}
+              className="transition-colors hover:opacity-70">
+              <strong>{count}</strong> {cat.toUpperCase()}
             </button>
-          )
+          ) : null
         })}
       </div>
 
       {/* Search + Category filter */}
-      <div className="flex gap-3 flex-wrap">
-        <div className="panel flex-1 min-w-[200px] flex items-center gap-2 px-3 py-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-3 mb-6">
+        <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14 }} className="flex items-center gap-2 px-4 py-2.5">
           <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Cerca documenti..."
+            placeholder="Cerca..."
             className="flex-1 bg-transparent outline-none text-sm" style={{ color: 'var(--text)' }} />
-          {search && <button onClick={() => setSearch('')} className="p-0.5"><X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} /></button>}
+          {search && <button onClick={() => setSearch('')} className="p-0.5">
+            <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+          </button>}
         </div>
         <select value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}
-          className="px-3 py-2.5 rounded-xl text-sm"
-          style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-          <option value="">Tutte le categorie</option>
+          className="px-4 py-2.5 rounded-3xl text-sm"
+          style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+          <option value="">Tutte</option>
           {KB_CATEGORIE.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
       {/* Documents grouped by category */}
       {filtered.length === 0 ? (
-        <div className="panel p-12 text-center">
-          <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" style={{ color: 'var(--muted)' }} />
+        <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: '48px' }} className="text-center">
           <p className="text-sm" style={{ color: 'var(--muted)' }}>
-            {docs.length === 0 ? 'Nessun documento nella Knowledge Base' : 'Nessun risultato per i filtri applicati'}
+            {docs.length === 0 ? 'Nessun documento' : 'Nessun risultato'}
           </p>
         </div>
       ) : (
         <div className="space-y-4">
           {grouped.map(group => (
-            <div key={group.label} className="panel overflow-hidden">
-              <div className="px-4 py-3 flex items-center justify-between" style={{ background: 'var(--panel2)' }}>
-                <div className="flex items-center gap-2">
-                  <FolderOpen className="w-4 h-4" style={{ color: 'var(--red2)' }} />
-                  <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>{group.label}</p>
-                </div>
-                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(208,0,58,0.1)', color: 'var(--red2)' }}>
+            <div key={group.label} style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>
+              <div className="px-4 py-3 flex items-center justify-between" style={{ background: 'var(--panel2)', borderBottom: '1px solid var(--line)' }}>
+                <p style={{ fontFamily: 'var(--font-serif)', fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>
+                  {group.label}
+                </p>
+                <span style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '9px',
+                  textTransform: 'uppercase',
+                  fontWeight: 600,
+                  background: 'var(--red2)',
+                  color: 'white',
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                }}>
                   {group.items.length}
                 </span>
               </div>
               <div>
-                {group.items.map(doc => (
+                {group.items.map((doc, idx) => (
                   <div key={doc.id} className="px-4 py-3 flex items-center gap-3 transition-all hover:bg-white/[0.02]"
-                    style={{ borderBottom: '1px solid var(--line)' }}>
+                    style={{ borderBottom: idx < group.items.length - 1 ? '1px solid var(--line)' : 'none' }}>
                     <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                       style={{ background: `${fileColor(doc.file_name)}15` }}>
                       <FileText className="w-4 h-4" style={{ color: fileColor(doc.file_name) }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{doc.nome}</p>
-                      <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
-                        {fileExt(doc.file_name)} - {formatSize(doc.file_size)} - {formatDate(doc.created_at)}
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)' }} className="truncate">
+                        {fileExt(doc.file_name)} — {formatSize(doc.file_size)} — {formatDate(doc.created_at)}
                       </p>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
@@ -331,17 +349,17 @@ export default function Archivio() {
       {/* Upload Modal */}
       {formOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-md rounded-2xl p-6" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+          <div className="w-full max-w-md rounded-2xl p-6" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Carica in Knowledge Base</h2>
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', fontWeight: 600, color: 'var(--text)' }}>Carica Documento</h2>
               <button onClick={() => setFormOpen(false)} className="p-2 rounded-lg hover:bg-white/5">
                 <X className="w-5 h-5" style={{ color: 'var(--muted)' }} />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>File *</label>
-                <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all hover:bg-white/5"
+                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', fontWeight: 600, color: 'var(--muted)' }} className="mb-2 block">File *</label>
+                <label className="flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all hover:bg-white/5"
                   style={{ border: '2px dashed var(--line)' }}>
                   <Upload className="w-5 h-5" style={{ color: 'var(--muted)' }} />
                   <span className="text-sm truncate" style={{ color: uploadFile ? 'var(--text)' : 'var(--muted)' }}>
@@ -352,28 +370,28 @@ export default function Archivio() {
                 </label>
               </div>
               <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Nome documento *</label>
+                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', fontWeight: 600, color: 'var(--muted)' }} className="mb-2 block">Nome *</label>
                 <input value={formNome} onChange={e => setFormNome(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl text-sm"
-                  style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                  className="w-full px-4 py-3 rounded-2xl text-sm"
+                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
               </div>
               <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Categoria *</label>
+                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', fontWeight: 600, color: 'var(--muted)' }} className="mb-2 block">Categoria *</label>
                 <select value={formCategoria} onChange={e => setFormCategoria(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl text-sm"
-                  style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                  className="w-full px-4 py-3 rounded-2xl text-sm"
+                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
                   {KB_CATEGORIE.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Note</label>
+                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', fontWeight: 600, color: 'var(--muted)' }} className="mb-2 block">Note</label>
                 <input value={formNote} onChange={e => setFormNote(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl text-sm"
-                  style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                  className="w-full px-4 py-3 rounded-2xl text-sm"
+                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
               </div>
               <button onClick={handleUpload} disabled={uploading}
-                className="w-full py-3 rounded-xl text-sm font-medium text-white disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' }}>
+                className="w-full py-3 rounded-2xl text-sm font-medium text-white disabled:opacity-50 transition-opacity"
+                style={{ background: 'var(--red2)' }}>
                 {uploading ? 'Caricamento...' : 'Carica'}
               </button>
             </div>
@@ -384,12 +402,12 @@ export default function Archivio() {
       {/* Delete confirmation */}
       {deletingId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
             <p className="text-sm font-medium mb-4" style={{ color: 'var(--text)' }}>Eliminare questo documento?</p>
             <div className="flex gap-3">
-              <button onClick={() => setDeletingId(null)} className="flex-1 py-2.5 rounded-xl text-sm"
+              <button onClick={() => setDeletingId(null)} className="flex-1 py-2.5 rounded-2xl text-sm"
                 style={{ border: '1px solid var(--line)', color: 'var(--text)' }}>Annulla</button>
-              <button onClick={() => handleDelete(deletingId)} className="flex-1 py-2.5 rounded-xl text-sm text-white"
+              <button onClick={() => handleDelete(deletingId)} className="flex-1 py-2.5 rounded-2xl text-sm text-white"
                 style={{ background: 'var(--red2)' }}>Elimina</button>
             </div>
           </div>
@@ -399,7 +417,7 @@ export default function Archivio() {
       {/* Preview Modal */}
       {previewDoc && previewUrl && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(0,0,0,0.85)' }}>
-          <div className="flex items-center justify-between px-4 py-3" style={{ background: 'var(--panel)', borderBottom: '1px solid var(--line)' }}>
+          <div className="flex items-center justify-between px-4 py-3" style={{ background: 'var(--panel-solid)', borderBottom: '1px solid var(--line)' }}>
             <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{previewDoc.nome}</p>
             <div className="flex items-center gap-2">
               <button onClick={() => handleDownload(previewDoc)}

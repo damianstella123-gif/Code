@@ -8,7 +8,6 @@ import {
   Database,
   LayoutDashboard,
   Zap,
-  Save,
   RotateCcw,
   Check,
   ChevronRight,
@@ -160,7 +159,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
       onClick={() => !disabled && onChange(!checked)}
       className="relative flex-shrink-0 w-11 h-6 rounded-full transition-all"
       style={{
-        background: checked ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'var(--panel2)',
+        background: checked ? 'var(--red2)' : 'var(--panel2)',
         border: `1px solid ${checked ? 'var(--red2)' : 'var(--line)'}`,
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
@@ -191,18 +190,23 @@ function SectionCard({ icon: Icon, title, subtitle, children }: {
   icon: React.ElementType; title: string; subtitle: string; children: React.ReactNode
 }) {
   return (
-    <div className="panel p-6 space-y-6 animate-fade-in">
-      <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'rgba(208,0,58,0.12)', border: '1px solid rgba(208,0,58,0.2)' }}>
+    <div className="animate-fade-in" style={{
+      background: 'var(--panel-solid)',
+      border: '1px solid var(--line)',
+      borderRadius: 14,
+      padding: 24,
+    }}>
+      <div className="flex items-start gap-4 mb-6">
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(208,0,58,0.10)' }}>
           <Icon className="w-5 h-5" style={{ color: 'var(--red2)' }} />
         </div>
-        <div>
-          <h2 className="text-base font-bold" style={{ color: 'var(--text)' }}>{title}</h2>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>{subtitle}</p>
+        <div className="flex-1">
+          <h2 className="text-sm font-mono uppercase tracking-wide" style={{ color: 'var(--text)' }}>{title}</h2>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{subtitle}</p>
         </div>
       </div>
-      <div className="border-t" style={{ borderColor: 'var(--line)' }} />
+      <div style={{ borderColor: 'var(--line)' }} className="border-t mb-6" />
       {children}
     </div>
   )
@@ -222,7 +226,7 @@ function ChipGroup({ options, selected, onChange }: {
             onClick={() => onChange(active ? selected.filter(x => x !== o.value) : [...selected, o.value])}
             className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
             style={{
-              background: active ? 'rgba(208,0,58,0.12)' : 'var(--panel2)',
+              background: active ? 'rgba(208,0,58,0.10)' : 'var(--panel2)',
               color: active ? 'var(--red2)' : 'var(--muted)',
               border: `1px solid ${active ? 'rgba(208,0,58,0.35)' : 'var(--line)'}`,
             }}>
@@ -247,7 +251,7 @@ function RadioGroup({ options, value, onChange }: {
           <button key={o.value} onClick={() => onChange(o.value)}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
             style={{
-              background: active ? 'rgba(208,0,58,0.07)' : 'var(--panel2)',
+              background: active ? 'rgba(208,0,58,0.06)' : 'var(--panel2)',
               border: `1px solid ${active ? 'rgba(208,0,58,0.35)' : 'var(--line)'}`,
             }}>
             <div className="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center"
@@ -421,14 +425,14 @@ function CambioPasswordSection() {
         )}
 
         <button onClick={handleChangePassword} disabled={status === 'loading'}
-          className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all"
+          className="flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-mono uppercase tracking-wide transition-all"
           style={{
-            background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)',
-            color: 'white',
+            background: status === 'loading' ? 'var(--panel)' : 'var(--red2)',
+            color: status === 'loading' ? 'var(--muted)' : 'white',
             opacity: status === 'loading' ? 0.6 : 1,
           }}>
           <Key className="w-4 h-4" />
-          {status === 'loading' ? 'Aggiornamento...' : 'Aggiorna Password'}
+          {status === 'loading' ? 'Aggiornamento...' : 'Aggiorna'}
         </button>
       </div>
     </SectionCard>
@@ -486,14 +490,14 @@ function NotifichePersonali({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSe
     <SectionCard icon={Bell} title="Notifiche" subtitle="Le tue preferenze di notifica">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Canali</p>
+          <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>Canali</p>
           <div>
             <ToggleRow label="Notifiche email" hint="Digest periodici via email" checked={s.notificheEmail} onChange={v => upd({ notificheEmail: v })} />
             <ToggleRow label="Notifiche push" hint="Alert in-app in tempo reale" checked={s.notifichePush} onChange={v => upd({ notifichePush: v })} />
           </div>
         </div>
         <div>
-          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Tipologie</p>
+          <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>Tipologie</p>
           <div>
             <ToggleRow label="Task e scadenze" checked={s.notificheTask} onChange={v => upd({ notificheTask: v })} />
             <ToggleRow label="Aggiornamenti eventi" checked={s.notificheEventi} onChange={v => upd({ notificheEventi: v })} />
@@ -504,7 +508,7 @@ function NotifichePersonali({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSe
         </div>
       </div>
       <div>
-        <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Frequenza digest email</p>
+        <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>Frequenza digest email</p>
         <RadioGroup value={s.frequenzaDigest} onChange={v => upd({ frequenzaDigest: v as AppSettings['frequenzaDigest'] })}
           options={[
             { value: 'istantanea', label: 'Istantanea', desc: 'Notifica immediata per ogni evento' },
@@ -535,7 +539,7 @@ function FlyConfig({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSettings>) 
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ opacity: s.flyAbilitato ? 1 : 0.4, pointerEvents: s.flyAbilitato ? 'auto' : 'none' }}>
           <div>
-            <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Presenza UI</p>
+            <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>Presenza UI</p>
             <RadioGroup value={s.flyPresenza} onChange={v => upd({ flyPresenza: v as AppSettings['flyPresenza'] })}
               options={[
                 { value: 'sempre', label: 'Sempre visibile', desc: 'Il pulsante Fly è sempre in primo piano' },
@@ -545,7 +549,7 @@ function FlyConfig({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSettings>) 
             />
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Tono personalità</p>
+            <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>Tono personalità</p>
             <RadioGroup value={s.flyTono} onChange={v => upd({ flyTono: v as AppSettings['flyTono'] })}
               options={[
                 { value: 'professionale', label: 'Professionale', desc: 'Risposte formali, dati al centro' },
@@ -632,7 +636,7 @@ function Branding({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSettings>) =
         </Field>
       </div>
       <div className="mt-4 p-4 rounded-xl" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
-        <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Anteprima brand</p>
+        <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>Anteprima brand</p>
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg flex items-center justify-center"
             style={{ background: `linear-gradient(135deg, ${s.coloreAccento} 0%, ${s.coloreSecondario} 100%)` }}>
@@ -704,7 +708,7 @@ function ConfigDashboard({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSetti
     <SectionCard icon={LayoutDashboard} title="Configurazione Dashboard" subtitle="Layout, widget e KPI visibili (globale)">
       <div className="space-y-6">
         <div>
-          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>Layout</p>
+          <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>Layout</p>
           <RadioGroup value={s.layoutDashboard} onChange={v => upd({ layoutDashboard: v as AppSettings['layoutDashboard'] })}
             options={[
               { value: 'compatto', label: 'Compatto', desc: 'Più informazioni in meno spazio' },
@@ -714,7 +718,7 @@ function ConfigDashboard({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSetti
           />
         </div>
         <div>
-          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: 'var(--muted)' }}>KPI visibili</p>
+          <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>KPI visibili</p>
           <ChipGroup
             options={[
               { value: 'eventi', label: 'Eventi attivi' },
@@ -871,37 +875,37 @@ export default function Impostazioni() {
 
   return (
     <div className="space-y-0 -mt-1">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+      {/* Wire Masthead */}
+      <div className="wire-masthead">
         <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Impostazioni</h1>
-          <p className="mt-1" style={{ color: 'var(--muted)' }}>
-            {showAdmin ? 'Impostazioni personali e amministrazione sistema' : 'Le tue preferenze personali'}
-          </p>
+          <span className="wire-masthead-title">IMPOSTAZIONI</span>
         </div>
-        <div className="flex items-center gap-3">
-          {dirty && (
-            <button onClick={handleReset}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
-              style={{ background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>
-              <RotateCcw className="w-4 h-4" /> Annulla
+        <div className="wire-masthead-right">
+          <div className="flex items-center gap-3">
+            {dirty && (
+              <button onClick={handleReset}
+                className="font-mono uppercase text-xs tracking-wide px-3.5 py-2 rounded-lg transition-all"
+                style={{ background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>
+                Annulla
+              </button>
+            )}
+            <button onClick={handleSave}
+              className="font-mono uppercase text-xs tracking-wide transition-all"
+              style={{
+                background: saved ? 'var(--panel)' : dirty ? 'var(--red2)' : 'var(--panel)',
+                color: saved ? 'var(--green)' : dirty ? 'white' : 'var(--muted)',
+                borderRadius: 6,
+                padding: '6px 14px',
+                border: 'none',
+              }}>
+              {saved ? 'Salvato' : dirty ? 'Salva' : 'Salva'}
             </button>
-          )}
-          <button onClick={handleSave}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
-            style={{
-              background: saved ? 'rgba(56,210,125,0.12)' : dirty ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'var(--panel)',
-              color: saved ? 'var(--green)' : dirty ? 'white' : 'var(--muted)',
-              border: `1px solid ${saved ? 'rgba(56,210,125,0.3)' : dirty ? 'transparent' : 'var(--line)'}`,
-              boxShadow: dirty && !saved ? 'var(--shadow-red)' : 'none',
-            }}>
-            {saved ? <><Check className="w-4 h-4" />Salvato</> : <><Save className="w-4 h-4" />Salva</>}
-          </button>
+          </div>
         </div>
       </div>
 
       {dirty && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl mb-4"
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl mx-0 mb-4"
           style={{ background: 'rgba(255,194,75,0.06)', border: '1px solid rgba(255,194,75,0.2)' }}>
           <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--yellow)' }} />
           <p className="text-sm" style={{ color: 'var(--yellow)' }}>Hai modifiche non salvate.</p>
@@ -911,7 +915,7 @@ export default function Impostazioni() {
       <div className="flex gap-6 items-start">
         {/* Left nav */}
         <div className="hidden lg:flex flex-col gap-1 w-52 flex-shrink-0 sticky top-24">
-          <p className="text-[10px] uppercase tracking-widest font-bold px-4 py-2" style={{ color: 'var(--muted)' }}>
+          <p className="text-xs font-mono uppercase tracking-widest px-4 py-2" style={{ color: 'var(--muted)' }}>
             Personali
           </p>
           {personalSections.map(sec => {
@@ -934,7 +938,7 @@ export default function Impostazioni() {
           {adminSections.length > 0 && (
             <>
               <div className="my-2 border-t" style={{ borderColor: 'var(--line)' }} />
-              <p className="text-[10px] uppercase tracking-widest font-bold px-4 py-2" style={{ color: 'var(--muted)' }}>
+              <p className="text-xs font-mono uppercase tracking-widest px-4 py-2" style={{ color: 'var(--muted)' }}>
                 Amministrazione
               </p>
               {adminSections.map(sec => {
@@ -964,9 +968,9 @@ export default function Impostazioni() {
               const active = activeSection === sec.id
               return (
                 <button key={sec.id} onClick={() => setActiveSection(sec.id)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap flex-shrink-0 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono uppercase tracking-wide whitespace-nowrap flex-shrink-0 transition-all"
                   style={{
-                    background: active ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'var(--panel)',
+                    background: active ? 'var(--red2)' : 'var(--panel)',
                     color: active ? 'white' : 'var(--muted)',
                     border: `1px solid ${active ? 'transparent' : 'var(--line)'}`,
                   }}>

@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  CheckCircle2, Circle, AlertTriangle, ChevronDown,
-  ClipboardList,
+  CheckCircle2, Circle, ChevronDown,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { fetchEvents } from '@/lib/events-service'
@@ -94,61 +93,62 @@ export default function Workflow() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Workflow Eventi</h1>
-        <div className="panel p-12 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Calcolo stato eventi...</div></div>
+        <div className="wire-masthead">
+          <div>
+            <span className="wire-masthead-title">Workflow Eventi</span>
+          </div>
+        </div>
+        <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 32, textAlign: 'center' }}>
+          <div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Calcolo stato eventi...</div>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Workflow Eventi</h1>
-        <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
-          Stato di completamento calcolato automaticamente dai dati presenti nel sistema
-        </p>
-      </div>
-
-      {/* Global KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="panel p-4">
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Eventi attivi</p>
-          <p className="text-2xl font-bold mt-1" style={{ color: 'var(--text)' }}>{globalStats.total}</p>
-        </div>
-        <div className="panel p-4">
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Pronti</p>
-          <p className="text-2xl font-bold mt-1" style={{ color: 'var(--green)' }}>{globalStats.ready}</p>
-        </div>
-        <div className="panel p-4">
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Critici (&lt;40%)</p>
-          <p className="text-2xl font-bold mt-1" style={{ color: globalStats.critical > 0 ? 'var(--red2)' : 'var(--text)' }}>{globalStats.critical}</p>
-        </div>
-        <div className="panel p-4">
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Media completamento</p>
-          <p className="text-2xl font-bold mt-1" style={{ color: globalStats.avgPct >= 70 ? 'var(--green)' : 'var(--yellow)' }}>{globalStats.avgPct}%</p>
+      {/* Masthead */}
+      <div className="wire-masthead">
+        <div>
+          <span className="wire-masthead-title">Workflow Eventi</span>
         </div>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2">
+      {/* Global KPIs - wire-ticker style */}
+      <div className="wire-ticker">
+        <span>Eventi attivi <strong style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{globalStats.total}</strong></span>
+        <span>Pronti <strong style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--green)' }}>{globalStats.ready}</strong></span>
+        <span>Critici &lt;40% <strong style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: globalStats.critical > 0 ? 'var(--red2)' : 'var(--text)' }}>{globalStats.critical}</strong></span>
+        <span>Media <strong style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: globalStats.avgPct >= 70 ? 'var(--green)' : 'var(--yellow)' }}>{globalStats.avgPct}%</strong></span>
+      </div>
+
+      {/* Filter tabs - wire-tabs pattern */}
+      <div className="flex gap-1">
         {(['incomplete', 'all', 'complete'] as const).map(f => (
-          <button key={f} onClick={() => setFilterStatus(f)}
-            className="px-3 py-2 rounded-lg text-xs font-medium transition-all"
+          <button key={f}
+            onClick={() => setFilterStatus(f)}
+            className={`wire-tab ${filterStatus === f ? 'wire-tab--active' : ''}`}
             style={{
-              background: filterStatus === f ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'var(--panel)',
-              color: filterStatus === f ? '#fff' : 'var(--muted)',
-              border: `1px solid ${filterStatus === f ? 'transparent' : 'var(--line)'}`,
+              fontFamily: 'var(--font-mono)',
+              fontSize: '11px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              padding: '6px 12px',
+              border: '1px solid var(--line)',
+              borderRadius: 6,
+              background: filterStatus === f ? 'var(--panel-solid)' : 'transparent',
+              color: filterStatus === f ? 'var(--text)' : 'var(--muted)',
+              cursor: 'pointer',
+              transition: 'all 150ms ease',
             }}>
-            {f === 'incomplete' ? 'Da completare' : f === 'all' ? 'Tutti' : 'Pronti'}
+            {f === 'incomplete' ? 'DA COMPLETARE' : f === 'all' ? 'TUTTI' : 'PRONTI'}
           </button>
         ))}
       </div>
 
       {/* Event checklists */}
       {filtered.length === 0 ? (
-        <div className="panel p-12 text-center">
-          <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-30" style={{ color: 'var(--muted)' }} />
+        <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 32, textAlign: 'center' }}>
           <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun evento in questa vista</p>
         </div>
       ) : (
@@ -160,10 +160,11 @@ export default function Workflow() {
             const pctColor = cl.pct >= 80 ? 'var(--green)' : cl.pct >= 50 ? 'var(--blue)' : cl.pct >= 30 ? 'var(--yellow)' : 'var(--red2)'
 
             return (
-              <div key={cl.event.id} className="panel overflow-hidden">
+              <div key={cl.event.id} style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>
                 <button
-                  className="w-full text-left px-4 py-4 flex items-center gap-4"
+                  className="w-full text-left flex items-center gap-4"
                   onClick={() => setExpandedId(isExpanded ? null : cl.event.id)}
+                  style={{ padding: 16, borderBottom: 'none' }}
                 >
                   {/* Progress ring */}
                   <div className="relative w-12 h-12 flex-shrink-0">
@@ -175,16 +176,16 @@ export default function Workflow() {
                         strokeDasharray={`${cl.pct}, 100`}
                         strokeLinecap="round" />
                     </svg>
-                    <span className="absolute inset-0 flex items-center justify-center text-xs font-bold" style={{ color: pctColor }}>
+                    <span className="absolute inset-0 flex items-center justify-center text-xs font-bold" style={{ color: pctColor, fontFamily: 'var(--font-mono)' }}>
                       {cl.pct}%
                     </span>
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{cl.event.nome}</p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                      {done}/{cl.items.length} completati
-                      {missing.length > 0 && ` - ${missing.length} mancanti`}
+                    <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cl.event.nome}</p>
+                    <p style={{ fontSize: '11px', marginTop: 4, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                      {done}/{cl.items.length} COMPLETATI
+                      {missing.length > 0 && ` — ${missing.length} MANCANTI`}
                     </p>
                   </div>
 
@@ -193,40 +194,65 @@ export default function Workflow() {
                 </button>
 
                 {isExpanded && (
-                  <div className="px-4 pb-4 space-y-2" style={{ borderTop: '1px solid var(--line)' }}>
-                    <div className="pt-3 pb-1 flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Checklist</p>
+                  <div style={{ borderTop: '1px solid var(--line)', padding: 16 }}>
+                    <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                      <p style={{ fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>CHECKLIST</p>
                       <button onClick={() => navigate(`/eventi?id=${cl.event.id}`)}
-                        className="text-xs font-medium px-2 py-1 rounded-lg transition-all hover:bg-white/5"
-                        style={{ color: 'var(--red2)' }}>
-                        Apri Evento
+                        style={{
+                          fontSize: '11px',
+                          fontFamily: 'var(--font-mono)',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          color: 'var(--red2)',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                          transition: 'opacity 150ms ease',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity = '0.7')}
+                        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                      >
+                        APRI EVENTO
                       </button>
                     </div>
 
-                    {cl.items.map(item => (
-                      <div key={item.id} className="flex items-center gap-3 py-1.5">
-                        {item.completed ? (
-                          <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--green)' }} />
-                        ) : (
-                          <Circle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
-                        )}
-                        <span className="text-sm" style={{
-                          color: item.completed ? 'var(--text)' : 'var(--muted)',
-                          textDecoration: item.completed ? 'line-through' : 'none',
-                          opacity: item.completed ? 0.7 : 1,
-                        }}>
-                          {item.label}
-                        </span>
-                        {!item.completed && (
-                          <AlertTriangle className="w-3 h-3 ml-auto flex-shrink-0" style={{ color: 'var(--yellow)' }} />
-                        )}
-                      </div>
-                    ))}
+                    <div className="space-y-1">
+                      {cl.items.map(item => (
+                        <div key={item.id} className="flex items-center gap-2" style={{ paddingTop: 6, paddingBottom: 6 }}>
+                          {item.completed ? (
+                            <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--green)' }} />
+                          ) : (
+                            <Circle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                          )}
+                          <span style={{
+                            fontSize: '12px',
+                            color: item.completed ? 'var(--text)' : 'var(--muted)',
+                            textDecoration: item.completed ? 'line-through' : 'none',
+                            opacity: item.completed ? 0.7 : 1,
+                            fontFamily: item.completed ? 'var(--font-mono)' : 'inherit',
+                          }}>
+                            {item.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
 
                     {missing.length > 0 && (
-                      <div className="mt-3 p-3 rounded-lg" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
-                        <p className="text-xs font-medium" style={{ color: 'var(--yellow)' }}>
-                          Mancano {missing.length} elementi per completare l'evento
+                      <div style={{
+                        marginTop: 12,
+                        padding: 8,
+                        borderRadius: 6,
+                        background: 'rgba(245,158,11,0.06)',
+                        border: '1px solid rgba(245,158,11,0.15)',
+                      }}>
+                        <p style={{
+                          fontSize: '11px',
+                          fontFamily: 'var(--font-mono)',
+                          fontWeight: 500,
+                          color: 'var(--yellow)',
+                        }}>
+                          MANCANO {missing.length} ELEMENTI
                         </p>
                       </div>
                     )}

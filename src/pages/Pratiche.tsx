@@ -2,23 +2,13 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   FileText,
-  Plus,
   Search,
-  Filter,
-  ChevronRight,
+  X,
   ArrowLeft,
-  Clock,
   AlertTriangle,
-  CheckCircle,
-  Calendar,
   Euro,
-  User,
-  Tag,
   Edit3,
   Trash2,
-  FileCheck,
-  FileClock,
-  FileWarning,
   Briefcase,
   Shield,
   Receipt,
@@ -88,7 +78,6 @@ export default function Pratiche() {
   const [filterStato, setFilterStato] = useState<StatoPratica | 'tutti'>('tutti')
   const [filterEvento, setFilterEvento] = useState<string | 'tutti'>('tutti')
   const [filterPriorita, setFilterPriorita] = useState<PrioritaPratica | 'tutti'>('tutti')
-  const [showFilters, setShowFilters] = useState(false)
 
   // Pratiche: fonte di verita' Supabase. Nessun fallback mock.
   // La snapshot in localStorage resta solo per Calendario che la legge.
@@ -223,90 +212,109 @@ export default function Pratiche() {
   }
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      {/* Wire masthead */}
+      <div className="wire-masthead">
         <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Pratiche</h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
-            Gestione contratti, preventivi, permessi e documenti
-          </p>
+          <span className="wire-masthead-title">PRATICHE</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>
+            {filtered.length} PRATICH{filtered.length !== 1 ? 'E' : 'A'}
+          </span>
         </div>
-        <button onClick={openNew}
-          className="btn-primary flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl">
-          <Plus className="w-4 h-4" /> Nuova pratica
-        </button>
+        <div className="wire-masthead-right">
+          <span onClick={openNew}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--red2)', cursor: 'pointer' }}>
+            + NUOVA
+          </span>
+        </div>
       </div>
 
-      {/* KPI dashboard */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <KpiMini label="Totali" value={kpi.totali} icon={FileText} color="var(--blue)" />
-        <KpiMini label="In corso" value={kpi.inCorso} icon={FileClock} color="var(--yellow)" />
-        <KpiMini label="Scadute" value={kpi.scadute} icon={FileWarning} color="var(--red2)" pulse={kpi.scadute > 0} />
-        <KpiMini label="In scadenza" value={kpi.inRitardo} icon={Clock} color="var(--yellow)" />
-        <KpiMini label="Approvate" value={kpi.approvate} icon={FileCheck} color="var(--green)" />
-        <KpiMini label="Valore" value={`€${(kpi.importoTotale / 1000).toFixed(0)}K`} icon={Euro} color="var(--green)" />
+      {/* Wire ticker: KPIs */}
+      <div className="wire-ticker">
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+          <strong>{kpi.totali}</strong> totali
+        </span>
+        {kpi.inCorso > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+            <strong>{kpi.inCorso}</strong> in corso
+          </span>
+        )}
+        {kpi.scadute > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--red2)' }}>
+            <strong>{kpi.scadute}</strong> scadute
+          </span>
+        )}
+        {kpi.inRitardo > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--yellow)' }}>
+            <strong>{kpi.inRitardo}</strong> in scadenza
+          </span>
+        )}
+        {kpi.approvate > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+            <strong>{kpi.approvate}</strong> approvate
+          </span>
+        )}
+        {kpi.importoTotale > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--green)' }}>
+            <strong>€{(kpi.importoTotale / 1000).toFixed(0)}K</strong> valore
+          </span>
+        )}
       </div>
 
       {/* Search + Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+      <div className="space-y-4 animate-fade-in" style={{ marginTop: '20px' }}>
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
           <input
             type="text"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Cerca pratiche..."
-            className="input w-full pl-10 pr-4 py-2.5 text-sm rounded-xl"
+            className="w-full pl-10 pr-9 py-2.5 text-sm rounded-lg focus:outline-none"
+            style={{ background: 'transparent', border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
           />
-        </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all"
-          style={{
-            background: showFilters ? 'rgba(208,0,58,0.1)' : 'var(--panel)',
-            border: `1px solid ${showFilters ? 'rgba(208,0,58,0.3)' : 'var(--line)'}`,
-            color: showFilters ? 'var(--red2)' : 'var(--muted)',
-          }}>
-          <Filter className="w-4 h-4" /> Filtri
-          {(filterCategoria !== 'tutti' || filterStato !== 'tutti' || filterEvento !== 'tutti' || filterPriorita !== 'tutti') && (
-            <span className="w-2 h-2 rounded-full" style={{ background: 'var(--red2)' }} />
+          {searchTerm && (
+            <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+              <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+            </button>
           )}
-        </button>
-      </div>
+        </div>
 
-      {/* Filter bar */}
-      {showFilters && (
-        <div className="panel p-4 animate-fade-in grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Inline filters */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Categoria</label>
+            <label className="text-xs font-medium mb-1 block" style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Categoria</label>
             <select value={filterCategoria} onChange={e => setFilterCategoria(e.target.value as CategoriaPratica | 'tutti')}
-              className="input w-full py-2 text-sm rounded-lg">
+              className="w-full py-2 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
               <option value="tutti">Tutte</option>
               {CATEGORIE.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Stato</label>
+            <label className="text-xs font-medium mb-1 block" style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Stato</label>
             <select value={filterStato} onChange={e => setFilterStato(e.target.value as StatoPratica | 'tutti')}
-              className="input w-full py-2 text-sm rounded-lg">
+              className="w-full py-2 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
               <option value="tutti">Tutti</option>
               {STATI.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Evento</label>
+            <label className="text-xs font-medium mb-1 block" style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evento</label>
             <select value={filterEvento} onChange={e => setFilterEvento(e.target.value)}
-              className="input w-full py-2 text-sm rounded-lg">
+              className="w-full py-2 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
               <option value="tutti">Tutti</option>
               {allEvents.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
               <option value="none">Senza evento</option>
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Priorita</label>
+            <label className="text-xs font-medium mb-1 block" style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priorita</label>
             <select value={filterPriorita} onChange={e => setFilterPriorita(e.target.value as PrioritaPratica | 'tutti')}
-              className="input w-full py-2 text-sm rounded-lg">
+              className="w-full py-2 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
               <option value="tutti">Tutte</option>
               <option value="alta">Alta</option>
               <option value="media">Media</option>
@@ -314,19 +322,14 @@ export default function Pratiche() {
             </select>
           </div>
         </div>
-      )}
-
-      {/* Results count */}
-      <p className="text-xs" style={{ color: 'var(--muted)' }}>
-        {filtered.length} pratich{filtered.length !== 1 ? 'e' : 'a'} trovate
-      </p>
+      </div>
 
       {/* List */}
-      <div className="space-y-2">
+      <div className="space-y-2" style={{ marginTop: '20px' }}>
         {filtered.length === 0 ? (
-          <div className="panel p-12 text-center">
+          <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 48, textAlign: 'center' }}>
             <FileText className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--muted)', opacity: 0.4 }} />
-            <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessuna pratica trovata</p>
+            <p className="text-sm" style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessuna pratica trovata</p>
           </div>
         ) : (
           filtered.map((p, i) => {
@@ -337,13 +340,13 @@ export default function Pratiche() {
             return (
               <button key={p.id}
                 onClick={() => openDetail(p.id)}
-                className="w-full flex items-center gap-3 p-4 rounded-xl text-left transition-all hover:bg-white/5 group animate-fade-in"
+                className="w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all hover:bg-white/5 group animate-fade-in"
                 style={{
-                  background: 'var(--panel)',
+                  background: 'var(--panel-solid)',
                   border: `1px solid ${overdue ? 'rgba(255,49,95,0.2)' : 'var(--line)'}`,
                   animationDelay: `${Math.min(i * 30, 300)}ms`,
                 }}>
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{ background: `${catColor(p.categoria)}12` }}>
                   <CatIcon className="w-4 h-4" style={{ color: catColor(p.categoria) }} />
                 </div>
@@ -352,8 +355,8 @@ export default function Pratiche() {
                     <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{p.titolo}</p>
                     {overdue && <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--red2)' }} />}
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs" style={{ color: catColor(p.categoria) }}>{catLabel(p.categoria)}</span>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: catColor(p.categoria) }}>{catLabel(p.categoria)}</span>
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>·</span>
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>{p.controparte}</span>
                     {evento && (
@@ -365,46 +368,27 @@ export default function Pratiche() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  {p.responsabileId && <span className="text-xs px-2 py-0.5 rounded font-medium hidden sm:block" style={{ background: 'rgba(77,180,255,0.15)', color: 'var(--blue)' }}>{(() => { const u = allUsers.find(x => x.id === p.responsabileId); return u ? `${u.first_name} ${u.last_name}`.trim() : p.responsabileId })()}</span>}
-                  <span className="text-xs px-2 py-0.5 rounded"
-                    style={{ background: `${statoColor(p.stato)}15`, color: statoColor(p.stato), border: `1px solid ${statoColor(p.stato)}25` }}>
+                  {p.responsabileId && <span className="text-xs px-2 py-0.5 rounded font-medium hidden sm:block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', background: 'rgba(77,180,255,0.15)', color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{(() => { const u = allUsers.find(x => x.id === p.responsabileId); return u ? `${u.first_name} ${u.last_name}`.trim() : p.responsabileId })()}</span>}
+                  <span className="text-xs px-2 py-0.5 rounded" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', background: `${statoColor(p.stato)}15`, color: statoColor(p.stato), border: `1px solid ${statoColor(p.stato)}25` }}>
                     {statoLabel(p.stato)}
                   </span>
                   <div className="text-right hidden md:block">
-                    <p className="text-xs font-medium" style={{ color: overdue ? 'var(--red2)' : dl <= 7 ? 'var(--yellow)' : 'var(--muted)' }}>
-                      {overdue ? `${Math.abs(dl)}g scad.` : dl === 0 ? 'Oggi' : `${dl}g`}
+                    <p className="text-xs font-medium" style={{ fontFamily: 'var(--font-mono)', color: overdue ? 'var(--red2)' : dl <= 7 ? 'var(--yellow)' : 'var(--muted)' }}>
+                      {overdue ? `${Math.abs(dl)}G SCAD.` : dl === 0 ? 'OGGI' : `${dl}G`}
                     </p>
-                    <p className="text-xs" style={{ color: 'var(--muted)' }}>{fmtShort(p.scadenza)}</p>
+                    <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>{fmtShort(p.scadenza)}</p>
                   </div>
                   {p.importo && (
-                    <p className="text-xs font-semibold hidden lg:block" style={{ color: 'var(--text)' }}>
+                    <p className="text-xs font-semibold hidden lg:block" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
                       €{p.importo.toLocaleString('it-IT')}
                     </p>
                   )}
-                  <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--muted)' }} />
                 </div>
               </button>
             )
           })
         )}
       </div>
-    </div>
-  )
-}
-
-// ─── KPI Mini ─────────────────────────────────────────────────────────────────
-
-function KpiMini({ label, value, icon: Icon, color, pulse }: {
-  label: string; value: string | number; icon: React.ElementType; color: string; pulse?: boolean
-}) {
-  return (
-    <div className="panel p-4 animate-fade-in relative">
-      {pulse && <div className="absolute top-2 right-2 w-2 h-2 rounded-full animate-pulse" style={{ background: color }} />}
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className="w-3.5 h-3.5" style={{ color }} />
-        <p className="text-xs" style={{ color: 'var(--muted)' }}>{label}</p>
-      </div>
-      <p className="text-xl font-bold" style={{ color: 'var(--text)' }}>{value}</p>
     </div>
   )
 }
@@ -428,32 +412,32 @@ function DetailView({ pratica, onBack, onEdit, onDelete, allEvents, allUsers }: 
       <div className="flex items-center justify-between gap-3">
         <button onClick={onBack}
           className="flex items-center gap-2 text-sm transition-all hover:opacity-80"
-          style={{ color: 'var(--muted)' }}>
-          <ArrowLeft className="w-4 h-4" /> Torna alla lista
+          style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+          <ArrowLeft className="w-4 h-4" /> TORNA ALLA LISTA
         </button>
         <div className="flex items-center gap-2">
           <button onClick={onEdit}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all hover:bg-white/5"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-            <Edit3 className="w-3.5 h-3.5" /> Modifica
+            style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <Edit3 className="w-3.5 h-3.5" /> MODIFICA
           </button>
           {!confirmDelete ? (
             <button onClick={() => setConfirmDelete(true)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all hover:bg-red-500/10"
-              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--red2)' }}>
-              <Trash2 className="w-3.5 h-3.5" /> Elimina
+              style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', color: 'var(--red2)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <Trash2 className="w-3.5 h-3.5" /> ELIMINA
             </button>
           ) : (
             <div className="flex items-center gap-2">
               <button onClick={onDelete}
                 className="px-3 py-2 rounded-lg text-xs font-medium"
-                style={{ background: 'rgba(255,49,95,0.15)', color: 'var(--red2)', border: '1px solid rgba(255,49,95,0.3)' }}>
-                Conferma
+                style={{ background: 'rgba(255,49,95,0.15)', color: 'var(--red2)', border: '1px solid rgba(255,49,95,0.3)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                CONFERMA
               </button>
               <button onClick={() => setConfirmDelete(false)}
                 className="px-3 py-2 rounded-lg text-xs"
-                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
-                Annulla
+                style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                ANNULLA
               </button>
             </div>
           )}
@@ -461,9 +445,9 @@ function DetailView({ pratica, onBack, onEdit, onDelete, allEvents, allUsers }: 
       </div>
 
       {/* Header */}
-      <div className="panel p-6">
+      <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 24 }}>
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+          <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ background: `${catColor(pratica.categoria)}12` }}>
             <CatIcon className="w-6 h-6" style={{ color: catColor(pratica.categoria) }} />
           </div>
@@ -472,7 +456,7 @@ function DetailView({ pratica, onBack, onEdit, onDelete, allEvents, allUsers }: 
               <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{pratica.titolo}</h1>
               {overdue && (
                 <span className="text-xs px-2 py-0.5 rounded animate-pulse"
-                  style={{ background: 'rgba(255,49,95,0.1)', color: 'var(--red2)', border: '1px solid rgba(255,49,95,0.2)' }}>
+                  style={{ background: 'rgba(255,49,95,0.1)', color: 'var(--red2)', border: '1px solid rgba(255,49,95,0.2)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   SCADUTA
                 </span>
               )}
@@ -484,25 +468,25 @@ function DetailView({ pratica, onBack, onEdit, onDelete, allEvents, allUsers }: 
 
       {/* Info grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <InfoCard icon={Tag} label="Categoria" value={catLabel(pratica.categoria)} color={catColor(pratica.categoria)} />
-        <InfoCard icon={CheckCircle} label="Stato" value={statoLabel(pratica.stato)} color={statoColor(pratica.stato)} />
-        <InfoCard icon={AlertTriangle} label="Priorita" value={(pratica.priorita || '').charAt(0).toUpperCase() + (pratica.priorita || '').slice(1)} color={priColor(pratica.priorita)} />
-        <InfoCard icon={Calendar} label="Creazione" value={fmtShort(pratica.creatoIl)} color="var(--muted)" />
-        <InfoCard icon={Clock} label="Scadenza" value={`${fmtShort(pratica.scadenza)} (${overdue ? `${Math.abs(dl)}g fa` : dl === 0 ? 'Oggi' : `tra ${dl}g`})`} color={overdue ? 'var(--red2)' : dl <= 7 ? 'var(--yellow)' : 'var(--muted)'} />
+        <InfoCard label="Categoria" value={catLabel(pratica.categoria)} color={catColor(pratica.categoria)} />
+        <InfoCard label="Stato" value={statoLabel(pratica.stato)} color={statoColor(pratica.stato)} />
+        <InfoCard label="Priorita" value={(pratica.priorita || '').charAt(0).toUpperCase() + (pratica.priorita || '').slice(1)} color={priColor(pratica.priorita)} />
+        <InfoCard label="Creazione" value={fmtShort(pratica.creatoIl)} color="var(--muted)" />
+        <InfoCard label="Scadenza" value={`${fmtShort(pratica.scadenza)} (${overdue ? `${Math.abs(dl)}g fa` : dl === 0 ? 'Oggi' : `tra ${dl}g`})`} color={overdue ? 'var(--red2)' : dl <= 7 ? 'var(--yellow)' : 'var(--muted)'} />
         {pratica.importo && (
-          <InfoCard icon={Euro} label="Importo" value={`€${pratica.importo.toLocaleString('it-IT')}`} color="var(--green)" />
+          <InfoCard label="Importo" value={`€${pratica.importo.toLocaleString('it-IT')}`} color="var(--green)" />
         )}
-        <InfoCard icon={User} label="Responsabile" value={responsabileLabel} color="var(--blue)" />
-        <InfoCard icon={Briefcase} label="Controparte" value={pratica.controparte} color="var(--text)" />
+        <InfoCard label="Responsabile" value={responsabileLabel} color="var(--blue)" />
+        <InfoCard label="Controparte" value={pratica.controparte} color="var(--text)" />
         {evento && (
-          <InfoCard icon={Calendar} label="Evento" value={evento.nome} color="var(--red2)" />
+          <InfoCard label="Evento" value={evento.nome} color="var(--red2)" />
         )}
       </div>
 
       {/* Note */}
       {pratica.note && (
-        <div className="panel p-5">
-          <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--text)' }}>Note</h3>
+        <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+          <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>NOTE</h3>
           <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{pratica.note}</p>
         </div>
       )}
@@ -510,23 +494,13 @@ function DetailView({ pratica, onBack, onEdit, onDelete, allEvents, allUsers }: 
   )
 }
 
-function InfoCard({ icon: Icon, label, value, color, avatar }: {
-  icon: React.ElementType; label: string; value: string; color: string; avatar?: string
+function InfoCard({ label, value, color }: {
+  label: string; value: string; color: string
 }) {
   return (
-    <div className="panel p-4 flex items-center gap-3">
-      {avatar ? (
-        <img src={avatar} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
-      ) : (
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ background: `${color}12` }}>
-          <Icon className="w-4 h-4" style={{ color }} />
-        </div>
-      )}
-      <div className="min-w-0">
-        <p className="text-xs" style={{ color: 'var(--muted)' }}>{label}</p>
-        <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{value}</p>
-      </div>
+    <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 16 }}>
+      <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>{label}</p>
+      <p className="text-sm font-medium" style={{ color }}>{value}</p>
     </div>
   )
 }
@@ -575,82 +549,95 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
       <div className="flex items-center justify-between gap-3">
         <button onClick={onCancel}
           className="flex items-center gap-2 text-sm transition-all hover:opacity-80"
-          style={{ color: 'var(--muted)' }}>
-          <ArrowLeft className="w-4 h-4" /> Annulla
+          style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+          <ArrowLeft className="w-4 h-4" /> ANNULLA
         </button>
         <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
           {pratica ? 'Modifica pratica' : 'Nuova pratica'}
         </h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="panel p-6 space-y-5">
+      <form onSubmit={handleSubmit} style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 24 }} className="space-y-5">
         {/* Row 1 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Titolo *</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Titolo *</label>
             <input type="text" value={titolo} onChange={e => setTitolo(e.target.value)}
-              className="input w-full py-2.5 text-sm rounded-lg" placeholder="Titolo pratica" required />
+              className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              placeholder="Titolo pratica" required />
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Controparte *</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Controparte *</label>
             <input type="text" value={controparte} onChange={e => setControparte(e.target.value)}
-              className="input w-full py-2.5 text-sm rounded-lg" placeholder="Nome azienda/ente" required />
+              className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              placeholder="Nome azienda/ente" required />
           </div>
         </div>
 
         {/* Row 2 */}
         <div>
-          <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Descrizione</label>
+          <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descrizione</label>
           <textarea value={descrizione} onChange={e => setDescrizione(e.target.value)}
-            className="input w-full py-2.5 text-sm rounded-lg resize-none" rows={3} placeholder="Descrizione dettagliata..." />
+            className="w-full py-2.5 text-sm rounded-lg resize-none focus:outline-none"
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+            rows={3} placeholder="Descrizione dettagliata..." />
         </div>
 
         {/* Row 3 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Categoria</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Categoria</label>
             <select value={categoria} onChange={e => setCategoria(e.target.value as CategoriaPratica)}
-              className="input w-full py-2.5 text-sm rounded-lg">
+              className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
               {CATEGORIE.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Stato</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Stato</label>
             <select value={stato} onChange={e => setStato(e.target.value as StatoPratica)}
-              className="input w-full py-2.5 text-sm rounded-lg">
+              className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
               {STATI.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Priorita</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priorita</label>
             <select value={priorita} onChange={e => setPriorita(e.target.value as PrioritaPratica)}
-              className="input w-full py-2.5 text-sm rounded-lg">
+              className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
               <option value="alta">Alta</option>
               <option value="media">Media</option>
               <option value="bassa">Bassa</option>
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Importo (€)</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Importo (€)</label>
             <input type="number" value={importo} onChange={e => setImporto(e.target.value)}
-              className="input w-full py-2.5 text-sm rounded-lg" placeholder="0" min="0" step="0.01" />
+              className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              placeholder="0" min="0" step="0.01" />
           </div>
         </div>
 
         {/* Row 4 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Evento collegato</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evento collegato</label>
             <select value={eventoId} onChange={e => setEventoId(e.target.value)}
-              className="input w-full py-2.5 text-sm rounded-lg">
+              className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
               <option value="">Nessuno</option>
               {allEvents.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Responsabile</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Responsabile</label>
             <select value={responsabileId} onChange={e => setResponsabileId(e.target.value)}
-              className="input w-full py-2.5 text-sm rounded-lg">
+              className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
               <option value="">Seleziona responsabile</option>
               {allUsers.filter(u => u.is_active).map(u => (
                 <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
@@ -658,29 +645,34 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Scadenza *</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Scadenza *</label>
             <input type="date" value={scadenza} onChange={e => setScadenza(e.target.value)}
-              className="input w-full py-2.5 text-sm rounded-lg" required />
+              className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              required />
           </div>
         </div>
 
         {/* Row 5 */}
         <div>
-          <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Note</label>
+          <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Note</label>
           <textarea value={note} onChange={e => setNote(e.target.value)}
-            className="input w-full py-2.5 text-sm rounded-lg resize-none" rows={3} placeholder="Note aggiuntive..." />
+            className="w-full py-2.5 text-sm rounded-lg resize-none focus:outline-none"
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+            rows={3} placeholder="Note aggiuntive..." />
         </div>
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-3 pt-3" style={{ borderTop: '1px solid var(--line)' }}>
           <button type="button" onClick={onCancel}
-            className="px-4 py-2.5 rounded-xl text-sm transition-all hover:bg-white/5"
-            style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>
-            Annulla
+            className="px-4 py-2.5 rounded-lg text-sm transition-all hover:bg-white/5"
+            style={{ color: 'var(--muted)', border: '1px solid var(--line)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            ANNULLA
           </button>
           <button type="submit"
-            className="btn-primary px-5 py-2.5 rounded-xl text-sm flex items-center gap-2">
-            {pratica ? 'Salva modifiche' : 'Crea pratica'}
+            className="btn-primary px-5 py-2.5 rounded-lg text-sm font-medium"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            {pratica ? 'SALVA MODIFICHE' : 'CREA PRATICA'}
           </button>
         </div>
       </form>
