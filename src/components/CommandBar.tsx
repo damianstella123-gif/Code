@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Send, X } from 'lucide-react'
+import { Loader2, Send, X, Calendar, Users, Briefcase, CheckSquare } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
@@ -13,10 +13,153 @@ interface CommandBarProps {
   onFilter?: (filter: string) => void
 }
 
+interface FlyEntity {
+  type: 'event' | 'supplier' | 'task' | 'client'
+  id: string
+  nome?: string
+  data?: string
+  stato?: string
+  categoria?: string
+  citta?: string
+  scadenza?: string
+  priorita?: string
+  [key: string]: unknown
+}
+
 interface FlyMessage {
   role: 'user' | 'assistant'
   content: string
+  entities?: FlyEntity[]
 }
+
+// ─── Entity Card ──────────────────────────────────────────────────────────────
+
+function getCountdown(dateStr: string | undefined): string | null {
+  if (!dateStr) return null
+  const target = new Date(dateStr)
+  const now = new Date()
+  const diff = Math.ceil((target.getTime() - now.getTime()) / 86400000)
+  if (diff < 0) return `T+${Math.abs(diff)}`
+  if (diff === 0) return 'OGGI'
+  return `T-${diff}`
+}
+
+const ENTITY_ICONS: Record<string, typeof Calendar> = {
+  event: Calendar,
+  supplier: Briefcase,
+  task: CheckSquare,
+  client: Users,
+}
+
+const STATO_COLORS: Record<string, string> = {
+  pianificazione: 'var(--blue)',
+  in_corso: 'var(--green)',
+  completato: 'var(--muted)',
+  bozza: 'var(--yellow)',
+  attivo: 'var(--green)',
+  lead: 'var(--blue)',
+  da_fare: 'var(--yellow)',
+  in_lavorazione: 'var(--blue)',
+  completata: 'var(--green)',
+}
+
+function EntityCard({ entity, navigate }: { entity: FlyEntity; navigate: (path: string) => void }) {
+  const Icon = ENTITY_ICONS[entity.type] || Calendar
+  const countdown = entity.type === 'event' ? getCountdown(entity.data as string) : null
+  const statoColor = STATO_COLORS[(entity.stato || '').toLowerCase()] || 'var(--muted)'
+
+  function handleClick() {
+    switch (entity.type) {
+      case 'event': navigate(`/eventi?id=${entity.id}`); break
+      case 'supplier': navigate('/fornitori'); break
+      case 'task': navigate('/task'); break
+      case 'client': navigate(`/crm?client=${entity.id}`); break
+    }
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        width: '100%',
+        padding: '8px 12px',
+        borderRadius: 8,
+        border: '1px solid var(--line)',
+        background: 'var(--panel2)',
+        cursor: 'pointer',
+        textAlign: 'left',
+        transition: 'border-color 150ms, background 150ms',
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.borderColor = 'var(--red2)'
+        ;(e.currentTarget as HTMLElement).style.background = 'rgba(208,0,58,0.04)'
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.borderColor = 'var(--line)'
+        ;(e.currentTarget as HTMLElement).style.background = 'var(--panel2)'
+      }}
+    >
+      <Icon style={{ width: 14, height: 14, color: 'var(--muted)', flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: '12px',
+          fontWeight: 600,
+          color: 'var(--text)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          {entity.nome || entity.id}
+        </div>
+        <div style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: '10px',
+          color: 'var(--muted)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          marginTop: 2,
+        }}>
+          {entity.stato && (
+            <span style={{
+              padding: '1px 5px',
+              borderRadius: 3,
+              background: `${statoColor}18`,
+              color: statoColor,
+              fontWeight: 600,
+              fontSize: '9px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.03em',
+            }}>
+              {entity.stato}
+            </span>
+          )}
+          {entity.data && <span>{entity.data}</span>}
+          {entity.categoria && <span>{entity.categoria}</span>}
+          {entity.citta && <span>{entity.citta}</span>}
+          {entity.scadenza && <span>{entity.scadenza}</span>}
+        </div>
+      </div>
+      {countdown && (
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: '10px',
+          fontWeight: 700,
+          color: countdown.startsWith('T+') ? 'var(--red2)' : countdown === 'OGGI' ? 'var(--yellow)' : 'var(--green)',
+          flexShrink: 0,
+        }}>
+          {countdown}
+        </span>
+      )}
+    </button>
+  )
+}
+
+// ─── Main CommandBar ──────────────────────────────────────────────────────────
 
 export default function CommandBar({ events, tasks, clients, onFilter }: CommandBarProps) {
   const navigate = useNavigate()
@@ -110,7 +253,8 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
       if (data?.error) throw new Error(data.error)
 
       const reply = data?.reply || '(nessuna risposta)'
-      setFlyHistory([...newHistory, { role: 'assistant', content: reply }])
+      const entities: FlyEntity[] = Array.isArray(data?.entities) ? data.entities : []
+      setFlyHistory([...newHistory, { role: 'assistant', content: reply, entities }])
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Errore imprevisto'
       setFlyError(msg)
@@ -322,6 +466,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
               <div key={i} style={{
                 alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
                 maxWidth: '85%',
+                width: msg.role === 'assistant' ? '100%' : undefined,
               }}>
                 {msg.role === 'user' ? (
                   <div style={{
@@ -335,15 +480,24 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
                     {msg.content}
                   </div>
                 ) : (
-                  <div style={{
-                    borderLeft: '2px solid var(--red2)',
-                    paddingLeft: 12,
-                    fontSize: '12px',
-                    lineHeight: '1.6',
-                    color: 'var(--text)',
-                    whiteSpace: 'pre-wrap',
-                  }}>
-                    {msg.content}
+                  <div>
+                    <div style={{
+                      borderLeft: '2px solid var(--red2)',
+                      paddingLeft: 12,
+                      fontSize: '12px',
+                      lineHeight: '1.6',
+                      color: 'var(--text)',
+                      whiteSpace: 'pre-wrap',
+                    }}>
+                      {msg.content}
+                    </div>
+                    {msg.entities && msg.entities.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+                        {msg.entities.slice(0, 5).map((ent, ei) => (
+                          <EntityCard key={ei} entity={ent} navigate={navigate} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

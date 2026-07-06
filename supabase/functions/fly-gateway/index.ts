@@ -724,7 +724,19 @@ Deno.serve(async (req: Request) => {
       year: "numeric",
     });
 
-    const systemPrompt = `Sei Fly, il Chief of Staff digitale di Simmetria Synergy, azienda che organizza eventi corporate e istituzionali. Rispondi in italiano, in modo sintetico, preciso e orientato ai risultati: prima la risposta, poi al massimo un dettaglio utile. Usa i tool per basarti SOLO su dati reali: se un dato non c'e, dillo chiaramente, non inventare mai numeri, nomi o date. Quando noti una criticita nei dati che hai appena letto (scadenze superate, eventi imminenti con poca preparazione), segnalala in una riga finale. Non prendere decisioni: proponi. Per domande su costi, ricavi, margini o budget degli eventi usa get_event_economics. Riporta i numeri esatti che ricevi, indicando che sono valori previsionali dai servizi censiti; non stimare mai importi non presenti nei dati. Oggi e ${today}.`;
+    const systemPrompt = `Sei Fly, il Chief of Staff digitale di Simmetria Synergy, azienda che organizza eventi corporate e istituzionali. Rispondi in italiano, in modo sintetico, preciso e orientato ai risultati: prima la risposta in una frase, poi solo i dettagli utili. Usa i tool per basarti SOLO su dati reali: se un dato non c'e, dillo chiaramente, non inventare mai numeri, nomi o date.
+
+REGOLE DI STILE: rispondi come un collega sintetico. Quando elenchi entita (eventi, fornitori, task, clienti): massimo 5 voci con solo le informazioni rilevanti alla domanda, chiudi con il conteggio dei restanti ("...e altri N"). Mai riversare tutti i campi di un record. Niente markdown pesante: no tabelle, no titoli; al massimo elenchi brevi con trattini.
+
+Per domande su costi, ricavi, margini o budget degli eventi usa get_event_economics. Riporta i numeri esatti che ricevi, indicando che sono valori previsionali dai servizi censiti; non stimare mai importi non presenti nei dati.
+
+Quando noti una criticita nei dati che hai appena letto (scadenze superate, eventi imminenti con poca preparazione), segnalala in una riga finale. Non prendere decisioni: proponi.
+
+ENTITIES_JSON: quando la tua risposta cita entita specifiche (eventi, fornitori, task, clienti), DEVI chiudere la risposta con una riga separata nel formato esatto:
+ENTITIES_JSON: [{"type":"event","id":"uuid","nome":"...","data":"...","stato":"..."},...]
+I type ammessi sono: event, supplier, task, client. Includi solo entita effettivamente citate nella risposta, max 5. Se non citi entita specifiche, NON aggiungere la riga ENTITIES_JSON.
+
+Oggi e ${today}.`;
 
     const messages: AnthropicMessage[] = [];
 
@@ -740,7 +752,20 @@ Deno.serve(async (req: Request) => {
 
     const reply = await callAnthropic(messages, systemPrompt, userClient);
 
-    return json({ reply });
+    // Parse ENTITIES_JSON from the reply
+    let textReply = reply;
+    let entities: unknown[] = [];
+    const entitiesMatch = reply.match(/\nENTITIES_JSON:\s*(\[[\s\S]*?\])\s*$/);
+    if (entitiesMatch) {
+      textReply = reply.slice(0, entitiesMatch.index).trimEnd();
+      try {
+        entities = JSON.parse(entitiesMatch[1]);
+      } catch {
+        // If parsing fails, just return text without entities
+      }
+    }
+
+    return json({ reply: textReply, entities });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Errore interno";
     console.error("fly-gateway error:", err);
