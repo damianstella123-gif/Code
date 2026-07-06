@@ -7,9 +7,35 @@ import { loadUser } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/profiles'
 
+/*
+ ┌─────────────────────────────────────────────────────┐
+ │  Z-INDEX SCALE (fixed-position overlays)            │
+ │                                                     │
+ │  40  — Pinned chat bubbles                          │
+ │  42  — Mini-chat window (open conversation)         │
+ │  50  — FlyAssistant closed button (actual: 1000*)   │
+ │  ...                                                │
+ │  * FlyAssistant uses z-1000 internally; our bubbles │
+ │    must sit BELOW it (40) and the mini-window just  │
+ │    above bubbles (42) but still below Fly.          │
+ │  Modals/overlays typically use 50+ / portals.       │
+ └─────────────────────────────────────────────────────┘
+*/
+const Z_BUBBLES = 40
+const Z_MINI_WINDOW = 42
+
 const DRAG_THRESHOLD = 5
-const BUBBLE_SIZE = 52
 const STORAGE_KEY = 'pinned_chat_positions'
+
+// FlyAssistant occupies: fixed bottom:24px right:16px, 56px diameter
+const FLY_BOTTOM = 24
+const FLY_SIZE = 56
+const FLY_MARGIN = 16 // gap between Fly top edge and bottom-most bubble
+const FLY_RESERVED = FLY_BOTTOM + FLY_SIZE + FLY_MARGIN // 96px from viewport bottom
+
+const BUBBLE_DESKTOP = 52
+const BUBBLE_MOBILE = 44
+const BUBBLE_GAP = 12
 
 interface BubblePosition {
   x: number
@@ -41,12 +67,19 @@ function savePositions(positions: Record<string, BubblePosition>) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(positions))
 }
 
-function clampPosition(x: number, y: number): BubblePosition {
-  const maxX = window.innerWidth - BUBBLE_SIZE - 8
-  const maxY = window.innerHeight - BUBBLE_SIZE - 8
+function clampPosition(x: number, y: number, size: number): BubblePosition {
+  const maxX = window.innerWidth - size - 8
+  const maxY = window.innerHeight - size - FLY_RESERVED
   return {
     x: Math.max(8, Math.min(x, maxX)),
     y: Math.max(8, Math.min(y, maxY)),
+  }
+}
+
+function defaultBubblePosition(index: number, size: number): BubblePosition {
+  return {
+    x: window.innerWidth - size - 20,
+    y: window.innerHeight - FLY_RESERVED - size - index * (size + BUBBLE_GAP),
   }
 }
 
@@ -63,9 +96,34 @@ function useIsMobile() {
 export default function PinnedChats() {
   const { unread } = useChatNotifications()
   const [openConvId, setOpenConvId] = useState<string | null>(null)
-  const [positions, setPositions] = useState<Record<string, BubblePosition>>(loadPositions)
+  const [positions, setPositions] = useState<Record<string, BubblePosition>>(() => {
+    const saved = loadPositions()
+    const validated: Record<string, BubblePosition> = {}
+    for (const [id, pos] of Object.entries(saved)) {
+      validated[id] = clampPosition(pos.x, pos.y, BUBBLE_DESKTOP)
+    }
+    return validated
+  })
   const navigate = useNavigate()
   const isMobile = useIsMobile()
+
+  useEffect(() => {
+    function handleResize() {
+      setPositions(prev => {
+        const next: Record<string, BubblePosition> = {}
+        let changed = false
+        for (const [id, pos] of Object.entries(prev)) {
+          const clamped = clampPosition(pos.x, pos.y, BUBBLE_DESKTOP)
+          if (clamped.x !== pos.x || clamped.y !== pos.y) changed = true
+          next[id] = clamped
+        }
+        if (changed) savePositions(next)
+        return changed ? next : prev
+      })
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   const pinnedConvs = useMemo(() => {
     return unread.pinnedIds
@@ -99,11 +157,20 @@ export default function PinnedChats() {
     })
   }
 
+  // Mobile layout: fixed column above Fly
   if (isMobile) {
+    const bubbleSize = pinnedConvs.length > 3 ? BUBBLE_MOBILE : BUBBLE_DESKTOP
+    const mobileSize = window.innerHeight < 600 ? BUBBLE_MOBILE : bubbleSize
+
     return (
       <div style={{
-        position: 'fixed', bottom: '20px', right: '20px', zIndex: 45,
-        display: 'flex', flexDirection: 'column-reverse', gap: '10px',
+        position: 'fixed',
+        bottom: `${FLY_RESERVED}px`,
+        right: '16px',
+        zIndex: Z_BUBBLES,
+        display: 'flex',
+        flexDirection: 'column-reverse',
+        gap: `${BUBBLE_GAP}px`,
         pointerEvents: 'auto',
       }}>
         {pinnedConvs.map(conv => {
@@ -116,9 +183,10 @@ export default function PinnedChats() {
               key={conv.id}
               onClick={() => navigate('/comunicazioni')}
               style={{
-                width: `${BUBBLE_SIZE}px`, height: `${BUBBLE_SIZE}px`, borderRadius: '50%',
+                width: `${mobileSize}px`, height: `${mobileSize}px`, borderRadius: '50%',
                 background: 'var(--panel-solid)', border: '2px solid var(--line)',
-                color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '14px', fontWeight: 700,
+                color: 'var(--text)', fontFamily: 'var(--font-mono)',
+                fontSize: mobileSize < 52 ? '12px' : '14px', fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', position: 'relative',
                 boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
@@ -133,13 +201,11 @@ export default function PinnedChats() {
     )
   }
 
+  // Desktop: individually-positioned draggable bubbles
   return (
     <>
       {pinnedConvs.map((conv, idx) => {
-        const defaultPos = clampPosition(
-          window.innerWidth - BUBBLE_SIZE - 20,
-          window.innerHeight - BUBBLE_SIZE - 20 - idx * (BUBBLE_SIZE + 12)
-        )
+        const defaultPos = defaultBubblePosition(idx, BUBBLE_DESKTOP)
         const pos = positions[conv.id] ?? defaultPos
         const unreadCount = unread.byConversation.get(conv.id) ?? 0
         const initial = conv.is_group
@@ -166,7 +232,7 @@ export default function PinnedChats() {
           conversations={unread.conversations}
           profileMap={profileMap}
           currentUserId={user.id}
-          anchorPos={positions[openConvId] ?? { x: window.innerWidth - 340, y: window.innerHeight - 500 }}
+          anchorPos={positions[openConvId] ?? defaultBubblePosition(0, BUBBLE_DESKTOP)}
           onClose={() => setOpenConvId(null)}
         />
       )}
@@ -223,7 +289,7 @@ function DraggableBubble({ initial, unreadCount, isOpen, position, onPositionCha
     if (!didDrag.current && Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return
     didDrag.current = true
 
-    const newPos = clampPosition(startPos.current.x + dx, startPos.current.y + dy)
+    const newPos = clampPosition(startPos.current.x + dx, startPos.current.y + dy, BUBBLE_DESKTOP)
     onPositionChange(newPos)
   }, [onPositionChange])
 
@@ -245,8 +311,8 @@ function DraggableBubble({ initial, unreadCount, isOpen, position, onPositionCha
         position: 'fixed',
         left: `${position.x}px`,
         top: `${position.y}px`,
-        width: `${BUBBLE_SIZE}px`,
-        height: `${BUBBLE_SIZE}px`,
+        width: `${BUBBLE_DESKTOP}px`,
+        height: `${BUBBLE_DESKTOP}px`,
         borderRadius: '50%',
         background: isOpen ? 'var(--red2)' : 'var(--panel-solid)',
         border: '2px solid var(--line)',
@@ -258,7 +324,7 @@ function DraggableBubble({ initial, unreadCount, isOpen, position, onPositionCha
         alignItems: 'center',
         justifyContent: 'center',
         cursor: 'grab',
-        zIndex: 46,
+        zIndex: Z_BUBBLES,
         boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
         transition: didDrag.current ? 'none' : 'background 0.15s ease, color 0.15s ease',
         touchAction: 'none',
@@ -342,9 +408,9 @@ function MiniChatWindow({ conversationId, conversations, profileMap, currentUser
   const windowWidth = 320
   const windowHeight = 420
   let left = anchorPos.x - windowWidth - 12
-  let top = anchorPos.y - windowHeight + BUBBLE_SIZE
+  let top = anchorPos.y - windowHeight + BUBBLE_DESKTOP
 
-  if (left < 8) left = anchorPos.x + BUBBLE_SIZE + 12
+  if (left < 8) left = anchorPos.x + BUBBLE_DESKTOP + 12
   if (top < 8) top = 8
   if (top + windowHeight > window.innerHeight - 8) top = window.innerHeight - windowHeight - 8
 
@@ -362,7 +428,7 @@ function MiniChatWindow({ conversationId, conversations, profileMap, currentUser
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      zIndex: 47,
+      zIndex: Z_MINI_WINDOW,
       animation: 'fadeIn 0.15s ease',
     }}>
       <div style={{
