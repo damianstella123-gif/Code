@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
+import { calcRowEconomics, calcRowCommission, type RawRow } from "../_shared/event-economics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -115,6 +116,25 @@ const TOOLS = [
         giorni: {
           type: "number",
           description: "Finestra temporale in giorni da oggi (default 7).",
+        },
+      },
+      required: [] as string[],
+    },
+  },
+  {
+    name: "get_event_economics",
+    description:
+      "Analisi economica dettagliata di un evento (costi, ricavi, margine per fornitore/categoria) oppure riepilogo aggregato di tutti gli eventi se chiamato senza parametri. Usa per domande su budget, margini, costi, ricavi.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        event_id: {
+          type: "string",
+          description: "UUID dell'evento specifico.",
+        },
+        nome_evento: {
+          type: "string",
+          description: "Nome (anche parziale) dell'evento da cercare. Se ambiguo restituisce le corrispondenze per disambiguare.",
         },
       },
       required: [] as string[],
@@ -352,6 +372,225 @@ async function executeTool(
       return JSON.stringify(results);
     }
 
+    case "get_event_economics": {
+      const eventId = input.event_id as string | undefined;
+      const nomeEvento = input.nome_evento as string | undefined;
+
+      // Helper to compute economics for a single event
+      async function computeForEvent(eid: string, supabaseClient: ReturnType<typeof createClient>) {
+        const { data: ev } = await supabaseClient
+          .from("events")
+          .select("id, title, start_date, end_date, fee_agenzia_pct, status, client")
+          .eq("id", eid)
+          .maybeSingle();
+
+        if (!ev) return null;
+
+        const feePct = (ev.fee_agenzia_pct as number) || 6;
+
+        const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes, suppliersRes] = await Promise.all([
+          supabaseClient.from("event_supplier_services").select("*").eq("event_id", eid),
+          supabaseClient.from("event_hotel_details").select("*").eq("event_id", eid),
+          supabaseClient.from("event_restaurant_details").select("*").eq("event_id", eid),
+          supabaseClient.from("event_experience_details").select("*").eq("event_id", eid),
+          supabaseClient.from("event_catering_details").select("*").eq("event_id", eid),
+          supabaseClient.from("event_staff_interno_details").select("*").eq("event_id", eid),
+          supabaseClient.from("event_staff_esterno_details").select("*").eq("event_id", eid),
+          supabaseClient.from("event_varie_details").select("*").eq("event_id", eid),
+          supabaseClient.from("event_audio_video_details").select("*").eq("event_id", eid),
+          supabaseClient.from("event_allestimenti_details").select("*").eq("event_id", eid),
+          supabaseClient.from("event_grafica_stampa_details").select("*").eq("event_id", eid),
+          supabaseClient.from("event_suppliers").select("supplier_id, service_category").eq("event_id", eid),
+        ]);
+
+        // Get supplier names
+        const supplierIds = [...new Set((suppliersRes.data ?? []).map((s: any) => s.supplier_id).filter(Boolean))];
+        let suppMap: Record<string, string> = {};
+        if (supplierIds.length > 0) {
+          const { data: supps } = await supabaseClient
+            .from("suppliers")
+            .select("id, name")
+            .in("id", supplierIds);
+          for (const s of (supps ?? [])) {
+            suppMap[s.id] = s.name;
+          }
+        }
+
+        const catTables: { category: string; rows: RawRow[] }[] = [
+          { category: "transfer", rows: (svcRes.data ?? []) as RawRow[] },
+          { category: "hotel", rows: (hotelRes.data ?? []) as RawRow[] },
+          { category: "ristorante", rows: (restRes.data ?? []) as RawRow[] },
+          { category: "experience", rows: (expRes.data ?? []) as RawRow[] },
+          { category: "catering", rows: (catRes.data ?? []) as RawRow[] },
+          { category: "staff_interno", rows: (staffIntRes.data ?? []) as RawRow[] },
+          { category: "staff_esterno", rows: (staffExtRes.data ?? []) as RawRow[] },
+          { category: "varie", rows: (varieRes.data ?? []) as RawRow[] },
+          { category: "audio_video", rows: (avRes.data ?? []) as RawRow[] },
+          { category: "allestimenti", rows: (allestRes.data ?? []) as RawRow[] },
+          { category: "grafica_stampa", rows: (graficaRes.data ?? []) as RawRow[] },
+        ];
+
+        let totVenduto = 0, totCosto = 0, totCommissioni = 0;
+        const righe: { fornitore: string; categoria: string; costo: number; venduto: number; margine: number; margine_pct: number }[] = [];
+
+        for (const { category, rows } of catTables) {
+          for (const row of rows) {
+            const econ = calcRowEconomics(row, category);
+            if (!econ.venduto && !econ.costo) continue;
+            const comm = calcRowCommission(row, econ.costo);
+            const suppId = (row.supplier_id as string) || (row.profile_id as string) || "";
+            const margine = econ.venduto - econ.costo;
+            const marginePct = econ.venduto > 0 ? (margine / econ.venduto) * 100 : 0;
+            righe.push({
+              fornitore: suppMap[suppId] || suppId || "(interno)",
+              categoria: category,
+              costo: Math.round(econ.costo * 100) / 100,
+              venduto: Math.round(econ.venduto * 100) / 100,
+              margine: Math.round(margine * 100) / 100,
+              margine_pct: Math.round(marginePct * 10) / 10,
+            });
+            totVenduto += econ.venduto;
+            totCosto += econ.costo;
+            totCommissioni += comm;
+          }
+        }
+
+        const fee = totVenduto * feePct / 100;
+        const ricavi = totVenduto + fee + totCommissioni;
+        const margine = ricavi - totCosto;
+        const marginePct = ricavi > 0 ? (margine / ricavi) * 100 : 0;
+
+        return {
+          evento: { id: ev.id, nome: ev.title, data_inizio: ev.start_date, data_fine: ev.end_date, fee_pct: feePct, stato: ev.status, cliente: ev.client },
+          righe,
+          totali: {
+            costo: Math.round(totCosto * 100) / 100,
+            venduto: Math.round(totVenduto * 100) / 100,
+            fee: Math.round(fee * 100) / 100,
+            commissioni: Math.round(totCommissioni * 100) / 100,
+            ricavi: Math.round(ricavi * 100) / 100,
+            margine: Math.round(margine * 100) / 100,
+            margine_pct: Math.round(marginePct * 10) / 10,
+          },
+        };
+      }
+
+      // Single event by ID
+      if (eventId) {
+        const result = await computeForEvent(eventId, supabase);
+        if (!result) return "Evento non trovato con questo ID.";
+        return JSON.stringify(result);
+      }
+
+      // Search by name
+      if (nomeEvento) {
+        const { data: matches } = await supabase
+          .from("events")
+          .select("id, title, start_date, status")
+          .ilike("title", `%${nomeEvento}%`)
+          .limit(5);
+
+        if (!matches || matches.length === 0) return `Nessun evento trovato con nome "${nomeEvento}".`;
+        if (matches.length > 1) {
+          return JSON.stringify({
+            disambiguazione: true,
+            messaggio: `Ho trovato ${matches.length} eventi corrispondenti. Specifica quale:`,
+            eventi: matches.map(m => ({ id: m.id, nome: m.title, data: m.start_date, stato: m.status })),
+          });
+        }
+
+        const result = await computeForEvent(matches[0].id, supabase);
+        if (!result) return "Errore nel calcolo economico.";
+        return JSON.stringify(result);
+      }
+
+      // Aggregated view for all events
+      const { data: allEvents } = await supabase
+        .from("events")
+        .select("id, title, start_date, fee_agenzia_pct, status")
+        .order("start_date", { ascending: false })
+        .limit(50);
+
+      if (!allEvents || allEvents.length === 0) return "Nessun evento trovato.";
+
+      const feePctByEvent: Record<string, number> = {};
+      for (const ev of allEvents) {
+        feePctByEvent[ev.id] = (ev.fee_agenzia_pct as number) || 6;
+      }
+
+      // Fetch all detail tables at once (same logic as src/lib/event-economics.ts)
+      const [svcR, hotelR, restR, expR, catR, siR, seR, varR, avR, allR, grR] = await Promise.all([
+        supabase.from("event_supplier_services").select("event_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo"),
+        supabase.from("event_hotel_details").select("event_id, tipo, payment_mode, rooms_client_count, room_rate_client, rooms_simmetria_count, room_cost_simmetria, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, check_in_date, data, ora_inizio, commissione_pct, commissione_importo"),
+        supabase.from("event_restaurant_details").select("event_id, budget_totale, budget_per_persona, pax_confermati, pax_previsti, costo_totale_reale, costo_per_persona, data, ora_inizio, commissione_pct, commissione_importo"),
+        supabase.from("event_experience_details").select("event_id, venduto_totale, venduto_per_persona, costo_totale, costo_per_persona, pax, data, ora_inizio, ora, commissione_pct, commissione_importo"),
+        supabase.from("event_catering_details").select("event_id, venduto_totale, venduto_per_persona, costo_totale, costo_per_persona, pax, data, ora_inizio, ora, commissione_pct, commissione_importo"),
+        supabase.from("event_staff_interno_details").select("event_id, venduto_totale, costo_totale, costo_giornaliero, data, ora_inizio, commissione_pct, commissione_importo"),
+        supabase.from("event_staff_esterno_details").select("event_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo"),
+        supabase.from("event_varie_details").select("event_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo"),
+        supabase.from("event_audio_video_details").select("event_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo"),
+        supabase.from("event_allestimenti_details").select("event_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo"),
+        supabase.from("event_grafica_stampa_details").select("event_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo"),
+      ]);
+
+      const catToRows: { category: string; rows: RawRow[] }[] = [
+        { category: "transfer", rows: (svcR.data ?? []) as RawRow[] },
+        { category: "hotel", rows: (hotelR.data ?? []) as RawRow[] },
+        { category: "ristorante", rows: (restR.data ?? []) as RawRow[] },
+        { category: "experience", rows: (expR.data ?? []) as RawRow[] },
+        { category: "catering", rows: (catR.data ?? []) as RawRow[] },
+        { category: "staff_interno", rows: (siR.data ?? []) as RawRow[] },
+        { category: "staff_esterno", rows: (seR.data ?? []) as RawRow[] },
+        { category: "varie", rows: (varR.data ?? []) as RawRow[] },
+        { category: "audio_video", rows: (avR.data ?? []) as RawRow[] },
+        { category: "allestimenti", rows: (allR.data ?? []) as RawRow[] },
+        { category: "grafica_stampa", rows: (grR.data ?? []) as RawRow[] },
+      ];
+
+      const byEvent: Record<string, { venduto: number; costo: number; commissioni: number }> = {};
+      for (const { category, rows } of catToRows) {
+        for (const row of rows) {
+          const eid = row.event_id as string;
+          if (!eid) continue;
+          const econ = calcRowEconomics(row, category);
+          if (!econ.venduto && !econ.costo) continue;
+          if (!byEvent[eid]) byEvent[eid] = { venduto: 0, costo: 0, commissioni: 0 };
+          byEvent[eid].venduto += econ.venduto;
+          byEvent[eid].costo += econ.costo;
+          byEvent[eid].commissioni += calcRowCommission(row, econ.costo);
+        }
+      }
+
+      const nameMap: Record<string, { title: string; date: string; status: string }> = {};
+      for (const ev of allEvents) {
+        nameMap[ev.id] = { title: ev.title, date: ev.start_date, status: ev.status };
+      }
+
+      const summaries = Object.entries(byEvent)
+        .filter(([eid]) => nameMap[eid])
+        .map(([eid, d]) => {
+          const feePct = feePctByEvent[eid] ?? 6;
+          const fee = d.venduto * feePct / 100;
+          const ricavi = d.venduto + fee + d.commissioni;
+          const margine = ricavi - d.costo;
+          const marginePct = ricavi > 0 ? (margine / ricavi) * 100 : 0;
+          return {
+            id: eid,
+            nome: nameMap[eid].title,
+            data: nameMap[eid].date,
+            stato: nameMap[eid].status,
+            costo: Math.round(d.costo),
+            ricavi: Math.round(ricavi),
+            margine: Math.round(margine),
+            margine_pct: Math.round(marginePct * 10) / 10,
+          };
+        })
+        .sort((a, b) => b.margine - a.margine);
+
+      if (summaries.length === 0) return "Nessun dato economico trovato per gli eventi.";
+      return JSON.stringify(summaries);
+    }
+
     default:
       return `Tool sconosciuto: ${name}`;
   }
@@ -485,7 +724,7 @@ Deno.serve(async (req: Request) => {
       year: "numeric",
     });
 
-    const systemPrompt = `Sei Fly, il Chief of Staff digitale di Simmetria Synergy, azienda che organizza eventi corporate e istituzionali. Rispondi in italiano, in modo sintetico, preciso e orientato ai risultati: prima la risposta, poi al massimo un dettaglio utile. Usa i tool per basarti SOLO su dati reali: se un dato non c'e, dillo chiaramente, non inventare mai numeri, nomi o date. Quando noti una criticita nei dati che hai appena letto (scadenze superate, eventi imminenti con poca preparazione), segnalala in una riga finale. Non prendere decisioni: proponi. Oggi e ${today}.`;
+    const systemPrompt = `Sei Fly, il Chief of Staff digitale di Simmetria Synergy, azienda che organizza eventi corporate e istituzionali. Rispondi in italiano, in modo sintetico, preciso e orientato ai risultati: prima la risposta, poi al massimo un dettaglio utile. Usa i tool per basarti SOLO su dati reali: se un dato non c'e, dillo chiaramente, non inventare mai numeri, nomi o date. Quando noti una criticita nei dati che hai appena letto (scadenze superate, eventi imminenti con poca preparazione), segnalala in una riga finale. Non prendere decisioni: proponi. Per domande su costi, ricavi, margini o budget degli eventi usa get_event_economics. Riporta i numeri esatti che ricevi, indicando che sono valori previsionali dai servizi censiti; non stimare mai importi non presenti nei dati. Oggi e ${today}.`;
 
     const messages: AnthropicMessage[] = [];
 
