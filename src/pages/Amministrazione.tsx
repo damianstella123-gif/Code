@@ -498,10 +498,18 @@ export default function Amministrazione() {
   const totInAttesa = visibleEntrate.filter(e => e.stato === 'in_attesa').reduce((s, e) => s + e.importo, 0)
   const totScaduto = visibleEntrate.filter(e => e.stato === 'scaduto').reduce((s, e) => s + e.importo, 0)
 
-  // Event economics (filtered by allowed events for Manager)
+  // Event economics (filtered by allowed events for Manager + temporal/event filters)
   const visibleEventEcon = useMemo(() =>
-    eventEconomics.filter(ec => !isManagerOnly || allowedEventIds.includes(ec.eventId)),
-    [eventEconomics, isManagerOnly, allowedEventIds])
+    eventEconomics.filter(ec => {
+      if (isManagerOnly && !allowedEventIds.includes(ec.eventId)) return false
+      if (filterEvento !== 'tutti' && ec.eventId !== filterEvento) return false
+      if (filterMese !== 'tutti') {
+        const ev = events.find(e => e.id === ec.eventId)
+        if (ev && !ev.dataInizio.startsWith(filterMese)) return false
+      }
+      return true
+    }),
+    [eventEconomics, isManagerOnly, allowedEventIds, filterEvento, filterMese, events])
 
   const totRicaviEventi = visibleEventEcon.reduce((s, ec) => s + ec.ricavi, 0)
   const totCostiEventi = visibleEventEcon.reduce((s, ec) => s + ec.costo, 0)
@@ -512,18 +520,23 @@ export default function Amministrazione() {
   const margine = totEntrate - totUscite
   const marginePerc = totEntrate > 0 ? Math.round((margine / totEntrate) * 100) : 0
 
-  const budgetEvents = events
-    .filter(e => !isManagerOnly || allowedEventIds.includes(e.id))
-    .reduce((s, e) => s + e.budget, 0)
+  const filteredEvents = useMemo(() =>
+    events.filter(e => {
+      if (isManagerOnly && !allowedEventIds.includes(e.id)) return false
+      if (filterEvento !== 'tutti' && e.id !== filterEvento) return false
+      if (filterMese !== 'tutti' && !e.dataInizio.startsWith(filterMese)) return false
+      return true
+    }),
+    [events, isManagerOnly, allowedEventIds, filterEvento, filterMese])
 
-  const alertBudget = events
-    .filter(e => !isManagerOnly || allowedEventIds.includes(e.id))
-    .some(ev => {
-      if (ev.budget <= 0) return false
-      const costoManuale = visibleUscite.filter(x => x.eventoId === ev.id).reduce((s, x) => s + x.importo, 0)
-      const costoServizi = eventEconomics.find(ec => ec.eventId === ev.id)?.costo ?? 0
-      return (costoManuale + costoServizi) > ev.budget * 0.9
-    })
+  const budgetEvents = filteredEvents.reduce((s, e) => s + e.budget, 0)
+
+  const alertBudget = filteredEvents.some(ev => {
+    if (ev.budget <= 0) return false
+    const costoManuale = visibleUscite.filter(x => x.eventoId === ev.id).reduce((s, x) => s + x.importo, 0)
+    const costoServizi = eventEconomics.find(ec => ec.eventId === ev.id)?.costo ?? 0
+    return (costoManuale + costoServizi) > ev.budget * 0.9
+  })
 
   const fattureInScadenza = visibleFatture.filter(f => {
     const days = Math.ceil((new Date(f.scadenza).getTime() - Date.now()) / 86400000)
@@ -813,8 +826,8 @@ export default function Amministrazione() {
         ))}
       </div>
 
-      {/* Filters row (not on dashboard) */}
-      {activeTab !== 'dashboard' && (
+      {/* Filters row */}
+      {(
         <div className="flex flex-wrap gap-3" style={{ padding: '14px 0' }}>
           <div className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
             <Filter className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
@@ -881,7 +894,7 @@ export default function Amministrazione() {
           {/* KPI grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[
-              { label: 'Budget Totale Eventi', value: formatEur(budgetEvents), sub: `${events.filter(e => !isManagerOnly || allowedEventIds.includes(e.id)).length} eventi`, breakdown: null, color: 'var(--text)', icon: Euro },
+              { label: 'Budget Totale Eventi', value: formatEur(budgetEvents), sub: `${filteredEvents.length} eventi`, breakdown: null, color: 'var(--text)', icon: Euro },
               { label: 'Ricavi Totali', value: formatEur(totEntrate), sub: `${marginePerc}% margine`, breakdown: `eventi: ${formatEur(totRicaviEventi)} · manuali: ${formatEur(totEntrateManuali)}`, color: 'var(--green)', icon: ArrowUpRight },
               { label: 'Costi Totali', value: formatEur(totUscite), sub: `${visibleUscite.length + visibleEventEcon.reduce((s, e) => s + e.lineCount, 0)} voci`, breakdown: `eventi: ${formatEur(totCostiEventi)} · manuali: ${formatEur(totUsciteManuali)}`, color: 'var(--red2)', icon: ArrowDownRight },
               { label: 'Margine Stimato', value: formatEur(margine), sub: `${marginePerc}% sui ricavi`, breakdown: null, color: margine >= 0 ? 'var(--green)' : 'var(--red2)', icon: TrendingUp },
@@ -909,9 +922,7 @@ export default function Amministrazione() {
           <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
             <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 16 }}>Costi vs Budget per Evento</h3>
             <div className="space-y-4">
-              {events
-                .filter(ev => !isManagerOnly || allowedEventIds.includes(ev.id))
-                .map(ev => {
+              {filteredEvents.map(ev => {
                   const costoManuale = uscite.filter(u => u.eventoId === ev.id).reduce((s, u) => s + u.importo, 0)
                   const costoServizi = eventEconomics.find(ec => ec.eventId === ev.id)?.costo ?? 0
                   const speso = costoManuale + costoServizi
