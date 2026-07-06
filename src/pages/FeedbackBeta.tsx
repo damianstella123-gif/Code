@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Search, X, Pencil, Trash2, MessageCircle, Bug, Lightbulb, Sparkles, AlertTriangle } from 'lucide-react'
-import { fetchFeedbacks, upsertFeedback, deleteFeedback, type Feedback } from '@/lib/feedback-service'
+import { fetchFeedbacks, insertFeedback, updateFeedback, deleteFeedback, type Feedback } from '@/lib/feedback-service'
 import { loadUser } from '@/lib/auth'
 import { useRealtimeTable } from '@/lib/use-realtime'
 
@@ -78,20 +78,26 @@ function FeedbackForm({ initial, onClose, onSaved }: FeedbackFormProps) {
     if (!titolo.trim()) { setError('Il titolo e obbligatorio'); return }
     setError(null)
     setSaving(true)
-    const payload = {
-      id: initial?.id ?? crypto.randomUUID(),
+
+    const fields = {
       titolo: titolo.trim(),
       descrizione: descrizione.trim(),
       categoria,
       priorita,
       modulo,
       stato,
-      autore_id: initial?.autore_id ?? user?.id ?? null,
       autore_nome: initial?.autore_nome ?? (user ? `${user.first_name} ${user.last_name}` : ''),
     }
-    const saved = await upsertFeedback(payload)
+
+    let result
+    if (isEdit && initial) {
+      result = await updateFeedback(initial.id, fields)
+    } else {
+      result = await insertFeedback(fields)
+    }
+
     setSaving(false)
-    if (!saved) { setError('Salvataggio non riuscito'); return }
+    if (result.error) { setError(result.error); return }
     onSaved()
     onClose()
   }
@@ -203,6 +209,7 @@ export default function FeedbackBeta() {
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState<Feedback | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Feedback | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const refresh = useCallback(() => {
     fetchFeedbacks().then(setList)
@@ -235,7 +242,12 @@ export default function FeedbackBeta() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return
-    await deleteFeedback(deleteTarget.id)
+    setDeleteError(null)
+    const result = await deleteFeedback(deleteTarget.id)
+    if (!result.success) {
+      setDeleteError(result.error ?? 'Eliminazione non riuscita')
+      return
+    }
     setDeleteTarget(null)
     refresh()
   }
@@ -350,7 +362,7 @@ export default function FeedbackBeta() {
                       className="p-1.5 rounded-lg hover:bg-white/10 transition-all" title="Modifica">
                       <Pencil className="w-4 h-4" style={{ color: 'var(--muted)' }} />
                     </button>
-                    <button onClick={() => setDeleteTarget(fb)}
+                    <button onClick={() => { setDeleteError(null); setDeleteTarget(fb) }}
                       className="p-1.5 rounded-lg hover:bg-white/10 transition-all" title="Elimina">
                       <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
                     </button>
@@ -383,6 +395,11 @@ export default function FeedbackBeta() {
             <p className="text-xs mt-2" style={{ color: 'var(--muted)' }}>
               Vuoi eliminare "{deleteTarget.titolo}"?
             </p>
+            {deleteError && (
+              <p className="text-xs mt-2 px-2 py-1.5 rounded" style={{ color: 'var(--red2)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                {deleteError}
+              </p>
+            )}
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => setDeleteTarget(null)}
                 className="px-4 py-2 rounded-lg text-xs font-medium hover:bg-white/5"

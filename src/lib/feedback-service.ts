@@ -1,5 +1,4 @@
 import { supabase } from './supabase'
-import { loadUser } from './auth'
 
 export interface Feedback {
   id: string
@@ -15,6 +14,11 @@ export interface Feedback {
   updated_at: string
 }
 
+export interface FeedbackResult {
+  data: Feedback | null
+  error: string | null
+}
+
 export async function fetchFeedbacks(): Promise<Feedback[]> {
   const { data, error } = await supabase
     .from('feedback')
@@ -27,31 +31,55 @@ export async function fetchFeedbacks(): Promise<Feedback[]> {
   return (data ?? []) as Feedback[]
 }
 
-export async function upsertFeedback(f: Omit<Feedback, 'created_at' | 'updated_at'>): Promise<Feedback | null> {
-  const user = loadUser()
-  const payload = {
-    ...f,
-    autore_id: f.autore_id || user?.id || null,
-    autore_nome: f.autore_nome || (user ? `${user.first_name} ${user.last_name}` : ''),
-    updated_at: new Date().toISOString(),
-  }
-  const { data, error } = await supabase
-    .from('feedback')
-    .upsert(payload, { onConflict: 'id' })
-    .select()
-    .maybeSingle()
-  if (error) {
-    console.error('upsertFeedback error:', error.message)
-    return null
-  }
-  return data as Feedback | null
+async function getAuthUid(): Promise<string | null> {
+  const { data } = await supabase.auth.getUser()
+  return data?.user?.id ?? null
 }
 
-export async function deleteFeedback(id: string): Promise<boolean> {
+export async function insertFeedback(
+  f: Omit<Feedback, 'id' | 'created_at' | 'updated_at' | 'autore_id'>,
+): Promise<FeedbackResult> {
+  const uid = await getAuthUid()
+  if (!uid) return { data: null, error: 'Utente non autenticato' }
+
+  const { data, error } = await supabase
+    .from('feedback')
+    .insert({
+      ...f,
+      autore_id: uid,
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .maybeSingle()
+
+  if (error) return { data: null, error: error.message }
+  return { data: data as Feedback | null, error: null }
+}
+
+export async function updateFeedback(
+  id: string,
+  fields: Partial<Omit<Feedback, 'id' | 'created_at' | 'autore_id'>>,
+): Promise<FeedbackResult> {
+  const uid = await getAuthUid()
+  if (!uid) return { data: null, error: 'Utente non autenticato' }
+
+  const { data, error } = await supabase
+    .from('feedback')
+    .update({ ...fields, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .maybeSingle()
+
+  if (error) return { data: null, error: error.message }
+  if (!data) return { data: null, error: 'Elemento non trovato o permesso negato' }
+  return { data: data as Feedback, error: null }
+}
+
+export async function deleteFeedback(id: string): Promise<{ success: boolean; error: string | null }> {
+  const uid = await getAuthUid()
+  if (!uid) return { success: false, error: 'Utente non autenticato' }
+
   const { error } = await supabase.from('feedback').delete().eq('id', id)
-  if (error) {
-    console.error('deleteFeedback error:', error.message)
-    return false
-  }
-  return true
+  if (error) return { success: false, error: error.message }
+  return { success: true, error: null }
 }
