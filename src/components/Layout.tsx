@@ -1,5 +1,4 @@
 import { ReactNode, useState, useEffect, useCallback } from 'react'
-import FlyAssistant from '@/components/FlyAssistant'
 import GlobalSearch from '@/components/GlobalSearch'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -511,7 +510,6 @@ export default function Layout({ children }: { children: ReactNode }) {
             {children}
           </main>
         </div>
-        <FlyAssistant />
         <PinnedChats />
       </div>
     </ChatNotificationsProvider>

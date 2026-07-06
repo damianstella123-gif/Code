@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Send, X, Calendar, Users, Briefcase, CheckSquare } from 'lucide-react'
+import { Send, X, Calendar, Users, Briefcase, CheckSquare, PawPrint } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
@@ -298,7 +298,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
   return (
     <div ref={containerRef} className="cmd-bar-wrapper">
       <div className="cmd-bar">
-        <div className="cmd-bar-dot" />
+        <PawPrint style={{ width: 16, height: 16, color: 'var(--muted)', flexShrink: 0 }} />
         <input
           ref={inputRef}
           type="text"
@@ -306,7 +306,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
           onChange={e => setQuery(e.target.value)}
           onFocus={() => setFocused(true)}
           onKeyDown={handleBarKeyDown}
-          placeholder="Chiedi o cerca qualsiasi cosa..."
+          placeholder="Chiedi a Fly o cerca qualsiasi cosa..."
           className="cmd-bar-input"
         />
       </div>
@@ -366,8 +366,9 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
 
               {/* Ask Fly - always at the bottom */}
               <div className="cmd-group" style={{ borderTop: '1px solid var(--line)', marginTop: 4, paddingTop: 4 }}>
-                <button className="cmd-result" onClick={() => openFlyWithQuery(query)}>
-                  <span className="cmd-result-name" style={{ color: 'var(--red2)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+                <button className="cmd-result" onClick={() => openFlyWithQuery(query)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <PawPrint style={{ width: 12, height: 12, color: 'var(--muted)', flexShrink: 0 }} />
+                  <span className="cmd-result-name" style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                     CHIEDI A FLY
                   </span>
                   <span className="cmd-result-ctx">"{query}"</span>
@@ -403,24 +404,25 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
             borderBottom: '1px solid var(--line)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: flyLoading ? 'var(--yellow)' : 'var(--red2)',
-                animation: flyLoading ? 'fly-glow-pulse 1.2s infinite' : 'none',
+              <PawPrint style={{
+                width: 14, height: 14, color: 'var(--muted)',
+                transition: 'opacity 0.8s ease',
+                opacity: flyLoading ? undefined : 1,
+                animation: flyLoading ? 'fly-paw-pulse 1.6s ease-in-out infinite' : 'none',
               }} />
               <span style={{
                 fontFamily: 'var(--font-mono)',
-                fontSize: '11px',
+                fontSize: '10px',
                 fontWeight: 700,
                 textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                color: 'var(--text)',
+                letterSpacing: '1px',
+                color: 'var(--muted)',
               }}>
                 FLY
               </span>
               {flyLoading && (
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
-                  sta guardando i dati...
+                  sta cercando...
                 </span>
               )}
             </div>
@@ -505,9 +507,9 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
 
             {flyLoading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--red2)' }} />
+                <PawPrint className="w-3.5 h-3.5" style={{ color: 'var(--muted)', animation: 'fly-paw-pulse 1.6s ease-in-out infinite' }} />
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
-                  Fly sta guardando i dati...
+                  Fly sta cercando...
                 </span>
               </div>
             )}

@@ -13,11 +13,6 @@ import type { Profile } from '@/lib/profiles'
  │                                                     │
  │  40  — Pinned chat bubbles                          │
  │  42  — Mini-chat window (open conversation)         │
- │  50  — FlyAssistant closed button (actual: 1000*)   │
- │  ...                                                │
- │  * FlyAssistant uses z-1000 internally; our bubbles │
- │    must sit BELOW it (40) and the mini-window just  │
- │    above bubbles (42) but still below Fly.          │
  │  Modals/overlays typically use 50+ / portals.       │
  └─────────────────────────────────────────────────────┘
 */
@@ -27,11 +22,7 @@ const Z_MINI_WINDOW = 42
 const DRAG_THRESHOLD = 5
 const STORAGE_KEY = 'pinned_chat_positions'
 
-// FlyAssistant occupies: fixed bottom:24px right:16px, 56px diameter
-const FLY_BOTTOM = 24
-const FLY_SIZE = 56
-const FLY_MARGIN = 16 // gap between Fly top edge and bottom-most bubble
-const FLY_RESERVED = FLY_BOTTOM + FLY_SIZE + FLY_MARGIN // 96px from viewport bottom
+const FLY_RESERVED = 16 // simple bottom margin
 
 const BUBBLE_DESKTOP = 52
 const BUBBLE_MOBILE = 44
