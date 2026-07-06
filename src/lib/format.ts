@@ -23,6 +23,10 @@ export function toISO(d: Date): string {
   return `${y}-${m}-${g}`
 }
 
+export function todayISO(): string {
+  return toISO(new Date())
+}
+
 export function addDaysISO(iso: string, days: number): string {
   const [y, m, d] = iso.split('-').map(Number)
   const dt = new Date(Date.UTC(y, m - 1, d + days))

@@ -22,7 +22,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { loadUser, isPartnerUser } from '@/lib/auth'
-import { toISO } from '@/lib/format'
+import { todayISO, addDaysISO } from '@/lib/format'
 import type {
   Entrata,
   Uscita,
@@ -523,7 +523,7 @@ export default function Amministrazione() {
   function segnaEntrataPagata(id: string) {
     setEntrate(prev => {
       const updated = prev.map(e =>
-        e.id === id ? { ...e, stato: 'pagato' as StatoPagamento, dataPagamento: toISO(new Date()) } : e
+        e.id === id ? { ...e, stato: 'pagato' as StatoPagamento, dataPagamento: todayISO() } : e
       )
       saveLocal(SK_ENTRATE, updated)
       return updated
@@ -531,7 +531,7 @@ export default function Amministrazione() {
   }
 
   function segnaUscitaPagata(id: string) {
-    const today = toISO(new Date())
+    const today = todayISO()
     setUscite(prev => prev.map(u =>
       u.id === id ? { ...u, stato: 'pagato' as StatoPagamento, dataPagamento: today } : u
     ))
@@ -577,8 +577,8 @@ export default function Amministrazione() {
       imponibile: importo,
       iva: Math.round(importo * 0.22),
       stato: 'bozza',
-      dataEmissione: toISO(new Date()),
-      scadenza: toISO(new Date(Date.now() + 30 * 86400000)),
+      dataEmissione: todayISO(),
+      scadenza: addDaysISO(todayISO(), 30),
       note: 'Fattura generata automaticamente',
     }
     setFatture(prev => {
@@ -618,7 +618,7 @@ export default function Amministrazione() {
     const wsE = XLSX.utils.json_to_sheet(entrateRows)
     XLSX.utils.book_append_sheet(wb, wsU, 'Uscite')
     XLSX.utils.book_append_sheet(wb, wsE, 'Entrate')
-    XLSX.writeFile(wb, `simmetria_budget_${toISO(new Date())}.xlsx`)
+    XLSX.writeFile(wb, `simmetria_budget_${todayISO()}.xlsx`)
   }
 
   async function esportaPDF() {
@@ -628,7 +628,7 @@ export default function Amministrazione() {
     doc.setFontSize(16)
     doc.text('SIMMETRIA HUB - Riepilogo Budget', 14, 20)
     doc.setFontSize(10)
-    doc.text(`Data: ${new Date().toLocaleDateString('it-IT')}`, 14, 28)
+    doc.text(`Data: ${todayISO()}`, 14, 28)
     doc.text(`Budget eventi: ${formatEur(budgetEvents)}  |  Entrate: ${formatEur(totEntrate)}  |  Uscite: ${formatEur(totUscite)}  |  Margine: ${formatEur(margine)} (${marginePerc}%)`, 14, 34)
 
     autoTable(doc, {
@@ -648,11 +648,11 @@ export default function Amministrazione() {
       headStyles: { fillColor: [220, 30, 60] },
     })
 
-    doc.save(`simmetria_budget_${toISO(new Date())}.pdf`)
+    doc.save(`simmetria_budget_${todayISO()}.pdf`)
   }
 
   function handleNuovoMovimento(tipo: TipoMovimento, importo: number, note: string, eventoId: string | null, soggettoId: string, quantity: number, unitPrice: number | null) {
-    const today = toISO(new Date())
+    const today = todayISO()
     if (tipo === 'entrata') {
       const newE: Entrata = {
         id: `ent_new_${Date.now()}`,
@@ -1162,7 +1162,7 @@ export default function Amministrazione() {
                     </td>
                   </tr>
                 ) : filteredUscite.map((u, i) => {
-                  const isScad = new Date(u.scadenza) < new Date() && u.stato !== 'pagato'
+                  const isScad = u.scadenza < todayISO() && u.stato !== 'pagato'
                   return (
                     <tr
                       key={u.id}
@@ -1264,7 +1264,7 @@ export default function Amministrazione() {
                   </tr>
                 ) : filteredFatture.map((f, i) => {
                   const Icon = statoFatIcon(f.stato)
-                  const isScad = f.stato === 'scaduta' || (new Date(f.scadenza) < new Date() && f.stato === 'emessa')
+                  const isScad = f.stato === 'scaduta' || (f.scadenza < todayISO() && f.stato === 'emessa')
                   return (
                     <tr
                       key={f.id}
