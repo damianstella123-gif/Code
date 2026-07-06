@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   TrendingUp,
@@ -43,20 +43,28 @@ import {
   type Invoice, type AdminDocument,
 } from '@/lib/invoices-service'
 import { fetchAllEventsEconomics, type EventEconomicsSummary } from '@/lib/use-event-services'
+import { useRealtimeTable } from '@/lib/use-realtime'
+import {
+  fetchEntrate as fetchEntrateDB,
+  fetchFatture as fetchFattureDB,
+  upsertEntrata,
+  upsertFattura,
+  deleteEntrata as deleteEntrataDB,
+  bulkImportEntrate,
+  bulkImportFatture,
+} from '@/lib/admin-service'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const SK_ENTRATE = 'simmetria_entrate'
 const SK_FATTURE = 'simmetria_fatture'
+const SK_MIGRATED = 'simmetria_admin_migrated'
 
 function loadLocal<T>(key: string): T[] {
   try {
     const r = localStorage.getItem(key)
     return r ? JSON.parse(r) : []
   } catch { return [] }
-}
-function saveLocal(key: string, data: unknown) {
-  localStorage.setItem(key, JSON.stringify(data))
 }
 
 function formatEur(n: number) {
@@ -353,12 +361,12 @@ export default function Amministrazione() {
     if (paramTab === 'entrate' || paramTab === 'uscite' || paramTab === 'fatture' || paramTab === 'invoices' || paramTab === 'documenti') return paramTab
     return 'dashboard'
   })
-  const [entrate, setEntrate] = useState<Entrata[]>(() => loadLocal(SK_ENTRATE))
+  const [entrate, setEntrate] = useState<Entrata[]>([])
   const [uscite, setUscite] = useState<Uscita[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [clients, setClients] = useState<{ id: string; nome: string }[]>([])
-  const [fatture, setFatture] = useState<Fattura[]>(() => loadLocal(SK_FATTURE))
+  const [fatture, setFatture] = useState<Fattura[]>([])
   const [showNuovoMovimento, setShowNuovoMovimento] = useState(false)
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [adminDocs, setAdminDocs] = useState<AdminDocument[]>([])
@@ -367,6 +375,8 @@ export default function Amministrazione() {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
   const [editingDoc, setEditingDoc] = useState<AdminDocument | null>(null)
   const [eventEconomics, setEventEconomics] = useState<EventEconomicsSummary[]>([])
+  const [migrationMsg, setMigrationMsg] = useState<string | null>(null)
+  const migrationRan = useRef(false)
 
   useEffect(() => {
     if (searchParams.has('tab') || searchParams.has('id')) {
@@ -374,9 +384,26 @@ export default function Amministrazione() {
     }
   }, [searchParams, setSearchParams])
 
+  const loadEntrateFromDB = useCallback(async () => {
+    try {
+      const data = await fetchEntrateDB()
+      setEntrate(data)
+    } catch { /* RLS may block if unauthenticated */ }
+  }, [])
+
+  const loadFattureFromDB = useCallback(async () => {
+    try {
+      const data = await fetchFattureDB()
+      setFatture(data)
+    } catch { /* RLS may block if unauthenticated */ }
+  }, [])
+
+  useRealtimeTable('admin_entrate', loadEntrateFromDB)
+  useRealtimeTable('admin_fatture', loadFattureFromDB)
+
   useEffect(() => {
     let cancelled = false
-    Promise.all([fetchBudgets(), fetchEvents(), fetchSuppliers(), fetchClients(), fetchInvoices(), fetchAdminDocuments()]).then(([bg, ev, sp, cl, inv, docs]) => {
+    Promise.all([fetchBudgets(), fetchEvents(), fetchSuppliers(), fetchClients(), fetchInvoices(), fetchAdminDocuments(), fetchEntrateDB(), fetchFattureDB()]).then(([bg, ev, sp, cl, inv, docs, ent, fat]) => {
       if (cancelled) return
       setUscite(bg)
       setEvents(ev)
@@ -384,6 +411,8 @@ export default function Amministrazione() {
       setClients(cl.map(c => ({ id: c.id, nome: c.nome })))
       setInvoices(inv)
       setAdminDocs(docs)
+      setEntrate(ent)
+      setFatture(fat)
       _clients = cl.map(c => ({ id: c.id, nome: c.nome }))
       _suppliers = sp
       _events = ev
@@ -393,6 +422,34 @@ export default function Amministrazione() {
       fetchAllEventsEconomics(feePctMap).then(econ => {
         if (!cancelled) setEventEconomics(econ)
       })
+
+      // One-time localStorage migration
+      if (!migrationRan.current && localStorage.getItem(SK_MIGRATED) !== '1') {
+        migrationRan.current = true
+        const localEntrate = loadLocal<Entrata>(SK_ENTRATE)
+        const localFatture = loadLocal<Fattura>(SK_FATTURE)
+        if (localEntrate.length > 0 || localFatture.length > 0) {
+          Promise.all([
+            bulkImportEntrate(localEntrate),
+            bulkImportFatture(localFatture),
+          ]).then(async ([nEnt, nFat]) => {
+            localStorage.setItem(SK_MIGRATED, '1')
+            if (nEnt > 0 || nFat > 0) {
+              setMigrationMsg(`Migrazione completata: ${nEnt} entrate e ${nFat} fatture importate da localStorage.`)
+              const refreshed = await Promise.all([fetchEntrateDB(), fetchFattureDB()])
+              if (!cancelled) {
+                setEntrate(refreshed[0])
+                setFatture(refreshed[1])
+              }
+              setTimeout(() => setMigrationMsg(null), 6000)
+            }
+          }).catch(() => {
+            // Migration failed - will retry next load
+          })
+        } else {
+          localStorage.setItem(SK_MIGRATED, '1')
+        }
+      }
     })
     return () => { cancelled = true }
   }, [])
@@ -500,13 +557,11 @@ export default function Amministrazione() {
   // ─── Actions ─────────────────────────────────────────────────────────────────
 
   function segnaEntrataPagata(id: string) {
-    setEntrate(prev => {
-      const updated = prev.map(e =>
-        e.id === id ? { ...e, stato: 'pagato' as StatoPagamento, dataPagamento: todayISO() } : e
-      )
-      saveLocal(SK_ENTRATE, updated)
-      return updated
-    })
+    const updated = entrate.find(e => e.id === id)
+    if (!updated) return
+    const patched = { ...updated, stato: 'pagato' as StatoPagamento, dataPagamento: todayISO() }
+    setEntrate(prev => prev.map(e => e.id === id ? patched : e))
+    upsertEntrata(patched)
   }
 
   function segnaUscitaPagata(id: string) {
@@ -518,11 +573,8 @@ export default function Amministrazione() {
   }
 
   function eliminaEntrata(id: string) {
-    setEntrate(prev => {
-      const updated = prev.filter(e => e.id !== id)
-      saveLocal(SK_ENTRATE, updated)
-      return updated
-    })
+    setEntrate(prev => prev.filter(e => e.id !== id))
+    deleteEntrataDB(id)
   }
 
   function eliminaUscita(id: string) {
@@ -531,11 +583,11 @@ export default function Amministrazione() {
   }
 
   function editEntrata(id: string, importo: number, note: string) {
-    setEntrate(prev => {
-      const updated = prev.map(e => e.id === id ? { ...e, importo, note } : e)
-      saveLocal(SK_ENTRATE, updated)
-      return updated
-    })
+    const existing = entrate.find(e => e.id === id)
+    if (!existing) return
+    const patched = { ...existing, importo, note }
+    setEntrate(prev => prev.map(e => e.id === id ? patched : e))
+    upsertEntrata(patched)
   }
 
   function editUscita(id: string, importo: number, note: string) {
@@ -560,11 +612,8 @@ export default function Amministrazione() {
       scadenza: addDaysISO(todayISO(), 30),
       note: 'Fattura generata automaticamente',
     }
-    setFatture(prev => {
-      const updated = [...prev, newFat]
-      saveLocal(SK_FATTURE, updated)
-      return updated
-    })
+    setFatture(prev => [...prev, newFat])
+    upsertFattura(newFat)
     alert(`Fattura ${num} creata in bozza.`)
   }
 
@@ -645,7 +694,8 @@ export default function Amministrazione() {
         note,
         fatturaId: null,
       }
-      setEntrate(prev => { const u = [...prev, newE]; saveLocal(SK_ENTRATE, u); return u })
+      setEntrate(prev => [...prev, newE])
+      upsertEntrata(newE)
     } else {
       const newU: Uscita = {
         id: `usc_new_${Date.now()}`,
@@ -693,6 +743,12 @@ export default function Amministrazione() {
 
   return (
     <div className="space-y-0">
+      {/* Migration toast */}
+      {migrationMsg && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in" style={{ background: 'var(--green)', color: '#000', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, padding: '10px 16px', borderRadius: 8, maxWidth: 360 }}>
+          {migrationMsg}
+        </div>
+      )}
       {/* Wire Masthead */}
       <div className="wire-masthead">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
