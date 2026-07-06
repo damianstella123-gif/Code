@@ -165,27 +165,28 @@ function NuovoMovimentoModal({ onClose, onSave, clients, suppliers, events }: Nu
     onSave(tipo, amt, note, eventoId === 'none' ? null : eventoId, soggettoId || defaultSoggetto, q, up > 0 ? up : null)
   }
 
+  const inputStyle = { background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}
+      style={{ background: 'rgba(0,0,0,0.75)' }}
       onClick={onClose}
     >
       <div
         className="w-full max-w-md rounded-2xl overflow-hidden animate-fade-in"
-        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-5" style={{ borderBottom: '1px solid var(--line)' }}>
-          <h3 className="font-bold text-lg" style={{ color: 'var(--text)' }}>Aggiungi Movimento</h3>
+          <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text)' }}>Aggiungi Movimento</h3>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-all">
             <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
           </button>
         </div>
         <div className="p-5 space-y-4">
-          {/* Tipo */}
           <div>
-            <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>Tipo</label>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 8 }}>Tipo</label>
             <div className="flex gap-2">
               {(['entrata', 'uscita'] as TipoMovimento[]).map(t => (
                 <button
@@ -202,6 +203,8 @@ function NuovoMovimentoModal({ onClose, onSave, clients, suppliers, events }: Nu
                       ? t === 'entrata' ? 'var(--green)' : 'var(--red2)'
                       : 'var(--muted)',
                     border: `1px solid ${tipo === t ? (t === 'entrata' ? 'rgba(56,210,125,0.3)' : 'rgba(255,49,95,0.3)') : 'var(--line)'}`,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
                   }}
                 >
                   {t === 'entrata' ? '+ Entrata' : '− Uscita'}
@@ -210,79 +213,48 @@ function NuovoMovimentoModal({ onClose, onSave, clients, suppliers, events }: Nu
             </div>
           </div>
 
-          {/* Importo / Qty+UnitPrice */}
           {tipo === 'uscita' ? (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>Quantita</label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="1"
-                    value={quantity}
-                    onChange={e => setQuantity(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                    style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
-                  />
+                  <label style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 8 }}>Quantita</label>
+                  <input type="number" min="1" placeholder="1" value={quantity} onChange={e => setQuantity(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none" style={inputStyle} />
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>Prezzo Unitario (€)</label>
-                  <input
-                    type="number"
-                    placeholder="0.00"
-                    value={unitPrice}
-                    onChange={e => setUnitPrice(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                    style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
-                  />
+                  <label style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 8 }}>Prezzo Unitario</label>
+                  <input type="number" placeholder="0.00" value={unitPrice} onChange={e => setUnitPrice(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none" style={inputStyle} />
                 </div>
               </div>
               {computedImporto > 0 && (
-                <div className="text-sm font-semibold px-1" style={{ color: 'var(--text)' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--text)', paddingLeft: 4 }}>
                   Totale: {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(computedImporto)}
                 </div>
               )}
               {!unitPrice && (
                 <div>
-                  <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>Oppure importo totale (€)</label>
-                  <input
-                    type="number"
-                    placeholder="0.00"
-                    value={importo}
-                    onChange={e => setImporto(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                    style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
-                  />
+                  <label style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 8 }}>Oppure importo totale</label>
+                  <input type="number" placeholder="0.00" value={importo} onChange={e => setImporto(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none" style={inputStyle} />
                 </div>
               )}
             </div>
           ) : (
             <div>
-              <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>Importo (€)</label>
-              <input
-                type="number"
-                placeholder="0.00"
-                value={importo}
-                onChange={e => setImporto(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
-              />
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 8 }}>Importo</label>
+              <input type="number" placeholder="0.00" value={importo} onChange={e => setImporto(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none" style={inputStyle} />
             </div>
           )}
 
-          {/* Soggetto */}
           <div>
-            <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 8 }}>
               {tipo === 'entrata' ? 'Cliente' : 'Fornitore'}
             </label>
-            <select
-              value={soggettoId}
-              onChange={e => setSoggettoId(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
-            >
-              <option value="">Seleziona…</option>
+            <select value={soggettoId} onChange={e => setSoggettoId(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none" style={inputStyle}>
+              <option value="">Seleziona...</option>
               {tipo === 'entrata'
                 ? clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)
                 : suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)
@@ -290,48 +262,30 @@ function NuovoMovimentoModal({ onClose, onSave, clients, suppliers, events }: Nu
             </select>
           </div>
 
-          {/* Evento */}
           <div>
-            <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>Evento collegato</label>
-            <select
-              value={eventoId}
-              onChange={e => setEventoId(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
-            >
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 8 }}>Evento collegato</label>
+            <select value={eventoId} onChange={e => setEventoId(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none" style={inputStyle}>
               <option value="none">Nessun evento</option>
-              {events.map(ev => (
-                <option key={ev.id} value={ev.id}>{ev.nome}</option>
-              ))}
+              {events.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
             </select>
           </div>
 
-          {/* Note */}
           <div>
-            <label className="text-xs uppercase tracking-wide mb-2 block" style={{ color: 'var(--muted)' }}>Note</label>
-            <textarea
-              rows={3}
-              placeholder="Descrizione movimento..."
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
-              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
-            />
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 8 }}>Note</label>
+            <textarea rows={3} placeholder="Descrizione movimento..." value={note} onChange={e => setNote(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none" style={inputStyle} />
           </div>
 
           <div className="flex gap-3 pt-1">
-            <button
-              onClick={onClose}
-              className="flex-1 py-3 rounded-xl text-sm font-medium transition-all"
-              style={{ background: 'var(--panel2)', color: 'var(--muted)', border: '1px solid var(--line)' }}
-            >
+            <button onClick={onClose}
+              className="flex-1 py-3 rounded-xl transition-all"
+              style={{ background: 'var(--panel2)', color: 'var(--muted)', border: '1px solid var(--line)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.04em' }}>
               Annulla
             </button>
-            <button
-              onClick={handleSave}
-              className="flex-1 py-3 rounded-xl text-sm font-medium transition-all"
-              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}
-            >
+            <button onClick={handleSave}
+              className="flex-1 py-3 rounded-xl transition-all"
+              style={{ background: 'var(--text)', color: 'var(--bg)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em' }}>
               Aggiungi
             </button>
           </div>
@@ -346,10 +300,19 @@ function NuovoMovimentoModal({ onClose, onSave, clients, suppliers, events }: Nu
 function StatoBadge({ stato }: { stato: StatoPagamento }) {
   return (
     <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
       style={{
-        background: `${statoPagColor(stato)}15`,
+        fontFamily: 'var(--font-mono)',
+        fontSize: 9,
+        fontWeight: 600,
+        letterSpacing: '0.04em',
+        textTransform: 'uppercase',
         color: statoPagColor(stato),
+        background: `${statoPagColor(stato)}15`,
+        padding: '2px 6px',
+        borderRadius: 4,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 3,
       }}
     >
       {stato === 'pagato' && <CheckCircle className="w-3 h-3" />}
@@ -370,14 +333,11 @@ export default function Amministrazione() {
   if (!currentUser || (!isPartnerUser(currentUser) && ['Operativo', 'Commerciale', 'Fornitore'].includes(currentUser.ruolo))) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center"
-          style={{ background: 'rgba(208,0,58,0.1)' }}
-        >
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
           <Lock className="w-8 h-8" style={{ color: 'var(--red2)' }} />
         </div>
-        <h2 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Accesso negato</h2>
-        <p className="text-sm" style={{ color: 'var(--muted)' }}>
+        <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 600, color: 'var(--text)' }}>Accesso negato</h2>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
           Non hai i permessi per accedere all'area amministrativa.
         </p>
       </div>
@@ -705,92 +665,73 @@ export default function Amministrazione() {
     { id: 'documenti', label: `Documenti (${adminDocs.length})` },
   ]
 
+  // ─── Shared styles ──────────────────────────────────────────────────────────
+  const thStyle: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6, whiteSpace: 'nowrap', padding: '10px 14px', textAlign: 'left', borderBottom: '1px solid var(--text)' }
+  const thStyleRight: React.CSSProperties = { ...thStyle, textAlign: 'right' }
+  const tdStyle: React.CSSProperties = { padding: '10px 14px', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }
+  const tdMuted: React.CSSProperties = { ...tdStyle, color: 'var(--muted)' }
+  const tdAmount: React.CSSProperties = { ...tdStyle, textAlign: 'right', fontWeight: 600 }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Amministrazione</h1>
-          <p className="mt-1" style={{ color: 'var(--muted)' }}>
-            Gestione economica e finanziaria
-            {isManagerOnly && (
-              <span className="ml-2 text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(77,180,255,0.1)', color: 'var(--blue)' }}>
-                Solo eventi assegnati
-              </span>
-            )}
-          </p>
+    <div className="space-y-0">
+      {/* Wire Masthead */}
+      <div className="wire-masthead">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="wire-masthead-title">AMMINISTRAZIONE</span>
+          {isManagerOnly && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--blue)', opacity: 0.8 }}>SOLO EVENTI ASSEGNATI</span>
+          )}
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowNuovoMovimento(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}
-          >
-            <Plus className="w-4 h-4" /> Movimento
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <button onClick={() => setShowNuovoMovimento(true)}
+            className="transition-colors"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Plus className="w-3.5 h-3.5" /> Movimento
           </button>
-          <button
-            onClick={esportaXLSX}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}
-          >
-            <Download className="w-4 h-4" /> XLSX
+          <button onClick={esportaXLSX}
+            className="transition-colors"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Download className="w-3.5 h-3.5" /> XLSX
           </button>
-          <button
-            onClick={esportaPDF}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}
-          >
-            <FileText className="w-4 h-4" /> PDF
+          <button onClick={esportaPDF}
+            className="transition-colors"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <FileText className="w-3.5 h-3.5" /> PDF
           </button>
         </div>
       </div>
 
       {/* Alerts */}
       {(alertBudget || fattureInScadenza > 0 || totScaduto > 0) && (
-        <div className="space-y-2">
+        <div style={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {alertBudget && (
-            <div className="flex items-center gap-3 p-3.5 rounded-xl" style={{ background: 'rgba(255,49,95,0.08)', border: '1px solid rgba(255,49,95,0.25)' }}>
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--red2)' }} />
-              <p className="text-sm" style={{ color: 'var(--red2)' }}>
-                Attenzione: uno o piu eventi hanno superato il 90% del budget previsto.
-              </p>
+            <div className="flex items-center gap-3" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--red2)' }}>
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+              Uno o piu eventi hanno superato il 90% del budget previsto.
             </div>
           )}
           {fattureInScadenza > 0 && (
-            <div className="flex items-center gap-3 p-3.5 rounded-xl" style={{ background: 'rgba(255,194,75,0.08)', border: '1px solid rgba(255,194,75,0.25)' }}>
-              <Clock className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--yellow)' }} />
-              <p className="text-sm" style={{ color: 'var(--yellow)' }}>
-                {fattureInScadenza} fattura{fattureInScadenza !== 1 ? 'e' : ''} in scadenza nei prossimi 7 giorni.
-              </p>
+            <div className="flex items-center gap-3" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--yellow)' }}>
+              <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+              {fattureInScadenza} fattura{fattureInScadenza !== 1 ? 'e' : ''} in scadenza nei prossimi 7 giorni.
             </div>
           )}
           {totScaduto > 0 && (
-            <div className="flex items-center gap-3 p-3.5 rounded-xl" style={{ background: 'rgba(255,49,95,0.08)', border: '1px solid rgba(255,49,95,0.25)' }}>
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--red2)' }} />
-              <p className="text-sm" style={{ color: 'var(--red2)' }}>
-                {formatEur(totScaduto)} di pagamenti scaduti da incassare.
-              </p>
+            <div className="flex items-center gap-3" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--red2)' }}>
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+              {formatEur(totScaduto)} di pagamenti scaduti da incassare.
             </div>
           )}
         </div>
       )}
 
-      {/* Tabs */}
-      <div
-        className="flex gap-1 p-1 rounded-xl"
-        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
-      >
+      {/* Wire Tabs */}
+      <div className="wire-tabs">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className="flex-1 py-2 rounded-lg text-sm font-medium transition-all"
-            style={{
-              background: activeTab === tab.id
-                ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)'
-                : 'transparent',
-              color: activeTab === tab.id ? 'white' : 'var(--muted)',
-            }}
+            className={`wire-tab ${activeTab === tab.id ? 'wire-tab--active' : ''}`}
           >
             {tab.label}
           </button>
@@ -799,18 +740,12 @@ export default function Amministrazione() {
 
       {/* Filters row (not on dashboard) */}
       {activeTab !== 'dashboard' && (
-        <div className="flex flex-wrap gap-3">
-          <div
-            className="flex items-center gap-2 px-3 py-2 rounded-xl"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
-          >
-            <Filter className="w-4 h-4" style={{ color: 'var(--muted)' }} />
-            <select
-              value={filterEvento}
-              onChange={e => setFilterEvento(e.target.value)}
-              className="bg-transparent text-sm focus:outline-none pr-1"
-              style={{ color: filterEvento === 'tutti' ? 'var(--muted)' : 'var(--text)' }}
-            >
+        <div className="flex flex-wrap gap-3" style={{ padding: '14px 0' }}>
+          <div className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+            <Filter className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+            <select value={filterEvento} onChange={e => setFilterEvento(e.target.value)}
+              className="bg-transparent focus:outline-none pr-1"
+              style={{ color: filterEvento === 'tutti' ? 'var(--muted)' : 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
               <option value="tutti">Tutti gli eventi</option>
               {events.filter(ev => !isManagerOnly || allowedEventIds.includes(ev.id)).map(ev => (
                 <option key={ev.id} value={ev.id}>{ev.nome}</option>
@@ -819,34 +754,20 @@ export default function Amministrazione() {
             <ChevronDown className="w-3 h-3" style={{ color: 'var(--muted)' }} />
           </div>
 
-          <div
-            className="flex items-center gap-2 px-3 py-2 rounded-xl"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
-          >
-            <select
-              value={filterMese}
-              onChange={e => setFilterMese(e.target.value)}
-              className="bg-transparent text-sm focus:outline-none"
-              style={{ color: filterMese === 'tutti' ? 'var(--muted)' : 'var(--text)' }}
-            >
+          <div className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+            <select value={filterMese} onChange={e => setFilterMese(e.target.value)}
+              className="bg-transparent focus:outline-none"
+              style={{ color: filterMese === 'tutti' ? 'var(--muted)' : 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
               <option value="tutti">Tutti i mesi</option>
-              {allMonths.map(m => (
-                <option key={m} value={m}>{monthLabel(m + '-01')}</option>
-              ))}
+              {allMonths.map(m => <option key={m} value={m}>{monthLabel(m + '-01')}</option>)}
             </select>
             <ChevronDown className="w-3 h-3" style={{ color: 'var(--muted)' }} />
           </div>
 
-          <div
-            className="flex items-center gap-2 px-3 py-2 rounded-xl"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
-          >
-            <select
-              value={filterStato}
-              onChange={e => setFilterStato(e.target.value)}
-              className="bg-transparent text-sm focus:outline-none"
-              style={{ color: filterStato === 'tutti' ? 'var(--muted)' : 'var(--text)' }}
-            >
+          <div className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+            <select value={filterStato} onChange={e => setFilterStato(e.target.value)}
+              className="bg-transparent focus:outline-none"
+              style={{ color: filterStato === 'tutti' ? 'var(--muted)' : 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
               <option value="tutti">Tutti gli stati</option>
               <option value="pagato">Pagato</option>
               <option value="in_attesa">In attesa</option>
@@ -865,16 +786,10 @@ export default function Amministrazione() {
           </div>
 
           {activeTab === 'fatture' && (
-            <div
-              className="flex items-center gap-2 px-3 py-2 rounded-xl"
-              style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
-            >
-              <select
-                value={filterTipo}
-                onChange={e => setFilterTipo(e.target.value as typeof filterTipo)}
-                className="bg-transparent text-sm focus:outline-none"
-                style={{ color: filterTipo === 'tutti' ? 'var(--muted)' : 'var(--text)' }}
-              >
+            <div className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+              <select value={filterTipo} onChange={e => setFilterTipo(e.target.value as typeof filterTipo)}
+                className="bg-transparent focus:outline-none"
+                style={{ color: filterTipo === 'tutti' ? 'var(--muted)' : 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                 <option value="tutti">Entrate + Uscite</option>
                 <option value="entrata">Solo entrate</option>
                 <option value="uscita">Solo uscite</option>
@@ -887,85 +802,34 @@ export default function Amministrazione() {
 
       {/* ─── TAB: DASHBOARD ────────────────────────────────────────────────────── */}
       {activeTab === 'dashboard' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in" style={{ paddingTop: 20 }}>
           {/* KPI grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[
-              {
-                label: 'Budget Totale Eventi',
-                value: formatEur(budgetEvents),
-                sub: `${events.filter(e => !isManagerOnly || allowedEventIds.includes(e.id)).length} eventi`,
-                color: 'var(--text)',
-                icon: Euro,
-                bg: 'rgba(255,255,255,0.04)',
-              },
-              {
-                label: 'Ricavi Previsti',
-                value: formatEur(totEntrate),
-                sub: `${visibleEntrate.length} voci`,
-                color: 'var(--green)',
-                icon: ArrowUpRight,
-                bg: 'rgba(56,210,125,0.06)',
-              },
-              {
-                label: 'Costi Fornitori',
-                value: formatEur(totUscite),
-                sub: `${visibleUscite.length} voci`,
-                color: 'var(--red2)',
-                icon: ArrowDownRight,
-                bg: 'rgba(255,49,95,0.06)',
-              },
-              {
-                label: 'Margine Stimato',
-                value: formatEur(margine),
-                sub: `${marginePerc}% sui ricavi`,
-                color: margine >= 0 ? 'var(--green)' : 'var(--red2)',
-                icon: TrendingUp,
-                bg: margine >= 0 ? 'rgba(56,210,125,0.06)' : 'rgba(255,49,95,0.06)',
-              },
-              {
-                label: 'Pagamenti in Sospeso',
-                value: formatEur(totInAttesa),
-                sub: `${visibleEntrate.filter(e => e.stato === 'in_attesa').length} movimenti`,
-                color: 'var(--yellow)',
-                icon: Clock,
-                bg: 'rgba(255,194,75,0.06)',
-              },
-              {
-                label: 'Fatture da Emettere',
-                value: String(visibleFatture.filter(f => f.stato === 'bozza').length),
-                sub: `Scadute: ${visibleFatture.filter(f => f.stato === 'scaduta').length}`,
-                color: 'var(--blue)',
-                icon: Receipt,
-                bg: 'rgba(77,180,255,0.06)',
-              },
+              { label: 'Budget Totale Eventi', value: formatEur(budgetEvents), sub: `${events.filter(e => !isManagerOnly || allowedEventIds.includes(e.id)).length} eventi`, color: 'var(--text)', icon: Euro },
+              { label: 'Ricavi Previsti', value: formatEur(totEntrate), sub: `${visibleEntrate.length} voci`, color: 'var(--green)', icon: ArrowUpRight },
+              { label: 'Costi Fornitori', value: formatEur(totUscite), sub: `${visibleUscite.length} voci`, color: 'var(--red2)', icon: ArrowDownRight },
+              { label: 'Margine Stimato', value: formatEur(margine), sub: `${marginePerc}% sui ricavi`, color: margine >= 0 ? 'var(--green)' : 'var(--red2)', icon: TrendingUp },
+              { label: 'Pagamenti in Sospeso', value: formatEur(totInAttesa), sub: `${visibleEntrate.filter(e => e.stato === 'in_attesa').length} movimenti`, color: 'var(--yellow)', icon: Clock },
+              { label: 'Fatture da Emettere', value: String(visibleFatture.filter(f => f.stato === 'bozza').length), sub: `Scadute: ${visibleFatture.filter(f => f.stato === 'scaduta').length}`, color: 'var(--blue)', icon: Receipt },
             ].map((kpi, i) => {
               const Icon = kpi.icon
               return (
-                <div
-                  key={i}
-                  className="panel p-5 flex flex-col gap-3"
-                  style={{ background: kpi.bg, border: `1px solid ${kpi.color}20` }}
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{kpi.label}</p>
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center"
-                      style={{ background: `${kpi.color}15` }}
-                    >
-                      <Icon className="w-4 h-4" style={{ color: kpi.color }} />
-                    </div>
+                <div key={i} style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+                  <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6 }}>{kpi.label}</p>
+                    <Icon className="w-4 h-4" style={{ color: kpi.color, opacity: 0.7 }} />
                   </div>
-                  <p className="text-2xl font-bold" style={{ color: kpi.color }}>{kpi.value}</p>
-                  <p className="text-xs" style={{ color: 'var(--muted)' }}>{kpi.sub}</p>
+                  <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: kpi.color, lineHeight: 1.1 }}>{kpi.value}</p>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{kpi.sub}</p>
                 </div>
               )
             })}
           </div>
 
           {/* Budget per evento */}
-          <div className="panel p-5">
-            <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text)' }}>Budget vs Speso per Evento</h3>
+          <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+            <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 16 }}>Budget vs Speso per Evento</h3>
             <div className="space-y-4">
               {events
                 .filter(ev => !isManagerOnly || allowedEventIds.includes(ev.id))
@@ -976,17 +840,14 @@ export default function Amministrazione() {
                   const barColor = perc >= 100 ? 'var(--red2)' : perc >= 80 ? 'var(--yellow)' : 'var(--green)'
                   return (
                     <div key={ev.id}>
-                      <div className="flex justify-between text-xs mb-1.5">
-                        <span style={{ color: 'var(--text)' }}>{ev.nome}</span>
-                        <span style={{ color: overBudget ? 'var(--red2)' : 'var(--muted)' }}>
-                          {formatEur(speso)} / {formatEur(ev.budget)} {overBudget && '⚠'}
+                      <div className="flex justify-between" style={{ marginBottom: 4 }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{ev.nome}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: overBudget ? 'var(--red2)' : 'var(--muted)' }}>
+                          {formatEur(speso)} / {formatEur(ev.budget)}
                         </span>
                       </div>
-                      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{ width: `${perc}%`, background: barColor }}
-                        />
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--panel2)' }}>
+                        <div className="h-full rounded-full transition-all" style={{ width: `${perc}%`, background: barColor }} />
                       </div>
                     </div>
                   )
@@ -996,19 +857,19 @@ export default function Amministrazione() {
 
           {/* Ultimi movimenti */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="panel p-5">
-              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text)' }}>
-                <ArrowUpRight className="w-4 h-4" style={{ color: 'var(--green)' }} /> Entrate recenti
+            <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+              <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <ArrowUpRight className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} /> Entrate recenti
               </h3>
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {visibleEntrate.slice(0, 5).map(e => (
                   <div key={e.id} className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-xs font-medium truncate" style={{ color: 'var(--text)' }}>{clientName(e.clienteId)}</p>
-                      <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{eventName(e.eventoId)}</p>
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{clientName(e.clienteId)}</p>
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{eventName(e.eventoId)}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-bold" style={{ color: 'var(--green)' }}>{formatEur(e.importo)}</p>
+                      <p style={{ fontFamily: 'var(--font-serif)', fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>{formatEur(e.importo)}</p>
                       <StatoBadge stato={e.stato} />
                     </div>
                   </div>
@@ -1016,19 +877,19 @@ export default function Amministrazione() {
               </div>
             </div>
 
-            <div className="panel p-5">
-              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text)' }}>
-                <ArrowDownRight className="w-4 h-4" style={{ color: 'var(--red2)' }} /> Uscite recenti
+            <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+              <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <ArrowDownRight className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} /> Uscite recenti
               </h3>
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {visibleUscite.slice(0, 5).map(u => (
                   <div key={u.id} className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-xs font-medium truncate" style={{ color: 'var(--text)' }}>{supplierName(u.fornitoreId)}</p>
-                      <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{u.categoria} · {eventName(u.eventoId)}</p>
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{supplierName(u.fornitoreId)}</p>
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.categoria} · {eventName(u.eventoId)}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-bold" style={{ color: 'var(--red2)' }}>{formatEur(u.importo)}</p>
+                      <p style={{ fontFamily: 'var(--font-serif)', fontSize: 15, fontWeight: 600, color: 'var(--red2)' }}>{formatEur(u.importo)}</p>
                       <StatoBadge stato={u.stato} />
                     </div>
                   </div>
@@ -1041,87 +902,65 @@ export default function Amministrazione() {
 
       {/* ─── TAB: ENTRATE ──────────────────────────────────────────────────────── */}
       {activeTab === 'entrate' && (
-        <div className="panel overflow-hidden animate-fade-in">
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--line)' }}>
-            <div className="flex items-center gap-2">
-              <ArrowUpRight className="w-4 h-4" style={{ color: 'var(--green)' }} />
-              <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>Entrate</span>
-            </div>
-            <span className="text-sm font-bold" style={{ color: 'var(--green)' }}>
+        <div className="animate-fade-in" style={{ paddingTop: 14 }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {filteredEntrate.length} voci
+            </span>
+            <span style={{ fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 600, color: 'var(--green)' }}>
               {formatEur(filteredEntrate.reduce((s, e) => s + e.importo, 0))}
             </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: 'var(--panel2)', borderBottom: '1px solid var(--line)' }}>
-                  {['Cliente', 'Evento', 'Importo', 'Stato', 'Data prevista', 'Metodo', 'Note', ''].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
+                <tr>
+                  <th style={thStyle}>Cliente</th>
+                  <th style={thStyle}>Evento</th>
+                  <th style={thStyleRight}>Importo</th>
+                  <th style={thStyle}>Stato</th>
+                  <th style={thStyle}>Data prevista</th>
+                  <th style={thStyle}>Metodo</th>
+                  <th style={thStyle}>Note</th>
+                  <th style={thStyle}></th>
                 </tr>
               </thead>
               <tbody>
                 {filteredEntrate.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--muted)' }}>
-                      Nessun movimento trovato
-                    </td>
+                    <td colSpan={8} style={{ ...tdMuted, textAlign: 'center', padding: '32px 14px' }}>Nessun movimento trovato</td>
                   </tr>
-                ) : filteredEntrate.map((e, i) => (
-                  <tr
-                    key={e.id}
-                    style={{
-                      borderBottom: '1px solid var(--line)',
-                      background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
-                    }}
-                  >
-                    <td className="px-4 py-3" style={{ color: 'var(--text)', whiteSpace: 'nowrap' }}>{clientName(e.clienteId)}</td>
-                    <td className="px-4 py-3 max-w-[160px]">
-                      <span className="truncate block text-xs" style={{ color: 'var(--muted)' }}>{eventName(e.eventoId)}</span>
-                    </td>
-                    <td className="px-4 py-3 font-bold" style={{ color: 'var(--green)', whiteSpace: 'nowrap' }}>{formatEur(e.importo)}</td>
-                    <td className="px-4 py-3"><StatoBadge stato={e.stato} /></td>
-                    <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{formatDateShort(e.dataPrevista)}</td>
-                    <td className="px-4 py-3 text-xs capitalize" style={{ color: 'var(--muted)' }}>{e.metodoPagamento}</td>
-                    <td className="px-4 py-3 max-w-[180px]">
-                      <span className="text-xs truncate block" style={{ color: 'var(--muted)' }}>{e.note}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 flex-wrap">
+                ) : filteredEntrate.map(e => (
+                  <tr key={e.id} style={{ borderBottom: '1px solid var(--line)' }}
+                    className="hover:bg-[var(--panel2)] transition-colors">
+                    <td style={tdStyle}>{clientName(e.clienteId)}</td>
+                    <td style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(e.eventoId)}</td>
+                    <td style={{ ...tdAmount, color: 'var(--green)' }}>{formatEur(e.importo)}</td>
+                    <td style={{ padding: '10px 14px' }}><StatoBadge stato={e.stato} /></td>
+                    <td style={tdMuted}>{formatDateShort(e.dataPrevista)}</td>
+                    <td style={{ ...tdMuted, textTransform: 'capitalize' }}>{e.metodoPagamento}</td>
+                    <td style={{ ...tdMuted, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.note}</td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <div className="flex items-center gap-1">
                         {e.stato !== 'pagato' && e.stato !== 'annullato' && (
-                          <button
-                            onClick={() => segnaEntrataPagata(e.id)}
-                            className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 whitespace-nowrap"
-                            style={{ background: 'rgba(56,210,125,0.12)', color: 'var(--green)', border: '1px solid rgba(56,210,125,0.25)' }}
-                          >
-                            Segna pagato
+                          <button onClick={() => segnaEntrataPagata(e.id)}
+                            style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--green)', padding: '3px 8px', borderRadius: 4, background: 'rgba(56,210,125,0.1)' }}>
+                            Pagato
                           </button>
                         )}
                         {!e.fatturaId && (
-                          <button
-                            onClick={() => generaFattura('entrata', e.clienteId, clientName(e.clienteId), e.importo, e.eventoId)}
-                            className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 whitespace-nowrap"
-                            style={{ background: 'rgba(77,180,255,0.1)', color: 'var(--blue)', border: '1px solid rgba(77,180,255,0.25)' }}
-                          >
+                          <button onClick={() => generaFattura('entrata', e.clienteId, clientName(e.clienteId), e.importo, e.eventoId)}
+                            style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--blue)', padding: '3px 8px', borderRadius: 4, background: 'rgba(77,180,255,0.1)' }}>
                             Fattura
                           </button>
                         )}
-                        <button
-                          onClick={() => {
-                            const newAmt = prompt('Nuovo importo:', String(e.importo))
-                            if (newAmt) editEntrata(e.id, parseFloat(newAmt) || e.importo, e.note)
-                          }}
-                          className="p-1.5 rounded-lg transition-all hover:bg-white/10"
-                          title="Modifica importo"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                        <button onClick={() => { const newAmt = prompt('Nuovo importo:', String(e.importo)); if (newAmt) editEntrata(e.id, parseFloat(newAmt) || e.importo, e.note) }}
+                          className="p-1.5 rounded-lg transition-all hover:bg-white/10">
+                          <Edit3 className="w-3 h-3" style={{ color: 'var(--muted)' }} />
                         </button>
-                        <button
-                          onClick={() => { if (confirm('Eliminare questa entrata?')) eliminaEntrata(e.id) }}
-                          className="p-1.5 rounded-lg transition-all hover:bg-white/10"
-                          title="Elimina"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                        <button onClick={() => { if (confirm('Eliminare questa entrata?')) eliminaEntrata(e.id) }}
+                          className="p-1.5 rounded-lg transition-all hover:bg-white/10">
+                          <Trash2 className="w-3 h-3" style={{ color: 'var(--red2)' }} />
                         </button>
                       </div>
                     </td>
@@ -1135,93 +974,73 @@ export default function Amministrazione() {
 
       {/* ─── TAB: USCITE ───────────────────────────────────────────────────────── */}
       {activeTab === 'uscite' && (
-        <div className="panel overflow-hidden animate-fade-in">
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--line)' }}>
-            <div className="flex items-center gap-2">
-              <ArrowDownRight className="w-4 h-4" style={{ color: 'var(--red2)' }} />
-              <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>Uscite</span>
-            </div>
-            <span className="text-sm font-bold" style={{ color: 'var(--red2)' }}>
+        <div className="animate-fade-in" style={{ paddingTop: 14 }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {filteredUscite.length} voci
+            </span>
+            <span style={{ fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 600, color: 'var(--red2)' }}>
               {formatEur(filteredUscite.reduce((s, u) => s + u.importo, 0))}
             </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: 'var(--panel2)', borderBottom: '1px solid var(--line)' }}>
-                  {['Fornitore', 'Evento', 'Categoria', 'Qty', 'P.Unit.', 'Totale', 'Stato', 'Scadenza', 'Note', ''].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
+                <tr>
+                  <th style={thStyle}>Fornitore</th>
+                  <th style={thStyle}>Evento</th>
+                  <th style={thStyle}>Categoria</th>
+                  <th style={thStyle}>Qty</th>
+                  <th style={thStyleRight}>P.Unit.</th>
+                  <th style={thStyleRight}>Totale</th>
+                  <th style={thStyle}>Stato</th>
+                  <th style={thStyle}>Scadenza</th>
+                  <th style={thStyle}>Note</th>
+                  <th style={thStyle}></th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUscite.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--muted)' }}>
-                      Nessun movimento trovato
-                    </td>
+                    <td colSpan={10} style={{ ...tdMuted, textAlign: 'center', padding: '32px 14px' }}>Nessun movimento trovato</td>
                   </tr>
-                ) : filteredUscite.map((u, i) => {
+                ) : filteredUscite.map(u => {
                   const isScad = u.scadenza < todayISO() && u.stato !== 'pagato'
                   return (
-                    <tr
-                      key={u.id}
-                      style={{
-                        borderBottom: '1px solid var(--line)',
-                        background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
-                      }}
-                    >
-                      <td className="px-4 py-3" style={{ color: 'var(--text)', whiteSpace: 'nowrap' }}>{supplierName(u.fornitoreId)}</td>
-                      <td className="px-4 py-3 max-w-[160px]">
-                        <span className="truncate block text-xs" style={{ color: 'var(--muted)' }}>{eventName(u.eventoId)}</span>
-                      </td>
-                      <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)' }}>{u.categoria}</td>
-                      <td className="px-4 py-3 text-xs" style={{ color: 'var(--text)' }}>{u.quantity ?? 1}</td>
-                      <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{u.unitPrice != null ? formatEur(u.unitPrice) : '—'}</td>
-                      <td className="px-4 py-3 font-bold" style={{ color: 'var(--red2)', whiteSpace: 'nowrap' }}>{formatEur(u.importo)}</td>
-                      <td className="px-4 py-3"><StatoBadge stato={u.stato} /></td>
-                      <td className="px-4 py-3 text-xs" style={{ color: isScad ? 'var(--red2)' : 'var(--muted)', whiteSpace: 'nowrap' }}>
+                    <tr key={u.id} style={{ borderBottom: '1px solid var(--line)' }}
+                      className="hover:bg-[var(--panel2)] transition-colors">
+                      <td style={tdStyle}>{supplierName(u.fornitoreId)}</td>
+                      <td style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(u.eventoId)}</td>
+                      <td style={tdMuted}>{u.categoria}</td>
+                      <td style={tdStyle}>{u.quantity ?? 1}</td>
+                      <td style={{ ...tdAmount, color: 'var(--muted)' }}>{u.unitPrice != null ? formatEur(u.unitPrice) : '—'}</td>
+                      <td style={{ ...tdAmount, color: 'var(--red2)' }}>{formatEur(u.importo)}</td>
+                      <td style={{ padding: '10px 14px' }}><StatoBadge stato={u.stato} /></td>
+                      <td style={{ ...tdMuted, color: isScad ? 'var(--red2)' : 'var(--muted)' }}>
                         {formatDateShort(u.scadenza)} {isScad && '!'}
                       </td>
-                      <td className="px-4 py-3 max-w-[180px]">
-                        <span className="text-xs truncate block" style={{ color: 'var(--muted)' }}>{u.note}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 flex-wrap">
+                      <td style={{ ...tdMuted, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.note}</td>
+                      <td style={{ padding: '10px 14px' }}>
+                        <div className="flex items-center gap-1">
                           {u.stato !== 'pagato' && u.stato !== 'annullato' && (
-                            <button
-                              onClick={() => segnaUscitaPagata(u.id)}
-                              className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 whitespace-nowrap"
-                              style={{ background: 'rgba(56,210,125,0.12)', color: 'var(--green)', border: '1px solid rgba(56,210,125,0.25)' }}
-                            >
-                              Segna pagato
+                            <button onClick={() => segnaUscitaPagata(u.id)}
+                              style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--green)', padding: '3px 8px', borderRadius: 4, background: 'rgba(56,210,125,0.1)' }}>
+                              Pagato
                             </button>
                           )}
                           {!u.fatturaId && (
-                            <button
-                              onClick={() => generaFattura('uscita', u.fornitoreId, supplierName(u.fornitoreId), u.importo, u.eventoId)}
-                              className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 whitespace-nowrap"
-                              style={{ background: 'rgba(77,180,255,0.1)', color: 'var(--blue)', border: '1px solid rgba(77,180,255,0.25)' }}
-                            >
+                            <button onClick={() => generaFattura('uscita', u.fornitoreId, supplierName(u.fornitoreId), u.importo, u.eventoId)}
+                              style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--blue)', padding: '3px 8px', borderRadius: 4, background: 'rgba(77,180,255,0.1)' }}>
                               Fattura
                             </button>
                           )}
-                          <button
-                            onClick={() => {
-                              const newAmt = prompt('Nuovo importo:', String(u.importo))
-                              if (newAmt) editUscita(u.id, parseFloat(newAmt) || u.importo, u.note)
-                            }}
-                            className="p-1.5 rounded-lg transition-all hover:bg-white/10"
-                            title="Modifica importo"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                          <button onClick={() => { const newAmt = prompt('Nuovo importo:', String(u.importo)); if (newAmt) editUscita(u.id, parseFloat(newAmt) || u.importo, u.note) }}
+                            className="p-1.5 rounded-lg transition-all hover:bg-white/10">
+                            <Edit3 className="w-3 h-3" style={{ color: 'var(--muted)' }} />
                           </button>
-                          <button
-                            onClick={() => { if (confirm('Eliminare questa uscita?')) eliminaUscita(u.id) }}
-                            className="p-1.5 rounded-lg transition-all hover:bg-white/10"
-                            title="Elimina"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                          <button onClick={() => { if (confirm('Eliminare questa uscita?')) eliminaUscita(u.id) }}
+                            className="p-1.5 rounded-lg transition-all hover:bg-white/10">
+                            <Trash2 className="w-3 h-3" style={{ color: 'var(--red2)' }} />
                           </button>
                         </div>
                       </td>
@@ -1236,82 +1055,75 @@ export default function Amministrazione() {
 
       {/* ─── TAB: FATTURE ──────────────────────────────────────────────────────── */}
       {activeTab === 'fatture' && (
-        <div className="panel overflow-hidden animate-fade-in">
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--line)' }}>
-            <div className="flex items-center gap-2">
-              <Receipt className="w-4 h-4" style={{ color: 'var(--blue)' }} />
-              <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>Registro Fatture</span>
-            </div>
-            <span className="text-sm" style={{ color: 'var(--muted)' }}>
-              {filteredFatture.length} fatture · {formatEur(filteredFatture.reduce((s, f) => s + f.importo, 0))} totale
+        <div className="animate-fade-in" style={{ paddingTop: 14 }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {filteredFatture.length} fatture
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>
+              {formatEur(filteredFatture.reduce((s, f) => s + f.importo, 0))} totale
             </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: 'var(--panel2)', borderBottom: '1px solid var(--line)' }}>
-                  {['N. Fattura', 'Tipo', 'Soggetto', 'Evento', 'Imponibile', 'IVA', 'Totale', 'Stato', 'Emessa', 'Scadenza'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
+                <tr>
+                  <th style={thStyle}>N. Fattura</th>
+                  <th style={thStyle}>Tipo</th>
+                  <th style={thStyle}>Soggetto</th>
+                  <th style={thStyle}>Evento</th>
+                  <th style={thStyleRight}>Imponibile</th>
+                  <th style={thStyleRight}>IVA</th>
+                  <th style={thStyleRight}>Totale</th>
+                  <th style={thStyle}>Stato</th>
+                  <th style={thStyle}>Emessa</th>
+                  <th style={thStyle}>Scadenza</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredFatture.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-8 text-center text-sm" style={{ color: 'var(--muted)' }}>
-                      Nessuna fattura trovata
-                    </td>
+                    <td colSpan={10} style={{ ...tdMuted, textAlign: 'center', padding: '32px 14px' }}>Nessuna fattura trovata</td>
                   </tr>
-                ) : filteredFatture.map((f, i) => {
+                ) : filteredFatture.map(f => {
                   const Icon = statoFatIcon(f.stato)
                   const isScad = f.stato === 'scaduta' || (f.scadenza < todayISO() && f.stato === 'emessa')
                   return (
-                    <tr
-                      key={f.id}
-                      style={{
-                        borderBottom: '1px solid var(--line)',
-                        background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
-                      }}
-                    >
-                      <td className="px-4 py-3 font-mono text-xs font-semibold" style={{ color: 'var(--text)', whiteSpace: 'nowrap' }}>{f.numero}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className="flex items-center gap-1 text-xs px-2 py-0.5 rounded w-fit"
-                          style={{
-                            background: f.tipo === 'entrata' ? 'rgba(56,210,125,0.12)' : 'rgba(255,49,95,0.12)',
-                            color: f.tipo === 'entrata' ? 'var(--green)' : 'var(--red2)',
-                          }}
-                        >
-                          {f.tipo === 'entrata'
-                            ? <ArrowUpRight className="w-3 h-3" />
-                            : <ArrowDownRight className="w-3 h-3" />}
-                          {f.tipo === 'entrata' ? 'Entrata' : 'Uscita'}
+                    <tr key={f.id} style={{ borderBottom: '1px solid var(--line)' }}
+                      className="hover:bg-[var(--panel2)] transition-colors">
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>{f.numero}</td>
+                      <td style={{ padding: '10px 14px' }}>
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
+                          color: f.tipo === 'entrata' ? 'var(--green)' : 'var(--red2)',
+                          background: f.tipo === 'entrata' ? 'rgba(56,210,125,0.12)' : 'rgba(255,49,95,0.12)',
+                          padding: '2px 6px', borderRadius: 4,
+                          display: 'inline-flex', alignItems: 'center', gap: 3,
+                        }}>
+                          {f.tipo === 'entrata' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                          {f.tipo === 'entrata' ? 'ENT' : 'USC'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 max-w-[160px]">
-                        <span className="truncate block text-xs" style={{ color: 'var(--text)' }}>{f.soggetto}</span>
-                      </td>
-                      <td className="px-4 py-3 max-w-[140px]">
-                        <span className="truncate block text-xs" style={{ color: 'var(--muted)' }}>{eventName(f.eventoId)}</span>
-                      </td>
-                      <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{formatEur(f.imponibile)}</td>
-                      <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{formatEur(f.iva)}</td>
-                      <td className="px-4 py-3 font-bold text-xs" style={{
-                        color: f.tipo === 'entrata' ? 'var(--green)' : 'var(--red2)',
-                        whiteSpace: 'nowrap',
-                      }}>{formatEur(f.importo)}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded"
-                          style={{ background: `${statoFatColor(f.stato)}15`, color: statoFatColor(f.stato) }}
-                        >
+                      <td style={{ ...tdStyle, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.soggetto}</td>
+                      <td style={{ ...tdMuted, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(f.eventoId)}</td>
+                      <td style={{ ...tdAmount, color: 'var(--muted)' }}>{formatEur(f.imponibile)}</td>
+                      <td style={{ ...tdAmount, color: 'var(--muted)' }}>{formatEur(f.iva)}</td>
+                      <td style={{ ...tdAmount, color: f.tipo === 'entrata' ? 'var(--green)' : 'var(--red2)' }}>{formatEur(f.importo)}</td>
+                      <td style={{ padding: '10px 14px' }}>
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
+                          color: statoFatColor(f.stato),
+                          background: `${statoFatColor(f.stato)}15`,
+                          padding: '2px 6px', borderRadius: 4,
+                          display: 'inline-flex', alignItems: 'center', gap: 3,
+                        }}>
                           <Icon className="w-3 h-3" />
                           {statoFatLabel(f.stato)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{formatDate(f.dataEmissione)}</td>
-                      <td className="px-4 py-3 text-xs" style={{ color: isScad ? 'var(--red2)' : 'var(--muted)', whiteSpace: 'nowrap' }}>
-                        {formatDate(f.scadenza)} {isScad && '⚠'}
+                      <td style={tdMuted}>{formatDate(f.dataEmissione)}</td>
+                      <td style={{ ...tdMuted, color: isScad ? 'var(--red2)' : 'var(--muted)' }}>
+                        {formatDate(f.scadenza)} {isScad && '!'}
                       </td>
                     </tr>
                   )
@@ -1335,79 +1147,83 @@ export default function Amministrazione() {
 
       {/* ─── TAB: INVOICES (Supabase) ─────────────────────────────────────────── */}
       {activeTab === 'invoices' && (
-        <div className="space-y-4 animate-fade-in">
-          <div className="flex justify-between items-center">
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>
-              Fatture gestite su Supabase. Per collegamento futuro con Fatture in Cloud.
-            </p>
+        <div className="animate-fade-in" style={{ paddingTop: 14 }}>
+          <div className="flex justify-between items-center" style={{ marginBottom: 10 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Fatture Supabase · {invoices.length} voci
+            </span>
             <button onClick={() => { setEditingInvoice(null); setShowInvoiceForm(true) }}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
-              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+              className="transition-colors"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
               <Plus className="w-3.5 h-3.5" /> Nuova Fattura
             </button>
           </div>
           {invoices.length === 0 ? (
-            <div className="text-center py-10 panel rounded-2xl">
-              <Receipt className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--muted)' }} />
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessuna fattura registrata</p>
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <Receipt className="w-8 h-8 mx-auto" style={{ color: 'var(--muted)', opacity: 0.4, marginBottom: 8 }} />
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>Nessuna fattura registrata</p>
             </div>
           ) : (
-            <div className="panel rounded-2xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm" style={{ color: 'var(--text)' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                      <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'var(--muted)' }}>Numero</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'var(--muted)' }}>Tipo</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'var(--muted)' }}>Soggetto</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium" style={{ color: 'var(--muted)' }}>Importo</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'var(--muted)' }}>Stato</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'var(--muted)' }}>Scadenza</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium" style={{ color: 'var(--muted)' }}>Azioni</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoices.map(inv => {
-                      const subject = inv.type === 'emessa'
-                        ? (clients.find(c => c.id === inv.client_id)?.nome ?? '-')
-                        : (suppliers.find(s => s.id === inv.supplier_id)?.nome ?? '-')
-                      const st = INVOICE_STATUSES.find(s => s.id === inv.status)
-                      return (
-                        <tr key={inv.id} style={{ borderBottom: '1px solid var(--line)' }} className="hover:bg-white/[0.02]">
-                          <td className="px-4 py-3 font-medium">{inv.number || '-'}</td>
-                          <td className="px-4 py-3 text-xs capitalize">{inv.type}</td>
-                          <td className="px-4 py-3 text-xs">{subject}</td>
-                          <td className="px-4 py-3 text-right font-medium">{formatEur(inv.amount)}</td>
-                          <td className="px-4 py-3">
-                            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: `${st?.color ?? '#9ba3aa'}20`, color: st?.color ?? '#9ba3aa' }}>
-                              {st?.label ?? inv.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-xs">{inv.due_date ? formatDate(inv.due_date) : '-'}</td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              {inv.external_url && (
-                                <a href={inv.external_url} target="_blank" rel="noopener noreferrer"
-                                  className="p-1.5 rounded-lg hover:bg-white/10" title="Apri in Fatture in Cloud">
-                                  <FileText className="w-3.5 h-3.5" style={{ color: 'var(--blue)' }} />
-                                </a>
-                              )}
-                              <button onClick={() => { setEditingInvoice(inv); setShowInvoiceForm(true) }}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Numero</th>
+                    <th style={thStyle}>Tipo</th>
+                    <th style={thStyle}>Soggetto</th>
+                    <th style={thStyleRight}>Importo</th>
+                    <th style={thStyle}>Stato</th>
+                    <th style={thStyle}>Scadenza</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Azioni</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map(inv => {
+                    const subject = inv.type === 'emessa'
+                      ? (clients.find(c => c.id === inv.client_id)?.nome ?? '-')
+                      : (suppliers.find(s => s.id === inv.supplier_id)?.nome ?? '-')
+                    const st = INVOICE_STATUSES.find(s => s.id === inv.status)
+                    return (
+                      <tr key={inv.id} style={{ borderBottom: '1px solid var(--line)' }}
+                        className="hover:bg-[var(--panel2)] transition-colors">
+                        <td style={{ ...tdStyle, fontWeight: 600 }}>{inv.number || '-'}</td>
+                        <td style={{ ...tdMuted, textTransform: 'capitalize' }}>{inv.type}</td>
+                        <td style={tdMuted}>{subject}</td>
+                        <td style={{ ...tdAmount, color: 'var(--text)' }}>{formatEur(inv.amount)}</td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{
+                            fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
+                            color: st?.color ?? 'var(--muted)',
+                            background: `${st?.color ?? '#9ba3aa'}20`,
+                            padding: '2px 6px', borderRadius: 4,
+                          }}>
+                            {st?.label ?? inv.status}
+                          </span>
+                        </td>
+                        <td style={tdMuted}>{inv.due_date ? formatDate(inv.due_date) : '-'}</td>
+                        <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                          <div className="flex items-center justify-end gap-1">
+                            {inv.external_url && (
+                              <a href={inv.external_url} target="_blank" rel="noopener noreferrer"
                                 className="p-1.5 rounded-lg hover:bg-white/10">
-                                <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-                              </button>
-                              <button onClick={async () => { await deleteInvoice(inv.id); setInvoices(prev => prev.filter(i => i.id !== inv.id)) }}
-                                className="p-1.5 rounded-lg hover:bg-white/10">
-                                <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                                <FileText className="w-3 h-3" style={{ color: 'var(--blue)' }} />
+                              </a>
+                            )}
+                            <button onClick={() => { setEditingInvoice(inv); setShowInvoiceForm(true) }}
+                              className="p-1.5 rounded-lg hover:bg-white/10">
+                              <Edit3 className="w-3 h-3" style={{ color: 'var(--muted)' }} />
+                            </button>
+                            <button onClick={async () => { await deleteInvoice(inv.id); setInvoices(prev => prev.filter(i => i.id !== inv.id)) }}
+                              className="p-1.5 rounded-lg hover:bg-white/10">
+                              <Trash2 className="w-3 h-3" style={{ color: 'var(--red2)' }} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -1415,51 +1231,51 @@ export default function Amministrazione() {
 
       {/* ─── TAB: DOCUMENTI ────────────────────────────────────────────────────── */}
       {activeTab === 'documenti' && (
-        <div className="space-y-4 animate-fade-in">
-          <div className="flex justify-between items-center">
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>
-              Documenti amministrativi: contratti, ricevute, note di credito, F24.
-            </p>
+        <div className="animate-fade-in" style={{ paddingTop: 14 }}>
+          <div className="flex justify-between items-center" style={{ marginBottom: 10 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Documenti amministrativi · {adminDocs.length}
+            </span>
             <button onClick={() => { setEditingDoc(null); setShowDocForm(true) }}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
-              style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+              className="transition-colors"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
               <Plus className="w-3.5 h-3.5" /> Nuovo Documento
             </button>
           </div>
           {adminDocs.length === 0 ? (
-            <div className="text-center py-10 panel rounded-2xl">
-              <FileText className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--muted)' }} />
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun documento amministrativo</p>
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <FileText className="w-8 h-8 mx-auto" style={{ color: 'var(--muted)', opacity: 0.4, marginBottom: 8 }} />
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>Nessun documento amministrativo</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {adminDocs.map(doc => {
                 const typeLabel = ADMIN_DOC_TYPES.find(t => t.id === doc.type)?.label ?? doc.type
                 return (
-                  <div key={doc.id} className="panel p-4 rounded-xl space-y-2">
+                  <div key={doc.id} style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 16 }}>
                     <div className="flex items-start justify-between">
                       <div>
-                        <h4 className="text-sm font-medium" style={{ color: 'var(--text)' }}>{doc.title}</h4>
-                        <p className="text-xs" style={{ color: 'var(--muted)' }}>{typeLabel}</p>
+                        <h4 style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{doc.title}</h4>
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 2 }}>{typeLabel}</p>
                       </div>
                       <div className="flex gap-1">
                         <button onClick={() => { setEditingDoc(doc); setShowDocForm(true) }} className="p-1 rounded hover:bg-white/10">
-                          <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                          <Edit3 className="w-3 h-3" style={{ color: 'var(--muted)' }} />
                         </button>
                         <button onClick={async () => { await deleteAdminDocument(doc.id); setAdminDocs(prev => prev.filter(d => d.id !== doc.id)) }}
                           className="p-1 rounded hover:bg-white/10">
-                          <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                          <Trash2 className="w-3 h-3" style={{ color: 'var(--red2)' }} />
                         </button>
                       </div>
                     </div>
-                    {doc.notes && <p className="text-xs" style={{ color: 'var(--muted)' }}>{doc.notes}</p>}
+                    {doc.notes && <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 8 }}>{doc.notes}</p>}
                     {doc.file_url && (
                       <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
-                        className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--blue)' }}>
+                        style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
                         <Download className="w-3 h-3" /> Scarica file
                       </a>
                     )}
-                    <p className="text-xs" style={{ color: 'var(--muted)' }}>{formatDate(doc.created_at)}</p>
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', marginTop: 8, opacity: 0.6 }}>{formatDate(doc.created_at)}</p>
                   </div>
                 )
               })}
@@ -1536,13 +1352,18 @@ function InvoiceFormModal({ invoice, events, clients, suppliers, onClose, onSave
   const [ficId, setFicId] = useState(invoice?.fatture_in_cloud_id ?? '')
   const [notes, setNotes] = useState(invoice?.notes ?? '')
 
+  const labelStyle: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 6 }
+  const inputStyle: React.CSSProperties = { background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)' }} />
       <div className="relative w-full max-w-lg rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
-        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{invoice ? 'Modifica Fattura' : 'Nuova Fattura'}</h3>
+          <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text)' }}>
+            {invoice ? 'Modifica Fattura' : 'Nuova Fattura'}
+          </h3>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10">
             <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
           </button>
@@ -1550,58 +1371,58 @@ function InvoiceFormModal({ invoice, events, clients, suppliers, onClose, onSave
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Tipo</label>
+              <label style={labelStyle}>Tipo</label>
               <select value={type} onChange={e => setType(e.target.value as 'emessa' | 'ricevuta')}
-                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle}>
                 <option value="emessa">Emessa (attiva)</option>
                 <option value="ricevuta">Ricevuta (passiva)</option>
               </select>
             </div>
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Numero</label>
+              <label style={labelStyle}>Numero</label>
               <input value={number} onChange={e => setNumber(e.target.value)} placeholder="FT-2026-001"
-                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle} />
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Importo</label>
+              <label style={labelStyle}>Importo</label>
               <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle} />
             </div>
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>IVA</label>
+              <label style={labelStyle}>IVA</label>
               <input type="number" value={vatAmount} onChange={e => setVatAmount(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle} />
             </div>
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Stato</label>
+              <label style={labelStyle}>Stato</label>
               <select value={status} onChange={e => setStatus(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle}>
                 {INVOICE_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Evento</label>
+              <label style={labelStyle}>Evento</label>
               <select value={eventId} onChange={e => setEventId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle}>
                 <option value="">Nessuno</option>
                 {events.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>{type === 'emessa' ? 'Cliente' : 'Fornitore'}</label>
+              <label style={labelStyle}>{type === 'emessa' ? 'Cliente' : 'Fornitore'}</label>
               {type === 'emessa' ? (
                 <select value={clientId} onChange={e => setClientId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                  className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle}>
                   <option value="">Seleziona</option>
                   {clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                 </select>
               ) : (
                 <select value={supplierId} onChange={e => setSupplierId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                  className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle}>
                   <option value="">Seleziona</option>
                   {suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
                 </select>
@@ -1610,23 +1431,23 @@ function InvoiceFormModal({ invoice, events, clients, suppliers, onClose, onSave
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Scadenza</label>
+              <label style={labelStyle}>Scadenza</label>
               <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle} />
             </div>
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>ID Fatture in Cloud</label>
+              <label style={labelStyle}>ID Fatture in Cloud</label>
               <input value={ficId} onChange={e => setFicId(e.target.value)} placeholder="Opzionale"
-                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle} />
             </div>
           </div>
           <div>
-            <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Link esterno (Fatture in Cloud)</label>
+            <label style={labelStyle}>Link esterno (Fatture in Cloud)</label>
             <input value={externalUrl} onChange={e => setExternalUrl(e.target.value)} placeholder="https://..."
-              className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+              className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle} />
           </div>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Note" rows={2}
-            className="w-full px-3 py-2 rounded-xl text-sm resize-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            className="w-full px-3 py-2 rounded-xl text-sm resize-none" style={inputStyle} />
         </div>
         <button onClick={() => onSave({
           ...(invoice?.id ? { id: invoice.id } : {}),
@@ -1635,8 +1456,8 @@ function InvoiceFormModal({ invoice, events, clients, suppliers, onClose, onSave
           event_id: eventId || null, client_id: clientId || null, supplier_id: supplierId || null,
           fatture_in_cloud_id: ficId || null, external_url: externalUrl || null, notes,
         })} disabled={!number && !amount}
-          className="w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+          className="w-full py-3 rounded-xl disabled:opacity-40"
+          style={{ background: 'var(--text)', color: 'var(--bg)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em' }}>
           {invoice ? 'Salva Modifiche' : 'Crea Fattura'}
         </button>
       </div>
@@ -1671,32 +1492,37 @@ function DocFormModal({ doc, events, clients, suppliers, onClose, onSave }: {
     setUploading(false)
   }
 
+  const labelStyle: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 6 }
+  const inputStyle: React.CSSProperties = { background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)' }} />
       <div className="relative w-full max-w-md rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
-        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{doc ? 'Modifica Documento' : 'Nuovo Documento'}</h3>
+          <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text)' }}>
+            {doc ? 'Modifica Documento' : 'Nuovo Documento'}
+          </h3>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10">
             <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
           </button>
         </div>
         <div className="space-y-3">
           <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Titolo documento"
-            className="w-full px-3 py-2.5 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            className="w-full px-3 py-2.5 rounded-xl text-sm" style={inputStyle} />
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Tipo</label>
+              <label style={labelStyle}>Tipo</label>
               <select value={type} onChange={e => setType(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle}>
                 {ADMIN_DOC_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Evento</label>
+              <label style={labelStyle}>Evento</label>
               <select value={eventId} onChange={e => setEventId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle}>
                 <option value="">Nessuno</option>
                 {events.map(ev => <option key={ev.id} value={ev.id}>{ev.nome}</option>)}
               </select>
@@ -1704,42 +1530,44 @@ function DocFormModal({ doc, events, clients, suppliers, onClose, onSave }: {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Cliente</label>
+              <label style={labelStyle}>Cliente</label>
               <select value={clientId} onChange={e => setClientId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle}>
                 <option value="">Nessuno</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Fornitore</label>
+              <label style={labelStyle}>Fornitore</label>
               <select value={supplierId} onChange={e => setSupplierId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                className="w-full px-3 py-2 rounded-xl text-sm" style={inputStyle}>
                 <option value="">Nessuno</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
               </select>
             </div>
           </div>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Note" rows={2}
-            className="w-full px-3 py-2 rounded-xl text-sm resize-none" style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            className="w-full px-3 py-2 rounded-xl text-sm resize-none" style={inputStyle} />
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm cursor-pointer"
-              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-              <Upload className="w-4 h-4" />
+            <label
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm cursor-pointer"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 10 }}
+            >
+              <Upload className="w-3.5 h-3.5" />
               {uploading ? 'Caricamento...' : 'Carica file'}
               <input type="file" className="hidden" onChange={handleFileUpload} />
             </label>
-            {fileUrl && <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs" style={{ color: 'var(--blue)' }}>File caricato</a>}
+            {fileUrl && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--green)' }}>File caricato</span>}
           </div>
         </div>
         <button onClick={() => onSave({
           ...(doc?.id ? { id: doc.id } : {}),
           title, type,
           event_id: eventId || null, client_id: clientId || null, supplier_id: supplierId || null,
-          file_url: fileUrl || null, notes,
-        })} disabled={!title.trim()}
-          className="w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
+          notes, file_url: fileUrl || null,
+        })} disabled={!title}
+          className="w-full py-3 rounded-xl disabled:opacity-40"
+          style={{ background: 'var(--text)', color: 'var(--bg)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em' }}>
           {doc ? 'Salva Modifiche' : 'Crea Documento'}
         </button>
       </div>
