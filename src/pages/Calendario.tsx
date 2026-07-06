@@ -13,9 +13,6 @@ import {
   Euro,
   Check,
   Play,
-  LayoutGrid,
-  List,
-  ArrowRight,
   Tag,
   Zap,
   FileText,
@@ -197,20 +194,20 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
     const dl = daysLeft(m.start_date)
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+        style={{ background: 'rgba(0,0,0,0.6)' }}
         onClick={onClose}>
         <div className="w-full max-w-md rounded-2xl overflow-hidden animate-fade-in"
-          style={{ background: 'var(--panel)', border: `1px solid ${color}30`, boxShadow: `0 24px 80px rgba(0,0,0,0.7), 0 0 40px ${color}15` }}
+          style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-sm)' }}
           onClick={e => e.stopPropagation()}>
           <div className="p-5"
-            style={{ background: `linear-gradient(135deg, ${color}12 0%, transparent 70%)`, borderBottom: '1px solid var(--line)' }}>
+            style={{ borderBottom: '1px solid var(--line)', borderLeft: `3px solid ${color}`, paddingLeft: '17px' }}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <Bell className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} />
-                  <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{ITEM_TYPE_LABELS[m.item_type]}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>{ITEM_TYPE_LABELS[m.item_type]}</span>
                 </div>
-                <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{m.title}</h3>
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: 'var(--text)' }}>{m.title}</h3>
                 {m.description && <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>{m.description}</p>}
               </div>
               <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0">
@@ -266,20 +263,20 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+        style={{ background: 'rgba(0,0,0,0.6)' }}
         onClick={onClose}>
         <div className="w-full max-w-md rounded-2xl overflow-hidden animate-fade-in"
-          style={{ background: 'var(--panel)', border: `1px solid ${color}30`, boxShadow: `0 24px 80px rgba(0,0,0,0.7), 0 0 40px ${color}15` }}
+          style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-sm)' }}
           onClick={e => e.stopPropagation()}>
           <div className="p-5 relative overflow-hidden"
-            style={{ background: `linear-gradient(135deg, ${color}15 0%, transparent 70%)`, borderBottom: '1px solid var(--line)' }}>
+            style={{ borderBottom: '1px solid var(--line)', borderLeft: `3px solid ${color}`, paddingLeft: '17px' }}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <Calendar className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} />
-                  <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Evento</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>Evento</span>
                 </div>
-                <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{ev.nome}</h3>
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: 'var(--text)' }}>{ev.nome}</h3>
                 <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>{ev.descrizione}</p>
               </div>
               <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0">
@@ -347,21 +344,21 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
     const categoriaLabel = { contratto: 'Contratto', preventivo: 'Preventivo', permesso: 'Permesso', assicurazione: 'Assicurazione', fattura: 'Fattura', documento: 'Documento' }[p.categoria] ?? p.categoria
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+        style={{ background: 'rgba(0,0,0,0.6)' }}
         onClick={onClose}>
         <div className="w-full max-w-md rounded-2xl overflow-hidden animate-fade-in"
-          style={{ background: 'var(--panel)', border: `1px solid ${color}30`, boxShadow: `0 24px 80px rgba(0,0,0,0.7), 0 0 40px ${color}15` }}
+          style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-sm)' }}
           onClick={e => e.stopPropagation()}>
           <div className="p-5"
-            style={{ background: `linear-gradient(135deg, ${color}12 0%, transparent 70%)`, borderBottom: '1px solid var(--line)' }}>
+            style={{ borderBottom: '1px solid var(--line)', borderLeft: `3px solid ${color}`, paddingLeft: '17px' }}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} />
-                  <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Pratica</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>Pratica</span>
                   <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: `${color}18`, color }}>{categoriaLabel}</span>
                 </div>
-                <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{p.titolo}</h3>
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: 'var(--text)' }}>{p.titolo}</h3>
                 <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>{p.descrizione}</p>
               </div>
               <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0">
@@ -406,21 +403,21 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
     const dl = c.due_date ? daysLeft(c.due_date) : null
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+        style={{ background: 'rgba(0,0,0,0.6)' }}
         onClick={onClose}>
         <div className="w-full max-w-md rounded-2xl overflow-hidden animate-fade-in"
-          style={{ background: 'var(--panel)', border: `1px solid ${color}30`, boxShadow: `0 24px 80px rgba(0,0,0,0.7), 0 0 40px ${color}15` }}
+          style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-sm)' }}
           onClick={e => e.stopPropagation()}>
           <div className="p-5"
-            style={{ background: `linear-gradient(135deg, ${color}12 0%, transparent 70%)`, borderBottom: '1px solid var(--line)' }}>
+            style={{ borderBottom: '1px solid var(--line)', borderLeft: `3px solid ${color}`, paddingLeft: '17px' }}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <Tag className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} />
-                  <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Creative</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>Creative</span>
                   <span className="text-xs px-1.5 py-0.5 rounded capitalize" style={{ background: `${color}18`, color }}>{c.type}</span>
                 </div>
-                <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{c.title}</h3>
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: 'var(--text)' }}>{c.title}</h3>
                 {c.notes && <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>{c.notes}</p>}
               </div>
               <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0">
@@ -465,21 +462,21 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
     const dl = s.publish_date ? daysLeft(s.publish_date) : null
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+        style={{ background: 'rgba(0,0,0,0.6)' }}
         onClick={onClose}>
         <div className="w-full max-w-md rounded-2xl overflow-hidden animate-fade-in"
-          style={{ background: 'var(--panel)', border: `1px solid ${color}30`, boxShadow: `0 24px 80px rgba(0,0,0,0.7), 0 0 40px ${color}15` }}
+          style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-sm)' }}
           onClick={e => e.stopPropagation()}>
           <div className="p-5"
-            style={{ background: `linear-gradient(135deg, ${color}12 0%, transparent 70%)`, borderBottom: '1px solid var(--line)' }}>
+            style={{ borderBottom: '1px solid var(--line)', borderLeft: `3px solid ${color}`, paddingLeft: '17px' }}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <Zap className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} />
-                  <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Social</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>Social</span>
                   <span className="text-xs px-1.5 py-0.5 rounded capitalize" style={{ background: `${color}18`, color }}>{s.channel.replace(/_/g, ' ')}</span>
                 </div>
-                <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{s.title}</h3>
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: 'var(--text)' }}>{s.title}</h3>
                 {s.copy && <p className="text-sm mt-0.5 line-clamp-2" style={{ color: 'var(--muted)' }}>{s.copy}</p>}
               </div>
               <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0">
@@ -565,7 +562,7 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
             </span>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide mb-2" style={{ color: 'var(--muted)' }}>Cambia stato rapido</p>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', marginBottom: '8px' }}>Cambia stato rapido</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {STATES.map(s => {
                 const active = t.stato === s
@@ -654,13 +651,14 @@ function CalPill({ item, onClick, onDragStart, isLastDay, onResizeStart }: {
   return (
     <div draggable={!!onDragStart} onDragStart={onDragStart}
       onClick={e => { e.stopPropagation(); onClick() }}
-      className={`relative truncate rounded px-1.5 py-0.5 text-xs font-medium transition-all hover:brightness-110 select-none ${onDragStart ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} group/pill`}
+      className={`relative truncate px-1.5 py-0.5 text-xs transition-colors select-none ${onDragStart ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} group/pill`}
       style={{
-        background: `${color}20`,
+        borderRadius: '6px',
+        background: `${color}15`,
         color,
         borderLeft: `3px solid ${color}`,
-        border: `1px solid ${color}30`,
-        borderLeftWidth: 3,
+        fontSize: '11px',
+        fontFamily: 'inherit',
         opacity: isDone && item.type !== 'event' ? 0.5 : 1,
         outline: isOverdue ? `1px dashed ${color}60` : 'none',
       }}>
@@ -761,8 +759,8 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem,
       <div className="overflow-x-auto">
       <div className="grid grid-cols-7 border-b min-w-[600px]" style={{ borderColor: 'var(--line)' }}>
         {DAYS_IT.map((d, i) => (
-          <div key={d} className="py-2.5 text-center text-xs font-semibold"
-            style={{ color: i === 0 || i === 6 ? 'rgba(155,163,170,0.45)' : 'var(--muted)' }}>{d}</div>
+          <div key={d} className="py-2 text-center"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', opacity: i === 0 || i === 6 ? 0.4 : 0.6 }}>{d}</div>
         ))}
       </div>
       <div className="grid grid-cols-7 min-w-[600px]">
@@ -781,7 +779,7 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem,
               className="min-h-[90px] border-b border-r last-of-type:border-r-0 relative cursor-pointer"
               style={{
                 borderColor: 'var(--line)',
-                background: isResizeHighlight ? 'rgba(208,0,58,0.08)' : isOver ? 'rgba(208,0,58,0.12)' : isToday ? 'rgba(77,180,255,0.04)' : 'transparent',
+                background: isResizeHighlight ? 'rgba(208,0,58,0.08)' : isOver ? 'rgba(208,0,58,0.12)' : isToday ? 'color-mix(in srgb, var(--red2) 4%, transparent)' : 'transparent',
                 boxShadow: isResizeHighlight ? 'inset 0 0 0 1px rgba(208,0,58,0.3)' : isOver ? 'inset 0 0 0 2px rgba(208,0,58,0.4)' : 'none',
               }}
               onDragOver={e => { e.preventDefault(); setDragOver(iso) }}
@@ -792,11 +790,13 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem,
                 setDragging(null)
               }}
               onClick={() => onDayClick(day)}>
-              <div className="flex items-center justify-center w-6 h-6 mx-1 mt-1 rounded-full"
+              <div className="mx-1 mt-1"
                 style={{
-                  background: isToday ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'transparent',
-                  color: isToday ? 'white' : isCurrentMonth ? (isWeekend ? 'rgba(155,163,170,0.5)' : 'var(--text)') : 'rgba(155,163,170,0.25)',
-                  fontSize: 11, fontWeight: isToday ? 700 : 400,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '11px',
+                  fontWeight: isToday ? 700 : 400,
+                  color: isToday ? 'var(--red2)' : isCurrentMonth ? (isWeekend ? 'var(--muted)' : 'var(--text)') : 'var(--muted)',
+                  opacity: isCurrentMonth ? 1 : 0.3,
                 }}>
                 {day.getDate()}
               </div>
@@ -924,16 +924,18 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem, onResizeEv
           const isToday = sameDay(day, today)
           return (
             <div key={i} className="py-3 px-1.5 border-r last:border-r-0 text-center"
-              style={{ borderColor: 'var(--line)', background: isToday ? 'rgba(77,180,255,0.04)' : 'transparent' }}>
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>{DAYS_IT[day.getDay()]}</p>
-              <div className="w-8 h-8 flex items-center justify-center mx-auto mt-1 rounded-full text-sm font-semibold"
+              style={{ borderColor: 'var(--line)', background: isToday ? 'color-mix(in srgb, var(--red2) 4%, transparent)' : 'transparent' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6 }}>{DAYS_IT[day.getDay()]}</p>
+              <div className="flex items-center justify-center mx-auto mt-1"
                 style={{
-                  background: isToday ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'transparent',
-                  color: isToday ? 'white' : 'var(--text)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '14px',
+                  fontWeight: isToday ? 700 : 400,
+                  color: isToday ? 'var(--red2)' : 'var(--text)',
                 }}>
                 {day.getDate()}
               </div>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{MONTHS_IT[day.getMonth()].slice(0, 3)}</p>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', marginTop: '2px', opacity: 0.5 }}>{MONTHS_IT[day.getMonth()].slice(0, 3)}</p>
             </div>
           )
         })}
@@ -950,7 +952,7 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem, onResizeEv
               className="border-r last:border-r-0 p-1.5 space-y-1"
               style={{
                 borderColor: 'var(--line)',
-                background: isResizeHighlight ? 'rgba(208,0,58,0.08)' : isOver ? 'rgba(208,0,58,0.12)' : isToday ? 'rgba(77,180,255,0.03)' : 'transparent',
+                background: isResizeHighlight ? 'rgba(208,0,58,0.08)' : isOver ? 'rgba(208,0,58,0.12)' : isToday ? 'color-mix(in srgb, var(--red2) 3%, transparent)' : 'transparent',
                 boxShadow: isResizeHighlight ? 'inset 0 0 0 1px rgba(208,0,58,0.3)' : isOver ? 'inset 0 0 0 2px rgba(208,0,58,0.4)' : 'none',
                 minHeight: 200,
               }}
@@ -1176,11 +1178,11 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
         <div className="panel p-4" style={{ borderLeft: '3px solid var(--red2)' }}>
           <div className="flex items-center gap-2 mb-3">
             <AlertTriangle className="w-4 h-4" style={{ color: 'var(--red2)' }} />
-            <p className="text-sm font-semibold" style={{ color: 'var(--red2)' }}>
-              Scaduti senza completamento ({overdue.length})
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, color: 'var(--red2)' }}>
+              SCADUTI ({overdue.length})
             </p>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-0">
             {overdue.map(item => {
               const color = item.type === 'event'
                 ? eventColor(item.data as Event)
@@ -1198,16 +1200,15 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
                 : item.type === 'task'
                   ? (item.data as Task).id
                   : (item.data as Pratica).id
-              const typeLabel = item.type === 'event' ? 'Evento' : item.type === 'task' ? 'Task' : 'Pratica'
+              const typeLabel = item.type === 'event' ? 'EVENTO' : item.type === 'task' ? 'TASK' : 'PRATICA'
               return (
                 <button key={item.type + id} onClick={() => onItemClick(item)}
-                  className="w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all hover:bg-white/5">
-                  <div className="w-1.5 h-8 rounded-full flex-shrink-0" style={{ background: color }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm truncate" style={{ color: 'var(--text)' }}>{label}</p>
-                    <p className="text-xs" style={{ color: 'var(--muted)' }}>{fmtShort(d)} · {typeLabel}</p>
-                  </div>
-                  <span className="text-xs flex-shrink-0" style={{ color: 'var(--red2)' }}>{Math.abs(daysLeft(d))}g fa</span>
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--line)]"
+                  style={{ borderBottom: '1px solid var(--line)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', minWidth: '60px' }}>{fmtShort(d)}</span>
+                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: '13px', color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color, opacity: 0.8 }}>{typeLabel}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--red2)' }}>{Math.abs(daysLeft(d))}g fa</span>
                 </button>
               )
             })}
@@ -1230,30 +1231,21 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
         const urgent = dl <= 3
         return (
           <div key={iso} className="panel overflow-hidden"
-            style={{ borderLeft: urgent ? `3px solid ${dl <= 0 ? 'var(--red2)' : dl <= 2 ? 'var(--red2)' : 'var(--yellow)'}` : undefined }}>
+            style={{ borderLeft: urgent ? `3px solid ${dl <= 2 ? 'var(--red2)' : 'var(--yellow)'}` : undefined }}>
             <div className="flex items-center gap-3 px-4 py-3"
-              style={{ borderBottom: '1px solid var(--line)', background: 'rgba(255,255,255,0.015)' }}>
-              <div className="w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0"
-                style={{ background: isToday ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'var(--panel2)' }}>
-                <span style={{ color: isToday ? 'white' : 'var(--text)', fontSize: 16, fontWeight: 700, lineHeight: 1 }}>
-                  {day.getDate()}
-                </span>
-                <span style={{ color: isToday ? 'rgba(255,255,255,0.8)' : 'var(--muted)', fontSize: 10 }}>
-                  {MONTHS_IT[day.getMonth()].slice(0, 3)}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                  {isToday ? 'Oggi' : isTomorrow ? 'Domani' : DAYS_FULL[day.getDay()]}
-                </p>
-                <p className="text-xs" style={{ color: 'var(--muted)' }}>{dayItems.length} attività</p>
-              </div>
+              style={{ borderBottom: '1px solid var(--line)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 700, color: isToday ? 'var(--red2)' : 'var(--text)', minWidth: '32px' }}>
+                {day.getDate()}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase' }}>
+                {MONTHS_IT[day.getMonth()].slice(0, 3)}
+              </span>
+              <span className="flex-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+                {isToday ? 'OGGI' : isTomorrow ? 'DOMANI' : DAYS_FULL[day.getDay()].toUpperCase()}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>{dayItems.length} elem.</span>
               {dl >= 0 && dl <= 7 && !isToday && (
-                <span className="text-xs px-2 py-0.5 rounded flex-shrink-0"
-                  style={{
-                    background: dl <= 2 ? 'rgba(255,49,95,0.1)' : 'rgba(255,194,75,0.1)',
-                    color: dl <= 2 ? 'var(--red2)' : 'var(--yellow)',
-                  }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: dl <= 2 ? 'var(--red2)' : 'var(--yellow)' }}>
                   tra {dl}g
                 </span>
               )}
@@ -1280,28 +1272,18 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
                   : item.type === 'task'
                     ? (item.data as Task).id
                     : (item.data as Pratica).id
-                const urgentItem = item.type === 'task' && (item.data as Task).priorita === 'alta' && (item.data as Task).stato !== 'completato'
+                const typeLabel = item.type === 'event' ? 'EVENTO' : item.type === 'task' ? 'TASK' : 'PRATICA'
                 return (
                   <button key={item.type + id}
                     onClick={() => onItemClick(item)}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all hover:bg-white/5"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--line)]"
                     style={{ borderTop: ii > 0 ? '1px solid var(--line)' : 'none' }}>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: `${color}18` }}>
-                      {item.type === 'event'
-                        ? <Calendar className="w-3.5 h-3.5" style={{ color }} />
-                        : item.type === 'task'
-                          ? <CheckSquare className="w-3.5 h-3.5" style={{ color }} />
-                          : <FileText className="w-3.5 h-3.5" style={{ color }} />}
-                    </div>
+                    <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ background: color }} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        {urgentItem && <Zap className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--red2)' }} />}
-                        <p className="text-sm truncate" style={{ color: 'var(--text)' }}>{label}</p>
-                      </div>
+                      <p className="truncate" style={{ fontFamily: 'var(--font-serif)', fontSize: '13px', color: 'var(--text)' }}>{label}</p>
                       <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{sub}</p>
                     </div>
-                    <ArrowRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color, flexShrink: 0 }}>{typeLabel}</span>
                   </button>
                 )
               })}
@@ -1405,11 +1387,11 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/60" />
       <div className="relative w-full max-w-md rounded-2xl p-6 space-y-4"
-        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>
+          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: 'var(--text)' }}>
             {type === 'memo' ? 'Nuovo Promemoria' : type === 'event' ? 'Nuovo Evento' : type === 'task' ? 'Nuovo Task' : 'Nuova Pratica'}
           </h3>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10">
@@ -1444,40 +1426,40 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
             value={titolo} onChange={e => setTitolo(e.target.value)}
             placeholder={type === 'event' ? 'Nome evento' : type === 'memo' ? 'Titolo promemoria' : 'Titolo'}
             className="w-full px-3 py-2.5 rounded-xl text-sm"
-            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
           />
           <textarea
             value={desc} onChange={e => setDesc(e.target.value)}
             placeholder="Descrizione (opzionale)"
             rows={2}
             className="w-full px-3 py-2.5 rounded-xl text-sm resize-none"
-            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
           />
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>
                 {type === 'event' || type === 'memo' ? 'Data inizio' : 'Scadenza'}
               </label>
               <input type="date" value={dataInizio} onChange={e => setDataInizio(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl text-sm"
-                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
               />
             </div>
             {(type === 'event' || type === 'memo') && (
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Data fine</label>
+                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Data fine</label>
                 <input type="date" value={dataFine} onChange={e => setDataFine(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
                 />
               </div>
             )}
             {type !== 'event' && type !== 'memo' && (
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Priorita</label>
+                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Priorita</label>
                 <select value={priorita} onChange={e => setPriorita(e.target.value as 'alta' | 'media' | 'bassa')}
                   className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
                   <option value="alta">Alta</option>
                   <option value="media">Media</option>
                   <option value="bassa">Bassa</option>
@@ -1489,10 +1471,10 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
           {type === 'memo' && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Tipo</label>
+                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Tipo</label>
                 <select value={memoType} onChange={e => setMemoType(e.target.value as typeof memoType)}
                   className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
                   <option value="promemoria">Promemoria</option>
                   <option value="evento">Evento</option>
                   <option value="scadenza">Scadenza</option>
@@ -1500,10 +1482,10 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
                 </select>
               </div>
               <div>
-                <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Alert</label>
+                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Alert</label>
                 <select value={alert} onChange={e => setAlert(e.target.value as typeof alert)}
                   className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
                   <option value="none">Nessun alert</option>
                   <option value="10min">10 minuti prima</option>
                   <option value="1h">1 ora prima</option>
@@ -1518,16 +1500,16 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
             <input value={location} onChange={e => setLocation(e.target.value)}
               placeholder="Location"
               className="w-full px-3 py-2.5 rounded-xl text-sm"
-              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
             />
           )}
 
           {(type === 'task' || type === 'pratica') && events.length > 0 && (
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Evento collegato</label>
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Evento collegato</label>
               <select value={eventoId} onChange={e => setEventoId(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl text-sm"
-                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
                 <option value="">Nessuno</option>
                 {events.map(ev => (
                   <option key={ev.id} value={ev.id}>{ev.nome}</option>
@@ -1630,15 +1612,15 @@ function EventDateEditModal({ event, onClose, onSave }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/60" />
       <div className="relative w-full max-w-md rounded-2xl overflow-hidden"
-        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-        <div className="p-5" style={{ borderBottom: '1px solid var(--line)', background: 'rgba(77,180,255,0.04)' }}>
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
+        <div className="p-5" style={{ borderBottom: '1px solid var(--line)' }}>
           <div className="flex items-center gap-2 mb-1">
             <Calendar className="w-4 h-4" style={{ color: 'var(--blue)' }} />
-            <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Durata evento</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', color: 'var(--muted)' }}>Durata evento</span>
           </div>
-          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>{event.nome}</h3>
+          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: 'var(--text)' }}>{event.nome}</h3>
           <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
             Date attuali: {fmtLong(event.dataInizio)} {event.dataInizio !== event.dataFine ? `\u2192 ${fmtLong(event.dataFine)}` : '(giornata singola)'}
             {originalDuration > 0 && ` (${originalDuration + 1} giorni)`}
@@ -1647,17 +1629,17 @@ function EventDateEditModal({ event, onClose, onSave }: {
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Data inizio</label>
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '6px', display: 'block', color: 'var(--muted)' }}>Data inizio</label>
               <input type="date" value={startDate} onChange={e => handleStartChange(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl text-sm"
-                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
             </div>
             <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--muted)' }}>Data fine</label>
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '6px', display: 'block', color: 'var(--muted)' }}>Data fine</label>
               <input type="date" value={endDate} onChange={e => handleEndChange(e.target.value)}
                 min={startDate}
                 className="w-full px-3 py-2.5 rounded-xl text-sm"
-                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
             </div>
           </div>
 
@@ -1759,11 +1741,11 @@ function MemoEditModal({ item, onClose, onSave }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/60" />
       <div className="relative w-full max-w-md rounded-2xl p-6 space-y-4"
-        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Modifica elemento</h3>
+          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: 'var(--text)' }}>Modifica elemento</h3>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10">
             <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
           </button>
@@ -1771,31 +1753,31 @@ function MemoEditModal({ item, onClose, onSave }: {
         <div className="space-y-3">
           <input value={title} onChange={e => setTitle(e.target.value)}
             placeholder="Titolo" className="w-full px-3 py-2.5 rounded-xl text-sm"
-            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
           <textarea value={description} onChange={e => setDescription(e.target.value)}
             placeholder="Descrizione (opzionale)" rows={2}
             className="w-full px-3 py-2.5 rounded-xl text-sm resize-none"
-            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Data inizio</label>
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Data inizio</label>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl text-sm"
-                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
             </div>
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Data fine</label>
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Data fine</label>
               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl text-sm"
-                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Tipo</label>
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Tipo</label>
               <select value={itemType} onChange={e => setItemType(e.target.value as typeof itemType)}
                 className="w-full px-3 py-2 rounded-xl text-sm"
-                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
                 <option value="promemoria">Promemoria</option>
                 <option value="evento">Evento</option>
                 <option value="scadenza">Scadenza</option>
@@ -1803,10 +1785,10 @@ function MemoEditModal({ item, onClose, onSave }: {
               </select>
             </div>
             <div>
-              <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Alert</label>
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Alert</label>
               <select value={alertVal} onChange={e => setAlertVal(e.target.value as typeof alertVal)}
                 className="w-full px-3 py-2 rounded-xl text-sm"
-                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
                 <option value="none">Nessun alert</option>
                 <option value="10min">10 minuti prima</option>
                 <option value="1h">1 ora prima</option>
@@ -2036,88 +2018,60 @@ export default function Calendario() {
 
   return (
     <div className="space-y-5">
-      {/* Header + view switcher */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      {/* Wire masthead */}
+      <div className="wire-masthead">
         <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>Calendario</h1>
-          <p className="mt-1 flex items-center gap-2" style={{ color: 'var(--muted)' }}>
-            Pianificazione e scadenze
-            {ruolo !== 'Admin' && (
-              <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(77,180,255,0.1)', color: 'var(--blue)' }}>
-                Vista {ruolo}
-              </span>
+          <span className="wire-masthead-title">CALENDARIO</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>
+            {MONTHS_IT[cursor.getMonth()].toUpperCase()} {cursor.getFullYear()}
+            {ruolo !== 'Admin' && ruolo !== 'Partner' && (
+              <span style={{ marginLeft: '8px', color: 'var(--blue)' }}>[ {ruolo.toUpperCase()} ]</span>
             )}
-          </p>
+          </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="wire-masthead-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-105"
-            style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white', boxShadow: '0 4px 16px rgba(208,0,58,0.3)' }}>
-            <Bell className="w-4 h-4" />
-            + Promemoria
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+            + PROMEMORIA
           </button>
-          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-            {([
-              { id: 'month' as ViewMode, icon: LayoutGrid, label: 'Mese' },
-              { id: 'week' as ViewMode, icon: Calendar, label: 'Settimana' },
-              { id: 'day' as ViewMode, icon: Clock, label: 'Giorno' },
-              { id: 'agenda' as ViewMode, icon: List, label: 'Agenda' },
-            ]).map(v => (
-              <button key={v.id} onClick={() => setView(v.id)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
-                style={{
-                  background: view === v.id ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : 'transparent',
-                  color: view === v.id ? 'white' : 'var(--muted)',
-                }}>
-                <v.icon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{v.label}</span>
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Promemoria attivi', value: allMemos.length, color: '#a78bfa', icon: Bell },
-          { label: 'Scaduti', value: overdueItems.length, color: overdueItems.length > 0 ? 'var(--yellow)' : 'var(--muted)', icon: AlertTriangle },
-          { label: 'Questa settimana', value: thisWeekItems.length, color: 'var(--blue)', icon: Calendar },
-          { label: 'Attività visibili', value: visibleItems.length, color: 'var(--text)', icon: Tag },
-        ].map((kpi, i) => (
-          <div key={i} className="panel p-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: `${kpi.color}18` }}>
-              <kpi.icon className="w-4.5 h-4.5" style={{ color: kpi.color, width: 18, height: 18 }} />
-            </div>
-            <div>
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>{kpi.label}</p>
-              <p className="text-xl font-bold" style={{ color: kpi.color }}>{kpi.value}</p>
-            </div>
-          </div>
+      {/* Wire tabs — view selector */}
+      <div className="wire-tabs">
+        {([
+          { id: 'month' as ViewMode, label: 'MESE' },
+          { id: 'week' as ViewMode, label: 'SETTIMANA' },
+          { id: 'day' as ViewMode, label: 'GIORNO' },
+          { id: 'agenda' as ViewMode, label: 'AGENDA' },
+        ]).map(v => (
+          <button key={v.id} onClick={() => setView(v.id)}
+            className={`wire-tab ${view === v.id ? 'wire-tab--active' : ''}`}>
+            {v.label}
+          </button>
         ))}
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1">
-        {[
-          { label: 'Promemoria', color: '#a78bfa' },
-          { label: 'Evento in corso', color: '#ff315f' },
-          { label: 'Pianificazione', color: '#4db4ff' },
-          { label: 'Completato', color: '#38d27d' },
-          { label: 'Task urgente', color: '#ff315f' },
-          { label: 'Task media', color: '#ffc24b' },
-          { label: 'Inattivo/bozza', color: '#9ba3aa' },
-        ].map(l => (
-          <div key={l.label} className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm" style={{ background: l.color }} />
-            <span className="text-xs" style={{ color: 'var(--muted)' }}>{l.label}</span>
-          </div>
-        ))}
+      {/* Wire ticker — KPIs */}
+      <div className="wire-ticker">
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+          <Bell className="w-3 h-3 inline -mt-0.5 mr-1" />{allMemos.length} promemoria
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: overdueItems.length > 0 ? 'var(--yellow)' : 'var(--muted)' }}>
+          {overdueItems.length} scaduti
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--blue)' }}>
+          {thisWeekItems.length} questa settimana
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+          {visibleItems.length} visibili
+        </span>
         {(view === 'month' || view === 'week') && (
-          <div className="flex items-center gap-1.5 ml-2 pl-2" style={{ borderLeft: '1px solid var(--line)' }}>
-            <span className="text-xs" style={{ color: 'var(--muted)' }}>Trascina eventi e task per spostarli</span>
-          </div>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', opacity: 0.6 }}>
+            drag&amp;drop attivo
+          </span>
         )}
       </div>
 
@@ -2125,20 +2079,23 @@ export default function Calendario() {
       {view !== 'agenda' && (
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)}
-            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:bg-white/10"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-            <ChevronLeft className="w-4 h-4" style={{ color: 'var(--text)' }} />
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', transition: 'color 0.12s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+            <ChevronLeft className="w-4 h-4" />
           </button>
           <button onClick={() => { const t = new Date(); t.setHours(0,0,0,0); setCursor(t) }}
-            className="px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:opacity-80"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-            Oggi
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'none', border: '1px solid var(--line)', borderRadius: '6px', padding: '4px 10px', color: 'var(--muted)', cursor: 'pointer', transition: 'color 0.12s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+            OGGI
           </button>
-          <span className="flex-1 text-center text-sm font-semibold" style={{ color: 'var(--text)' }}>{navLabel}</span>
+          <span className="flex-1 text-center" style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{navLabel}</span>
           <button onClick={() => navigate(1)}
-            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:bg-white/10"
-            style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-            <ChevronRight className="w-4 h-4" style={{ color: 'var(--text)' }} />
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', transition: 'color 0.12s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       )}
