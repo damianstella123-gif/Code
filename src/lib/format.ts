@@ -4,6 +4,21 @@ export function daysLeft(iso: string): number {
   return Math.ceil((new Date(iso).getTime() - today.getTime()) / 86400000)
 }
 
+export function fmtDate(iso: string): string {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+export function fmtDateShort(iso: string): string {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
+}
+
+export function fmtDateTime(iso: string): string {
+  if (!iso) return ''
+  return new Date(iso).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
 export function fmtShort(iso: string): string {
   return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
 }

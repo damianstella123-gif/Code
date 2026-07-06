@@ -1652,7 +1652,7 @@ function TabComunicazioni({ event, comunicazioni }: { event: Event; comunicazion
                   <div>
                     <p className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{msg.oggetto}</p>
                     <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                      Da: {msg.mittente} · {new Date(msg.data).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      Da: {msg.mittente} · {new Date(msg.data).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">

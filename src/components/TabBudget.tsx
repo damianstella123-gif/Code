@@ -111,9 +111,9 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
   function fmtDate(d: unknown): string {
     if (!d || typeof d !== 'string') return ''
-    const [y, m, day] = d.split('-')
-    if (!y || !m || !day) return ''
-    return `${day}/${m}/${y}`
+    try {
+      return new Date(d + 'T00:00').toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    } catch { return '' }
   }
 
   const loadData = useCallback(async () => {

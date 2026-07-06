@@ -665,8 +665,8 @@ export default function Amministrazione() {
       'Prezzo Unitario': u.unitPrice ?? '',
       'Importo': u.importo,
       'Stato': statoPagLabel(u.stato),
-      'Scadenza': u.scadenza,
-      'Data Pagamento': u.dataPagamento ?? '',
+      'Scadenza': u.scadenza ? new Date(u.scadenza).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
+      'Data Pagamento': u.dataPagamento ? new Date(u.dataPagamento).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
       'Note': u.note,
     }))
     const entrateRows = visibleEntrate.map(e => ({
@@ -674,8 +674,8 @@ export default function Amministrazione() {
       'Evento': eventName(e.eventoId),
       'Importo': e.importo,
       'Stato': statoPagLabel(e.stato),
-      'Data Prevista': e.dataPrevista,
-      'Data Pagamento': e.dataPagamento ?? '',
+      'Data Prevista': e.dataPrevista ? new Date(e.dataPrevista).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
+      'Data Pagamento': e.dataPagamento ? new Date(e.dataPagamento).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
       'Metodo': e.metodoPagamento,
       'Note': e.note,
     }))
@@ -694,7 +694,7 @@ export default function Amministrazione() {
     doc.setFontSize(16)
     doc.text('SIMMETRIA HUB - Riepilogo Budget', 14, 20)
     doc.setFontSize(10)
-    doc.text(`Data: ${todayISO()}`, 14, 28)
+    doc.text(`Data: ${new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, 14, 28)
     doc.text(`Budget eventi: ${formatEur(budgetEvents)}  |  Entrate: ${formatEur(totEntrate)}  |  Uscite: ${formatEur(totUscite)}  |  Margine: ${formatEur(margine)} (${marginePerc}%)`, 14, 34)
 
     autoTable(doc, {
@@ -708,7 +708,7 @@ export default function Amministrazione() {
         u.unitPrice != null ? formatEur(u.unitPrice) : '-',
         formatEur(u.importo),
         statoPagLabel(u.stato),
-        u.scadenza,
+        u.scadenza ? new Date(u.scadenza).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
       ]),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [220, 30, 60] },
