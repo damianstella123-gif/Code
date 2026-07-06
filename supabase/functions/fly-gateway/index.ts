@@ -140,6 +140,37 @@ const TOOLS = [
       required: [] as string[],
     },
   },
+  {
+    name: "propose_event",
+    description:
+      "Genera una proposta economica per un nuovo evento basandosi sui dati storici di eventi simili. NON crea nulla nel database: produce solo un benchmark con costi/ricavi medi per categoria e fornitori suggeriti nella citta indicata. Usa quando l'utente chiede stime, preventivi, proposte per eventi futuri.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        citta: {
+          type: "string",
+          description: "Citta dove si terra l'evento.",
+        },
+        pax: {
+          type: "number",
+          description: "Numero di partecipanti previsti.",
+        },
+        budget_target: {
+          type: "number",
+          description: "Budget target opzionale in euro.",
+        },
+        giorni: {
+          type: "number",
+          description: "Durata dell'evento in giorni (default 1).",
+        },
+        tipo: {
+          type: "string",
+          description: "Tipologia evento (corporate, istituzionale, convention, etc.).",
+        },
+      },
+      required: ["citta", "pax"] as string[],
+    },
+  },
 ];
 
 // ─── TOOL EXECUTION ────────────────────────────────────────────────────
@@ -589,6 +620,214 @@ async function executeTool(
 
       if (summaries.length === 0) return "Nessun dato economico trovato per gli eventi.";
       return JSON.stringify(summaries);
+    }
+
+    case "propose_event": {
+      const citta = (input.citta as string) || "";
+      const pax = (input.pax as number) || 50;
+      const budgetTarget = input.budget_target as number | undefined;
+      const giorni = (input.giorni as number) || 1;
+      const tipo = input.tipo as string | undefined;
+
+      // 1. Find similar events (0.5x - 2x pax)
+      const paxMin = Math.floor(pax * 0.5);
+      const paxMax = Math.ceil(pax * 2);
+
+      let evQ = supabase
+        .from("events")
+        .select("id, title, attendees, status, start_date, fee_agenzia_pct")
+        .gte("attendees", paxMin)
+        .lte("attendees", paxMax)
+        .order("start_date", { ascending: false })
+        .limit(20);
+
+      const { data: similarEvents } = await evQ;
+      if (!similarEvents || similarEvents.length === 0) {
+        return JSON.stringify({ base_dati: 0, messaggio: "Nessun evento simile trovato per costruire il benchmark." });
+      }
+
+      // 2. For each similar event, compute economics per category
+      const CATEGORIES = ["hotel", "ristorante", "catering", "audio_video", "allestimenti", "staff_interno", "staff_esterno", "transfer", "varie", "grafica_stampa", "experience"] as const;
+      const CAT_TABLES: Record<string, string> = {
+        hotel: "event_hotel_details",
+        ristorante: "event_restaurant_details",
+        catering: "event_catering_details",
+        audio_video: "event_audio_video_details",
+        allestimenti: "event_allestimenti_details",
+        staff_interno: "event_staff_interno_details",
+        staff_esterno: "event_staff_esterno_details",
+        transfer: "event_supplier_services",
+        varie: "event_varie_details",
+        grafica_stampa: "event_grafica_stampa_details",
+        experience: "event_experience_details",
+      };
+
+      const eventIds = similarEvents.map(e => e.id);
+      const statusMap: Record<string, string> = {};
+      const paxMap: Record<string, number> = {};
+      for (const ev of similarEvents) {
+        statusMap[ev.id] = ev.status;
+        paxMap[ev.id] = ev.attendees || pax;
+      }
+
+      // Fetch all category data in parallel
+      const catFetches = await Promise.all(
+        CATEGORIES.map(cat =>
+          supabase.from(CAT_TABLES[cat]).select("event_id, venduto_totale, venduto_unitario, venduto_per_persona, costo_totale, costo_unitario, costo_per_persona, costo_totale_reale, quantita, pax, pax_confermati, pax_previsti, budget_totale, budget_per_persona, rooms_client_count, room_rate_client, rooms_simmetria_count, room_cost_simmetria, tipo, payment_mode, costo_giornaliero, commissione_pct, commissione_importo").in("event_id", eventIds)
+        )
+      );
+
+      // 3. Build benchmark per category
+      interface CatBenchmark {
+        costo_per_persona: number;
+        venduto_per_persona: number;
+        margine_pct: number;
+        eventi_contribuenti: number;
+      }
+      const benchmark: Record<string, CatBenchmark> = {};
+
+      for (let ci = 0; ci < CATEGORIES.length; ci++) {
+        const cat = CATEGORIES[ci];
+        const rows = (catFetches[ci].data ?? []) as RawRow[];
+        if (rows.length === 0) continue;
+
+        // Group by event
+        const byEvent: Record<string, { venduto: number; costo: number }> = {};
+        for (const row of rows) {
+          const eid = row.event_id as string;
+          if (!eid || !eventIds.includes(eid)) continue;
+          const econ = calcRowEconomics(row, cat);
+          if (!econ.venduto && !econ.costo) continue;
+          if (!byEvent[eid]) byEvent[eid] = { venduto: 0, costo: 0 };
+          byEvent[eid].venduto += econ.venduto;
+          byEvent[eid].costo += econ.costo;
+        }
+
+        const eventEntries = Object.entries(byEvent);
+        if (eventEntries.length === 0) continue;
+
+        // Weighted average: completato events count double
+        let totalWeight = 0;
+        let weightedCostoPP = 0;
+        let weightedVendutoPP = 0;
+
+        for (const [eid, totals] of eventEntries) {
+          const evPax = paxMap[eid] || pax;
+          const weight = statusMap[eid] === "completato" ? 2 : 1;
+          weightedCostoPP += (totals.costo / evPax) * weight;
+          weightedVendutoPP += (totals.venduto / evPax) * weight;
+          totalWeight += weight;
+        }
+
+        const avgCostoPP = weightedCostoPP / totalWeight;
+        const avgVendutoPP = weightedVendutoPP / totalWeight;
+        const marginePct = avgVendutoPP > 0 ? ((avgVendutoPP - avgCostoPP) / avgVendutoPP) * 100 : 0;
+
+        benchmark[cat] = {
+          costo_per_persona: Math.round(avgCostoPP * 100) / 100,
+          venduto_per_persona: Math.round(avgVendutoPP * 100) / 100,
+          margine_pct: Math.round(marginePct * 10) / 10,
+          eventi_contribuenti: eventEntries.length,
+        };
+      }
+
+      // 4. Suggested suppliers by city
+      const supplierCategories = Object.keys(benchmark);
+      // Always include hotel/ristorante/catering if not already there
+      for (const must of ["hotel", "ristorante", "catering"]) {
+        if (!supplierCategories.includes(must)) supplierCategories.push(must);
+      }
+
+      interface SuggestedSupplier {
+        id: string;
+        nome: string;
+        categoria: string;
+        citta: string;
+        rating: number;
+        nota_geo?: string;
+      }
+      const fornitori_suggeriti: SuggestedSupplier[] = [];
+
+      for (const cat of supplierCategories) {
+        // Map internal category names to supplier category values
+        const catSearch = cat.replace(/_/g, " ");
+
+        // Try city first
+        let { data: citySupp } = await supabase
+          .from("suppliers")
+          .select("id, name, category, city, rating, province, region")
+          .or(`city.ilike.%${citta}%,province.ilike.%${citta}%`)
+          .ilike("category", `%${catSearch}%`)
+          .order("rating", { ascending: false })
+          .limit(3);
+
+        if (citySupp && citySupp.length > 0) {
+          for (const s of citySupp) {
+            fornitori_suggeriti.push({
+              id: s.id,
+              nome: s.name,
+              categoria: s.category,
+              citta: s.city || s.province || "",
+              rating: s.rating || 0,
+            });
+          }
+        } else {
+          // Widen to region
+          const { data: regionSupp } = await supabase
+            .from("suppliers")
+            .select("id, name, category, city, rating, region")
+            .ilike("category", `%${catSearch}%`)
+            .not("city", "is", null)
+            .order("rating", { ascending: false })
+            .limit(3);
+
+          if (regionSupp && regionSupp.length > 0) {
+            for (const s of regionSupp) {
+              fornitori_suggeriti.push({
+                id: s.id,
+                nome: s.name,
+                categoria: s.category,
+                citta: s.city || "",
+                rating: s.rating || 0,
+                nota_geo: `Non trovato a ${citta}, suggerito dalla stessa regione`,
+              });
+            }
+          }
+        }
+      }
+
+      // 5. Build projected budget for the requested pax
+      const proiezione_budget: Record<string, { costo_stimato: number; venduto_stimato: number }> = {};
+      let totCostoStimato = 0;
+      let totVendutoStimato = 0;
+
+      for (const [cat, bm] of Object.entries(benchmark)) {
+        const costoStimato = Math.round(bm.costo_per_persona * pax * giorni);
+        const vendutoStimato = Math.round(bm.venduto_per_persona * pax * giorni);
+        proiezione_budget[cat] = { costo_stimato: costoStimato, venduto_stimato: vendutoStimato };
+        totCostoStimato += costoStimato;
+        totVendutoStimato += vendutoStimato;
+      }
+
+      const margineStimato = totVendutoStimato - totCostoStimato;
+      const marginePctStimato = totVendutoStimato > 0 ? (margineStimato / totVendutoStimato) * 100 : 0;
+
+      const result = {
+        base_dati: similarEvents.length,
+        parametri: { citta, pax, giorni, tipo: tipo || null, budget_target: budgetTarget || null },
+        benchmark_per_categoria: benchmark,
+        proiezione: {
+          per_categoria: proiezione_budget,
+          totale_costo_stimato: totCostoStimato,
+          totale_venduto_stimato: totVendutoStimato,
+          margine_stimato: margineStimato,
+          margine_pct_stimato: Math.round(marginePctStimato * 10) / 10,
+          ...(budgetTarget ? { budget_target: budgetTarget, delta_vs_target: budgetTarget - totCostoStimato } : {}),
+        },
+        fornitori_suggeriti,
+      };
+
+      return JSON.stringify(result);
     }
 
     default:
