@@ -7,13 +7,9 @@ import {
   ArrowLeft,
   Phone,
   Mail,
-  MapPin,
   Star,
   Building2,
   Pencil,
-  Upload,
-  Calendar,
-  ChevronRight,
   Sparkles,
 } from 'lucide-react'
 import type { Client } from '@/data/clients'
@@ -34,12 +30,12 @@ interface CompanyGroup {
   logoUrl?: string
 }
 
-const FILTERS: { id: FilterStato; label: string; color: string }[] = [
-  { id: 'Tutti', label: 'Tutti', color: 'var(--text)' },
-  { id: 'attivo', label: 'Attivo', color: 'var(--green)' },
-  { id: 'vip', label: 'VIP', color: 'var(--yellow)' },
-  { id: 'prospect', label: 'Prospect', color: 'var(--blue)' },
-  { id: 'perso', label: 'Perso', color: 'var(--muted)' },
+const FILTERS: { id: FilterStato; label: string }[] = [
+  { id: 'Tutti', label: 'TUTTI' },
+  { id: 'attivo', label: 'ATTIVI' },
+  { id: 'vip', label: 'VIP' },
+  { id: 'prospect', label: 'PROSPECT' },
+  { id: 'perso', label: 'PERSI' },
 ]
 
 function statoColor(stato: Client['stato']) {
@@ -51,12 +47,21 @@ function statoColor(stato: Client['stato']) {
   }
 }
 
+function statoBg(stato: Client['stato']) {
+  switch (stato) {
+    case 'attivo': return 'color-mix(in srgb, var(--green) 12%, transparent)'
+    case 'vip': return 'color-mix(in srgb, var(--yellow) 14%, transparent)'
+    case 'prospect': return 'color-mix(in srgb, var(--blue) 12%, transparent)'
+    case 'perso': return 'color-mix(in srgb, var(--muted) 12%, transparent)'
+  }
+}
+
 function statoLabel(stato: Client['stato']) {
   switch (stato) {
-    case 'attivo': return 'Attivo'
+    case 'attivo': return 'ATTIVO'
     case 'vip': return 'VIP'
-    case 'prospect': return 'Prospect'
-    case 'perso': return 'Perso'
+    case 'prospect': return 'PROSPECT'
+    case 'perso': return 'PERSO'
   }
 }
 
@@ -96,11 +101,11 @@ function evtStatoColor(stato: string) {
 
 function evtStatoLabel(stato: string) {
   switch (stato) {
-    case 'in_corso': return 'In Corso'
-    case 'pianificazione': return 'Pianificazione'
-    case 'completato': return 'Completato'
-    case 'bozza': return 'Bozza'
-    default: return stato
+    case 'in_corso': return 'IN CORSO'
+    case 'pianificazione': return 'PIANIFICAZIONE'
+    case 'completato': return 'COMPLETATO'
+    case 'bozza': return 'BOZZA'
+    default: return stato.toUpperCase()
   }
 }
 
@@ -110,6 +115,11 @@ function formatEventDate(start: string, end: string): string {
   const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }
   if (start === end) return s.toLocaleDateString('it-IT', opts)
   return `${s.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} - ${e.toLocaleDateString('it-IT', opts)}`
+}
+
+function fmtK(value: number): string {
+  if (value >= 1000) return `${(value / 1000).toFixed(0)}K`
+  return String(value)
 }
 
 interface EditReferenteModalProps {
@@ -143,43 +153,47 @@ function EditReferenteModal({ row, onClose, onSaved }: EditReferenteModalProps) 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+      style={{ background: 'rgba(0,0,0,0.6)' }}
       onClick={onClose}
     >
-      <div className="w-full max-w-md panel p-6 animate-fade-in" onClick={e => e.stopPropagation()}>
+      <div
+        className="w-full max-w-md p-6 animate-fade-in"
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px' }}
+        onClick={e => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Modifica referente</h2>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: 'var(--text)' }}>Modifica referente</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5">
             <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
           </button>
         </div>
         <div className="space-y-4">
           <div>
-            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>Nome referente</label>
+            <label className="block mb-1.5" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>Nome referente</label>
             <input type="text" value={referente} onChange={e => setReferente(e.target.value)}
               className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
               style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>Email</label>
+            <label className="block mb-1.5" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>Email</label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
               className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
               style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>Telefono</label>
+            <label className="block mb-1.5" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>Telefono</label>
             <input type="tel" value={telefono} onChange={e => setTelefono(e.target.value)}
               className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
               style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>Carica / Note</label>
+            <label className="block mb-1.5" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>Carica / Note</label>
             <input type="text" value={note} onChange={e => setNote(e.target.value)}
               className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
               style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--muted)' }}>Status</label>
+            <label className="block mb-1.5" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>Status</label>
             <select value={stato} onChange={e => setStato(e.target.value as Client['stato'])}
               className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
               style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
@@ -193,14 +207,14 @@ function EditReferenteModal({ row, onClose, onSaved }: EditReferenteModalProps) 
         </div>
         <div className="flex justify-end gap-2 mt-6">
           <button onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/5"
-            style={{ color: 'var(--muted)', border: '1px solid var(--line)' }}>
-            Annulla
+            className="px-4 py-2 rounded-lg text-sm hover:bg-white/5"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', border: '1px solid var(--line)' }}>
+            ANNULLA
           </button>
           <button onClick={submit} disabled={saving}
-            className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
-            style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
-            {saving ? 'Salvataggio...' : 'Salva'}
+            className="px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'var(--red2)', color: 'white', fontWeight: 600 }}>
+            {saving ? 'SALVATAGGIO...' : 'SALVA'}
           </button>
         </div>
       </div>
@@ -279,200 +293,160 @@ function CompanyDetail({ group, onBack, onRefresh, onNavigateToEvent }: CompanyD
     onRefresh()
   }
 
+  const settore = group.rows.find(r => r.note)?.note ?? ''
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <button onClick={onBack}
-        className="flex items-center gap-2 text-sm transition-all hover:opacity-80"
-        style={{ color: 'var(--muted)' }}>
-        <ArrowLeft className="w-4 h-4" /> Torna alle aziende
-      </button>
+      {/* Editorial header */}
+      <div style={{ paddingTop: '28px', paddingBottom: '18px', borderBottom: '1.5px solid var(--text)' }}>
+        <button onClick={onBack}
+          className="flex items-center gap-2 mb-4 transition-all hover:opacity-80"
+          style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
+          <ArrowLeft className="w-3.5 h-3.5" /> TORNA ALLE AZIENDE
+        </button>
 
-      {/* Hero */}
-      <div className="panel relative overflow-hidden" style={{ minHeight: '150px' }}>
-        {/* Logo watermark - right side only */}
-        {group.logoUrl ? (
-          <img src={group.logoUrl} alt="" aria-hidden
-            className="absolute right-4 top-[50%] -translate-y-1/2 h-[80%] w-[45%] object-contain object-right pointer-events-none select-none"
-            style={{ opacity: 0.10 }} />
-        ) : (
-          <div className="absolute right-6 top-[50%] -translate-y-1/2 pointer-events-none select-none">
-            <span className="text-8xl font-black" style={{ opacity: 0.06, color: statoColor(group.status) }}>
-              {group.companyName.split(' ').map(w => w[0]).join('').slice(0, 3)}
-            </span>
-          </div>
+        <div className="flex items-center gap-3 mb-2">
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '2px 8px', borderRadius: '4px', background: statoBg(group.status), color: statoColor(group.status) }}>
+            {group.status === 'vip' && <Star className="w-3 h-3 inline mr-1 -mt-0.5" />}
+            {statoLabel(group.status)}
+          </span>
+        </div>
+
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '26px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.2 }}>
+          {group.companyName}
+        </h1>
+
+        {(settore || group.city || group.country) && (
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)', marginTop: '6px' }}>
+            {[settore, group.city, group.country].filter(Boolean).join(' \u00B7 ')}
+          </p>
         )}
 
-        {/* Gradient overlay - protects left text */}
-        <div className="absolute inset-0 pointer-events-none"
-          style={{ background: 'linear-gradient(to right, var(--bg) 45%, transparent 80%)' }} />
-
-        {/* Content */}
-        <div className="relative p-6 flex flex-col justify-between" style={{ minHeight: '150px' }}>
-          <div>
-            <div className="flex flex-wrap items-center gap-2 mb-1.5">
-              <span className="text-xs px-2.5 py-1 rounded-full font-semibold"
-                style={{ background: `${statoColor(group.status)}18`, color: statoColor(group.status), border: `1px solid ${statoColor(group.status)}35` }}>
-                {group.status === 'vip' && <Star className="w-3 h-3 inline mr-1 -mt-0.5" />}
-                {statoLabel(group.status)}
-              </span>
-            </div>
-            <h1 className="text-2xl font-bold max-w-[70%]" style={{ color: 'var(--text)' }}>{group.companyName}</h1>
-            <div className="flex flex-wrap items-center gap-4 mt-2">
-              {(group.city || group.country) && (
-                <span className="text-sm flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
-                  <MapPin className="w-3.5 h-3.5" /> {[group.city, group.country].filter(Boolean).join(', ')}
-                </span>
-              )}
-              <span className="text-sm flex items-center gap-1.5" style={{ color: 'var(--muted)' }}>
-                <Users className="w-3.5 h-3.5" /> {group.rows.length} referent{group.rows.length !== 1 ? 'i' : 'e'}
-              </span>
-            </div>
-          </div>
-
-          {/* Upload logo button */}
-          <div className="mt-3">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80"
-              style={{ border: '1px solid var(--line)', color: 'var(--muted)' }}>
-              {uploading ? (
-                <span>Caricamento...</span>
-              ) : (
-                <><Upload className="w-3 h-3" /> {group.logoUrl ? 'Cambia logo' : 'Carica logo'}</>
-              )}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".png,.jpg,.jpeg,.webp,.svg"
-              className="hidden"
-              onChange={handleLogoUpload}
-            />
-            {uploadError && <p className="text-xs mt-1.5" style={{ color: 'var(--red2)' }}>{uploadError}</p>}
-          </div>
+        <div style={{ display: 'flex', gap: '18px', marginTop: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+            {group.rows.length} referent{group.rows.length !== 1 ? 'i' : 'e'}
+          </span>
+          {clientEvents.length > 0 && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+              {clientEvents.length} event{clientEvents.length !== 1 ? 'i' : 'o'}
+            </span>
+          )}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+            {uploading ? 'CARICAMENTO...' : group.logoUrl ? '[ CAMBIA LOGO ]' : '[ CARICA LOGO ]'}
+          </button>
+          <input ref={fileInputRef} type="file" accept=".png,.jpg,.jpeg,.webp,.svg" className="hidden" onChange={handleLogoUpload} />
         </div>
+        {uploadError && <p className="text-xs mt-1.5" style={{ color: 'var(--red2)' }}>{uploadError}</p>}
       </div>
 
       {/* Referenti section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Referenti</h2>
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
+      <div>
+        <div className="flex items-center gap-3 flex-wrap mb-4">
+          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)' }}>
+            REFERENTI ({filteredRefs.length})
+          </h2>
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
             <input type="text" placeholder="Cerca referente..."
               value={referenteSearch} onChange={e => setReferenteSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm bg-transparent"
-              style={{ border: '1px solid var(--line)', color: 'var(--text)' }} />
+              className="w-full pl-9 pr-4 py-2 rounded-lg text-sm bg-transparent focus:outline-none"
+              style={{ border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }} />
           </div>
         </div>
 
-        {filteredRefs.length === 0 ? (
-          <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
-            <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>Nessun referente trovato</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredRefs.map((row, i) => (
+        <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', overflow: 'hidden' }}>
+          {filteredRefs.length === 0 ? (
+            <div className="p-10 text-center" style={{ color: 'var(--muted)' }}>
+              <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessun referente trovato</p>
+            </div>
+          ) : (
+            filteredRefs.map((row, i) => (
               <div key={row.id}
-                className="panel p-4 flex items-start gap-4 group transition-all animate-fade-in"
-                style={{ animationDelay: `${i * 30}ms`, border: '1px solid var(--line)' }}>
-                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
-                  style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>
+                className="flex items-center gap-3 group transition-colors"
+                style={{ padding: '12px 16px', borderBottom: i < filteredRefs.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                <div className="flex-shrink-0 flex items-center justify-center"
+                  style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--panel2)', fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 600, color: 'var(--muted)' }}>
                   {row.referente ? row.referente.split(' ').map(w => w.charAt(0)).slice(0, 2).join('') : '?'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                    {row.referente || 'Senza nome'}
-                  </span>
-                  {row.note && (
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{row.note}</p>
-                  )}
-                  <div className="flex items-center gap-4 mt-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
+                      {row.referente || 'Senza nome'}
+                    </span>
+                    {row === group.rows[0] && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', opacity: 0.7 }}>PRINCIPALE</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 mt-0.5 flex-wrap">
                     {row.email && (
-                      <span className="text-xs flex items-center gap-1" style={{ color: 'var(--blue)' }}>
-                        <Mail className="w-3 h-3" /> {row.email}
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
+                        <Mail className="w-3 h-3 inline mr-1 -mt-0.5" />{row.email}
                       </span>
                     )}
                     {row.telefono && (
-                      <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-                        <Phone className="w-3 h-3" /> {row.telefono}
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
+                        <Phone className="w-3 h-3 inline mr-1 -mt-0.5" />{row.telefono}
                       </span>
                     )}
+                    {row.note && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', opacity: 0.7 }}>{row.note}</span>
+                    )}
                   </div>
-                  {row.stato && (
-                    <span className="inline-block text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded mt-2 font-medium"
-                      style={{ background: `${statoColor(row.stato)}15`, color: statoColor(row.stato) }}>
-                      {statoLabel(row.stato)}
-                    </span>
-                  )}
                 </div>
                 <button
                   onClick={() => setEditTarget(row)}
-                  className="p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10 flex-shrink-0"
+                  className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10 flex-shrink-0"
                   title="Modifica referente">
-                  <Pencil className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+                  <Pencil className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
                 </button>
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </div>
 
-      {/* Events section */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>
-          Eventi{!eventsLoading && clientEvents.length > 0 && ` (${clientEvents.length})`}
+      {/* Events section — cue-sheet style */}
+      <div>
+        <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '12px' }}>
+          EVENTI COLLEGATI{!eventsLoading && clientEvents.length > 0 ? ` (${clientEvents.length})` : ''}
         </h2>
 
         {eventsLoading ? (
-          <div className="panel p-6 text-center">
-            <div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento eventi...</div>
+          <div className="p-6 text-center">
+            <div className="animate-pulse" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>Caricamento eventi...</div>
           </div>
         ) : clientEvents.length === 0 ? (
-          <div className="panel p-10 text-center" style={{ border: '1px dashed var(--line)' }}>
-            <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-20" style={{ color: 'var(--muted)' }} />
-            <p className="text-sm font-medium" style={{ color: 'var(--muted)' }}>
+          <div className="p-10 text-center" style={{ background: 'var(--panel-solid)', border: '1px dashed var(--line)', borderRadius: '14px' }}>
+            <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-20" style={{ color: 'var(--muted)' }} />
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
               Nessun evento per questa azienda
-            </p>
-            <p className="text-xs mt-1" style={{ color: 'var(--muted)', opacity: 0.7 }}>
-              Gli eventi associati appariranno qui automaticamente
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', overflow: 'hidden' }}>
             {clientEvents.map((evt, i) => (
               <div
                 key={evt.id}
-                className="panel p-4 flex items-center gap-4 group cursor-pointer transition-all hover:translate-x-0.5 animate-fade-in"
-                style={{ animationDelay: `${i * 40}ms`, border: '1px solid var(--line)' }}
+                className="flex items-center gap-4 cursor-pointer group transition-colors"
+                style={{ padding: '12px 16px', borderBottom: i < clientEvents.length - 1 ? '1px solid var(--line)' : 'none' }}
                 onClick={() => onNavigateToEvent?.(evt.id)}
               >
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: `${evtStatoColor(evt.stato)}12` }}>
-                  <Calendar className="w-4.5 h-4.5" style={{ color: evtStatoColor(evt.stato) }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-semibold truncate block" style={{ color: 'var(--text)' }}>
-                    {evt.nome}
-                  </span>
-                  <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                      {formatEventDate(evt.dataInizio, evt.dataFine)}
-                    </span>
-                    {evt.location && (
-                      <span className="text-xs flex items-center gap-1" style={{ color: 'var(--muted)' }}>
-                        <MapPin className="w-3 h-3" /> {evt.location}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-full font-semibold flex-shrink-0"
-                  style={{ background: `${evtStatoColor(evt.stato)}15`, color: evtStatoColor(evt.stato), border: `1px solid ${evtStatoColor(evt.stato)}30` }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', minWidth: '90px', flexShrink: 0 }}>
+                  {formatEventDate(evt.dataInizio, evt.dataFine)}
+                </span>
+                <span className="flex-1 min-w-0 truncate group-hover:opacity-80 transition-opacity"
+                  style={{ fontFamily: 'var(--font-serif)', fontSize: '14px', color: 'var(--text)' }}>
+                  {evt.nome}
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em', color: evtStatoColor(evt.stato), flexShrink: 0 }}>
                   {evtStatoLabel(evt.stato)}
                 </span>
-                <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" style={{ color: 'var(--muted)' }} />
               </div>
             ))}
           </div>
@@ -548,6 +522,12 @@ export default function CRM() {
     })
   }, [groups, filter, search])
 
+  // KPI stats
+  const totalAziende = groups.length
+  const attive = groups.filter(g => g.status === 'attivo').length
+  const vip = groups.filter(g => g.status === 'vip').length
+  const prospect = groups.filter(g => g.status === 'prospect').length
+
   if (selectedGroup) {
     return (
       <CompanyDetail
@@ -560,112 +540,116 @@ export default function CRM() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
+    <div>
+      {/* Wire masthead */}
+      <div className="wire-masthead">
         <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>CRM</h1>
-          <p className="mt-1" style={{ color: 'var(--muted)' }}>
-            {filtered.length} aziend{filtered.length !== 1 ? 'e' : 'a'}
-          </p>
+          <span className="wire-masthead-title">CRM</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>
+            {totalAziende} AZIENDE
+          </span>
         </div>
       </div>
 
-      {/* Search + Filters */}
-      <div className="flex flex-wrap gap-3">
-        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl flex-1 min-w-[200px]"
-          style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-          <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
-          <input type="text" placeholder="Cerca azienda, referente, email, carica..."
-            value={search} onChange={e => setSearch(e.target.value)}
-            className="flex-1 bg-transparent text-sm focus:outline-none"
-            style={{ color: 'var(--text)' }} />
-          {search && (
-            <button onClick={() => setSearch('')}>
-              <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-            </button>
-          )}
-        </div>
-        <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+      {/* Wire ticker — KPIs */}
+      <div className="wire-ticker">
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+          <strong>{totalAziende}</strong> totali
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--green)' }}>
+          <strong>{attive}</strong> attive
+        </span>
+        {vip > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--yellow)' }}>
+            <Star className="w-3 h-3 inline -mt-0.5 mr-0.5" /><strong>{vip}</strong> VIP
+          </span>
+        )}
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--blue)' }}>
+          <strong>{prospect}</strong> prospect
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+          <strong>{fmtK(groups.reduce((s, g) => s + g.rows.length, 0))}</strong> referenti
+        </span>
+      </div>
+
+      {/* Wire tabs (filters) + search */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 0', borderBottom: '1px solid var(--line)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '20px' }}>
           {FILTERS.map(f => (
             <button key={f.id} onClick={() => setFilter(f.id)}
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
-              style={{
-                background: filter === f.id ? (f.id === 'Tutti' ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)' : `${f.color}18`) : 'transparent',
-                color: filter === f.id ? (f.id === 'Tutti' ? 'white' : f.color) : 'var(--muted)',
-                border: filter === f.id && f.id !== 'Tutti' ? `1px solid ${f.color}35` : '1px solid transparent',
-              }}>
+              className={`wire-tab ${filter === f.id ? 'wire-tab--active' : ''}`}>
               {f.label}
             </button>
           ))}
         </div>
+        <div className="flex-1" />
+        <div className="relative" style={{ minWidth: '180px' }}>
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+          <input type="text" placeholder="Cerca..."
+            value={search} onChange={e => setSearch(e.target.value)}
+            className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-transparent focus:outline-none"
+            style={{ border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }} />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2">
+              <X className="w-3 h-3" style={{ color: 'var(--muted)' }} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Company cards grid */}
-      {filtered.length === 0 ? (
-        <div className="panel p-12 text-center" style={{ color: 'var(--muted)' }}>
-          <Building2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>Nessuna azienda trovata</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((group, i) => (
-            <div
-              key={group.companyName}
-              className="panel hover-card cursor-pointer animate-fade-in relative overflow-hidden"
-              style={{ animationDelay: `${i * 40}ms`, minHeight: '130px' }}
-              onClick={() => setSelectedName(group.companyName)}
-            >
-              {/* Logo - right side, full height */}
-              {group.logoUrl ? (
-                <img
-                  src={group.logoUrl}
-                  alt=""
-                  aria-hidden
-                  className="absolute right-3 top-[50%] -translate-y-1/2 h-[80%] w-[45%] object-contain object-right pointer-events-none select-none"
-                  style={{ opacity: 0.12 }}
-                />
-              ) : (
-                <div className="absolute right-4 top-[50%] -translate-y-1/2 pointer-events-none select-none"
-                  style={{ opacity: 0.06 }}>
-                  <span className="text-7xl font-black" style={{ color: statoColor(group.status) }}>
-                    {(group.companyName || '?').charAt(0).toUpperCase()}
+      <div style={{ marginTop: '20px' }}>
+        {filtered.length === 0 ? (
+          <div className="p-12 text-center" style={{ color: 'var(--muted)' }}>
+            <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessuna azienda trovata</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+            {filtered.map((group) => (
+              <div
+                key={group.companyName}
+                className="cursor-pointer animate-fade-in"
+                style={{
+                  background: 'var(--panel-solid)',
+                  border: '1px solid var(--line)',
+                  borderRadius: '14px',
+                  padding: '16px 18px',
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                }}
+                onClick={() => setSelectedName(group.companyName)}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-sm)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
+              >
+                {/* Status badge */}
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '2px 7px', borderRadius: '4px', background: statoBg(group.status), color: statoColor(group.status) }}>
+                  {group.status === 'vip' && <Star className="w-2.5 h-2.5 inline mr-0.5 -mt-0.5" />}
+                  {statoLabel(group.status)}
+                </span>
+
+                {/* Company name */}
+                <h3 className="truncate" style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginTop: '8px', lineHeight: 1.3 }}>
+                  {group.companyName}
+                </h3>
+
+                {/* Settore + city */}
+                {(group.city || group.country) && (
+                  <p className="truncate" style={{ fontSize: '11.5px', color: 'var(--muted)', marginTop: '3px' }}>
+                    {[group.city, group.country].filter(Boolean).join(', ')}
+                  </p>
+                )}
+
+                {/* Data row */}
+                <div style={{ display: 'flex', gap: '12px', marginTop: '12px', alignItems: 'center' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
+                    {group.rows.length} ref.
                   </span>
                 </div>
-              )}
-
-              {/* Gradient overlay - protects left text from logo bleed */}
-              <div className="absolute inset-0 pointer-events-none"
-                style={{ background: 'linear-gradient(to right, var(--bg) 40%, transparent 75%)' }} />
-
-              {/* Content - left aligned */}
-              <div className="relative p-5 flex flex-col justify-between h-full" style={{ minHeight: '130px' }}>
-                <div>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                      style={{ background: `${statoColor(group.status)}15`, color: statoColor(group.status), border: `1px solid ${statoColor(group.status)}30` }}>
-                      {group.status === 'vip' && <Star className="w-3 h-3 inline mr-0.5 -mt-0.5" />}
-                      {statoLabel(group.status)}
-                    </span>
-                  </div>
-                  <h3 className="text-base font-semibold truncate max-w-[70%]" style={{ color: 'var(--text)' }}>
-                    {group.companyName}
-                  </h3>
-                  {group.city && (
-                    <p className="text-xs flex items-center gap-1 mt-0.5 max-w-[65%]" style={{ color: 'var(--muted)' }}>
-                      <MapPin className="w-3 h-3 flex-shrink-0" /> {[group.city, group.country].filter(Boolean).join(', ')}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 text-xs mt-3" style={{ color: 'var(--muted)' }}>
-                  <Users className="w-3.5 h-3.5" />
-                  {group.rows.length} referent{group.rows.length !== 1 ? 'i' : 'e'}
-                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
