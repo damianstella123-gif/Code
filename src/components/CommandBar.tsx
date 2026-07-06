@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, X, Calendar, Users, Briefcase, CheckSquare, PawPrint } from 'lucide-react'
+import { Send, X, Calendar, Users, Briefcase, CheckSquare, PawPrint, Check, XCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
@@ -26,10 +26,17 @@ interface FlyEntity {
   [key: string]: unknown
 }
 
+interface FlyProposal {
+  action: string
+  params: Record<string, unknown>
+}
+
 interface FlyMessage {
   role: 'user' | 'assistant'
   content: string
   entities?: FlyEntity[]
+  proposal?: FlyProposal | null
+  proposalStatus?: 'pending' | 'confirmed' | 'rejected' | 'executing' | 'done' | 'failed'
 }
 
 // ─── Entity Card ──────────────────────────────────────────────────────────────
@@ -254,7 +261,14 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
 
       const reply = data?.reply || '(nessuna risposta)'
       const entities: FlyEntity[] = Array.isArray(data?.entities) ? data.entities : []
-      setFlyHistory([...newHistory, { role: 'assistant', content: reply, entities }])
+      const proposal: FlyProposal | null = data?.proposal || null
+      setFlyHistory([...newHistory, {
+        role: 'assistant',
+        content: reply,
+        entities,
+        proposal,
+        proposalStatus: proposal ? 'pending' : undefined,
+      }])
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Errore imprevisto'
       setFlyError(msg)
@@ -262,6 +276,45 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
       setFlyLoading(false)
     }
   }, [flyHistory, flyLoading])
+
+  const confirmProposal = useCallback(async (msgIndex: number) => {
+    const msg = flyHistory[msgIndex]
+    if (!msg?.proposal || msg.proposalStatus !== 'pending') return
+
+    const updated = [...flyHistory]
+    updated[msgIndex] = { ...msg, proposalStatus: 'executing' }
+    setFlyHistory(updated)
+
+    try {
+      const { data, error } = await supabase.functions.invoke('fly-gateway', {
+        body: { action: 'execute', proposal: msg.proposal },
+      })
+
+      if (error) throw new Error(error.message)
+      if (!data?.success) throw new Error(data?.message || 'Errore esecuzione')
+
+      const final = [...updated]
+      final[msgIndex] = { ...msg, proposalStatus: 'done' }
+      final.push({ role: 'assistant', content: `Fatto. ${data.message}` })
+      setFlyHistory(final)
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Errore'
+      const final = [...updated]
+      final[msgIndex] = { ...msg, proposalStatus: 'failed' }
+      final.push({ role: 'assistant', content: `Errore: ${errMsg}` })
+      setFlyHistory(final)
+    }
+  }, [flyHistory])
+
+  const rejectProposal = useCallback((msgIndex: number) => {
+    const msg = flyHistory[msgIndex]
+    if (!msg?.proposal || msg.proposalStatus !== 'pending') return
+
+    const updated = [...flyHistory]
+    updated[msgIndex] = { ...msg, proposalStatus: 'rejected' }
+    updated.push({ role: 'assistant', content: 'Ok, azione annullata.' })
+    setFlyHistory(updated)
+  }, [flyHistory])
 
   const openFlyWithQuery = useCallback((text: string) => {
     setFlyOpen(true)
@@ -498,6 +551,68 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
                         {msg.entities.slice(0, 5).map((ent, ei) => (
                           <EntityCard key={ei} entity={ent} navigate={navigate} />
                         ))}
+                      </div>
+                    )}
+                    {msg.proposal && msg.proposalStatus === 'pending' && (
+                      <div style={{
+                        display: 'flex', gap: 8, marginTop: 10,
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        background: 'rgba(208,0,58,0.04)',
+                        border: '1px solid rgba(208,0,58,0.15)',
+                      }}>
+                        <button
+                          onClick={() => confirmProposal(i)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 4,
+                            padding: '5px 12px', borderRadius: 6,
+                            background: 'var(--green)', color: '#fff',
+                            border: 'none', cursor: 'pointer',
+                            fontFamily: 'var(--font-mono)', fontSize: '10px',
+                            fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em',
+                          }}
+                        >
+                          <Check style={{ width: 12, height: 12 }} />
+                          Conferma
+                        </button>
+                        <button
+                          onClick={() => rejectProposal(i)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 4,
+                            padding: '5px 12px', borderRadius: 6,
+                            background: 'transparent', color: 'var(--muted)',
+                            border: '1px solid var(--line)', cursor: 'pointer',
+                            fontFamily: 'var(--font-mono)', fontSize: '10px',
+                            fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em',
+                          }}
+                        >
+                          <XCircle style={{ width: 12, height: 12 }} />
+                          Annulla
+                        </button>
+                      </div>
+                    )}
+                    {msg.proposal && msg.proposalStatus === 'executing' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                        <PawPrint style={{ width: 12, height: 12, color: 'var(--muted)', animation: 'fly-paw-pulse 1.6s ease-in-out infinite' }} />
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>Esecuzione...</span>
+                      </div>
+                    )}
+                    {msg.proposal && msg.proposalStatus === 'done' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                        <Check style={{ width: 12, height: 12, color: 'var(--green)' }} />
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--green)' }}>Eseguita</span>
+                      </div>
+                    )}
+                    {msg.proposal && msg.proposalStatus === 'failed' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                        <XCircle style={{ width: 12, height: 12, color: 'var(--red2)' }} />
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--red2)' }}>Non riuscita</span>
+                      </div>
+                    )}
+                    {msg.proposal && msg.proposalStatus === 'rejected' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                        <XCircle style={{ width: 12, height: 12, color: 'var(--muted)' }} />
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>Annullata</span>
                       </div>
                     )}
                   </div>

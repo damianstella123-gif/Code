@@ -171,6 +171,63 @@ const TOOLS = [
       required: ["citta", "pax"] as string[],
     },
   },
+  {
+    name: "get_team_members",
+    description:
+      "Restituisce l'elenco dei membri del team attivi (profili) con id, nome e reparto. Usa per risolvere nomi parziali ('Giulia') in profile id.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [] as string[],
+    },
+  },
+  {
+    name: "propose_create_task",
+    description:
+      "PROPONE la creazione di un task. NON scrive nulla nel database. Restituisce un oggetto strutturato che l'utente dovra confermare prima dell'esecuzione. Usa quando l'utente chiede di creare un task/attivita.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        titolo: { type: "string", description: "Titolo del task." },
+        assegnatario_nome: { type: "string", description: "Nome della persona a cui assegnare (verra risolto in profile id)." },
+        scadenza: { type: "string", description: "Data di scadenza (formato YYYY-MM-DD)." },
+        evento_nome: { type: "string", description: "Nome dell'evento collegato (verra risolto in event id)." },
+        priorita: { type: "string", description: "alta, media, bassa." },
+        descrizione: { type: "string", description: "Descrizione opzionale." },
+      },
+      required: ["titolo"] as string[],
+    },
+  },
+  {
+    name: "propose_create_memo",
+    description:
+      "PROPONE la creazione di un promemoria nel calendario. NON scrive nulla nel database. Restituisce un oggetto strutturato che l'utente dovra confermare.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        titolo: { type: "string", description: "Titolo del promemoria." },
+        data: { type: "string", description: "Data (formato YYYY-MM-DD)." },
+        ora: { type: "string", description: "Ora opzionale (formato HH:MM)." },
+        alert: { type: "boolean", description: "Se true, invia notifica." },
+        descrizione: { type: "string", description: "Note aggiuntive." },
+      },
+      required: ["titolo", "data"] as string[],
+    },
+  },
+  {
+    name: "propose_update_task_status",
+    description:
+      "PROPONE l'aggiornamento dello stato di un task esistente. NON scrive nulla nel database. Restituisce un oggetto strutturato che l'utente dovra confermare.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        task_id: { type: "string", description: "UUID del task da aggiornare." },
+        riferimento_task: { type: "string", description: "Nome/descrizione del task per conferma visiva." },
+        nuovo_stato: { type: "string", description: "Nuovo stato: da_fare, in_lavorazione, completato." },
+      },
+      required: ["task_id", "nuovo_stato"] as string[],
+    },
+  },
 ];
 
 // ─── TOOL EXECUTION ────────────────────────────────────────────────────
@@ -830,6 +887,65 @@ async function executeTool(
       return JSON.stringify(result);
     }
 
+    case "get_team_members": {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, reparto, stato")
+        .eq("stato", "attivo")
+        .order("last_name");
+
+      if (error) return JSON.stringify({ error: error.message });
+      if (!data || data.length === 0) return "Nessun membro del team trovato.";
+      return JSON.stringify(
+        data.map((p) => ({
+          id: p.id,
+          nome: `${p.first_name || ""} ${p.last_name || ""}`.trim(),
+          reparto: p.reparto,
+        }))
+      );
+    }
+
+    case "propose_create_task": {
+      const proposal = {
+        action: "create_task",
+        params: {
+          titolo: input.titolo,
+          assegnatario_nome: input.assegnatario_nome || null,
+          scadenza: input.scadenza || null,
+          evento_nome: input.evento_nome || null,
+          priorita: input.priorita || "media",
+          descrizione: input.descrizione || null,
+        },
+      };
+      return `__PROPOSAL__${JSON.stringify(proposal)}`;
+    }
+
+    case "propose_create_memo": {
+      const proposal = {
+        action: "create_memo",
+        params: {
+          titolo: input.titolo,
+          data: input.data,
+          ora: input.ora || null,
+          alert: input.alert || false,
+          descrizione: input.descrizione || null,
+        },
+      };
+      return `__PROPOSAL__${JSON.stringify(proposal)}`;
+    }
+
+    case "propose_update_task_status": {
+      const proposal = {
+        action: "update_task_status",
+        params: {
+          task_id: input.task_id,
+          riferimento_task: input.riferimento_task || null,
+          nuovo_stato: input.nuovo_stato,
+        },
+      };
+      return `__PROPOSAL__${JSON.stringify(proposal)}`;
+    }
+
     default:
       return `Tool sconosciuto: ${name}`;
   }
@@ -846,15 +962,21 @@ interface AnthropicMessage {
   content: unknown;
 }
 
+interface FlyProposal {
+  action: string;
+  params: Record<string, unknown>;
+}
+
 async function callAnthropic(
   messages: AnthropicMessage[],
   systemPrompt: string,
   supabase: ReturnType<typeof createClient>
-): Promise<string> {
+): Promise<{ text: string; proposal?: FlyProposal }> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY non configurata");
 
   let currentMessages = [...messages];
+  let capturedProposal: FlyProposal | undefined;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const body = {
@@ -886,7 +1008,7 @@ async function callAnthropic(
       const textBlocks = (result.content || []).filter(
         (b: any) => b.type === "text"
       );
-      return textBlocks.map((b: any) => b.text).join("\n") || "(nessuna risposta)";
+      return { text: textBlocks.map((b: any) => b.text).join("\n") || "(nessuna risposta)", proposal: capturedProposal };
     }
 
     if (result.stop_reason === "tool_use") {
@@ -903,11 +1025,24 @@ async function callAnthropic(
           toolBlock.input || {},
           supabase
         );
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: toolBlock.id,
-          content: toolResult,
-        });
+
+        // Intercept proposals
+        if (toolResult.startsWith("__PROPOSAL__")) {
+          const proposalJson = toolResult.slice("__PROPOSAL__".length);
+          capturedProposal = JSON.parse(proposalJson);
+          // Feed back a confirmation message so the model knows to present the proposal
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: toolBlock.id,
+            content: `Proposta generata. Presenta all'utente un riepilogo dell'azione proposta e chiedi conferma esplicita prima di procedere. Dati proposta: ${proposalJson}`,
+          });
+        } else {
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: toolBlock.id,
+            content: toolResult,
+          });
+        }
       }
 
       currentMessages.push({ role: "user", content: toolResults });
@@ -917,10 +1052,130 @@ async function callAnthropic(
     const textBlocks = (result.content || []).filter(
       (b: any) => b.type === "text"
     );
-    return textBlocks.map((b: any) => b.text).join("\n") || "(nessuna risposta)";
+    return { text: textBlocks.map((b: any) => b.text).join("\n") || "(nessuna risposta)", proposal: capturedProposal };
   }
 
-  return "Ho raggiunto il limite di consultazioni. Prova a riformulare la domanda in modo piu specifico.";
+  return { text: "Ho raggiunto il limite di consultazioni. Prova a riformulare la domanda in modo piu specifico." };
+}
+
+// ─── EXECUTE CONFIRMED PROPOSALS ──────────────────────────────────────
+
+async function executeProposal(
+  proposal: { action: string; params: Record<string, unknown> },
+  supabaseClient: ReturnType<typeof createClient>,
+  userId: string
+): Promise<{ success: boolean; message: string; data?: unknown }> {
+  const { action, params } = proposal;
+
+  try {
+    let result: unknown = null;
+
+    switch (action) {
+      case "create_task": {
+        // Resolve assegnatario name to profile id
+        let assignedTo: string | null = null;
+        if (params.assegnatario_nome) {
+          const { data: profiles } = await supabaseClient
+            .from("profiles")
+            .select("id, first_name, last_name")
+            .eq("stato", "attivo");
+          const nome = (params.assegnatario_nome as string).toLowerCase();
+          const match = (profiles || []).find(
+            (p) => `${p.first_name} ${p.last_name}`.toLowerCase().includes(nome) ||
+                   (p.first_name || "").toLowerCase().includes(nome)
+          );
+          if (match) assignedTo = match.id;
+        }
+
+        // Resolve event name to event id
+        let eventId: string | null = null;
+        if (params.evento_nome) {
+          const { data: evts } = await supabaseClient
+            .from("events")
+            .select("id, title")
+            .ilike("title", `%${params.evento_nome}%`)
+            .limit(1);
+          if (evts && evts.length > 0) eventId = evts[0].id;
+        }
+
+        const { data, error } = await supabaseClient
+          .from("tasks")
+          .insert({
+            title: params.titolo,
+            assigned_to: assignedTo,
+            due_date: params.scadenza || null,
+            event_id: eventId,
+            priority: params.priorita || "media",
+            description: params.descrizione || null,
+            status: "da_fare",
+          })
+          .select("id, title")
+          .maybeSingle();
+
+        if (error) throw new Error(error.message);
+        result = data;
+        break;
+      }
+
+      case "create_memo": {
+        const { data, error } = await supabaseClient
+          .from("calendar_items")
+          .insert({
+            title: params.titolo,
+            start_date: params.data,
+            start_time: params.ora || null,
+            description: params.descrizione || null,
+            type: "memo",
+            user_id: userId,
+          })
+          .select("id, title")
+          .maybeSingle();
+
+        if (error) throw new Error(error.message);
+        result = data;
+        break;
+      }
+
+      case "update_task_status": {
+        const { data, error } = await supabaseClient
+          .from("tasks")
+          .update({ status: params.nuovo_stato })
+          .eq("id", params.task_id as string)
+          .select("id, title, status")
+          .maybeSingle();
+
+        if (error) throw new Error(error.message);
+        result = data;
+        break;
+      }
+
+      default:
+        throw new Error(`Azione sconosciuta: ${action}`);
+    }
+
+    // Log success
+    await supabaseClient.from("fly_actions_log").insert({
+      user_id: userId,
+      action_type: action,
+      payload: params,
+      status: "executed",
+    });
+
+    return { success: true, message: "Azione eseguita.", data: result };
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : "Errore sconosciuto";
+
+    // Log failure
+    await supabaseClient.from("fly_actions_log").insert({
+      user_id: userId,
+      action_type: action,
+      payload: params,
+      status: "failed",
+      error: errMsg,
+    });
+
+    return { success: false, message: errMsg };
+  }
 }
 
 // ─── MAIN HANDLER ──────────────────────────────────────────────────────
@@ -951,7 +1206,15 @@ Deno.serve(async (req: Request) => {
 
     const userClient = getUserClient(token);
 
-    const { message, history } = await req.json();
+    const { message, history, action, proposal: incomingProposal } = await req.json();
+
+    // ─── EXECUTE CONFIRMED PROPOSAL ─────────────────────────────────────
+    if (action === "execute" && incomingProposal) {
+      const result = await executeProposal(incomingProposal, userClient, user.id);
+      return json(result);
+    }
+
+    // ─── NORMAL CHAT FLOW ───────────────────────────────────────────────
     if (!message || typeof message !== "string") {
       return json({ error: "Campo 'message' obbligatorio" }, 400);
     }
@@ -979,6 +1242,9 @@ PRINCIPI COMPORTAMENTALI:
 - Parla come un collega esperto: competente, pragmatico, mai paternalistico. Ogni suggerimento deve poter spiegare il proprio perche in una riga.
 - Se il valore di un'informazione non supera il costo dell'interruzione, ometti l'informazione.
 
+AZIONI (PROPONI → CONFERMA → ESEGUI):
+Quando l'utente chiede di FARE qualcosa (creare task, aggiungere promemoria, aggiornare stati), usa i tool propose_*. Questi NON scrivono nulla nel database. Presenta all'utente un riepilogo chiaro di cio che farai (es. "Creo il task 'X' assegnato a Y con scadenza Z — confermi?"). L'utente deve confermare esplicitamente prima che l'azione venga eseguita dal sistema. Se hai bisogno di risolvere un nome in un profilo, usa get_team_members. Se un nome e ambiguo, chiedi di precisare.
+
 ENTITIES_JSON: quando la tua risposta cita entita specifiche (eventi, fornitori, task, clienti), DEVI chiudere la risposta con una riga separata nel formato esatto:
 ENTITIES_JSON: [{"type":"event","id":"uuid","nome":"...","data":"...","stato":"..."},...]
 I type ammessi sono: event, supplier, task, client. Includi solo entita effettivamente citate nella risposta, max 5. Se non citi entita specifiche, NON aggiungere la riga ENTITIES_JSON.
@@ -997,7 +1263,7 @@ Oggi e ${today}.`;
 
     messages.push({ role: "user", content: message });
 
-    const reply = await callAnthropic(messages, systemPrompt, userClient);
+    const { text: reply, proposal } = await callAnthropic(messages, systemPrompt, userClient);
 
     // Parse ENTITIES_JSON from the reply
     let textReply = reply;
@@ -1012,7 +1278,7 @@ Oggi e ${today}.`;
       }
     }
 
-    return json({ reply: textReply, entities });
+    return json({ reply: textReply, entities, proposal: proposal || null });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Errore interno";
     console.error("fly-gateway error:", err);
