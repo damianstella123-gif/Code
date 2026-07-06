@@ -21,7 +21,7 @@ import {
   Edit3,
   Upload,
 } from 'lucide-react'
-import { loadUser, isPartnerUser } from '@/lib/auth'
+import { loadUser } from '@/lib/auth'
 import { todayISO, addDaysISO } from '@/lib/format'
 import type {
   Entrata,
@@ -338,8 +338,9 @@ type TabId = 'dashboard' | 'entrate' | 'uscite' | 'fatture' | 'invoices' | 'docu
 export default function Amministrazione() {
   const currentUser = loadUser()
 
-  // Permission gate
-  if (!currentUser || (!isPartnerUser(currentUser) && ['Operativo', 'Commerciale', 'Fornitore'].includes(currentUser.ruolo))) {
+  // Permission gate - only Admin, Super Admin, Finance can access fiscal area
+  const FISCAL_ROLES = ['Admin', 'Super Admin', 'Finance']
+  if (!currentUser || !FISCAL_ROLES.includes(currentUser.ruolo || currentUser.role || '')) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>

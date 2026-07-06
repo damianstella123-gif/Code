@@ -73,7 +73,7 @@ export function canAccessSystemSettings(user: AuthUser | null): boolean {
 
 // Legacy compat - used by Amministrazione page
 export function isPartnerUser(user: AuthUser | null): boolean {
-  return isManager(user)
+  return isManager(user) || user?.role === 'Finance'
 }
 
 export type NavItem = {
@@ -105,8 +105,12 @@ const FINANCE_PATHS = ['/amministrazione']
 export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
   if (role === 'Super Admin' || role === 'Admin') return ALL_NAV
 
-  if (role === 'Project Manager') {
+  if (role === 'Finance') {
     return ALL_NAV.filter(item => !ADMIN_ONLY_PATHS.includes(item.href))
+  }
+
+  if (role === 'Project Manager') {
+    return ALL_NAV.filter(item => !ADMIN_ONLY_PATHS.includes(item.href) && !FINANCE_PATHS.includes(item.href))
   }
 
   // User / any other role: basic access (no admin, no finance, no user mgmt)
