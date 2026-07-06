@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, Clock, ShieldCheck, Lock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { calcRowEconomics } from '@/lib/event-economics'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import type { Event } from '@/data/events'
 import jsPDF from 'jspdf'
@@ -190,10 +191,9 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
     // TRANSFER
     for (const s of (svcRes.data ?? []) as Record<string, unknown>[]) {
-      const qty = (s.quantita as number) ?? 1
-      const venduto = (s.venduto_totale as number) ?? ((s.venduto_unitario as number) ? (s.venduto_unitario as number) * qty : 0)
-      const costo = (s.costo_totale as number) ?? ((s.costo_unitario as number) ? (s.costo_unitario as number) * qty : 0)
+      const { venduto, costo } = calcRowEconomics(s, 'transfer')
       if (!venduto && !costo) continue
+      const qty = (s.quantita as number) ?? 1
       pushLine(s, resolveCat(s.supplier_id as string, 'TRANSFER'), 'event_supplier_services', {
         descrizione: (s.titolo as string) || 'Transfer', qty, venduto, costo,
         dateLabel: fmtDate(s.data),
@@ -207,25 +207,22 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const roomType = (h.room_type as string) || ''
       const roomsClient = (h.rooms_client_count as number) || 0
       const roomsSimmetria = (h.rooms_simmetria_count as number) || 0
-      const roomRateClient = (h.room_rate_client as number) || 0
-      const roomCostSimmetria = (h.room_cost_simmetria as number) || 0
 
       const hotelDateLabel = (fmtDate(h.check_in_date) && fmtDate(h.check_out_date))
         ? `${fmtDate(h.check_in_date)} \u2192 ${fmtDate(h.check_out_date)}`
         : fmtDate(h.data)
 
+      const { venduto, costo } = calcRowEconomics(h, 'hotel')
+      if (!venduto && !costo) continue
+
       if (tipo === 'pernottamento' && paymentMode) {
         const totalRoomsQty = roomsClient + roomsSimmetria || 1
-        const venduto = (h.venduto_totale as number) || (roomsClient * roomRateClient)
-        const costo = (h.costo_totale as number) || (roomsSimmetria * roomCostSimmetria)
-
         const descParts: string[] = []
         if (roomType) descParts.push(roomType)
         if (roomsClient > 0) descParts.push(`${roomsClient} cam. cliente`)
         if (roomsSimmetria > 0) descParts.push(`${roomsSimmetria} cam. Simmetria`)
         const descrizione = descParts.length > 0 ? descParts.join(' - ') : (h.titolo as string) || 'Pernottamento'
 
-        if (!venduto && !costo) continue
         pushLine(h, resolveCat(h.supplier_id as string, 'HOTEL'), 'event_hotel_details', {
           descrizione, qty: totalRoomsQty, venduto, costo,
           commissione_pct: (h.commissione_pct as number) ?? null,
@@ -234,9 +231,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         })
       } else {
         const qty = (h.quantita as number) ?? 1
-        const venduto = (h.venduto_totale as number) ?? ((h.venduto_unitario as number) ? (h.venduto_unitario as number) * qty : 0)
-        const costo = (h.costo_totale as number) ?? ((h.costo_unitario as number) ? (h.costo_unitario as number) * qty : 0)
-        if (!venduto && !costo) continue
         pushLine(h, resolveCat(h.supplier_id as string, 'HOTEL'), 'event_hotel_details', {
           descrizione: (h.titolo as string) || (h.tipo as string) || 'Hotel', qty, venduto, costo,
           commissione_pct: (h.commissione_pct as number) ?? null,
@@ -248,8 +242,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     // RISTORANTE
     for (const r of (restRes.data ?? []) as Record<string, unknown>[]) {
       const pax = (r.pax_confermati as number) ?? (r.pax_previsti as number) ?? 1
-      const venduto = (r.budget_totale as number) ?? ((r.budget_per_persona as number) ? (r.budget_per_persona as number) * pax : 0)
-      const costo = (r.costo_totale_reale as number) ?? ((r.costo_per_persona as number) ? (r.costo_per_persona as number) * pax : 0)
+      const { venduto, costo } = calcRowEconomics(r, 'ristorante')
       if (!venduto && !costo) continue
       pushLine(r, resolveCat(r.supplier_id as string, 'RISTORANTE'), 'event_restaurant_details', {
         descrizione: (r.tipologia_servizio as string) || 'Ristorante', qty: pax, venduto, costo,
@@ -260,8 +253,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     // LOCATION / EXPERIENCE
     for (const e of (expRes.data ?? []) as Record<string, unknown>[]) {
       const pax = (e.pax as number) ?? 1
-      const venduto = (e.venduto_totale as number) ?? ((e.venduto_unitario as number) ? (e.venduto_unitario as number) * pax : 0)
-      const costo = (e.costo_totale as number) ?? ((e.costo_unitario as number) ? (e.costo_unitario as number) * pax : 0)
+      const { venduto, costo } = calcRowEconomics(e, 'experience')
       if (!venduto && !costo) continue
       pushLine(e, resolveCat(e.supplier_id as string, 'LOCATION / EXPERIENCE'), 'event_experience_details', {
         descrizione: (e.nome_attivita as string) || 'Experience', qty: pax, venduto, costo,
@@ -272,8 +264,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     // CATERING
     for (const c of (catRes.data ?? []) as Record<string, unknown>[]) {
       const pax = (c.pax as number) ?? 1
-      const venduto = (c.venduto_totale as number) ?? ((c.venduto_per_persona as number) ? (c.venduto_per_persona as number) * pax : 0)
-      const costo = (c.costo_totale as number) ?? ((c.costo_per_persona as number) ? (c.costo_per_persona as number) * pax : 0)
+      const { venduto, costo } = calcRowEconomics(c, 'catering')
       if (!venduto && !costo) continue
       pushLine(c, resolveCat(c.supplier_id as string, 'CATERING'), 'event_catering_details', {
         descrizione: (c.tipologia as string) || 'Catering', qty: pax, venduto, costo,
@@ -284,8 +275,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     // STAFF SIMMETRIA
     for (const si of (staffIntRes.data ?? []) as Record<string, unknown>[]) {
       const qty = (si.quantita as number) ?? 1
-      const venduto = (si.venduto_totale as number) ?? ((si.venduto_unitario as number) ? (si.venduto_unitario as number) * qty : 0)
-      const costo = (si.costo_totale as number) ?? (si.costo_giornaliero as number) ?? ((si.costo_unitario as number) ? (si.costo_unitario as number) * qty : 0)
+      const { venduto, costo } = calcRowEconomics(si, 'staff_interno')
       if (!venduto && !costo) continue
       const nome = [(si.nome as string), (si.cognome as string)].filter(Boolean).join(' ') || (si.risorsa as string)
       pushLine(si, resolveCat(si.supplier_id as string, 'STAFF'), 'event_staff_interno_details', {
@@ -298,8 +288,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     // STAFF ESTERNO
     for (const se of (staffExtRes.data ?? []) as Record<string, unknown>[]) {
       const qty = (se.quantita as number) ?? 1
-      const venduto = (se.venduto_totale as number) ?? ((se.venduto_unitario as number) ? (se.venduto_unitario as number) * qty : 0)
-      const costo = (se.costo_totale as number) ?? ((se.costo_unitario as number) ? (se.costo_unitario as number) * qty : 0)
+      const { venduto, costo } = calcRowEconomics(se, 'staff_esterno')
       if (!venduto && !costo) continue
       const nome = [(se.nome as string), (se.cognome as string)].filter(Boolean).join(' ')
       pushLine(se, resolveCat(se.supplier_id as string, 'STAFF'), 'event_staff_esterno_details', {
@@ -312,8 +301,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     // AUDIO VIDEO
     for (const av of (avRes.data ?? []) as Record<string, unknown>[]) {
       const qty = (av.quantita as number) ?? 1
-      const venduto = (av.venduto_totale as number) ?? ((av.venduto_unitario as number) ? (av.venduto_unitario as number) * qty : 0)
-      const costo = (av.costo_totale as number) ?? ((av.costo_unitario as number) ? (av.costo_unitario as number) * qty : 0)
+      const { venduto, costo } = calcRowEconomics(av, 'audio_video')
       if (!venduto && !costo) continue
       const avDates: string[] = []
       if (av.data_montaggio) avDates.push(`Mont. ${fmtDate(av.data_montaggio)}`)
@@ -329,8 +317,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     // ALLESTIMENTI
     for (const al of (allestRes.data ?? []) as Record<string, unknown>[]) {
       const qty = (al.quantita as number) ?? 1
-      const venduto = (al.venduto_totale as number) ?? ((al.venduto_unitario as number) ? (al.venduto_unitario as number) * qty : 0)
-      const costo = (al.costo_totale as number) ?? ((al.costo_unitario as number) ? (al.costo_unitario as number) * qty : 0)
+      const { venduto, costo } = calcRowEconomics(al, 'allestimenti')
       if (!venduto && !costo) continue
       const alDates: string[] = []
       if (al.data_montaggio) alDates.push(`Mont. ${fmtDate(al.data_montaggio)}`)
@@ -344,8 +331,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     // GRAFICA
     for (const g of (graficaRes.data ?? []) as Record<string, unknown>[]) {
       const qty = (g.quantita as number) ?? 1
-      const venduto = (g.venduto_totale as number) ?? ((g.venduto_unitario as number) ? (g.venduto_unitario as number) * qty : 0)
-      const costo = (g.costo_totale as number) ?? ((g.costo_unitario as number) ? (g.costo_unitario as number) * qty : 0)
+      const { venduto, costo } = calcRowEconomics(g, 'grafica_stampa')
       if (!venduto && !costo) continue
       pushLine(g, resolveCat(g.supplier_id as string, 'GRAFICA'), 'event_grafica_stampa_details', {
         descrizione: (g.tipo_materiale as string) || (g.descrizione as string) || 'Grafica', qty, venduto, costo,
@@ -356,8 +342,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     // VARIE
     for (const v of (varieRes.data ?? []) as Record<string, unknown>[]) {
       const qty = (v.quantita as number) ?? 1
-      const venduto = (v.venduto_totale as number) ?? ((v.venduto_unitario as number) ? (v.venduto_unitario as number) * qty : 0)
-      const costo = (v.costo_totale as number) ?? ((v.costo_unitario as number) ? (v.costo_unitario as number) * qty : 0)
+      const { venduto, costo } = calcRowEconomics(v, 'varie')
       if (!venduto && !costo) continue
       pushLine(v, resolveCat(v.supplier_id as string, 'VARIE'), 'event_varie_details', {
         descrizione: (v.tipologia as string) ? `${v.tipologia} — ${(v.descrizione as string) || 'Voce'}` : (v.descrizione as string) || 'Voce varia', qty, venduto, costo,

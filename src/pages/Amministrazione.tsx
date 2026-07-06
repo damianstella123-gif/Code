@@ -368,6 +368,7 @@ export default function Amministrazione() {
   const [clients, setClients] = useState<{ id: string; nome: string }[]>([])
   const [fatture, setFatture] = useState<Fattura[]>([])
   const [showNuovoMovimento, setShowNuovoMovimento] = useState(false)
+  const [expandedDoppioConteggio, setExpandedDoppioConteggio] = useState<string | null>(null)
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [adminDocs, setAdminDocs] = useState<AdminDocument[]>([])
   const [showInvoiceForm, setShowInvoiceForm] = useState(false)
@@ -513,12 +514,36 @@ export default function Amministrazione() {
 
   const totRicaviEventi = visibleEventEcon.reduce((s, ec) => s + ec.ricavi, 0)
   const totCostiEventi = visibleEventEcon.reduce((s, ec) => s + ec.costo, 0)
+  const marginePrevisto = totRicaviEventi - totCostiEventi
+  const marginePercPrevisto = totRicaviEventi > 0 ? Math.round((marginePrevisto / totRicaviEventi) * 100) : 0
 
-  // Aggregated totals
+  // Quadro complessivo (both worlds side by side, never fused)
+  const margineReale = totEntrateManuali - totUsciteManuali
+  const marginePercReale = totEntrateManuali > 0 ? Math.round((margineReale / totEntrateManuali) * 100) : 0
+
+  // Legacy aggregate for PDF/export (still useful)
   const totEntrate = totEntrateManuali + totRicaviEventi
   const totUscite = totUsciteManuali + totCostiEventi
   const margine = totEntrate - totUscite
   const marginePerc = totEntrate > 0 ? Math.round((margine / totEntrate) * 100) : 0
+
+  // ─── Double-counting detection ───────────────────────────────────────────────
+  const doppioConteggioAlerts = useMemo(() => {
+    const alerts: { eventId: string; eventName: string; manuali: number; servizi: number; tipo: 'uscite' | 'entrate' }[] = []
+    for (const ec of visibleEventEcon) {
+      const usciteManualiEvento = visibleUscite.filter(u => u.eventoId === ec.eventId).reduce((s, u) => s + u.importo, 0)
+      if (usciteManualiEvento > 0 && ec.costo > 0) {
+        const ev = events.find(e => e.id === ec.eventId)
+        alerts.push({ eventId: ec.eventId, eventName: ev?.nome ?? ec.eventId, manuali: usciteManualiEvento, servizi: ec.costo, tipo: 'uscite' })
+      }
+      const entrateManualiEvento = visibleEntrate.filter(e => e.eventoId === ec.eventId).reduce((s, e) => s + e.importo, 0)
+      if (entrateManualiEvento > 0 && ec.venduto > 0) {
+        const ev = events.find(e => e.id === ec.eventId)
+        alerts.push({ eventId: ec.eventId, eventName: ev?.nome ?? ec.eventId, manuali: entrateManualiEvento, servizi: ec.venduto, tipo: 'entrate' })
+      }
+    }
+    return alerts
+  }, [visibleEventEcon, visibleUscite, visibleEntrate, events])
 
   const filteredEvents = useMemo(() =>
     events.filter(e => {
@@ -891,31 +916,195 @@ export default function Amministrazione() {
       {/* ─── TAB: DASHBOARD ────────────────────────────────────────────────────── */}
       {activeTab === 'dashboard' && (
         <div className="space-y-6 animate-fade-in" style={{ paddingTop: 20 }}>
-          {/* KPI grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {[
-              { label: 'Budget Totale Eventi', value: formatEur(budgetEvents), sub: `${filteredEvents.length} eventi`, breakdown: null, color: 'var(--text)', icon: Euro },
-              { label: 'Ricavi Totali', value: formatEur(totEntrate), sub: `${marginePerc}% margine`, breakdown: `eventi: ${formatEur(totRicaviEventi)} · manuali: ${formatEur(totEntrateManuali)}`, color: 'var(--green)', icon: ArrowUpRight },
-              { label: 'Costi Totali', value: formatEur(totUscite), sub: `${visibleUscite.length + visibleEventEcon.reduce((s, e) => s + e.lineCount, 0)} voci`, breakdown: `eventi: ${formatEur(totCostiEventi)} · manuali: ${formatEur(totUsciteManuali)}`, color: 'var(--red2)', icon: ArrowDownRight },
-              { label: 'Margine Stimato', value: formatEur(margine), sub: `${marginePerc}% sui ricavi`, breakdown: null, color: margine >= 0 ? 'var(--green)' : 'var(--red2)', icon: TrendingUp },
-              { label: 'Pagamenti in Sospeso', value: formatEur(totInAttesa), sub: `${visibleEntrate.filter(e => e.stato === 'in_attesa').length} movimenti`, breakdown: null, color: 'var(--yellow)', icon: Clock },
-              { label: 'Fatture da Emettere', value: String(visibleFatture.filter(f => f.stato === 'bozza').length), sub: `Scadute: ${visibleFatture.filter(f => f.stato === 'scaduta').length}`, breakdown: null, color: 'var(--blue)', icon: Receipt },
-            ].map((kpi, i) => {
-              const Icon = kpi.icon
-              return (
-                <div key={i} style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
-                  <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
-                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6 }}>{kpi.label}</p>
-                    <Icon className="w-4 h-4" style={{ color: kpi.color, opacity: 0.7 }} />
-                  </div>
-                  <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: kpi.color, lineHeight: 1.1 }}>{kpi.value}</p>
-                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{kpi.sub}</p>
-                  {kpi.breakdown && (
-                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', marginTop: 4, opacity: 0.6 }}>{kpi.breakdown}</p>
-                  )}
+
+          {/* Double-counting alerts */}
+          {doppioConteggioAlerts.length > 0 && (
+            <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--yellow)', borderRadius: 14, padding: 16 }}>
+              <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
+                <AlertTriangle className="w-4 h-4" style={{ color: 'var(--yellow)' }} />
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--yellow)' }}>
+                  Possibile doppio conteggio rilevato
+                </p>
+              </div>
+              <div className="space-y-2">
+                {doppioConteggioAlerts.map(alert => {
+                  const key = `${alert.eventId}-${alert.tipo}`
+                  const isExpanded = expandedDoppioConteggio === key
+                  return (
+                    <div key={key}>
+                      <button
+                        onClick={() => setExpandedDoppioConteggio(isExpanded ? null : key)}
+                        className="w-full text-left"
+                        style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)', padding: '6px 0' }}
+                      >
+                        <span style={{ color: 'var(--yellow)' }}>{alert.tipo === 'uscite' ? 'Costi' : 'Entrate'}:</span>{' '}
+                        {alert.eventName} &mdash; {formatEur(alert.manuali)} manuali + {formatEur(alert.servizi)} servizi
+                        <ChevronDown className="w-3 h-3 inline-block ml-1" style={{ color: 'var(--muted)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                      </button>
+                      {isExpanded && (
+                        <div className="grid grid-cols-2 gap-3" style={{ padding: '8px 0 4px 12px' }}>
+                          <div>
+                            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>
+                              {alert.tipo === 'uscite' ? 'Uscite manuali' : 'Entrate manuali'}
+                            </p>
+                            {(alert.tipo === 'uscite'
+                              ? visibleUscite.filter(u => u.eventoId === alert.eventId)
+                              : visibleEntrate.filter(e => e.eventoId === alert.eventId)
+                            ).map((mov: any) => (
+                              <div key={mov.id} className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text)', marginBottom: 2 }}>
+                                <span>{mov.note || (alert.tipo === 'uscite' ? mov.categoria : 'Entrata')}</span>
+                                <span>{formatEur(mov.importo)}</span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, color: 'var(--yellow)', borderTop: '1px solid var(--line)', paddingTop: 4, marginTop: 4 }}>
+                              <span>Totale</span><span>{formatEur(alert.manuali)}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>
+                              {alert.tipo === 'uscite' ? 'Costi servizi' : 'Ricavi servizi'}
+                            </p>
+                            <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text)' }}>
+                              <span>Aggregato servizi evento</span>
+                              <span>{formatEur(alert.servizi)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* SECTION: ENTRATE REGISTRATE + USCITE REGISTRATE */}
+          <div>
+            <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12, opacity: 0.7 }}>Movimenti Registrati</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+                <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6 }}>Entrate Registrate</p>
+                  <ArrowUpRight className="w-4 h-4" style={{ color: 'var(--green)', opacity: 0.7 }} />
                 </div>
-              )
-            })}
+                <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: 'var(--green)', lineHeight: 1.1 }}>{formatEur(totEntrateManuali)}</p>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{visibleEntrate.length} movimenti</p>
+              </div>
+              <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+                <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6 }}>Uscite Registrate</p>
+                  <ArrowDownRight className="w-4 h-4" style={{ color: 'var(--red2)', opacity: 0.7 }} />
+                </div>
+                <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: 'var(--red2)', lineHeight: 1.1 }}>{formatEur(totUsciteManuali)}</p>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{visibleUscite.length} voci</p>
+              </div>
+              <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+                <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6 }}>Margine Reale</p>
+                  <TrendingUp className="w-4 h-4" style={{ color: margineReale >= 0 ? 'var(--green)' : 'var(--red2)', opacity: 0.7 }} />
+                </div>
+                <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: margineReale >= 0 ? 'var(--green)' : 'var(--red2)', lineHeight: 1.1 }}>{formatEur(margineReale)}</p>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{marginePercReale}% sui ricavi registrati</p>
+              </div>
+              <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+                <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6 }}>Pagamenti in Sospeso</p>
+                  <Clock className="w-4 h-4" style={{ color: 'var(--yellow)', opacity: 0.7 }} />
+                </div>
+                <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: 'var(--yellow)', lineHeight: 1.1 }}>{formatEur(totInAttesa)}</p>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{visibleEntrate.filter(e => e.stato === 'in_attesa').length} movimenti</p>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION: PREVISTO EVENTI */}
+          <div>
+            <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12, opacity: 0.7 }}>Previsionale Eventi</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+                <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6 }}>Ricavi Previsti</p>
+                  <ArrowUpRight className="w-4 h-4" style={{ color: 'var(--blue)', opacity: 0.7 }} />
+                </div>
+                <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: 'var(--blue)', lineHeight: 1.1 }}>{formatEur(totRicaviEventi)}</p>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{visibleEventEcon.length} eventi · {visibleEventEcon.reduce((s, e) => s + e.lineCount, 0)} righe</p>
+              </div>
+              <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+                <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6 }}>Costi Previsti</p>
+                  <ArrowDownRight className="w-4 h-4" style={{ color: 'var(--blue)', opacity: 0.7 }} />
+                </div>
+                <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: 'var(--blue)', lineHeight: 1.1 }}>{formatEur(totCostiEventi)}</p>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>Da servizi aggregati</p>
+              </div>
+              <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+                <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6 }}>Margine Previsto</p>
+                  <TrendingUp className="w-4 h-4" style={{ color: marginePrevisto >= 0 ? 'var(--green)' : 'var(--red2)', opacity: 0.7 }} />
+                </div>
+                <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: marginePrevisto >= 0 ? 'var(--green)' : 'var(--red2)', lineHeight: 1.1 }}>{formatEur(marginePrevisto)}</p>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{marginePercPrevisto}% sui ricavi previsti</p>
+              </div>
+              <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+                <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6 }}>Budget Eventi</p>
+                  <Euro className="w-4 h-4" style={{ color: 'var(--text)', opacity: 0.7 }} />
+                </div>
+                <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: 'var(--text)', lineHeight: 1.1 }}>{formatEur(budgetEvents)}</p>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{filteredEvents.length} eventi</p>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION: QUADRO COMPLESSIVO */}
+          <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+            <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 16 }}>Quadro Complessivo</h3>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase', color: 'var(--muted)', letterSpacing: '0.04em', marginBottom: 8 }}>Registrato (reale)</p>
+                <div className="space-y-2">
+                  <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                    <span style={{ color: 'var(--muted)' }}>Entrate</span>
+                    <span style={{ color: 'var(--green)' }}>{formatEur(totEntrateManuali)}</span>
+                  </div>
+                  <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                    <span style={{ color: 'var(--muted)' }}>Uscite</span>
+                    <span style={{ color: 'var(--red2)' }}>{formatEur(totUsciteManuali)}</span>
+                  </div>
+                  <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, borderTop: '1px solid var(--line)', paddingTop: 6 }}>
+                    <span style={{ color: 'var(--text)' }}>Margine</span>
+                    <span style={{ color: margineReale >= 0 ? 'var(--green)' : 'var(--red2)' }}>{formatEur(margineReale)}</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase', color: 'var(--muted)', letterSpacing: '0.04em', marginBottom: 8 }}>Previsionale (servizi)</p>
+                <div className="space-y-2">
+                  <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                    <span style={{ color: 'var(--muted)' }}>Ricavi</span>
+                    <span style={{ color: 'var(--blue)' }}>{formatEur(totRicaviEventi)}</span>
+                  </div>
+                  <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                    <span style={{ color: 'var(--muted)' }}>Costi</span>
+                    <span style={{ color: 'var(--blue)' }}>{formatEur(totCostiEventi)}</span>
+                  </div>
+                  <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, borderTop: '1px solid var(--line)', paddingTop: 6 }}>
+                    <span style={{ color: 'var(--text)' }}>Margine</span>
+                    <span style={{ color: marginePrevisto >= 0 ? 'var(--green)' : 'var(--red2)' }}>{formatEur(marginePrevisto)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+              <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                <span style={{ color: 'var(--muted)' }}>Fatture da emettere</span>
+                <span style={{ color: 'var(--blue)' }}>{visibleFatture.filter(f => f.stato === 'bozza').length}</span>
+              </div>
+              <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 4 }}>
+                <span style={{ color: 'var(--muted)' }}>Fatture scadute</span>
+                <span style={{ color: 'var(--red2)' }}>{visibleFatture.filter(f => f.stato === 'scaduta').length}</span>
+              </div>
+            </div>
           </div>
 
           {/* Budget per evento */}
