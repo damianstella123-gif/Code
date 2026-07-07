@@ -306,7 +306,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
 
   return (
     <header className="shell-header sticky top-0 z-30">
-      <div className="flex items-center justify-between h-full px-4 lg:px-6">
+      <div className="shell-header-inner">
         {/* Left side */}
         <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
           <button
