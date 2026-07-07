@@ -580,10 +580,10 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
 
 // ─── Form Modal ─────────────────────────────────────────────────────────────
 
-function SupplierFormModal({ supplier, onSave, onCancel }: {
-  supplier?: Supplier; onSave: (s: Supplier) => void; onCancel: () => void
+export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
+  supplier?: Supplier; onSave: (s: Supplier) => void; onCancel: () => void; initialName?: string
 }) {
-  const [nome, setNome] = useState(supplier?.nome ?? '')
+  const [nome, setNome] = useState(supplier?.nome ?? initialName ?? '')
   const [email, setEmail] = useState(supplier?.email ?? '')
   const [telefono, setTelefono] = useState(supplier?.telefono ?? '')
   const [categoria, setCategoria] = useState(supplier?.categoria ?? '')

@@ -33,7 +33,7 @@ import { useEventServices } from '@/lib/use-event-services'
 import { loadTasksFromStorage, cacheEventsSnapshot, loadWorkflowsFromStorage } from '@/lib/storage'
 import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote } from '@/lib/events-service'
 import { fetchTasksByEvent, upsertTask, changeTaskStatus, deleteTask as deleteTaskRemote } from '@/lib/tasks-service'
-import { fetchSuppliers } from '@/lib/suppliers-service'
+import { fetchSuppliers, upsertSupplier } from '@/lib/suppliers-service'
 import { fetchBudgets } from '@/lib/budgets-service'
 import { fetchCommunications } from '@/lib/communications-service'
 import { fetchClients as fetchClientsService } from '@/lib/clients-service'
@@ -48,6 +48,7 @@ import { daysLeft, fmtShort, fmtLong, fmtFullLong, toISO } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Supplier } from '@/data/suppliers'
+import { SupplierFormModal } from '@/pages/Fornitori'
 import type { Messaggio } from '@/data/comunicazioni'
 import type { Uscita } from '@/data/amministrazione'
 import type { EventoWorkflow } from '@/data/workflow'
@@ -1165,7 +1166,7 @@ const STATO_CONFERMA_CONFIG = {
   contrattualizzato: { label: 'Contrattualizzato', color: 'var(--green)', bg: 'color-mix(in srgb, var(--green) 12%, transparent)', border: 'var(--green)' },
 } as const
 
-function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
+function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; suppliers: Supplier[]; onSuppliersChanged: () => void }) {
   const { links, summaries, loading, reload, updateLinkStatus } = useEventServices(event.id)
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
@@ -1177,6 +1178,8 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
   const [linkCategory, setLinkCategory] = useState<CategoryType | ''>('')
   const [editingContact, setEditingContact] = useState<string | null>(null)
   const [contactForm, setContactForm] = useState({ contatto_operativo: '', telefono_operativo: '', email_operativo: '' })
+  const [showNewSupplier, setShowNewSupplier] = useState(false)
+  const [createdToast, setCreatedToast] = useState<string | null>(null)
 
   const linkedIds = links.map(l => l.supplier_id)
 
@@ -1231,6 +1234,19 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
     await supabase.from('event_suppliers').update(contactForm).eq('id', linkId)
     setEditingContact(null)
     await reload()
+  }
+
+  async function handleNewSupplierSave(s: Supplier) {
+    const result = await upsertSupplier(s)
+    if (!result) return
+    setShowNewSupplier(false)
+    onSuppliersChanged()
+    setPendingLink(result.id)
+    setLinkCategory('')
+    setAdding(false)
+    setSearch('')
+    setCreatedToast(s.nome)
+    setTimeout(() => setCreatedToast(null), 4000)
   }
 
   const linkedSuppliers = suppliers.filter(s => linkedIds.includes(s.id))
@@ -1314,9 +1330,16 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
           </div>
           <div className="max-h-48 overflow-y-auto space-y-1">
             {availableSuppliers.length === 0 ? (
-              <p className="text-xs p-2" style={{ color: 'var(--muted)' }}>
-                {suppliers.length === 0 ? 'Nessun fornitore nel sistema' : 'Nessun fornitore trovato'}
-              </p>
+              <div className="text-center py-3">
+                <p className="text-xs p-2" style={{ color: 'var(--muted)' }}>
+                  {suppliers.length === 0 ? 'Nessun fornitore nel sistema' : 'Nessun fornitore trovato'}
+                </p>
+                <button onClick={() => setShowNewSupplier(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mt-1"
+                  style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)', border: '1px solid var(--red2)' }}>
+                  <Plus className="w-3.5 h-3.5" /> Crea nuovo fornitore
+                </button>
+              </div>
             ) : availableSuppliers.slice(0, 10).map(s => (
               <button key={s.id} onClick={() => beginLink(s.id)}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all hover:bg-[var(--line)]"
@@ -1328,6 +1351,13 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
                 </div>
               </button>
             ))}
+          </div>
+          <div className="pt-2 border-t" style={{ borderColor: 'var(--line)' }}>
+            <button onClick={() => setShowNewSupplier(true)}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+              style={{ color: 'var(--red2)' }}>
+              <Plus className="w-3.5 h-3.5" /> Crea nuovo fornitore
+            </button>
           </div>
         </div>
       )}
@@ -1537,6 +1567,22 @@ function TabFornitori({ event, suppliers }: { event: Event; suppliers: Supplier[
           <p className="text-sm" style={{ color: 'var(--text)' }}>Fornitore rimosso dall'evento</p>
           <button onClick={() => handleUndoUnlink(toast.supplierId)} className="text-sm font-medium px-2 py-1 rounded-lg hover:opacity-80" style={{ color: 'var(--blue)' }}>Annulla</button>
         </div>
+      )}
+
+      {/* Created toast */}
+      {createdToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-sm" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
+          <p className="text-sm" style={{ color: 'var(--text)' }}>Fornitore "{createdToast}" creato e pronto per il collegamento</p>
+        </div>
+      )}
+
+      {/* New supplier modal */}
+      {showNewSupplier && (
+        <SupplierFormModal
+          initialName={search}
+          onSave={handleNewSupplierSave}
+          onCancel={() => setShowNewSupplier(false)}
+        />
       )}
     </div>
   )
@@ -2544,9 +2590,10 @@ interface EventDetailProps {
   comunicazioni: Messaggio[]
   internalUsers: InternalUser[]
   clients: Client[]
+  onSuppliersChanged: () => void
 }
 
-function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni, internalUsers, clients }: EventDetailProps) {
+function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni, internalUsers, clients, onSuppliersChanged }: EventDetailProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [eventTasks, setEventTasks] = useState<Task[]>([])
   const navigateRouter = useNavigate()
@@ -2726,7 +2773,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         )}
         {activeTab === 'task' && <TabTask event={event} suppliers={suppliers} internalUsers={internalUsers} />}
         {activeTab === 'team' && <TabTeam event={event} internalUsers={internalUsers} />}
-        {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} />}
+        {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} onSuppliersChanged={onSuppliersChanged} />}
         {activeTab === 'budget' && <BudgetTabContainer event={event} suppliers={suppliers} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} />}
@@ -2967,6 +3014,7 @@ export default function Eventi() {
           comunicazioni={comunicazioni}
           internalUsers={internalUsers}
           clients={clientsList}
+          onSuppliersChanged={() => fetchSuppliers().then(setSuppliers)}
         />
       </>
     )
