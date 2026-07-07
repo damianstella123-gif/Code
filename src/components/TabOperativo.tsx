@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Plus, Edit3, Trash2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { fmtDate } from '@/lib/format'
 
 
 export type CategoryType = 'hotel' | 'transfer' | 'ristorante' | 'experience' | 'catering' | 'audio_video' | 'allestimenti' | 'staff_interno' | 'staff_esterno' | 'grafica_stampa' | 'varie'
@@ -88,7 +89,7 @@ export function detectSupplierCategory(supplierCategory: string): CategoryType {
   return 'varie'
 }
 
-export function SupplierCategoryPanel({ event, supplierId, category }: { event: { id: string }; supplierId: string; category: CategoryType }) {
+export function SupplierCategoryPanel({ event, supplierId, category }: { event: { id: string; dataInizio?: string }; supplierId: string; category: CategoryType }) {
   const [items, setItems] = useState<Record<string, unknown>[]>([])
   const [extras, setExtras] = useState<Record<string, unknown>[]>([])
   const [loading, setLoading] = useState(true)
@@ -317,7 +318,7 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
   }
 
   function resetExtraForm() {
-    setExtraForm({ descrizione: '', quantita: '1', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', note: '' })
+    setExtraForm({ descrizione: '', quantita: '1', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', note: '', data: event.dataInizio || '', ora_inizio: '', ora_fine: '' })
   }
 
   function startAddExtra() { resetExtraForm(); setEditingExtraId(null); setShowExtraForm(true) }
@@ -349,6 +350,9 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
       costo_unitario: cu ?? 0,
       costo_totale: extraForm.costo_totale ? Number(extraForm.costo_totale) : (cu ? cu * qty : 0),
       note: String(extraForm.note || ''),
+      data: extraForm.data || null,
+      ora_inizio: extraForm.ora_inizio || null,
+      ora_fine: extraForm.ora_fine || null,
     }
     let error: { message: string } | null = null
     if (editingExtraId) {
@@ -839,6 +843,18 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
                   }} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
                 </div>
                 <div>
+                  <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Data</label>
+                  <input type="date" value={String(extraForm.data || '')} onChange={e => setExtraForm(f => ({ ...f, data: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Ora inizio</label>
+                  <input type="time" value={String(extraForm.ora_inizio || '')} onChange={e => setExtraForm(f => ({ ...f, ora_inizio: e.target.value }))} placeholder="09:00" className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Ora fine</label>
+                  <input type="time" value={String(extraForm.ora_fine || '')} onChange={e => setExtraForm(f => ({ ...f, ora_fine: e.target.value }))} placeholder="10:00" className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)' }} />
+                </div>
+                <div>
                   <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Venduto/unit.</label>
                   <input type="number" value={String(extraForm.venduto_unitario || '')} onChange={e => {
                     const vu = Number(e.target.value) || 0
@@ -891,6 +907,8 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--line)', color: 'var(--muted)' }}>Extra</span>
                         <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{(item.descrizione as string) || 'Extra'}</span>
+                        {(item.data as string) && <span className="text-xs" style={{ color: 'var(--muted)' }}>{fmtDate(item.data as string)}</span>}
+                        {(item.ora_inizio as string) && <span className="text-xs" style={{ color: 'var(--muted)' }}>{(item.ora_inizio as string).slice(0, 5)}{(item.ora_fine as string) ? `–${(item.ora_fine as string).slice(0, 5)}` : ''}</span>}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
                         {venduto > 0 && <span>Venduto: {'\u20AC'}{venduto.toLocaleString('it-IT')}</span>}
