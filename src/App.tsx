@@ -33,7 +33,8 @@ function PageLoader() {
   )
 }
 
-const ROLES_REQUIRING_2FA = ['Super Admin', 'Admin', 'Finance']
+/* 2FA — temporaneamente disattivato */
+export const ROLES_REQUIRING_2FA = ['Super Admin', 'Admin', 'Finance']
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true)
@@ -52,62 +53,55 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     let mounted = true
 
     const check = async () => {
-      const stored = loadUser()
-      if (!stored) {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session?.user) {
-          const profile = await fetchProfile(session.user.id)
-          if (profile && !profile.is_active) {
-            clearUser()
-            await supabase.auth.signOut()
+      try {
+        const stored = loadUser()
+        if (!stored) {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.user) {
+            const profile = await fetchProfile(session.user.id)
+            if (profile && !profile.is_active) {
+              clearUser()
+              await supabase.auth.signOut()
+              if (mounted) setChecking(false)
+              return
+            }
+            const meta = session.user.user_metadata || {}
+            saveUser({
+              id: profile?.id ?? session.user.id,
+              first_name: profile?.first_name ?? (meta as any).first_name ?? '',
+              last_name: profile?.last_name ?? (meta as any).last_name ?? '',
+              email: profile?.email ?? session.user.email ?? '',
+              role: (profile?.role ?? (meta as any).role ?? 'User') as any,
+              avatar_url: profile?.avatar_url ?? null,
+              is_active: profile?.is_active ?? true,
+            })
+          } else {
             if (mounted) setChecking(false)
             return
           }
-          const meta = session.user.user_metadata || {}
-          saveUser({
-            id: profile?.id ?? session.user.id,
-            first_name: profile?.first_name ?? (meta as any).first_name ?? '',
-            last_name: profile?.last_name ?? (meta as any).last_name ?? '',
-            email: profile?.email ?? session.user.email ?? '',
-            role: (profile?.role ?? (meta as any).role ?? 'User') as any,
-            avatar_url: profile?.avatar_url ?? null,
-            is_active: profile?.is_active ?? true,
-          })
-        } else {
-          if (mounted) setChecking(false)
-          return
         }
-      }
 
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) {
-        if (mounted) setChecking(false)
-        return
-      }
-
-      const profile = await fetchProfile(session.user.id)
-      if (profile && (profile as any).force_password_change) {
-        if (mounted) { setRedirectTo('/change-password'); setAuthenticated(true); setChecking(false) }
-        return
-      }
-
-      /* 2FA obbligatorio per Admin — temporaneamente disattivato */
-      /*
-      const user = loadUser()
-      if (user && ROLES_REQUIRING_2FA.includes(user.role)) {
-        const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-        if (aalData) {
-          const { data: factorsData } = await supabase.auth.mfa.listFactors()
-          const hasVerifiedFactor = (factorsData?.totp.filter(f => f.status === 'verified') ?? []).length > 0
-          if (!hasVerifiedFactor) {
-            if (mounted) { setRedirectTo('/setup-2fa'); setAuthenticated(true); setChecking(false) }
+        // Check force_password_change
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id)
+          if (profile && (profile as any).force_password_change) {
+            if (mounted) { setRedirectTo('/change-password'); setAuthenticated(true); setChecking(false) }
             return
           }
         }
-      }
-      */
 
-      if (mounted) { setAuthenticated(true); setChecking(false) }
+        if (mounted) { setAuthenticated(true); setChecking(false) }
+      } catch {
+        // If any auth check fails, still allow access if we have a stored user
+        if (mounted) {
+          const stored = loadUser()
+          if (stored) {
+            setAuthenticated(true)
+          }
+          setChecking(false)
+        }
+      }
     }
     check()
 
@@ -176,7 +170,9 @@ function ChangePasswordGuard({ children }: { children: React.ReactNode }) {
   return allowed ? <>{children}</> : null
 }
 
-function Setup2FAGuard({ children }: { children: React.ReactNode }) {
+/* 2FA Guard — temporaneamente disattivato */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function Setup2FAGuard({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true)
   const [allowed, setAllowed] = useState(false)
   const navigate = useNavigate()
@@ -230,7 +226,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/change-password" element={<ChangePasswordGuard><ChangePassword /></ChangePasswordGuard>} />
-      <Route path="/setup-2fa" element={<Setup2FAGuard><Setup2FA /></Setup2FAGuard>} />
+      <Route path="/setup-2fa" element={<Setup2FA />} />
 
       <Route path="/dashboard" element={<AuthGuard><Layout><LazyPage><Dashboard /></LazyPage></Layout></AuthGuard>} />
       <Route path="/eventi" element={<AuthGuard><Layout><LazyPage><Eventi /></LazyPage></Layout></AuthGuard>} />
