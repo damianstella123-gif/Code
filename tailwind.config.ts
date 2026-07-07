@@ -8,9 +8,11 @@ const config: Config = {
   theme: {
     extend: {
       fontSize: {
-        xs: ['13px', { lineHeight: '1.5' }],
-        sm: ['14.5px', { lineHeight: '1.6' }],
-        base: ['16px', { lineHeight: '1.7' }],
+        'xs':   ['13px', { lineHeight: '1.6' }],
+        'sm':   ['15px', { lineHeight: '1.65' }],
+        'base': ['16px', { lineHeight: '1.7' }],
+        'lg':   ['18px', { lineHeight: '1.6' }],
+        'xl':   ['20px', { lineHeight: '1.5' }],
       },
       colors: {
         background: 'hsl(var(--background))',
