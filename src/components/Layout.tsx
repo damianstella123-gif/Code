@@ -24,6 +24,8 @@ import {
   BookOpen,
   Search,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
@@ -59,9 +61,11 @@ const iconMap: Record<string, React.ElementType> = {
 interface SidebarProps {
   open: boolean
   setOpen: (open: boolean) => void
+  pinned: boolean
+  setPinned: (fn: (p: boolean) => boolean) => void
 }
 
-function Sidebar({ open, setOpen }: SidebarProps) {
+function Sidebar({ open, setOpen, pinned, setPinned }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const user = loadUser()
@@ -125,6 +129,17 @@ function Sidebar({ open, setOpen }: SidebarProps) {
             )
           })}
         </nav>
+
+        {/* Pin button — desktop only */}
+        <button
+          onClick={() => setPinned(p => !p)}
+          className="shell-nav-pin hidden lg:flex"
+          title={pinned ? 'Comprimi sidebar' : 'Fissa sidebar'}
+        >
+          <PanelLeftClose className="shell-nav-pin-icon-open" />
+          <PanelLeftOpen className="shell-nav-pin-icon-closed" />
+          <span className="shell-nav-label">{pinned ? 'Comprimi' : 'Fissa'}</span>
+        </button>
 
         {/* User section */}
         <div className="shell-sidebar-user">
@@ -606,6 +621,14 @@ function BottomNav() {
 
 export default function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [pinned, setPinned] = useState(() =>
+    localStorage.getItem('sidebar_pinned') !== 'false'
+  )
+
+  useEffect(() => {
+    document.body.classList.toggle('sidebar-pinned', pinned)
+    localStorage.setItem('sidebar_pinned', String(pinned))
+  }, [pinned])
 
   useEffect(() => {
     let cancelled = false
@@ -627,7 +650,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="shell-light-primary" />
           <div className="shell-light-secondary" />
         </div>
-        <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+        <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} pinned={pinned} setPinned={setPinned} />
         <div className="shell-main lg:pl-[232px]">
           <Topbar setOpen={setSidebarOpen} />
           <main className="shell-content pb-mobile-nav">

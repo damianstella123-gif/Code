@@ -2613,6 +2613,142 @@ textarea::placeholder {
   .fixed.inset-0.z-40 { display: none !important; }
 }
 
+/* ─── DESKTOP (≥1025px): Sidebar pin/unpin ─── */
+
+/* Base transition for shell-main */
+.shell-main {
+  transition: padding-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* PINNED — default desktop behavior */
+@media (min-width: 1025px) {
+  body.sidebar-pinned .shell-sidebar {
+    width: 232px;
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  body.sidebar-pinned .shell-main {
+    padding-left: 232px !important;
+    transition: padding-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* UNPINNED — collapsed on desktop */
+@media (min-width: 1025px) {
+  body:not(.sidebar-pinned) .shell-sidebar {
+    width: 56px;
+    overflow: hidden;
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  body:not(.sidebar-pinned) .shell-sidebar:hover,
+  body:not(.sidebar-pinned) .shell-sidebar:focus-within {
+    width: 232px;
+    overflow: visible;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.12);
+  }
+
+  body:not(.sidebar-pinned) .shell-sidebar .shell-sidebar-logo {
+    padding: 16px 8px 14px;
+    justify-content: center;
+  }
+  body:not(.sidebar-pinned) .shell-sidebar .shell-sidebar-logo img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    transition: width 0.2s ease;
+  }
+  body:not(.sidebar-pinned) .shell-sidebar:hover .shell-sidebar-logo img,
+  body:not(.sidebar-pinned) .shell-sidebar:focus-within .shell-sidebar-logo img {
+    width: 128px;
+    height: auto;
+  }
+
+  body:not(.sidebar-pinned) .shell-sidebar .shell-nav { padding: 8px 6px; }
+
+  body:not(.sidebar-pinned) .shell-sidebar .shell-nav-label {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    transition: opacity 0.15s ease, width 0.15s ease;
+  }
+  body:not(.sidebar-pinned) .shell-sidebar:hover .shell-nav-label,
+  body:not(.sidebar-pinned) .shell-sidebar:focus-within .shell-nav-label {
+    opacity: 1;
+    width: auto;
+  }
+
+  body:not(.sidebar-pinned) .shell-sidebar .shell-nav-item {
+    justify-content: center;
+    padding: 10px;
+  }
+  body:not(.sidebar-pinned) .shell-sidebar:hover .shell-nav-item,
+  body:not(.sidebar-pinned) .shell-sidebar:focus-within .shell-nav-item {
+    justify-content: flex-start;
+    padding: 9px 14px;
+  }
+
+  body:not(.sidebar-pinned) .shell-sidebar .shell-sidebar-user {
+    opacity: 0;
+    height: 0;
+    overflow: hidden;
+    transition: opacity 0.15s ease;
+  }
+  body:not(.sidebar-pinned) .shell-sidebar:hover .shell-sidebar-user,
+  body:not(.sidebar-pinned) .shell-sidebar:focus-within .shell-sidebar-user {
+    opacity: 1;
+    height: auto;
+  }
+
+  body:not(.sidebar-pinned) .shell-main {
+    padding-left: 56px !important;
+    transition: padding-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* PIN BUTTON */
+.shell-nav-pin {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+  margin-top: 8px;
+}
+.shell-nav-pin:hover {
+  background: var(--panel2);
+  color: var(--text);
+}
+.shell-nav-pin-icon-open,
+.shell-nav-pin-icon-closed {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Toggle pin icon visibility based on pinned state */
+body.sidebar-pinned .shell-nav-pin-icon-closed { display: none; }
+body.sidebar-pinned .shell-nav-pin-icon-open { display: block; }
+body:not(.sidebar-pinned) .shell-nav-pin-icon-open { display: none; }
+body:not(.sidebar-pinned) .shell-nav-pin-icon-closed { display: block; }
+
+/* When unpinned, center the pin button */
+@media (min-width: 1025px) {
+  body:not(.sidebar-pinned) .shell-nav-pin {
+    justify-content: center;
+    padding: 10px;
+  }
+  body:not(.sidebar-pinned) .shell-sidebar:hover .shell-nav-pin,
+  body:not(.sidebar-pinned) .shell-sidebar:focus-within .shell-nav-pin {
+    justify-content: flex-start;
+    padding: 9px 14px;
+  }
+}
+
 /* ─── PHONE (≤640px): Responsive masthead ─── */
 @media (max-width: 640px) {
   .wire-masthead {
