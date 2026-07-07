@@ -322,16 +322,26 @@ body {
 
 .shell-content {
   flex: 1;
-  padding: 20px 24px 32px;
+  padding: 24px 32px 40px;
   position: relative;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1400px) {
+  .shell-content {
+    padding: 28px 48px 48px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
 }
 
 @media (max-width: 1024px) {
-  .shell-content { padding: 16px 18px 28px; }
+  .shell-content { padding: 16px 20px 28px; }
 }
 
 @media (max-width: 640px) {
-  .shell-content { padding: 12px 12px 24px; }
+  .shell-content { padding: 12px 14px 24px; }
 }
 
 /* ─── Header user chip ─── */
@@ -1774,8 +1784,7 @@ textarea::placeholder {
    ═══════════════════════════════════════════════════════════════════════ */
 
 .wire-page {
-  max-width: 760px;
-  margin: 0 auto;
+  width: 100%;
   padding: 0 8px 40px;
 }
 
@@ -2530,178 +2539,13 @@ textarea::placeholder {
 }
 
 /* ─── TABLET (769-1024px): Collapsed sidebar ─── */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .shell-sidebar {
-    width: 56px !important;
-    overflow: hidden;
-    transition: width 0.2s ease;
-  }
-
-  .shell-sidebar:hover,
-  .shell-sidebar:focus-within {
-    width: 232px !important;
-    overflow: visible;
-  }
-
-  .shell-sidebar .shell-sidebar-logo {
-    padding: 16px 8px 14px;
-    justify-content: center;
-  }
-
-  .shell-sidebar .shell-sidebar-logo img {
-    width: 28px;
-    height: 28px;
-    object-fit: contain;
-    transition: width 0.2s ease;
-  }
-
-  .shell-sidebar:hover .shell-sidebar-logo img,
-  .shell-sidebar:focus-within .shell-sidebar-logo img {
-    width: 128px;
-    height: auto;
-  }
-
-  .shell-sidebar .shell-nav { padding: 8px 6px; }
-
-  .shell-sidebar .shell-nav-label {
-    opacity: 0;
-    width: 0;
-    overflow: hidden;
-    transition: opacity 0.15s ease, width 0.15s ease;
-  }
-
-  .shell-sidebar:hover .shell-nav-label,
-  .shell-sidebar:focus-within .shell-nav-label {
-    opacity: 1;
-    width: auto;
-  }
-
-  .shell-sidebar .shell-nav-item {
-    justify-content: center;
-    padding: 10px;
-  }
-
-  .shell-sidebar:hover .shell-nav-item,
-  .shell-sidebar:focus-within .shell-nav-item {
-    justify-content: flex-start;
-    padding: 9px 14px;
-  }
-
-  .shell-sidebar .shell-sidebar-user {
-    opacity: 0;
-    height: 0;
-    overflow: hidden;
-    transition: opacity 0.15s ease;
-  }
-
-  .shell-sidebar:hover .shell-sidebar-user,
-  .shell-sidebar:focus-within .shell-sidebar-user {
-    opacity: 1;
-    height: auto;
-  }
-
-  .shell-main { padding-left: 56px !important; }
-  .shell-sidebar:hover ~ .shell-main { padding-left: 56px !important; }
-
-  /* Show sidebar always on tablet (collapsed) */
-  .shell-sidebar { transform: translateX(0) !important; }
-
-  /* Hide hamburger on tablet */
-  .shell-header .lg\:hidden { display: none !important; }
-
-  /* Overlay shouldn't show on tablet since sidebar is always visible */
-  .fixed.inset-0.z-40 { display: none !important; }
-}
+/* Removed — sidebar is now hamburger-only on all devices */
 
 /* ─── DESKTOP (≥1025px): Sidebar pin/unpin ─── */
 
 /* Base transition for shell-main */
 .shell-main {
   transition: padding-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* PINNED — default desktop behavior */
-@media (min-width: 1025px) {
-  body.sidebar-pinned .shell-sidebar {
-    width: 232px;
-    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  body.sidebar-pinned .shell-main {
-    padding-left: 232px !important;
-    transition: padding-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-}
-
-/* UNPINNED — collapsed on desktop */
-@media (min-width: 1025px) {
-  body:not(.sidebar-pinned) .shell-sidebar {
-    width: 56px;
-    overflow: hidden;
-    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  body:not(.sidebar-pinned) .shell-sidebar:hover,
-  body:not(.sidebar-pinned) .shell-sidebar:focus-within {
-    width: 232px;
-    overflow: visible;
-    box-shadow: 4px 0 24px rgba(0,0,0,0.12);
-  }
-
-  body:not(.sidebar-pinned) .shell-sidebar .shell-sidebar-logo {
-    padding: 16px 8px 14px;
-    justify-content: center;
-  }
-  body:not(.sidebar-pinned) .shell-sidebar .shell-sidebar-logo img {
-    width: 28px;
-    height: 28px;
-    object-fit: contain;
-    transition: width 0.2s ease;
-  }
-  body:not(.sidebar-pinned) .shell-sidebar:hover .shell-sidebar-logo img,
-  body:not(.sidebar-pinned) .shell-sidebar:focus-within .shell-sidebar-logo img {
-    width: 128px;
-    height: auto;
-  }
-
-  body:not(.sidebar-pinned) .shell-sidebar .shell-nav { padding: 8px 6px; }
-
-  body:not(.sidebar-pinned) .shell-sidebar .shell-nav-label {
-    opacity: 0;
-    width: 0;
-    overflow: hidden;
-    transition: opacity 0.15s ease, width 0.15s ease;
-  }
-  body:not(.sidebar-pinned) .shell-sidebar:hover .shell-nav-label,
-  body:not(.sidebar-pinned) .shell-sidebar:focus-within .shell-nav-label {
-    opacity: 1;
-    width: auto;
-  }
-
-  body:not(.sidebar-pinned) .shell-sidebar .shell-nav-item {
-    justify-content: center;
-    padding: 10px;
-  }
-  body:not(.sidebar-pinned) .shell-sidebar:hover .shell-nav-item,
-  body:not(.sidebar-pinned) .shell-sidebar:focus-within .shell-nav-item {
-    justify-content: flex-start;
-    padding: 9px 14px;
-  }
-
-  body:not(.sidebar-pinned) .shell-sidebar .shell-sidebar-user {
-    opacity: 0;
-    height: 0;
-    overflow: hidden;
-    transition: opacity 0.15s ease;
-  }
-  body:not(.sidebar-pinned) .shell-sidebar:hover .shell-sidebar-user,
-  body:not(.sidebar-pinned) .shell-sidebar:focus-within .shell-sidebar-user {
-    opacity: 1;
-    height: auto;
-  }
-
-  body:not(.sidebar-pinned) .shell-main {
-    padding-left: 56px !important;
-    transition: padding-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  }
 }
 
 /* PIN BUTTON */
