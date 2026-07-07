@@ -19,7 +19,7 @@ import { fetchTasks, upsertTask, deleteTask as deleteTaskRemote, changeTaskStatu
 import { fetchEvents } from '@/lib/events-service'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { useRealtimeTable } from '@/lib/use-realtime'
-import { daysLeft, toISO } from '@/lib/format'
+import { daysLeft, toISO, fmtLong } from '@/lib/format'
 import type { Task } from '@/data/tasks'
 import type { Profile } from '@/lib/profiles'
 
@@ -711,7 +711,7 @@ function TaskDetailPanel({ task, events, getInitials, getFullName, onClose, onEd
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Calendar className="w-3.5 h-3.5" style={{ color: isOverdue ? 'var(--red2)' : 'var(--muted)' }} />
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600, color: isOverdue ? 'var(--red2)' : 'var(--text)' }}>
-                  {new Date(task.scadenza).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {fmtLong(task.scadenza)}
                 </span>
               </div>
               {isOverdue && <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--red2)', marginTop: '2px' }}>{Math.abs(dl)} giorni in ritardo</p>}
@@ -719,7 +719,7 @@ function TaskDetailPanel({ task, events, getInitials, getFullName, onClose, onEd
             <div>
               <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '6px' }}>CREATO IL</p>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text)' }}>
-                {task.creatoIl ? new Date(task.creatoIl).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }) : '\u2014'}
+                {task.creatoIl ? fmtLong(task.creatoIl) : '\u2014'}
               </span>
             </div>
             <div>

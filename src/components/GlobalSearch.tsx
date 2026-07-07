@@ -24,7 +24,7 @@ import { users } from '@/data/users'
 import { messaggi } from '@/data/comunicazioni'
 import { loadUser } from '@/lib/auth'
 import { loadWorkflowsFromStorage, loadEventsFromStorage, loadTasksFromStorage } from '@/lib/storage'
-import { daysLeft } from '@/lib/format'
+import { daysLeft, fmtDate, fmtLong } from '@/lib/format'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -170,7 +170,7 @@ function getSmartSuggestions(ruolo: string, userId: string): SearchResult[] {
       type: 'task',
       id: t.id,
       title: t.titolo,
-      subtitle: `Scadenza: ${new Date(t.scadenza).toLocaleDateString('it-IT')} · ${dl < 0 ? `${Math.abs(dl)}g scaduto` : `tra ${dl}g`}`,
+      subtitle: `Scadenza: ${fmtDate(t.scadenza)} · ${dl < 0 ? `${Math.abs(dl)}g scaduto` : `tra ${dl}g`}`,
       badge: { label: 'Urgente', color: 'var(--red2)' },
       urgency: dl < 0 ? 'critical' : 'warning',
       route: '/task',
@@ -188,7 +188,7 @@ function getSmartSuggestions(ruolo: string, userId: string): SearchResult[] {
       type: 'evento',
       id: e.id,
       title: e.nome,
-      subtitle: `${e.location} · ${new Date(e.dataInizio).toLocaleDateString('it-IT')}`,
+      subtitle: `${e.location} · ${fmtDate(e.dataInizio)}`,
       badge: { label: 'In Corso', color: 'var(--red2)' },
       urgency: dl <= 7 ? 'warning' : 'ok',
       route: '/eventi',
@@ -241,7 +241,7 @@ function runSearch(query: string, ruolo: string, userId: string): SearchResult[]
       results.push({
         type: 'evento', id: ev.id,
         title: ev.nome,
-        subtitle: `${ev.location} · ${new Date(ev.dataInizio).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+        subtitle: `${ev.location} · ${fmtLong(ev.dataInizio)}`,
         badge: {
           label: ev.stato === 'in_corso' ? 'In Corso' : ev.stato === 'pianificazione' ? 'Pianificazione' : ev.stato === 'completato' ? 'Completato' : 'Bozza',
           color: eventColor(ev.stato),
@@ -262,7 +262,7 @@ function runSearch(query: string, ruolo: string, userId: string): SearchResult[]
       results.push({
         type: 'task', id: t.id,
         title: t.titolo,
-        subtitle: `${assignee?.nome ?? '—'} · ${new Date(t.scadenza).toLocaleDateString('it-IT')}`,
+        subtitle: `${assignee?.nome ?? '—'} · ${fmtDate(t.scadenza)}`,
         badge: {
           label: t.stato === 'completato' ? 'Completato' : t.stato === 'in_corso' ? 'In Corso' : 'Da Fare',
           color: taskColor(t.priorita, t.stato),
@@ -337,7 +337,7 @@ function runSearch(query: string, ruolo: string, userId: string): SearchResult[]
       results.push({
         type: 'comunicazione', id: m.id,
         title: m.oggetto,
-        subtitle: `Da ${sender?.nome ?? '—'} · ${new Date(m.data).toLocaleDateString('it-IT')}`,
+        subtitle: `Da ${sender?.nome ?? '—'} · ${fmtDate(m.data)}`,
         badge: {
           label: m.priorita === 'alta' ? 'Urgente' : m.priorita === 'media' ? 'Normale' : 'Bassa',
           color: m.priorita === 'alta' ? 'var(--red2)' : m.priorita === 'media' ? 'var(--blue)' : 'var(--muted)',

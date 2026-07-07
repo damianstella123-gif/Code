@@ -3,6 +3,7 @@ import {
   Search, Plus, FileText, Trash2, X, Upload,
   Download, Eye,
 } from 'lucide-react'
+import { fmtLong } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 
 interface Document {
@@ -59,7 +60,7 @@ function formatSize(bytes: number) {
 }
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
+  return fmtLong(d)
 }
 
 export default function Archivio() {

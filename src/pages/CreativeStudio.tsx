@@ -15,6 +15,7 @@ import { fetchClients } from '@/lib/clients-service'
 import { fetchAllProfiles, type Profile } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import type { Event } from '@/data/events'
+import { fmtLong } from '@/lib/format'
 
 interface Client { id: string; nome: string }
 
@@ -52,7 +53,7 @@ function typeLabel(t: string) {
 }
 function formatDate(d: string | null) {
   if (!d) return '-'
-  return new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
+  return fmtLong(d)
 }
 
 export default function CreativeStudio() {

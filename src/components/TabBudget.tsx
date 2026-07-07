@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, Clock, ShieldCheck, Lock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { calcRowEconomics } from '@/lib/event-economics'
+import { fmtDate as fmtDateCentral } from '@/lib/format'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import type { Event } from '@/data/events'
 import jsPDF from 'jspdf'
@@ -111,9 +112,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
   function fmtDate(d: unknown): string {
     if (!d || typeof d !== 'string') return ''
-    try {
-      return new Date(d + 'T00:00').toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    } catch { return '' }
+    return fmtDateCentral(d)
   }
 
   const loadData = useCallback(async () => {
@@ -502,7 +501,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     doc.setFontSize(9)
     doc.setTextColor(80)
     if (clientName) doc.text(`Cliente: ${clientName}`, 14, 30)
-    doc.text(`Preventivo al ${new Date().toLocaleDateString('it-IT')}`, 14, clientName ? 36 : 30)
+    doc.text(`Preventivo al ${fmtDateCentral(new Date().toISOString())}`, 14, clientName ? 36 : 30)
 
     let startY = clientName ? 42 : 36
 
@@ -620,7 +619,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     doc.setFontSize(9)
     doc.setTextColor(80)
     if (clientName) doc.text(`Cliente: ${clientName}`, 14, 28)
-    doc.text(`Preventivo al ${new Date().toLocaleDateString('it-IT')}`, 14, clientName ? 34 : 28)
+    doc.text(`Preventivo al ${fmtDateCentral(new Date().toISOString())}`, 14, clientName ? 34 : 28)
 
     let startY = clientName ? 40 : 34
 
@@ -691,7 +690,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     rows.push([])
     rows.push([evName.toUpperCase()])
     if (clientName) rows.push([`Cliente: ${clientName}`])
-    rows.push([`Preventivo al ${new Date().toLocaleDateString('it-IT')}`])
+    rows.push([`Preventivo al ${fmtDateCentral(new Date().toISOString())}`])
     rows.push([])
     rows.push([])
     rows.push(['CATEGORIA', 'DESCRIZIONE', 'FORNITORE', 'STATO', 'QTY', 'VENDUTO CLIENTE', 'COSTO REALE', `FEE ${feePct}%`, 'MARGINE NETTO', 'MARGINE %'])
@@ -750,7 +749,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     rows.push([])
     rows.push([evName.toUpperCase()])
     if (clientName) rows.push([`Cliente: ${clientName}`])
-    rows.push([`Preventivo al ${new Date().toLocaleDateString('it-IT')}`])
+    rows.push([`Preventivo al ${fmtDateCentral(new Date().toISOString())}`])
     rows.push([])
     rows.push([])
     rows.push(['CATEGORIA', 'DESCRIZIONE', 'Nr/Qty', 'COSTO UNITARIO', 'TOTALE'])

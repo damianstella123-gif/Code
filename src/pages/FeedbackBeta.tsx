@@ -3,6 +3,7 @@ import { Search, X, Pencil, Trash2, MessageCircle, Bug, Lightbulb, Sparkles, Ale
 import { fetchFeedbacks, insertFeedback, updateFeedback, deleteFeedback, type Feedback } from '@/lib/feedback-service'
 import { loadUser } from '@/lib/auth'
 import { useRealtimeTable } from '@/lib/use-realtime'
+import { fmtLong } from '@/lib/format'
 
 type FilterStato = 'Tutti' | Feedback['stato']
 type FilterCategoria = 'Tutte' | Feedback['categoria']
@@ -53,7 +54,7 @@ function statoColor(s: Feedback['stato']) {
 }
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
+  return fmtLong(d)
 }
 
 interface FeedbackFormProps {

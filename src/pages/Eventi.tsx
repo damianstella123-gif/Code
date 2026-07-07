@@ -44,7 +44,7 @@ import { useRealtimeTable } from '@/lib/use-realtime'
 import { detectSupplierCategory, SupplierCategoryPanel, type CategoryType } from '@/components/TabOperativo'
 import TabBudget from '@/components/TabBudget'
 import { setFlyContext } from '@/lib/fly'
-import { daysLeft, fmtShort, fmtLong, toISO } from '@/lib/format'
+import { daysLeft, fmtShort, fmtLong, fmtFullLong, toISO } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Supplier } from '@/data/suppliers'
@@ -1855,7 +1855,7 @@ function TabDocumenti({ event }: { event: Event }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{doc.nome || doc.file_name}</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                    {doc.categoria} · {formatFileSize(doc.file_size)} · {new Date(doc.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {doc.categoria} · {formatFileSize(doc.file_size)} · {fmtLong(doc.created_at)}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -2370,7 +2370,7 @@ function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[
         <div key={dateStr}>
           <p className="text-xs font-semibold uppercase tracking-wide mb-3 px-1"
             style={{ color: 'var(--muted)' }}>
-            {new Date(dateStr + 'T00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {fmtFullLong(dateStr)}
           </p>
           <div className="relative pl-6">
             <div className="absolute left-[9px] top-2 bottom-2 w-px" style={{ background: 'var(--line)' }} />

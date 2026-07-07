@@ -19,6 +19,7 @@ import {
 import { fetchEvents } from '@/lib/events-service'
 import { supabase } from '@/lib/supabase'
 import type { Event } from '@/data/events'
+import { fmtDateShort, fmtLong } from '@/lib/format'
 
 function formatChatTime(d: string): string {
   const dt = new Date(d)
@@ -27,7 +28,7 @@ function formatChatTime(d: string): string {
   if (diffDays === 0) return dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
   if (diffDays === 1) return 'Ieri'
   if (diffDays < 7) return dt.toLocaleDateString('it-IT', { weekday: 'short' })
-  return dt.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
+  return fmtDateShort(d)
 }
 
 function formatMsgTime(d: string): string {
@@ -964,7 +965,7 @@ function LegacyArchive() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <span style={{ fontFamily: 'var(--font-serif)', fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>{m.oggetto}</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
-                    {new Date(m.data).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {fmtLong(m.data)}
                   </span>
                 </div>
                 <p style={{ fontSize: '12px', color: 'var(--muted)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

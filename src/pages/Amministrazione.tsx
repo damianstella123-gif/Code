@@ -22,7 +22,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
-import { todayISO, addDaysISO } from '@/lib/format'
+import { todayISO, addDaysISO, fmtLong, fmtDateShort, fmtDate } from '@/lib/format'
 import type {
   Entrata,
   Uscita,
@@ -71,10 +71,10 @@ function formatEur(n: number) {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 }
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
+  return fmtLong(d)
 }
 function formatDateShort(d: string) {
-  return new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
+  return fmtDateShort(d)
 }
 function monthLabel(d: string) {
   return new Date(d).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
@@ -666,8 +666,8 @@ export default function Amministrazione() {
       'Prezzo Unitario': u.unitPrice ?? '',
       'Importo': u.importo,
       'Stato': statoPagLabel(u.stato),
-      'Scadenza': u.scadenza ? new Date(u.scadenza).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
-      'Data Pagamento': u.dataPagamento ? new Date(u.dataPagamento).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
+      'Scadenza': u.scadenza ? fmtDate(u.scadenza) : '',
+      'Data Pagamento': u.dataPagamento ? fmtDate(u.dataPagamento) : '',
       'Note': u.note,
     }))
     const entrateRows = visibleEntrate.map(e => ({
@@ -675,8 +675,8 @@ export default function Amministrazione() {
       'Evento': eventName(e.eventoId),
       'Importo': e.importo,
       'Stato': statoPagLabel(e.stato),
-      'Data Prevista': e.dataPrevista ? new Date(e.dataPrevista).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
-      'Data Pagamento': e.dataPagamento ? new Date(e.dataPagamento).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
+      'Data Prevista': e.dataPrevista ? fmtDate(e.dataPrevista) : '',
+      'Data Pagamento': e.dataPagamento ? fmtDate(e.dataPagamento) : '',
       'Metodo': e.metodoPagamento,
       'Note': e.note,
     }))
@@ -695,7 +695,7 @@ export default function Amministrazione() {
     doc.setFontSize(16)
     doc.text('SIMMETRIA HUB - Riepilogo Budget', 14, 20)
     doc.setFontSize(10)
-    doc.text(`Data: ${new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, 14, 28)
+    doc.text(`Data: ${fmtDate(new Date().toISOString())}`, 14, 28)
     doc.text(`Budget eventi: ${formatEur(budgetEvents)}  |  Entrate: ${formatEur(totEntrate)}  |  Uscite: ${formatEur(totUscite)}  |  Margine: ${formatEur(margine)} (${marginePerc}%)`, 14, 34)
 
     autoTable(doc, {
@@ -709,7 +709,7 @@ export default function Amministrazione() {
         u.unitPrice != null ? formatEur(u.unitPrice) : '-',
         formatEur(u.importo),
         statoPagLabel(u.stato),
-        u.scadenza ? new Date(u.scadenza).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
+        u.scadenza ? fmtDate(u.scadenza) : '',
       ]),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [220, 30, 60] },

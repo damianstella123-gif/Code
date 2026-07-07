@@ -18,6 +18,7 @@ import { fetchClients, updateClient, uploadCompanyLogo, setCompanyLogo } from '@
 import { fetchEventsByClientName } from '@/lib/events-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { setFlyContext } from '@/lib/fly'
+import { fmtLong, fmtDateShort } from '@/lib/format'
 
 type FilterStato = 'Tutti' | 'attivo' | 'vip' | 'prospect' | 'perso'
 
@@ -110,11 +111,8 @@ function evtStatoLabel(stato: string) {
 }
 
 function formatEventDate(start: string, end: string): string {
-  const s = new Date(start)
-  const e = new Date(end)
-  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }
-  if (start === end) return s.toLocaleDateString('it-IT', opts)
-  return `${s.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} - ${e.toLocaleDateString('it-IT', opts)}`
+  if (start === end) return fmtLong(start)
+  return `${fmtDateShort(start)} - ${fmtLong(end)}`
 }
 
 function fmtK(value: number): string {

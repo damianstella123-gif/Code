@@ -12,6 +12,7 @@ import { fetchClients } from '@/lib/clients-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
 import { fetchAllProfiles, type Profile } from '@/lib/profiles'
 import type { Event } from '@/data/events'
+import { fmtLong } from '@/lib/format'
 
 interface Client { id: string; nome: string }
 
@@ -35,7 +36,7 @@ function channelIcon(c: string) {
 }
 function formatDate(d: string | null) {
   if (!d) return '-'
-  return new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
+  return fmtLong(d)
 }
 
 export default function SocialStudio() {
