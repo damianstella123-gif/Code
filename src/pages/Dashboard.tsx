@@ -70,20 +70,20 @@ export default function Dashboard() {
         const userIds = [...new Set([
           ...ev.map(e => e.responsabile).filter(Boolean),
           ...tk.map(t => t.assegnatario).filter(Boolean),
-        ])] as string[]
+        ])].filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}/.test(id)) as string[]
 
         if (userIds.length > 0) {
           const { data: profiles } = await supabase
             .from('profiles')
-            .select('id, nome, cognome, first_name, last_name')
+            .select('id, nome, first_name, last_name')
             .in('id', userIds)
           if (profiles) {
             const map: Record<string, string> = {}
             profiles.forEach((p: any) => {
-              map[p.id] =
-                p.nome ||
-                [p.first_name, p.last_name].filter(Boolean).join(' ') ||
-                'N/D'
+              const nome = p.nome || ''
+              const fullName = [p.first_name, p.last_name]
+                .filter(Boolean).join(' ').trim()
+              map[p.id] = fullName || nome || 'Utente'
             })
             setProfileMap(map)
           }
@@ -102,6 +102,28 @@ export default function Dashboard() {
   useRealtimeTable('events', () => { fetchEvents().then(setLiveEvents).catch(() => {}) })
   useRealtimeTable('tasks', () => { fetchTasks().then(setLiveTasks).catch(() => {}) })
   useRealtimeTable('clients', () => { fetchClients().then(setLiveClients).catch(() => {}) })
+
+  useEffect(() => {
+    if (liveEvents.length === 0 && liveTasks.length === 0) return
+    const userIds = [...new Set([
+      ...liveEvents.map(e => e.responsabile).filter(Boolean),
+      ...liveTasks.map(t => t.assegnatario).filter(Boolean),
+    ])].filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}/.test(id)) as string[]
+    if (userIds.length === 0) return
+    supabase.from('profiles')
+      .select('id, nome, first_name, last_name')
+      .in('id', userIds)
+      .then(({ data }) => {
+        if (!data) return
+        const map: Record<string, string> = {}
+        data.forEach((p: any) => {
+          const fullName = [p.first_name, p.last_name]
+            .filter(Boolean).join(' ').trim()
+          map[p.id] = fullName || p.nome || 'Utente'
+        })
+        setProfileMap(map)
+      })
+  }, [liveEvents, liveTasks])
 
   const firstName = currentUser?.first_name ?? currentUser?.nome?.split(' ')[0] ?? ''
 
