@@ -110,6 +110,10 @@ const MONTHS_IT = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
 function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
+function isoToLocalMidnight(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
 function startOfWeek(d: Date) {
   const x = new Date(d)
   const day = x.getDay()
@@ -732,27 +736,27 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem,
     return items.filter(item => {
       if (item.type === 'event') {
         const ev = item.data as Event
-        return day >= new Date(ev.dataInizio) && day <= new Date(ev.dataFine)
+        return day >= isoToLocalMidnight(ev.dataInizio) && day <= isoToLocalMidnight(ev.dataFine)
       }
       if (item.type === 'pratica') {
-        return sameDay(day, new Date((item.data as Pratica).scadenza))
+        return sameDay(day, isoToLocalMidnight((item.data as Pratica).scadenza))
       }
       if (item.type === 'creative') {
         const c = item.data as CreativeProject
-        return c.due_date ? sameDay(day, new Date(c.due_date)) : false
+        return c.due_date ? sameDay(day, isoToLocalMidnight(c.due_date)) : false
       }
       if (item.type === 'social') {
         const s = item.data as SocialContent
-        return s.publish_date ? sameDay(day, new Date(s.publish_date)) : false
+        return s.publish_date ? sameDay(day, isoToLocalMidnight(s.publish_date)) : false
       }
       if (item.type === 'memo') {
         const m = item.data as CalendarItem
         if (m.end_date) {
-          return day >= new Date(m.start_date) && day <= new Date(m.end_date)
+          return day >= isoToLocalMidnight(m.start_date) && day <= isoToLocalMidnight(m.end_date)
         }
-        return sameDay(day, new Date(m.start_date))
+        return sameDay(day, isoToLocalMidnight(m.start_date))
       }
-      return sameDay(day, new Date((item.data as Task).scadenza))
+      return sameDay(day, isoToLocalMidnight((item.data as Task).scadenza))
     })
   }
 
@@ -806,7 +810,7 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem,
                 {dayItems.slice(0, 3).map(item => {
                   const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : item.type === 'creative' ? (item.data as CreativeProject).id : item.type === 'social' ? (item.data as SocialContent).id : item.type === 'memo' ? (item.data as CalendarItem).id : (item.data as Pratica).id
                   const draggable = item.type === 'event' || item.type === 'task' || item.type === 'memo'
-                  const isEvtLastDay = item.type === 'event' && sameDay(day, new Date((item.data as Event).dataFine))
+                  const isEvtLastDay = item.type === 'event' && sameDay(day, isoToLocalMidnight((item.data as Event).dataFine))
                   return (
                     <CalPill key={id} item={item}
                       onClick={() => onItemClick(item)}
@@ -896,25 +900,25 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem, onResizeEv
     return items.filter(item => {
       if (item.type === 'event') {
         const ev = item.data as Event
-        return day >= new Date(ev.dataInizio) && day <= new Date(ev.dataFine)
+        return day >= isoToLocalMidnight(ev.dataInizio) && day <= isoToLocalMidnight(ev.dataFine)
       }
       if (item.type === 'pratica') {
-        return sameDay(day, new Date((item.data as Pratica).scadenza))
+        return sameDay(day, isoToLocalMidnight((item.data as Pratica).scadenza))
       }
       if (item.type === 'creative') {
         const c = item.data as CreativeProject
-        return c.due_date ? sameDay(day, new Date(c.due_date)) : false
+        return c.due_date ? sameDay(day, isoToLocalMidnight(c.due_date)) : false
       }
       if (item.type === 'social') {
         const s = item.data as SocialContent
-        return s.publish_date ? sameDay(day, new Date(s.publish_date)) : false
+        return s.publish_date ? sameDay(day, isoToLocalMidnight(s.publish_date)) : false
       }
       if (item.type === 'memo') {
         const m = item.data as CalendarItem
-        if (m.end_date) return day >= new Date(m.start_date) && day <= new Date(m.end_date)
-        return sameDay(day, new Date(m.start_date))
+        if (m.end_date) return day >= isoToLocalMidnight(m.start_date) && day <= isoToLocalMidnight(m.end_date)
+        return sameDay(day, isoToLocalMidnight(m.start_date))
       }
-      return sameDay(day, new Date((item.data as Task).scadenza))
+      return sameDay(day, isoToLocalMidnight((item.data as Task).scadenza))
     })
   }
 
@@ -968,7 +972,7 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem, onResizeEv
               {dayItems.map(item => {
                 const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : item.type === 'memo' ? (item.data as CalendarItem).id : (item.data as Pratica).id
                 const draggable = item.type === 'event' || item.type === 'task' || item.type === 'memo'
-                const isEvtLastDay = item.type === 'event' && sameDay(day, new Date((item.data as Event).dataFine))
+                const isEvtLastDay = item.type === 'event' && sameDay(day, isoToLocalMidnight((item.data as Event).dataFine))
                 return (
                   <CalPill key={id} item={item}
                     onClick={() => onItemClick(item)}
@@ -1014,25 +1018,25 @@ function DayView(props: {
   const dayItems = items.filter(item => {
     if (item.type === 'event') {
       const ev = item.data as Event
-      return day >= new Date(ev.dataInizio) && day <= new Date(ev.dataFine)
+      return day >= isoToLocalMidnight(ev.dataInizio) && day <= isoToLocalMidnight(ev.dataFine)
     }
     if (item.type === 'pratica') {
-      return sameDay(day, new Date((item.data as Pratica).scadenza))
+      return sameDay(day, isoToLocalMidnight((item.data as Pratica).scadenza))
     }
     if (item.type === 'creative') {
       const c = item.data as CreativeProject
-      return c.due_date ? sameDay(day, new Date(c.due_date)) : false
+      return c.due_date ? sameDay(day, isoToLocalMidnight(c.due_date)) : false
     }
     if (item.type === 'social') {
       const s = item.data as SocialContent
-      return s.publish_date ? sameDay(day, new Date(s.publish_date)) : false
+      return s.publish_date ? sameDay(day, isoToLocalMidnight(s.publish_date)) : false
     }
     if (item.type === 'memo') {
       const m = item.data as CalendarItem
-      if (m.end_date) return day >= new Date(m.start_date) && day <= new Date(m.end_date)
-      return sameDay(day, new Date(m.start_date))
+      if (m.end_date) return day >= isoToLocalMidnight(m.start_date) && day <= isoToLocalMidnight(m.end_date)
+      return sameDay(day, isoToLocalMidnight(m.start_date))
     }
-    return sameDay(day, new Date((item.data as Task).scadenza))
+    return sameDay(day, isoToLocalMidnight((item.data as Task).scadenza))
   })
 
   if (dayItems.length === 0) {
