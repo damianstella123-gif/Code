@@ -8,6 +8,7 @@ import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchClients } from '@/lib/clients-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
+import { supabase } from '@/lib/supabase'
 import { useChatNotifications } from '@/lib/chat-notifications'
 import { useToast } from '@/lib/toast'
 import CommandBar from '@/components/CommandBar'
@@ -52,6 +53,7 @@ export default function Dashboard() {
   const [liveTasks, setLiveTasks] = useState<Task[]>([])
   const [liveEvents, setLiveEvents] = useState<Event[]>([])
   const [liveClients, setLiveClients] = useState<Client[]>([])
+  const [profileMap, setProfileMap] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'tutto' | Category>('tutto')
   const [now, setNow] = useState(new Date())
@@ -64,6 +66,28 @@ export default function Dashboard() {
         setLiveEvents(ev)
         setLiveTasks(tk)
         setLiveClients(cl)
+
+        const userIds = [...new Set([
+          ...ev.map(e => e.responsabile).filter(Boolean),
+          ...tk.map(t => t.assegnatario).filter(Boolean),
+        ])] as string[]
+
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, nome, cognome, first_name, last_name')
+            .in('id', userIds)
+          if (profiles) {
+            const map: Record<string, string> = {}
+            profiles.forEach((p: any) => {
+              map[p.id] =
+                p.nome ||
+                [p.first_name, p.last_name].filter(Boolean).join(' ') ||
+                'N/D'
+            })
+            setProfileMap(map)
+          }
+        }
       } catch (err) {
         showToast('Errore caricamento dati')
       } finally {
@@ -87,6 +111,12 @@ export default function Dashboard() {
     return map
   }, [liveEvents])
 
+  function resolveName(id: string | null | undefined): string {
+    if (!id) return 'non assegnato'
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}/.test(id)) return id
+    return profileMap[id] || 'N/D'
+  }
+
   const stories = useMemo<Story[]>(() => {
     const items: Story[] = []
 
@@ -101,7 +131,7 @@ export default function Dashboard() {
           tagLabel: TAG_LABEL.urgente,
           headline: t.titolo,
           dek: ev ? `Collegato a ${ev.nome}. ${t.descrizione}` : t.descrizione,
-          meta: `${ritardo}g di ritardo · ${t.assegnatario || 'non assegnato'}`,
+          meta: `${ritardo}g di ritardo · ${resolveName(t.assegnatario)}`,
           category: 'task',
           score: 100 + ritardo,
           action: () => navigate('/task'),
@@ -122,7 +152,7 @@ export default function Dashboard() {
           tagLabel: TAG_LABEL.corso,
           headline: `${e.nome}: pronto al ${pct}%`,
           dek: `${e.location} · ${e.partecipanti} partecipanti attesi. ${dl === 0 ? 'È in scena oggi.' : dl === 1 ? 'Va in scena domani.' : `Va in scena tra ${dl} giorni.`}`,
-          meta: `responsabile ${e.responsabile || '—'} · budget €${(e.budget / 1000).toFixed(0)}K`,
+          meta: `responsabile ${resolveName(e.responsabile)} · budget €${(e.budget / 1000).toFixed(0)}K`,
           category: 'eventi',
           score: 40 + (21 - dl),
           action: () => navigate('/eventi'),
@@ -140,7 +170,7 @@ export default function Dashboard() {
           tagLabel: TAG_LABEL.attesa,
           headline: t.titolo,
           dek: ev ? `Da chiudere per ${ev.nome}. ${t.descrizione}` : t.descrizione,
-          meta: `scade tra ${dl === 0 ? 'oggi' : dl === 1 ? '1 giorno' : `${dl} giorni`} · ${t.assegnatario || 'non assegnato'}`,
+          meta: `scade tra ${dl === 0 ? 'oggi' : dl === 1 ? '1 giorno' : `${dl} giorni`} · ${resolveName(t.assegnatario)}`,
           category: 'task',
           score: 60 + (5 - dl),
           action: () => navigate('/task'),
@@ -159,7 +189,7 @@ export default function Dashboard() {
           tagLabel: TAG_LABEL.buona,
           headline: `${t.titolo}: completato`,
           dek: ev ? `Un passo avanti per ${ev.nome}.` : 'Attività fuori evento portata a termine.',
-          meta: `${t.assegnatario || 'team'} · ${timeAgoLabel(Math.abs(daysLeft(t.scadenza)))}`,
+          meta: `${resolveName(t.assegnatario)} · ${timeAgoLabel(Math.abs(daysLeft(t.scadenza)))}`,
           category: 'task',
           score: 10,
           action: () => navigate('/task'),
@@ -183,7 +213,7 @@ export default function Dashboard() {
     }
 
     return items.sort((a, b) => b.score - a.score)
-  }, [liveTasks, liveEvents, liveClients, eventById, navigate])
+  }, [liveTasks, liveEvents, liveClients, eventById, profileMap, navigate])
 
   const filteredByTab = tab === 'tutto' ? stories : stories.filter(s => s.category === tab)
 
