@@ -2673,3 +2673,143 @@ textarea::placeholder {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — ROUND 2
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── 4. FLY PANEL: Bottom sheet on phone ─── */
+@media (max-width: 640px) {
+  .fly-panel {
+    top: auto !important;
+    right: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    max-height: 70vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    border: none !important;
+    border-top: 1px solid var(--line) !important;
+    box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.25) !important;
+    animation: mobileSheetUp 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    z-index: 1001 !important;
+  }
+
+  .cmd-bar-wrapper {
+    width: 100%;
+  }
+
+  .cmd-bar {
+    width: 100%;
+  }
+
+  .cmd-dropdown {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    border-radius: 20px 20px 0 0;
+    max-height: 70vh;
+    overflow-y: auto;
+    animation: mobileSheetUp 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    z-index: 1001;
+  }
+}
+
+@keyframes mobileSheetUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── 5. MODALS: Bottom sheet on phone, centered on tablet ─── */
+@media (max-width: 640px) {
+  .fixed.inset-0.z-50.flex {
+    align-items: flex-end !important;
+    justify-content: stretch !important;
+    padding: 0 !important;
+  }
+
+  .fixed.inset-0.z-50.flex > div[class*="w-full"],
+  .fixed.inset-0.z-50.flex > div[class*="max-w-"],
+  .fixed.inset-0.z-50.flex > .w-full {
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 85vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    overflow-y: auto;
+    animation: mobileSheetUp 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    margin: 0 !important;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .fixed.inset-0.z-50.flex > div[class*="max-w-"] {
+    max-width: 560px !important;
+  }
+}
+
+/* ─── 6. ADMIN TABLES: Scrollable + hidden columns on phone ─── */
+.table-responsive-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.table-responsive-wrapper::-webkit-scrollbar { display: none; }
+
+@media (max-width: 640px) {
+  /* Make all tables in Amministrazione scrollable */
+  table {
+    min-width: 600px;
+  }
+
+  .mobile-hide {
+    display: none !important;
+  }
+
+  /* Force scroll on any direct table parent */
+  .overflow-x-auto,
+  div:has(> table) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  div:has(> table)::-webkit-scrollbar { display: none; }
+}
+
+/* ─── 7. EDITORIAL HEADERS: Vertical on phone ─── */
+@media (max-width: 640px) {
+  .editorial-header {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center;
+    gap: 12px !important;
+  }
+
+  .editorial-header img,
+  .editorial-header [class*="logo"],
+  .editorial-header > .relative {
+    align-self: center;
+    margin-bottom: 4px;
+  }
+
+  .editorial-header > .flex-1 {
+    width: 100%;
+    text-align: center;
+  }
+
+  .editorial-header > .flex-1 .flex {
+    justify-content: center;
+  }
+
+  /* Smaller event title on phone */
+  h1[style*="font-serif"][style*="28px"],
+  h1[style*="font-serif"][style*="26px"] {
+    font-size: 22px !important;
+  }
+}
+

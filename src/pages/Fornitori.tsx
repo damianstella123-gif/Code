@@ -478,7 +478,7 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
           </div>
         </div>
 
-        <div className="flex items-start gap-4">
+        <div className="editorial-header flex items-start gap-4">
           <div className="relative group flex-shrink-0">
             <SupplierLogo supplier={supplier} size={72} />
             <button onClick={() => fileRef.current?.click()}

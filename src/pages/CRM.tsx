@@ -358,7 +358,7 @@ function CompanyDetail({ group, onBack, onRefresh, onNavigateToEvent }: CompanyD
           </span>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="editorial-header flex items-center gap-4">
           <CompanyLogo url={group.logoUrl} name={group.companyName} size={56} radius={10} />
           <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '26px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.2 }}>
             {group.companyName}

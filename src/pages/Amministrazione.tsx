@@ -1197,12 +1197,12 @@ export default function Amministrazione() {
               <thead>
                 <tr>
                   <th style={thStyle}>Cliente</th>
-                  <th style={thStyle}>Evento</th>
+                  <th style={thStyle} className="mobile-hide">Evento</th>
                   <th style={thStyleRight}>Importo</th>
                   <th style={thStyle}>Stato</th>
                   <th style={thStyle}>Data prevista</th>
-                  <th style={thStyle}>Metodo</th>
-                  <th style={thStyle}>Note</th>
+                  <th style={thStyle} className="mobile-hide">Metodo</th>
+                  <th style={thStyle} className="mobile-hide">Note</th>
                   <th style={thStyle}></th>
                 </tr>
               </thead>
@@ -1215,12 +1215,12 @@ export default function Amministrazione() {
                   <tr key={e.id} style={{ borderBottom: '1px solid var(--line)' }}
                     className="hover:bg-[var(--panel2)] transition-colors">
                     <td style={tdStyle}>{clientName(e.clienteId)}</td>
-                    <td style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(e.eventoId)}</td>
+                    <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(e.eventoId)}</td>
                     <td style={{ ...tdAmount, color: 'var(--green)' }}>{formatEur(e.importo)}</td>
                     <td style={{ padding: '10px 14px' }}><StatoBadge stato={e.stato} /></td>
                     <td style={tdMuted}>{formatDateShort(e.dataPrevista)}</td>
-                    <td style={{ ...tdMuted, textTransform: 'capitalize' }}>{e.metodoPagamento}</td>
-                    <td style={{ ...tdMuted, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.note}</td>
+                    <td className="mobile-hide" style={{ ...tdMuted, textTransform: 'capitalize' }}>{e.metodoPagamento}</td>
+                    <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.note}</td>
                     <td style={{ padding: '10px 14px' }}>
                       <div className="flex items-center gap-1">
                         {e.stato !== 'pagato' && e.stato !== 'annullato' && (
@@ -1269,14 +1269,14 @@ export default function Amministrazione() {
               <thead>
                 <tr>
                   <th style={thStyle}>Fornitore</th>
-                  <th style={thStyle}>Evento</th>
-                  <th style={thStyle}>Categoria</th>
-                  <th style={thStyle}>Qty</th>
-                  <th style={thStyleRight}>P.Unit.</th>
+                  <th style={thStyle} className="mobile-hide">Evento</th>
+                  <th style={thStyle} className="mobile-hide">Categoria</th>
+                  <th style={thStyle} className="mobile-hide">Qty</th>
+                  <th style={thStyleRight} className="mobile-hide">P.Unit.</th>
                   <th style={thStyleRight}>Totale</th>
                   <th style={thStyle}>Stato</th>
                   <th style={thStyle}>Scadenza</th>
-                  <th style={thStyle}>Note</th>
+                  <th style={thStyle} className="mobile-hide">Note</th>
                   <th style={thStyle}></th>
                 </tr>
               </thead>
@@ -1291,16 +1291,16 @@ export default function Amministrazione() {
                     <tr key={u.id} style={{ borderBottom: '1px solid var(--line)' }}
                       className="hover:bg-[var(--panel2)] transition-colors">
                       <td style={tdStyle}>{supplierName(u.fornitoreId)}</td>
-                      <td style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(u.eventoId)}</td>
-                      <td style={tdMuted}>{u.categoria}</td>
-                      <td style={tdStyle}>{u.quantity ?? 1}</td>
-                      <td style={{ ...tdAmount, color: 'var(--muted)' }}>{u.unitPrice != null ? formatEur(u.unitPrice) : '—'}</td>
+                      <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(u.eventoId)}</td>
+                      <td className="mobile-hide" style={tdMuted}>{u.categoria}</td>
+                      <td className="mobile-hide" style={tdStyle}>{u.quantity ?? 1}</td>
+                      <td className="mobile-hide" style={{ ...tdAmount, color: 'var(--muted)' }}>{u.unitPrice != null ? formatEur(u.unitPrice) : '—'}</td>
                       <td style={{ ...tdAmount, color: 'var(--red2)' }}>{formatEur(u.importo)}</td>
                       <td style={{ padding: '10px 14px' }}><StatoBadge stato={u.stato} /></td>
                       <td style={{ ...tdMuted, color: isScad ? 'var(--red2)' : 'var(--muted)' }}>
                         {formatDateShort(u.scadenza)} {isScad && '!'}
                       </td>
-                      <td style={{ ...tdMuted, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.note}</td>
+                      <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.note}</td>
                       <td style={{ padding: '10px 14px' }}>
                         <div className="flex items-center gap-1">
                           {u.stato !== 'pagato' && u.stato !== 'annullato' && (
@@ -1350,14 +1350,14 @@ export default function Amministrazione() {
               <thead>
                 <tr>
                   <th style={thStyle}>N. Fattura</th>
-                  <th style={thStyle}>Tipo</th>
+                  <th style={thStyle} className="mobile-hide">Tipo</th>
                   <th style={thStyle}>Soggetto</th>
-                  <th style={thStyle}>Evento</th>
-                  <th style={thStyleRight}>Imponibile</th>
-                  <th style={thStyleRight}>IVA</th>
+                  <th style={thStyle} className="mobile-hide">Evento</th>
+                  <th style={thStyleRight} className="mobile-hide">Imponibile</th>
+                  <th style={thStyleRight} className="mobile-hide">IVA</th>
                   <th style={thStyleRight}>Totale</th>
                   <th style={thStyle}>Stato</th>
-                  <th style={thStyle}>Emessa</th>
+                  <th style={thStyle} className="mobile-hide">Emessa</th>
                   <th style={thStyle}>Scadenza</th>
                 </tr>
               </thead>
@@ -1373,7 +1373,7 @@ export default function Amministrazione() {
                     <tr key={f.id} style={{ borderBottom: '1px solid var(--line)' }}
                       className="hover:bg-[var(--panel2)] transition-colors">
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{f.numero}</td>
-                      <td style={{ padding: '10px 14px' }}>
+                      <td className="mobile-hide" style={{ padding: '10px 14px' }}>
                         <span style={{
                           fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
                           color: f.tipo === 'entrata' ? 'var(--green)' : 'var(--red2)',
@@ -1386,9 +1386,9 @@ export default function Amministrazione() {
                         </span>
                       </td>
                       <td style={{ ...tdStyle, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.soggetto}</td>
-                      <td style={{ ...tdMuted, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(f.eventoId)}</td>
-                      <td style={{ ...tdAmount, color: 'var(--muted)' }}>{formatEur(f.imponibile)}</td>
-                      <td style={{ ...tdAmount, color: 'var(--muted)' }}>{formatEur(f.iva)}</td>
+                      <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(f.eventoId)}</td>
+                      <td className="mobile-hide" style={{ ...tdAmount, color: 'var(--muted)' }}>{formatEur(f.imponibile)}</td>
+                      <td className="mobile-hide" style={{ ...tdAmount, color: 'var(--muted)' }}>{formatEur(f.iva)}</td>
                       <td style={{ ...tdAmount, color: f.tipo === 'entrata' ? 'var(--green)' : 'var(--red2)' }}>{formatEur(f.importo)}</td>
                       <td style={{ padding: '10px 14px' }}>
                         <span style={{
@@ -1402,7 +1402,7 @@ export default function Amministrazione() {
                           {statoFatLabel(f.stato)}
                         </span>
                       </td>
-                      <td style={tdMuted}>{formatDate(f.dataEmissione)}</td>
+                      <td className="mobile-hide" style={tdMuted}>{formatDate(f.dataEmissione)}</td>
                       <td style={{ ...tdMuted, color: isScad ? 'var(--red2)' : 'var(--muted)' }}>
                         {formatDate(f.scadenza)} {isScad && '!'}
                       </td>
@@ -1450,8 +1450,8 @@ export default function Amministrazione() {
                 <thead>
                   <tr>
                     <th style={thStyle}>Numero</th>
-                    <th style={thStyle}>Tipo</th>
-                    <th style={thStyle}>Soggetto</th>
+                    <th style={thStyle} className="mobile-hide">Tipo</th>
+                    <th style={thStyle} className="mobile-hide">Soggetto</th>
                     <th style={thStyleRight}>Importo</th>
                     <th style={thStyle}>Stato</th>
                     <th style={thStyle}>Scadenza</th>
@@ -1468,8 +1468,8 @@ export default function Amministrazione() {
                       <tr key={inv.id} style={{ borderBottom: '1px solid var(--line)' }}
                         className="hover:bg-[var(--panel2)] transition-colors">
                         <td style={{ ...tdStyle, fontWeight: 600 }}>{inv.number || '-'}</td>
-                        <td style={{ ...tdMuted, textTransform: 'capitalize' }}>{inv.type}</td>
-                        <td style={tdMuted}>{subject}</td>
+                        <td className="mobile-hide" style={{ ...tdMuted, textTransform: 'capitalize' }}>{inv.type}</td>
+                        <td className="mobile-hide" style={tdMuted}>{subject}</td>
                         <td style={{ ...tdAmount, color: 'var(--text)' }}>{formatEur(inv.amount)}</td>
                         <td style={{ padding: '10px 14px' }}>
                           <span style={{
