@@ -600,11 +600,13 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
 
 // ─── Calendar pill ────────────────────────────────────────────────────────────
 
-function CalPill({ item, onClick, onDragStart, isLastDay, onResizeStart }: {
+function CalPill({ item, onClick, onDragStart, isLastDay, isFirstDay, isContinuation, onResizeStart }: {
   item: CalItem
   onClick: () => void
   onDragStart?: (e: React.DragEvent) => void
   isLastDay?: boolean
+  isFirstDay?: boolean
+  isContinuation?: boolean
   onResizeStart?: (e: React.MouseEvent) => void
 }) {
   const color = item.type === 'event'
@@ -654,23 +656,47 @@ function CalPill({ item, onClick, onDragStart, isLastDay, onResizeStart }: {
             : (item.data as Pratica).stato === 'completata'
   const isOverdue = dl < 0 && !isDone
 
+  const isMultiDay = item.type === 'event' && (isFirstDay !== undefined || isContinuation)
+  const isMiddle = isMultiDay && !isFirstDay && !isLastDay
+
+  const pillRadius = !isMultiDay ? '6px'
+    : isFirstDay && isLastDay ? '6px'
+    : isFirstDay ? '6px 0 0 6px'
+    : isLastDay ? '0 6px 6px 0'
+    : '0'
+
+  const pillBorderLeft = (!isMultiDay || (isFirstDay && !isContinuation))
+    ? `3px solid ${color}` : 'none'
+
+  const pillBg = isMiddle || (isMultiDay && isLastDay && !isFirstDay)
+    ? `${color}0c` : `${color}15`
+
+  const pillBorderTop = isMiddle ? `1px solid ${color}20` : 'none'
+  const pillBorderBottom = isMiddle ? `1px solid ${color}20` : 'none'
+
+  const showLabel = !isMultiDay || isFirstDay || isContinuation
+
   return (
     <div draggable={!!onDragStart} onDragStart={onDragStart}
       onClick={e => { e.stopPropagation(); onClick() }}
       className={`relative truncate px-1.5 py-0.5 text-xs transition-colors select-none ${onDragStart ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} group/pill`}
       style={{
-        borderRadius: '6px',
-        background: `${color}15`,
+        borderRadius: pillRadius,
+        background: pillBg,
         color,
-        borderLeft: `3px solid ${color}`,
+        borderLeft: pillBorderLeft,
+        borderTop: pillBorderTop,
+        borderBottom: pillBorderBottom,
         fontSize: '11px',
         fontFamily: 'inherit',
         opacity: isDone && item.type !== 'event' ? 0.5 : 1,
         outline: isOverdue ? `1px dashed ${color}60` : 'none',
+        marginLeft: isMultiDay && !isFirstDay ? '-4px' : undefined,
+        marginRight: isMultiDay && !isLastDay ? '-4px' : undefined,
       }}>
       {urgent && <Zap style={{ display: 'inline', width: 9, height: 9, marginRight: 2, marginBottom: 1 }} />}
       {item.type === 'memo' && <Bell style={{ display: 'inline', width: 9, height: 9, marginRight: 2, marginBottom: 1 }} />}
-      {label}
+      {showLabel ? (isContinuation && !isFirstDay ? `\u2190 ${label}` : label) : '\u00A0'}
       {isLastDay && item.type === 'event' && onResizeStart && (
         <div
           className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize opacity-0 group-hover/pill:opacity-100 transition-opacity"
@@ -810,11 +836,16 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem,
                 {dayItems.slice(0, 3).map(item => {
                   const id = item.type === 'event' ? (item.data as Event).id : item.type === 'task' ? (item.data as Task).id : item.type === 'creative' ? (item.data as CreativeProject).id : item.type === 'social' ? (item.data as SocialContent).id : item.type === 'memo' ? (item.data as CalendarItem).id : (item.data as Pratica).id
                   const draggable = item.type === 'event' || item.type === 'task' || item.type === 'memo'
+                  const isEvtFirstDay = item.type === 'event' && sameDay(day, isoToLocalMidnight((item.data as Event).dataInizio))
                   const isEvtLastDay = item.type === 'event' && sameDay(day, isoToLocalMidnight((item.data as Event).dataFine))
+                  const isEvtMultiDay = item.type === 'event' && (item.data as Event).dataInizio !== (item.data as Event).dataFine
+                  const isEvtContinuation = isEvtMultiDay && !isEvtFirstDay && day.getDay() === 1
                   return (
                     <CalPill key={id} item={item}
                       onClick={() => onItemClick(item)}
+                      isFirstDay={isEvtMultiDay ? isEvtFirstDay : undefined}
                       isLastDay={isEvtLastDay}
+                      isContinuation={isEvtContinuation || undefined}
                       onResizeStart={isEvtLastDay ? () => {
                         const ev = item.data as Event
                         setResizing({ id: ev.id, startX: 0, startDate: ev.dataInizio, endDate: ev.dataFine })
