@@ -6,7 +6,6 @@ import { fetchProfile } from '@/lib/profiles'
 import { saveUser } from '@/lib/auth'
 import { syncThemeFromProfile } from '@/lib/theme'
 import BrandEvolutionTransition from '@/components/BrandEvolutionTransition'
-import BrandE from '@/components/BrandE'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -162,9 +161,6 @@ export default function Login() {
             alt="Simmetria Synergy"
             className="w-44 sm:w-52 mx-auto object-contain"
           />
-          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: '14px', letterSpacing: '0.08em', color: 'var(--text)', marginTop: '8px' }}>
-            SYN<BrandE size={14} />RGY
-          </p>
         </div>
 
         {!mfaStep ? (
