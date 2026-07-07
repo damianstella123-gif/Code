@@ -7,6 +7,11 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontSize: {
+        xs: ['13px', { lineHeight: '1.5' }],
+        sm: ['14.5px', { lineHeight: '1.6' }],
+        base: ['16px', { lineHeight: '1.7' }],
+      },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',

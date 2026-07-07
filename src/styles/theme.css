@@ -278,10 +278,11 @@ body {
 }
 
 .shell-user-role {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   opacity: 0.6;
   margin-top: 1px;
+  line-height: 1.5;
 }
 
 .shell-user-logout {
@@ -358,7 +359,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: white;
   background: var(--red);
@@ -373,7 +374,7 @@ body {
 @media (max-width: 640px) {
   .shell-header { height: 44px; }
   .shell-user-chip { padding: 4px 6px 4px 4px; gap: 4px; }
-  .shell-chip-avatar { width: 24px; height: 24px; font-size: 9px; }
+  .shell-chip-avatar { width: 24px; height: 24px; font-size: 11px; }
 }
 
 /* ─── PANEL / CARD ─────────────────────────────────────────────────────────── */
@@ -1135,7 +1136,7 @@ textarea::placeholder {
   align-items: center;
   gap: 7px;
   margin-bottom: 16px;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -1149,7 +1150,7 @@ textarea::placeholder {
 
 .cc-zone-link {
   margin-left: auto;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.05em;
   color: var(--muted);
@@ -1195,7 +1196,7 @@ textarea::placeholder {
   display: flex;
   justify-content: space-between;
   margin-bottom: 12px;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -1296,19 +1297,19 @@ textarea::placeholder {
 }
 
 .cc-node-days {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .cc-node-budget {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
   opacity: 0.6;
 }
 
 .cc-node-pct-mobile {
   display: none;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -1334,7 +1335,7 @@ textarea::placeholder {
 }
 
 .cc-readiness-label {
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--muted);
   opacity: 0.6;
@@ -1362,7 +1363,7 @@ textarea::placeholder {
 }
 
 .cc-metric-label {
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -1411,7 +1412,7 @@ textarea::placeholder {
 }
 
 .cc-team-count {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--muted);
   width: 14px;
@@ -1429,8 +1430,8 @@ textarea::placeholder {
 .cc-decision {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 12px;
+  padding: 12px 16px;
   border-radius: 10px;
   cursor: pointer;
   width: 100%;
@@ -1479,7 +1480,7 @@ textarea::placeholder {
 }
 
 .cc-decision-sub {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--muted);
   opacity: 0.6;
 }
@@ -1617,14 +1618,14 @@ textarea::placeholder {
   .cc-metric { align-items: center; text-align: center; flex: 1; }
 
   .cc-action-rail { gap: 6px; margin-top: 12px; }
-  .cc-rail-item { padding: 12px 8px; font-size: 10px; }
+  .cc-rail-item { padding: 12px 8px; font-size: 12px; }
 }
 
 @media (max-width: 380px) {
   .cc-display-headline { font-size: 1.05rem; }
   .cc-display-line { font-size: 0.8rem; }
   .cc-metric-value { font-size: 1rem; }
-  .cc-rail-item { padding: 10px 6px; font-size: 9px; }
+  .cc-rail-item { padding: 10px 6px; font-size: 11px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1824,8 +1825,9 @@ textarea::placeholder {
   flex-wrap: wrap;
   font-family: var(--font-mono);
   font-size: 11px;
+  line-height: 1.6;
   color: var(--muted);
-  padding: 12px 0;
+  padding: 14px 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -1837,7 +1839,7 @@ textarea::placeholder {
 .wire-tabs {
   display: flex;
   gap: 20px;
-  padding: 14px 0;
+  padding: 16px 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -1848,6 +1850,7 @@ textarea::placeholder {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
+  line-height: 1.5;
   opacity: 0.6;
   cursor: pointer;
   transition: opacity 0.15s ease, color 0.15s ease;
@@ -1902,7 +1905,7 @@ textarea::placeholder {
   flex-shrink: 0;
   height: fit-content;
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   padding: 3px 8px;
@@ -1940,7 +1943,7 @@ textarea::placeholder {
   font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  line-height: 1.3;
+  line-height: 1.5;
   color: var(--text);
   margin: 0 0 5px;
   transition: color 0.15s ease;
@@ -1956,7 +1959,7 @@ textarea::placeholder {
 
 .wire-story-meta {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--muted);
   opacity: 0.6;
   letter-spacing: 0.02em;
@@ -1980,7 +1983,7 @@ textarea::placeholder {
   .cmd-bar-input { font-size: 14px; }
   .cmd-dropdown { border-radius: 10px; }
   .cmd-suggestions { padding: 10px 12px; gap: 6px; }
-  .cmd-suggestion-pill { font-size: 10px; padding: 4px 10px; }
+  .cmd-suggestion-pill { font-size: 12px; padding: 4px 10px; }
 }
 
 /* ═══ LIVE DOT ═══ */
@@ -2044,7 +2047,7 @@ textarea::placeholder {
 
 .cmd-bar-shortcut {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   opacity: 0.5;
   flex-shrink: 0;
@@ -2106,7 +2109,7 @@ textarea::placeholder {
 
 .cmd-group-label {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--muted);
@@ -2138,13 +2141,13 @@ textarea::placeholder {
   font-weight: 600;
   color: var(--text);
   transition: color 0.15s ease;
-  line-height: 1.3;
+  line-height: 1.5;
 }
 
 .cmd-result-ctx {
   font-size: 11px;
   color: var(--muted);
-  line-height: 1.4;
+  line-height: 1.6;
 }
 
 /* ═══ FLY PANEL (responsive) ═══ */
@@ -2296,7 +2299,7 @@ textarea::placeholder {
 
 .chat-conv-time {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -2306,7 +2309,7 @@ textarea::placeholder {
   border-radius: 50%;
   background: var(--red2);
   color: #fff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -2338,7 +2341,7 @@ textarea::placeholder {
 
 .chat-main-header-event {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--blue);
   background: color-mix(in srgb, var(--blue) 12%, transparent);
   padding: 2px 8px;
@@ -2367,7 +2370,7 @@ textarea::placeholder {
 
 .chat-bubble-sender {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   margin-bottom: 2px;
   padding: 0 4px;
@@ -2398,7 +2401,7 @@ textarea::placeholder {
 
 .chat-bubble-time {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 11px;
   color: var(--muted);
   margin-top: 2px;
   padding: 0 4px;
@@ -2812,4 +2815,7 @@ textarea::placeholder {
     font-size: 22px !important;
   }
 }
+
+/* LEGGIBILITA v1.1 — scale: xs=13px sm=14.5px
+   mono-label min=11px padding=16px */
 
