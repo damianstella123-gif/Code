@@ -23,6 +23,8 @@ import {
   User,
   Key,
   FileWarning,
+  ScrollText,
+  Filter,
 } from 'lucide-react'
 import { loadUser, isAdmin } from '@/lib/auth'
 import { useTheme, type ThemeMode } from '@/lib/theme'
@@ -949,6 +951,172 @@ function RegistroErrori() {
   )
 }
 
+// ─── Audit Log Section (Super Admin only) ────────────────────────────────────
+
+interface AuditEntry {
+  id: string
+  created_at: string
+  user_id: string | null
+  user_email: string | null
+  action: string
+  table_name: string | null
+  record_id: string | null
+  old_data: Record<string, unknown> | null
+  new_data: Record<string, unknown> | null
+}
+
+function AuditLogSection() {
+  const [entries, setEntries] = useState<AuditEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filterTable, setFilterTable] = useState('')
+  const [filterUser, setFilterUser] = useState('')
+
+  useEffect(() => {
+    loadAuditLog()
+  }, [])
+
+  async function loadAuditLog() {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('audit_log')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100)
+    if (!error && data) setEntries(data as AuditEntry[])
+    setLoading(false)
+  }
+
+  const filtered = entries.filter(e => {
+    if (filterTable && e.table_name !== filterTable) return false
+    if (filterUser && !(e.user_email || '').toLowerCase().includes(filterUser.toLowerCase())) return false
+    return true
+  })
+
+  const tables = [...new Set(entries.map(e => e.table_name).filter(Boolean))]
+
+  const actionColor = (action: string) => {
+    switch (action) {
+      case 'DELETE': return { color: '#dc2626', bg: 'rgba(220,38,38,0.08)' }
+      case 'UPDATE': return { color: '#d97706', bg: 'rgba(217,119,6,0.08)' }
+      default: return { color: 'var(--muted)', bg: 'var(--line)' }
+    }
+  }
+
+  const formatTime = (d: string) => {
+    const date = new Date(d)
+    return date.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+  }
+
+  return (
+    <SectionCard icon={ScrollText} title="Audit Log" subtitle="Registro delle azioni critiche eseguite nel sistema">
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Filter className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+          <select
+            value={filterTable}
+            onChange={e => setFilterTable(e.target.value)}
+            style={{
+              fontFamily: 'var(--font-mono)', fontSize: '11px',
+              padding: '6px 10px', borderRadius: '6px',
+              background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)',
+            }}
+          >
+            <option value="">Tutte le tabelle</option>
+            {tables.map(t => <option key={t} value={t!}>{t}</option>)}
+          </select>
+        </div>
+        <input
+          type="text"
+          placeholder="Filtra per email..."
+          value={filterUser}
+          onChange={e => setFilterUser(e.target.value)}
+          style={{
+            fontFamily: 'var(--font-mono)', fontSize: '11px',
+            padding: '6px 10px', borderRadius: '6px', width: '200px',
+            background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)',
+          }}
+        />
+        <button onClick={loadAuditLog}
+          style={{
+            fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase',
+            padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--line)',
+            background: 'var(--bg)', color: 'var(--muted)', cursor: 'pointer',
+          }}>
+          <RotateCcw className="w-3 h-3" />
+        </button>
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', padding: '20px 0' }}>
+          Caricamento...
+        </p>
+      ) : filtered.length === 0 ? (
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', padding: '20px 0' }}>
+          Nessuna voce di audit trovata.
+        </p>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '9px' }}>Data</th>
+                <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '9px' }}>Utente</th>
+                <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '9px' }}>Azione</th>
+                <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '9px' }}>Tabella</th>
+                <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '9px' }}>Record ID</th>
+                <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '9px' }}>Dettagli</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(entry => {
+                const ac = actionColor(entry.action)
+                return (
+                  <tr key={entry.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', color: 'var(--muted)' }}>
+                      {formatTime(entry.created_at)}
+                    </td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text)' }}>
+                      {entry.user_email || entry.user_id?.slice(0, 8) || '—'}
+                    </td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <span style={{
+                        padding: '2px 6px', borderRadius: '4px', fontSize: '9px',
+                        fontWeight: 600, color: ac.color, background: ac.bg,
+                      }}>
+                        {entry.action}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text)' }}>
+                      {entry.table_name || '—'}
+                    </td>
+                    <td style={{ padding: '8px 10px', color: 'var(--muted)', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {entry.record_id?.slice(0, 8) || '—'}
+                    </td>
+                    <td style={{ padding: '8px 10px', maxWidth: '250px' }}>
+                      {entry.action === 'DELETE' && entry.old_data && (
+                        <span style={{ color: 'var(--muted)', fontSize: '10px' }}>
+                          {String((entry.old_data as Record<string, string>).nome || (entry.old_data as Record<string, string>).name || (entry.old_data as Record<string, string>).title || (entry.old_data as Record<string, string>).titolo || JSON.stringify(entry.old_data).slice(0, 60))}
+                        </span>
+                      )}
+                      {entry.action === 'UPDATE' && entry.old_data && entry.new_data && (
+                        <span style={{ color: 'var(--muted)', fontSize: '10px' }}>
+                          {Object.keys(entry.new_data).map(k => `${k}: ${String((entry.old_data as Record<string, unknown>)?.[k] ?? '')} → ${String((entry.new_data as Record<string, unknown>)?.[k] ?? '')}`).join(', ').slice(0, 80)}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
 // ─── Sidebar nav ──────────────────────────────────────────────────────────────
 
 type SectionDef = { id: string; icon: React.ElementType; label: string; group: 'personal' | 'admin' }
@@ -966,6 +1134,7 @@ const ALL_SECTIONS: SectionDef[] = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard Globale', group: 'admin' },
   { id: 'dati', icon: Database, label: 'Dati Applicazione', group: 'admin' },
   { id: 'errori', icon: FileWarning, label: 'Registro Errori', group: 'admin' },
+  { id: 'audit', icon: ScrollText, label: 'Audit Log', group: 'admin' },
 ]
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -975,7 +1144,7 @@ export default function Impostazioni() {
   const showAdmin = isAdmin(currentUser)
 
   const sections = showAdmin
-    ? ALL_SECTIONS
+    ? ALL_SECTIONS.filter(s => s.id !== 'audit' || currentUser?.role === 'Super Admin')
     : ALL_SECTIONS.filter(s => s.group === 'personal')
 
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
@@ -1132,6 +1301,7 @@ export default function Impostazioni() {
           {showAdmin && activeSection === 'dashboard' && <ConfigDashboard s={settings} upd={upd} />}
           {showAdmin && activeSection === 'dati' && <DatiApplicazione />}
           {showAdmin && activeSection === 'errori' && <RegistroErrori />}
+          {currentUser?.role === 'Super Admin' && activeSection === 'audit' && <AuditLogSection />}
         </div>
       </div>
     </div>
