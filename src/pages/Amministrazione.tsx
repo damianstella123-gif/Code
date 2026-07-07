@@ -157,6 +157,10 @@ function NuovoMovimentoModal({ onClose, onSave, clients, suppliers, events }: Nu
   const [soggettoId, setSoggettoId] = useState<string>('')
   const [quantity, setQuantity] = useState('1')
   const [unitPrice, setUnitPrice] = useState('')
+  const [soggettoSearch, setSoggettoSearch] = useState('')
+  const [soggettoOpen, setSoggettoOpen] = useState(false)
+  const [soggettoLabel, setSoggettoLabel] = useState('')
+  const soggettoRef = useRef<HTMLDivElement>(null)
 
   const computedImporto = useMemo(() => {
     const q = parseInt(quantity) || 1
@@ -164,6 +168,28 @@ function NuovoMovimentoModal({ onClose, onSave, clients, suppliers, events }: Nu
     if (up > 0) return q * up
     return parseFloat(importo.replace(',', '.')) || 0
   }, [quantity, unitPrice, importo])
+
+  const soggettoList = tipo === 'entrata' ? clients : suppliers
+  const filteredSoggetti = soggettoSearch.length > 0
+    ? soggettoList.filter(s => s.nome.toLowerCase().includes(soggettoSearch.toLowerCase()))
+    : soggettoList.slice(0, 8)
+
+  useEffect(() => {
+    setSoggettoId('')
+    setSoggettoSearch('')
+    setSoggettoLabel('')
+    setSoggettoOpen(false)
+  }, [tipo])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (soggettoRef.current && !soggettoRef.current.contains(e.target as Node)) {
+        setSoggettoOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   function handleSave() {
     const q = parseInt(quantity) || 1
@@ -261,14 +287,60 @@ function NuovoMovimentoModal({ onClose, onSave, clients, suppliers, events }: Nu
             <label style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', display: 'block', marginBottom: 8 }}>
               {tipo === 'entrata' ? 'Cliente' : 'Fornitore'}
             </label>
-            <select value={soggettoId} onChange={e => setSoggettoId(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none" style={inputStyle}>
-              <option value="">Seleziona...</option>
-              {tipo === 'entrata'
-                ? clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)
-                : suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)
-              }
-            </select>
+            <div ref={soggettoRef} style={{ position: 'relative' }}>
+              <input
+                type="text"
+                value={soggettoLabel}
+                placeholder={tipo === 'entrata' ? 'Cerca cliente...' : 'Cerca fornitore...'}
+                onChange={e => {
+                  setSoggettoLabel(e.target.value)
+                  setSoggettoSearch(e.target.value)
+                  setSoggettoId('')
+                  setSoggettoOpen(true)
+                }}
+                onFocus={() => setSoggettoOpen(true)}
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
+                style={inputStyle}
+              />
+              {soggettoOpen && filteredSoggetti.length > 0 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    zIndex: 100,
+                    maxHeight: 200,
+                    overflowY: 'auto',
+                    background: 'var(--panel-solid)',
+                    border: '1px solid var(--line)',
+                    borderRadius: 12,
+                    boxShadow: 'var(--shadow-md)',
+                    marginTop: 4,
+                  }}
+                >
+                  {filteredSoggetti.map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors"
+                      style={{ color: 'var(--text)', borderBottom: '1px solid var(--line)' }}
+                      onClick={() => {
+                        setSoggettoId(item.id)
+                        setSoggettoLabel(item.nome)
+                        setSoggettoSearch('')
+                        setSoggettoOpen(false)
+                      }}
+                    >
+                      <span>{item.nome}</span>
+                      {'categoria' in item && (item as Supplier).categoria && (
+                        <span className="ml-2 text-xs" style={{ color: 'var(--muted)' }}>{(item as Supplier).categoria}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div>
