@@ -110,12 +110,47 @@ const DEFAULT_SETTINGS: AppSettings = {
 }
 
 const SK = 'simmetria_settings'
+const MIGRATED_KEY = 'simmetria_settings_migrated'
 
 export function loadSettings(): AppSettings {
   try { const r = localStorage.getItem(SK); return r ? { ...DEFAULT_SETTINGS, ...JSON.parse(r) } : DEFAULT_SETTINGS }
   catch { return DEFAULT_SETTINGS }
 }
-function saveSettings(s: AppSettings) { localStorage.setItem(SK, JSON.stringify(s)) }
+
+async function loadSettingsFromDb(): Promise<AppSettings> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return loadSettings()
+
+  const { data } = await supabase
+    .from('profiles')
+    .select('settings')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (data?.settings && Object.keys(data.settings).length > 0) {
+    return { ...DEFAULT_SETTINGS, ...(data.settings as Partial<AppSettings>) }
+  }
+
+  // One-shot migration: localStorage → DB
+  if (!localStorage.getItem(MIGRATED_KEY)) {
+    const local = loadSettings()
+    const hasLocal = localStorage.getItem(SK)
+    if (hasLocal) {
+      await supabase.from('profiles').update({ settings: local }).eq('id', user.id)
+      localStorage.removeItem(SK)
+      localStorage.setItem(MIGRATED_KEY, '1')
+      return local
+    }
+  }
+
+  return DEFAULT_SETTINGS
+}
+
+async function saveSettingsToDb(s: AppSettings): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  await supabase.from('profiles').update({ settings: s }).eq('id', user.id)
+}
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -847,10 +882,11 @@ function DatiApplicazione() {
   const [showConfirm, setShowConfirm] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
 
-  function handleAction(key: string) {
+  async function handleAction(key: string) {
     if (key === 'export') {
+      const s = await loadSettingsFromDb()
       const data = {
-        settings: loadSettings(),
+        settings: s,
         exportedAt: new Date().toISOString(),
         version: '1.0.0',
       }
@@ -865,6 +901,7 @@ function DatiApplicazione() {
     }
     if (showConfirm === key) {
       if (key === 'reset_settings') {
+        await saveSettingsToDb(DEFAULT_SETTINGS)
         localStorage.removeItem('simmetria_settings')
         window.location.reload()
       } else if (key === 'clear_workflows') {
@@ -1147,10 +1184,18 @@ export default function Impostazioni() {
     ? ALL_SECTIONS.filter(s => s.id !== 'audit' || currentUser?.role === 'Super Admin')
     : ALL_SECTIONS.filter(s => s.group === 'personal')
 
-  const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS)
   const [activeSection, setActiveSection] = useState('profilo')
   const [saved, setSaved] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadSettingsFromDb().then(s => {
+      setSettings(s)
+      setLoading(false)
+    })
+  }, [])
 
   useEffect(() => {
     if (!sections.find(s => s.id === activeSection)) {
@@ -1163,20 +1208,27 @@ export default function Impostazioni() {
     setDirty(true)
   }
 
-  function handleSave() {
-    saveSettings(settings)
+  async function handleSave() {
+    await saveSettingsToDb(settings)
     setSaved(true)
     setDirty(false)
     setTimeout(() => setSaved(false), 2500)
   }
 
   function handleReset() {
-    setSettings(loadSettings())
-    setDirty(false)
+    loadSettingsFromDb().then(s => { setSettings(s); setDirty(false) })
   }
 
   const personalSections = sections.filter(s => s.group === 'personal')
   const adminSections = sections.filter(s => s.group === 'admin')
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)' }}>Caricamento impostazioni...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-0 -mt-1">
