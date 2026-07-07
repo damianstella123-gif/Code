@@ -12,6 +12,8 @@ import {
   Calendar,
   ArrowLeft,
   ArrowRight,
+  FileText,
+  Briefcase,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { cacheTasksSnapshot } from '@/lib/storage'
@@ -20,6 +22,7 @@ import { fetchEvents } from '@/lib/events-service'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { daysLeft, toISO, fmtLong } from '@/lib/format'
+import { supabase } from '@/lib/supabase'
 import type { Task } from '@/data/tasks'
 import type { Profile } from '@/lib/profiles'
 
@@ -28,6 +31,20 @@ function prioritaColor(p: string) {
     case 'alta': return 'var(--red2)'
     case 'media': return 'var(--yellow)'
     case 'bassa': return 'var(--muted)'
+    default: return 'var(--muted)'
+  }
+}
+
+const CATEGORIE = ['Amministrativo', 'Creativo', 'Logistico', 'Commerciale', 'Operativo', 'Altro'] as const
+
+function categoriaColor(c: string | null | undefined) {
+  switch (c) {
+    case 'Amministrativo': return 'var(--blue)'
+    case 'Creativo': return 'var(--yellow)'
+    case 'Logistico': return 'var(--green)'
+    case 'Commerciale': return 'var(--red2)'
+    case 'Operativo': return 'var(--muted)'
+    case 'Altro': return 'var(--muted)'
     default: return 'var(--muted)'
   }
 }
@@ -74,6 +91,7 @@ function TaskFormModal({ task, onSave, onClose, users, events }: {
   const [priorita, setPriorita] = useState<Task['priorita']>(task?.priorita ?? 'media')
   const [stato, setStato] = useState<Task['stato']>(task?.stato ?? 'da_fare')
   const [scadenza, setScadenza] = useState(task?.scadenza ?? '')
+  const [categoria, setCategoria] = useState(task?.categoria ?? '')
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -88,6 +106,7 @@ function TaskFormModal({ task, onSave, onClose, users, events }: {
       stato,
       scadenza,
       creatoIl: task?.creatoIl ?? toISO(new Date()),
+      categoria: categoria || null,
     })
   }
 
@@ -143,7 +162,16 @@ function TaskFormModal({ task, onSave, onClose, users, events }: {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Categoria</label>
+              <select value={categoria} onChange={e => setCategoria(e.target.value)}
+                className="w-full py-2.5 px-3 text-sm rounded-lg focus:outline-none"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+                <option value="">Nessuna</option>
+                {CATEGORIE.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
             <div>
               <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', display: 'block', marginBottom: '6px' }}>Priorita</label>
               <select value={priorita} onChange={e => setPriorita(e.target.value as Task['priorita'])}
@@ -199,6 +227,7 @@ export default function TaskPage() {
   const [filterStato, setFilterStato] = useState('Tutti')
   const [filterPriorita, setFilterPriorita] = useState('Tutte')
   const [filterAssegnatario, setFilterAssegnatario] = useState('Tutti')
+  const [filterCategoria, setFilterCategoria] = useState('Tutte')
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -252,9 +281,10 @@ export default function TaskPage() {
       const matchPriorita = filterPriorita === 'Tutte' || t.priorita === filterPriorita
       const matchAssegnatario = filterAssegnatario === 'Tutti' || t.assegnatario === filterAssegnatario
       const matchStato = filterStato === 'Tutti' || t.stato === filterStato
-      return matchSearch && matchPriorita && matchAssegnatario && matchStato
+      const matchCategoria = filterCategoria === 'Tutte' || t.categoria === filterCategoria
+      return matchSearch && matchPriorita && matchAssegnatario && matchStato && matchCategoria
     })
-  }, [visibleTasks, search, filterPriorita, filterAssegnatario, filterStato])
+  }, [visibleTasks, search, filterPriorita, filterAssegnatario, filterStato, filterCategoria])
 
   const sorted = useMemo(() => {
     const open = filtered.filter(t => t.stato !== 'completato')
@@ -386,6 +416,15 @@ export default function TaskPage() {
             }}>
             <option value="Tutti">ASSEGNATARIO</option>
             {teamMembers.map(id => <option key={id} value={id}>{getProfileName(id)}</option>)}
+          </select>
+          <select value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}
+            style={{
+              fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase',
+              background: 'none', border: 'none', color: filterCategoria !== 'Tutte' ? categoriaColor(filterCategoria) : 'var(--muted)', cursor: 'pointer',
+              letterSpacing: '0.04em',
+            }}>
+            <option value="Tutte">CATEGORIA</option>
+            {CATEGORIE.map(c => <option key={c} value={c}>{c.toUpperCase()}</option>)}
           </select>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '8px', padding: '4px 10px', border: '1px solid var(--line)', background: 'var(--panel)' }}>
@@ -524,14 +563,27 @@ function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus,
 
       {/* Title + event label */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{
-          fontFamily: 'var(--font-serif)', fontSize: '15px', fontWeight: 500,
-          color: 'var(--text)', lineHeight: 1.3, margin: 0,
-          textDecoration: isCompleted ? 'line-through' : 'none',
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        }}>
-          {task.titolo}
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <p style={{
+            fontFamily: 'var(--font-serif)', fontSize: '15px', fontWeight: 500,
+            color: 'var(--text)', lineHeight: 1.3, margin: 0,
+            textDecoration: isCompleted ? 'line-through' : 'none',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {task.titolo}
+          </p>
+          {task.categoria && (
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 600,
+              textTransform: 'uppercase', letterSpacing: '0.04em',
+              padding: '2px 6px', borderRadius: '4px', flexShrink: 0,
+              color: categoriaColor(task.categoria),
+              background: `color-mix(in srgb, ${categoriaColor(task.categoria)} 12%, transparent)`,
+            }}>
+              {task.categoria}
+            </span>
+          )}
+        </div>
         {evento && (
           <button
             onClick={e => { e.stopPropagation(); onNavigateEvent(evento.id) }}
@@ -588,6 +640,15 @@ function TaskDetailPanel({ task, events, getInitials, getFullName, onClose, onEd
   onNavigateEvent: (evtId: string) => void
 }) {
   const [confirmDel, setConfirmDel] = useState(false)
+  const [linkedDocs, setLinkedDocs] = useState<{ id: string; nome: string }[]>([])
+  const [linkedPratiche, setLinkedPratiche] = useState<{ id: string; titolo: string }[]>([])
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    supabase.from('documents').select('id, nome').eq('task_id', task.id).then(({ data }) => setLinkedDocs(data ?? []))
+    supabase.from('practices').select('id, titolo').eq('task_id', task.id).then(({ data }) => setLinkedPratiche(data ?? []))
+  }, [task.id])
+
   const evento = task.evento ? events.find(e => e.id === task.evento) : null
   const dl = daysLeft(task.scadenza)
   const isOverdue = dl < 0 && task.stato !== 'completato'
@@ -758,6 +819,38 @@ function TaskDetailPanel({ task, events, getInitials, getFullName, onClose, onEd
                 </button>
               )}
             </div>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>DOCUMENTI E PRATICHE COLLEGATI</p>
+            {linkedDocs.length === 0 && linkedPratiche.length === 0 ? (
+              <p style={{ fontSize: '12px', color: 'var(--muted)' }}>Nessun documento o pratica collegata</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {linkedDocs.map(doc => (
+                  <button key={doc.id} onClick={() => navigate('/archivio')}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--line)',
+                      background: 'var(--panel2)', cursor: 'pointer', textAlign: 'left',
+                    }}>
+                    <FileText className="w-3.5 h-3.5" style={{ color: 'var(--blue)', flexShrink: 0 }} />
+                    <span style={{ fontSize: '12px', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.nome}</span>
+                  </button>
+                ))}
+                {linkedPratiche.map(p => (
+                  <button key={p.id} onClick={() => navigate(`/pratiche?id=${p.id}`)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--line)',
+                      background: 'var(--panel2)', cursor: 'pointer', textAlign: 'left',
+                    }}>
+                    <Briefcase className="w-3.5 h-3.5" style={{ color: 'var(--green)', flexShrink: 0 }} />
+                    <span style={{ fontSize: '12px', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.titolo}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

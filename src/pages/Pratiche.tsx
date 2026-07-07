@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   FileText,
   Search,
@@ -23,6 +23,7 @@ import { fetchPractices, upsertPractice, deletePractice as deletePracticeRemote 
 import { fetchEvents } from '@/lib/events-service'
 import { fetchAllProfiles, type Profile } from '@/lib/profiles'
 import { useRealtimeTable } from '@/lib/use-realtime'
+import { supabase } from '@/lib/supabase'
 
 const CATEGORIE: { id: CategoriaPratica; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'contratto', label: 'Contratto', icon: Briefcase, color: 'var(--red2)' },
@@ -399,11 +400,23 @@ function DetailView({ pratica, onBack, onEdit, onDelete, allEvents, allUsers }: 
   pratica: Pratica; onBack: () => void; onEdit: () => void; onDelete: () => void; allEvents: Event[]; allUsers: Profile[]
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [linkedTaskTitle, setLinkedTaskTitle] = useState<string | null>(null)
+  const navigate = useNavigate()
   const evento = pratica.eventoId ? allEvents.find(e => e.id === pratica.eventoId) : null
   const responsabile = pratica.responsabileId ? allUsers.find(u => u.id === pratica.responsabileId) : null
   const responsabileLabel = responsabile ? `${responsabile.first_name} ${responsabile.last_name}`.trim() : (pratica.responsabileId ?? '—')
   const dl = daysLeft(pratica.scadenza)
   const overdue = pratica.stato !== 'completata' && dl < 0
+
+  useEffect(() => {
+    if (pratica.task_id) {
+      supabase.from('tasks').select('titolo').eq('id', pratica.task_id).maybeSingle().then(({ data }) => {
+        setLinkedTaskTitle(data?.titolo ?? null)
+      })
+    } else {
+      setLinkedTaskTitle(null)
+    }
+  }, [pratica.task_id])
   const CatIcon = catIcon(pratica.categoria)
 
   return (
@@ -483,6 +496,19 @@ function DetailView({ pratica, onBack, onEdit, onDelete, allEvents, allUsers }: 
         )}
       </div>
 
+      {/* Linked task */}
+      {pratica.task_id && linkedTaskTitle && (
+        <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+          <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TASK COLLEGATO</h3>
+          <button onClick={() => navigate(`/task?id=${pratica.task_id}`)}
+            className="flex items-center gap-2 text-sm transition-all hover:opacity-80"
+            style={{ color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            <FileText className="w-3.5 h-3.5" />
+            {linkedTaskTitle}
+          </button>
+        </div>
+      )}
+
       {/* Note */}
       {pratica.note && (
         <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
@@ -521,6 +547,35 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
   const [note, setNote] = useState(pratica?.note ?? '')
   const [importo, setImporto] = useState(pratica?.importo?.toString() ?? '')
   const [controparte, setControparte] = useState(pratica?.controparte ?? '')
+  const [taskId, setTaskId] = useState(pratica?.task_id ?? '')
+  const [taskSearch, setTaskSearch] = useState('')
+  const [taskLabel, setTaskLabel] = useState('')
+  const [taskDropOpen, setTaskDropOpen] = useState(false)
+  const [availableTasks, setAvailableTasks] = useState<{ id: string; titolo: string }[]>([])
+  const taskDropRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    supabase.from('tasks').select('id, titolo').neq('stato', 'completato').order('scadenza').then(({ data }) => {
+      const tasks = data ?? []
+      setAvailableTasks(tasks)
+      if (pratica?.task_id) {
+        const found = tasks.find(t => t.id === pratica.task_id)
+        if (found) setTaskLabel(found.titolo)
+      }
+    })
+  }, [pratica?.task_id])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (taskDropRef.current && !taskDropRef.current.contains(e.target as Node)) setTaskDropOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const filteredTasks = taskSearch.length > 0
+    ? availableTasks.filter(t => t.titolo.toLowerCase().includes(taskSearch.toLowerCase()))
+    : availableTasks.slice(0, 8)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -540,6 +595,7 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
       note: note.trim(),
       importo: importo ? parseFloat(importo) : null,
       controparte: controparte.trim(),
+      task_id: taskId || null,
     }
     onSave(result)
   }
@@ -650,6 +706,34 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
               className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
               style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
               required />
+          </div>
+        </div>
+
+        {/* Row 4b - Task collegato */}
+        <div>
+          <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Task collegato</label>
+          <div ref={taskDropRef} style={{ position: 'relative' }}>
+            <input
+              type="text"
+              value={taskLabel}
+              placeholder="Cerca task..."
+              onChange={e => { setTaskLabel(e.target.value); setTaskSearch(e.target.value); setTaskId(''); setTaskDropOpen(true) }}
+              onFocus={() => setTaskDropOpen(true)}
+              className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+            />
+            {taskDropOpen && filteredTasks.length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: 200, overflowY: 'auto', background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 12, boxShadow: 'var(--shadow-md)', marginTop: 4 }}>
+                {filteredTasks.map(t => (
+                  <button key={t.id} type="button"
+                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors"
+                    style={{ color: 'var(--text)', borderBottom: '1px solid var(--line)' }}
+                    onClick={() => { setTaskId(t.id); setTaskLabel(t.titolo); setTaskSearch(''); setTaskDropOpen(false) }}>
+                    {t.titolo}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

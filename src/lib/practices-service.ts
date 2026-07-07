@@ -10,6 +10,7 @@ import type {
 interface PracticeRow {
   id: string
   event_id: string | null
+  task_id: string | null
   title: string
   description: string
   category: CategoriaPratica
@@ -41,6 +42,7 @@ function rowToPratica(r: PracticeRow): Pratica {
       ? null
       : typeof r.amount === 'string' ? Number(r.amount) : r.amount,
     controparte: r.counterparty ?? '',
+    task_id: r.task_id ?? null,
   }
 }
 
@@ -48,6 +50,7 @@ function praticaToRow(p: Pratica): Omit<PracticeRow, 'updated_at'> {
   return {
     id: p.id,
     event_id: p.eventoId && p.eventoId.length > 0 ? p.eventoId : null,
+    task_id: p.task_id || null,
     title: p.titolo,
     description: p.descrizione ?? '',
     category: p.categoria,

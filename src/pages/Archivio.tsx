@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import {
   Search, Plus, FileText, Trash2, X, Upload,
   Download, Eye,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { fmtLong } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 
@@ -13,6 +14,7 @@ interface Document {
   cliente_id: string | null
   event_id: string | null
   supplier_id: string | null
+  task_id: string | null
   scope: string
   file_path: string
   file_name: string
@@ -64,6 +66,7 @@ function formatDate(d: string) {
 }
 
 export default function Archivio() {
+  const navigate = useNavigate()
   const [docs, setDocs] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -75,6 +78,12 @@ export default function Archivio() {
   const [formNote, setFormNote] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [formTaskId, setFormTaskId] = useState<string | null>(null)
+  const [taskSearch, setTaskSearch] = useState('')
+  const [taskLabel, setTaskLabel] = useState('')
+  const [taskDropOpen, setTaskDropOpen] = useState(false)
+  const [availableTasks, setAvailableTasks] = useState<{ id: string; titolo: string }[]>([])
+  const taskDropRef = useRef<HTMLDivElement>(null)
 
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -90,6 +99,24 @@ export default function Archivio() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  useEffect(() => {
+    supabase.from('tasks').select('id, titolo').neq('stato', 'completato').order('scadenza').then(({ data }) => {
+      setAvailableTasks(data ?? [])
+    })
+  }, [])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (taskDropRef.current && !taskDropRef.current.contains(e.target as Node)) setTaskDropOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const filteredTasks = taskSearch.length > 0
+    ? availableTasks.filter(t => t.titolo.toLowerCase().includes(taskSearch.toLowerCase()))
+    : availableTasks.slice(0, 8)
 
   const filtered = useMemo(() => {
     return docs.filter(d => {
@@ -116,6 +143,10 @@ export default function Archivio() {
     setFormCategoria('Varie')
     setFormNote('')
     setUploadFile(null)
+    setFormTaskId(null)
+    setTaskSearch('')
+    setTaskLabel('')
+    setTaskDropOpen(false)
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -154,6 +185,7 @@ export default function Archivio() {
       file_size: uploadFile.size,
       file_type: uploadFile.type,
       uploaded_by: '',
+      task_id: formTaskId || null,
     })
 
     if (dbError) {
@@ -324,6 +356,12 @@ export default function Archivio() {
                       <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)' }} className="truncate">
                         {fileExt(doc.file_name)} — {formatSize(doc.file_size)} — {formatDate(doc.created_at)}
                       </p>
+                      {doc.task_id && (
+                        <button onClick={e => { e.stopPropagation(); navigate(`/task?id=${doc.task_id}`) }}
+                          style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: '2px' }}>
+                          Task: {availableTasks.find(t => t.id === doc.task_id)?.titolo ?? doc.task_id}
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button onClick={() => handlePreview(doc)}
@@ -383,6 +421,32 @@ export default function Archivio() {
                   style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
                   {KB_CATEGORIE.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
+              </div>
+              <div>
+                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', fontWeight: 600, color: 'var(--muted)' }} className="mb-2 block">Task collegato</label>
+                <div ref={taskDropRef} style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={taskLabel}
+                    placeholder="Cerca task..."
+                    onChange={e => { setTaskLabel(e.target.value); setTaskSearch(e.target.value); setFormTaskId(null); setTaskDropOpen(true) }}
+                    onFocus={() => setTaskDropOpen(true)}
+                    className="w-full px-4 py-3 rounded-2xl text-sm"
+                    style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                  />
+                  {taskDropOpen && filteredTasks.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: 200, overflowY: 'auto', background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 12, boxShadow: 'var(--shadow-md)', marginTop: 4 }}>
+                      {filteredTasks.map(t => (
+                        <button key={t.id} type="button"
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors"
+                          style={{ color: 'var(--text)', borderBottom: '1px solid var(--line)' }}
+                          onClick={() => { setFormTaskId(t.id); setTaskLabel(t.titolo); setTaskSearch(''); setTaskDropOpen(false) }}>
+                          {t.titolo}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <label style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', fontWeight: 600, color: 'var(--muted)' }} className="mb-2 block">Note</label>

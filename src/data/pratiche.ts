@@ -16,6 +16,7 @@ export interface Pratica {
   note: string
   importo: number | null
   controparte: string
+  task_id?: string | null
 }
 
 export const pratiche: Pratica[] = [
