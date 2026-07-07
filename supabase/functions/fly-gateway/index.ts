@@ -1073,6 +1073,122 @@ async function callAnthropic(
   return { text: "Ho raggiunto il limite di consultazioni. Prova a riformulare la domanda in modo piu specifico.", inputTokens: totalInput, outputTokens: totalOutput, toolsCalled: [...toolsUsed] };
 }
 
+// ─── INPUT VALIDATION ─────────────────────────────────────────────────
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^\d{2}:\d{2}$/;
+
+const VALID_PRIORITA = ["alta", "media", "bassa"];
+const VALID_TASK_STATO = ["da_fare", "in_lavorazione", "completato"];
+
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]*>/g, "").trim();
+}
+
+interface ValidationError {
+  campo: string;
+  motivo: string;
+}
+
+function validateText(value: unknown, campo: string, maxLen = 500, required = true): ValidationError | null {
+  if (value == null || value === "") {
+    return required ? { campo, motivo: "campo obbligatorio, non puo essere vuoto" } : null;
+  }
+  if (typeof value !== "string") return { campo, motivo: "deve essere una stringa" };
+  const clean = stripHtml(value);
+  if (required && clean.length === 0) return { campo, motivo: "non puo essere vuoto dopo la rimozione dei tag HTML" };
+  if (clean.length > maxLen) return { campo, motivo: `troppo lungo (max ${maxLen} caratteri, ricevuti ${clean.length})` };
+  return null;
+}
+
+function validateDate(value: unknown, campo: string, required = false): ValidationError | null {
+  if (value == null || value === "") {
+    return required ? { campo, motivo: "data obbligatoria" } : null;
+  }
+  if (typeof value !== "string") return { campo, motivo: "deve essere una stringa" };
+  if (!DATE_RE.test(value)) return { campo, motivo: "formato non valido, atteso YYYY-MM-DD" };
+  const ts = Date.parse(value + "T00:00:00Z");
+  if (isNaN(ts)) return { campo, motivo: "data non valida" };
+  return null;
+}
+
+function validateTime(value: unknown, campo: string): ValidationError | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") return { campo, motivo: "deve essere una stringa" };
+  if (!TIME_RE.test(value)) return { campo, motivo: "formato non valido, atteso HH:MM" };
+  const [h, m] = value.split(":").map(Number);
+  if (h < 0 || h > 23 || m < 0 || m > 59) return { campo, motivo: "ora non valida" };
+  return null;
+}
+
+function validateEnum(value: unknown, campo: string, allowed: string[], required = true): ValidationError | null {
+  if (value == null || value === "") {
+    return required ? { campo, motivo: `obbligatorio, valori ammessi: ${allowed.join(", ")}` } : null;
+  }
+  if (typeof value !== "string") return { campo, motivo: "deve essere una stringa" };
+  if (!allowed.includes(value)) return { campo, motivo: `valore non ammesso "${value}", valori validi: ${allowed.join(", ")}` };
+  return null;
+}
+
+function validateUuid(value: unknown, campo: string, required = true): ValidationError | null {
+  if (value == null || value === "") {
+    return required ? { campo, motivo: "UUID obbligatorio" } : null;
+  }
+  if (typeof value !== "string") return { campo, motivo: "deve essere una stringa" };
+  if (!UUID_RE.test(value)) return { campo, motivo: "formato UUID non valido" };
+  return null;
+}
+
+function validateProposalParams(action: string, params: Record<string, unknown>): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  switch (action) {
+    case "create_task": {
+      const te = validateText(params.titolo, "titolo", 500, true);
+      if (te) errors.push(te);
+      const de = validateDate(params.scadenza, "scadenza", false);
+      if (de) errors.push(de);
+      const pe = validateEnum(params.priorita, "priorita", VALID_PRIORITA, false);
+      if (pe) errors.push(pe);
+      const desc = validateText(params.descrizione, "descrizione", 500, false);
+      if (desc) errors.push(desc);
+      const an = validateText(params.assegnatario_nome, "assegnatario_nome", 200, false);
+      if (an) errors.push(an);
+      const en = validateText(params.evento_nome, "evento_nome", 200, false);
+      if (en) errors.push(en);
+      break;
+    }
+    case "create_memo": {
+      const te = validateText(params.titolo, "titolo", 500, true);
+      if (te) errors.push(te);
+      const de = validateDate(params.data, "data", true);
+      if (de) errors.push(de);
+      const ti = validateTime(params.ora, "ora");
+      if (ti) errors.push(ti);
+      const desc = validateText(params.descrizione, "descrizione", 500, false);
+      if (desc) errors.push(desc);
+      break;
+    }
+    case "update_task_status": {
+      const ue = validateUuid(params.task_id, "task_id", true);
+      if (ue) errors.push(ue);
+      const se = validateEnum(params.nuovo_stato, "nuovo_stato", VALID_TASK_STATO, true);
+      if (se) errors.push(se);
+      break;
+    }
+    default:
+      errors.push({ campo: "action", motivo: `azione sconosciuta: ${action}` });
+  }
+
+  return errors;
+}
+
+function sanitizeString(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return stripHtml(value).slice(0, 500);
+}
+
 // ─── EXECUTE CONFIRMED PROPOSALS ──────────────────────────────────────
 
 async function executeProposal(
@@ -1081,6 +1197,30 @@ async function executeProposal(
   userId: string
 ): Promise<{ success: boolean; message: string; data?: unknown }> {
   const { action, params } = proposal;
+
+  // ─── Validate inputs ────────────────────────────────────────────────
+  const validationErrors = validateProposalParams(action, params);
+  if (validationErrors.length > 0) {
+    const errorMsg = validationErrors
+      .map(e => `parametro non valido: ${e.campo} — ${e.motivo}`)
+      .join("; ");
+
+    await supabaseClient.from("fly_actions_log").insert({
+      user_id: userId,
+      action_type: action,
+      payload: params,
+      status: "failed",
+      error: errorMsg,
+    });
+
+    return { success: false, message: errorMsg };
+  }
+
+  // ─── Sanitize string fields ─────────────────────────────────────────
+  if (params.titolo) params.titolo = sanitizeString(params.titolo);
+  if (params.descrizione) params.descrizione = sanitizeString(params.descrizione);
+  if (params.assegnatario_nome) params.assegnatario_nome = sanitizeString(params.assegnatario_nome);
+  if (params.evento_nome) params.evento_nome = sanitizeString(params.evento_nome);
 
   try {
     let result: unknown = null;
