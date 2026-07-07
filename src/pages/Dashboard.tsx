@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { useChatNotifications } from '@/lib/chat-notifications'
 import { useToast } from '@/lib/toast'
 import CommandBar from '@/components/CommandBar'
+import BrandE from '@/components/BrandE'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Client } from '@/data/clients'
@@ -259,7 +260,7 @@ export default function Dashboard() {
   return (
     <div className="wire-page">
       <div className="wire-masthead">
-        <span className="wire-masthead-title">SIMMETRIA WIRE{firstName ? ` — ${firstName.toUpperCase()}` : ''}</span>
+        <span className="wire-masthead-title">SIMM<BrandE size={13} />TRIA WIR<BrandE size={13} />{firstName ? ` — ${firstName.toUpperCase()}` : ''}</span>
         <div className="wire-masthead-right">
           <span className="wire-clock">
             {now.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase()} · {now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}

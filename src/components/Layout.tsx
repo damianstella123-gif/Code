@@ -26,6 +26,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import BrandE from '@/components/BrandE'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
 import PinnedChats from '@/components/PinnedChats'
 import { loadUser, getAllowedNavForRole, signOutEverywhere } from '@/lib/auth'
@@ -90,12 +91,15 @@ function Sidebar({ open, setOpen }: SidebarProps) {
       >
         {/* Logo */}
         <div className="shell-sidebar-logo">
-          <Link to="/dashboard" className="flex items-center justify-center w-full group">
+          <Link to="/dashboard" className="flex flex-col items-center justify-center w-full group gap-1">
             <img
               src="/logo-synergy.png"
               alt="Simmetria Synergy"
               className="w-32 object-contain transition-opacity duration-300 group-hover:opacity-80"
             />
+            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: '11px', letterSpacing: '0.08em', color: 'var(--text)' }}>
+              SYN<BrandE size={11} />RGY
+            </span>
           </Link>
           <button
             onClick={() => setOpen(false)}
