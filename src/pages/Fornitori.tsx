@@ -8,6 +8,7 @@ import {
   Music, ChevronRight, Navigation,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
+import { useToast } from '@/lib/toast'
 import { fetchSuppliers, upsertSupplier, deleteSupplier as deleteSupplierRemote, updateSupplier } from '@/lib/suppliers-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { supabase } from '@/lib/supabase'
@@ -964,6 +965,7 @@ function NavTile({ label, count, icon: Icon, onClick }: {
 
 export default function Fornitori() {
   loadUser()
+  const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const [supplierList, setSupplierList] = useState<Supplier[]>([])
   const [selected, setSelected] = useState<Supplier | null>(null)
@@ -983,9 +985,13 @@ export default function Fornitori() {
   const [searchQuery, setSearchQuery] = useState('')
 
   const loadData = useCallback(async () => {
-    const sups = await fetchSuppliers()
-    setSupplierList(sups)
-  }, [])
+    try {
+      const sups = await fetchSuppliers()
+      setSupplierList(sups)
+    } catch (err) {
+      showToast('Errore caricamento fornitori')
+    }
+  }, [showToast])
 
   useEffect(() => { loadData() }, [loadData])
   useRealtimeTable('suppliers', loadData)

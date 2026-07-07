@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logError } from './error-log'
 
 export interface Feedback {
   id: string
@@ -25,8 +26,8 @@ export async function fetchFeedbacks(): Promise<Feedback[]> {
     .select('*')
     .order('created_at', { ascending: false })
   if (error) {
-    console.error('fetchFeedbacks error:', error.message)
-    return []
+    logError('feedback-service', 'fetchFeedbacks', error)
+    throw new Error(error.message)
   }
   return (data ?? []) as Feedback[]
 }
@@ -52,7 +53,10 @@ export async function insertFeedback(
     .select()
     .maybeSingle()
 
-  if (error) return { data: null, error: error.message }
+  if (error) {
+    logError('feedback-service', 'insertFeedback', error)
+    throw new Error(error.message)
+  }
   return { data: data as Feedback | null, error: null }
 }
 
@@ -70,7 +74,10 @@ export async function updateFeedback(
     .select()
     .maybeSingle()
 
-  if (error) return { data: null, error: error.message }
+  if (error) {
+    logError('feedback-service', 'updateFeedback', error)
+    throw new Error(error.message)
+  }
   if (!data) return { data: null, error: 'Elemento non trovato o permesso negato' }
   return { data: data as Feedback, error: null }
 }
@@ -80,6 +87,9 @@ export async function deleteFeedback(id: string): Promise<{ success: boolean; er
   if (!uid) return { success: false, error: 'Utente non autenticato' }
 
   const { error } = await supabase.from('feedback').delete().eq('id', id)
-  if (error) return { success: false, error: error.message }
+  if (error) {
+    logError('feedback-service', 'deleteFeedback', error)
+    throw new Error(error.message)
+  }
   return { success: true, error: null }
 }

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logError } from './error-log'
 
 export interface SocialContent {
   id: string
@@ -41,8 +42,8 @@ export async function fetchSocialContents(): Promise<SocialContent[]> {
     .order('created_at', { ascending: false })
     .limit(500)
   if (error) {
-    console.error('fetchSocialContents error:', error.message)
-    return []
+    logError('social-service', 'fetchSocialContents', error)
+    throw new Error(error.message)
   }
   return (data ?? []) as SocialContent[]
 }
@@ -54,8 +55,8 @@ export async function upsertSocialContent(content: Partial<SocialContent> & { ti
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertSocialContent error:', error.message)
-    return null
+    logError('social-service', 'upsertSocialContent', error)
+    throw new Error(error.message)
   }
   return data as SocialContent | null
 }
@@ -68,8 +69,8 @@ export async function updateSocialContent(id: string, patch: Partial<SocialConte
     .select()
     .maybeSingle()
   if (error) {
-    console.error('updateSocialContent error:', error.message)
-    return null
+    logError('social-service', 'updateSocialContent', error)
+    throw new Error(error.message)
   }
   return data as SocialContent | null
 }
@@ -77,8 +78,8 @@ export async function updateSocialContent(id: string, patch: Partial<SocialConte
 export async function deleteSocialContent(id: string): Promise<boolean> {
   const { error } = await supabase.from('social_contents').delete().eq('id', id)
   if (error) {
-    console.error('deleteSocialContent error:', error.message)
-    return false
+    logError('social-service', 'deleteSocialContent', error)
+    throw new Error(error.message)
   }
   return true
 }
@@ -90,8 +91,8 @@ export async function uploadSocialAsset(file: File, contentId: string): Promise<
     .from('creative-files')
     .upload(path, file, { upsert: true })
   if (error) {
-    console.error('uploadSocialAsset error:', error.message)
-    return null
+    logError('social-service', 'uploadSocialAsset', error)
+    throw new Error(error.message)
   }
   const { data: urlData } = supabase.storage.from('creative-files').getPublicUrl(path)
   return urlData.publicUrl

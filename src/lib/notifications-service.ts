@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logError } from './error-log'
 
 export interface Notification {
   id: string
@@ -20,8 +21,8 @@ export async function fetchNotifications(userId: string): Promise<Notification[]
     .order('created_at', { ascending: false })
     .limit(50)
   if (error) {
-    console.error('fetchNotifications error:', error.message)
-    return []
+    logError('notifications-service', 'fetchNotifications', error)
+    throw new Error(error.message)
   }
   return (data ?? []) as Notification[]
 }
@@ -33,8 +34,8 @@ export async function fetchUnreadCount(userId: string): Promise<number> {
     .eq('user_id', userId)
     .eq('is_read', false)
   if (error) {
-    console.error('fetchUnreadCount error:', error.message)
-    return 0
+    logError('notifications-service', 'fetchUnreadCount', error)
+    throw new Error(error.message)
   }
   return count ?? 0
 }
@@ -45,7 +46,8 @@ export async function markAsRead(notificationId: string): Promise<void> {
     .update({ is_read: true })
     .eq('id', notificationId)
   if (error) {
-    console.error('markAsRead error:', error.message)
+    logError('notifications-service', 'markAsRead', error)
+    throw new Error(error.message)
   }
 }
 
@@ -56,6 +58,7 @@ export async function markAllAsRead(userId: string): Promise<void> {
     .eq('user_id', userId)
     .eq('is_read', false)
   if (error) {
-    console.error('markAllAsRead error:', error.message)
+    logError('notifications-service', 'markAllAsRead', error)
+    throw new Error(error.message)
   }
 }

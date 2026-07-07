@@ -73,104 +73,109 @@ function normalizeMultiDateService(row: Record<string, any>, table: string, cate
   return results
 }
 
-export function useEventTimeline(eventId: string) {
+export function useEventTimeline(eventId: string, showToast?: (msg: string) => void) {
   const [event, setEvent] = useState<Event | null>(null)
   const [days, setDays] = useState<DayData[]>([])
   const [loading, setLoading] = useState(true)
 
   const reload = useCallback(async () => {
-    setLoading(true)
+    try {
+      setLoading(true)
 
-    const events = await fetchEvents()
-    const ev = events.find(e => e.id === eventId)
-    if (!ev) { setLoading(false); return }
-    setEvent(ev)
+      const events = await fetchEvents()
+      const ev = events.find(e => e.id === eventId)
+      if (!ev) { setLoading(false); return }
+      setEvent(ev)
 
-    const [
-      programRes, transferRes, hotelRes, restRes, expRes, catRes,
-      staffIntRes, staffExtRes, avRes, allestRes, graficaRes, varieRes
-    ] = await Promise.all([
-      supabase.from('event_program').select('*').eq('event_id', eventId),
-      supabase.from('event_supplier_services').select('*').eq('event_id', eventId),
-      supabase.from('event_hotel_details').select('*').eq('event_id', eventId),
-      supabase.from('event_restaurant_details').select('*').eq('event_id', eventId),
-      supabase.from('event_experience_details').select('*').eq('event_id', eventId),
-      supabase.from('event_catering_details').select('*').eq('event_id', eventId),
-      supabase.from('event_staff_interno_details').select('*').eq('event_id', eventId),
-      supabase.from('event_staff_esterno_details').select('*').eq('event_id', eventId),
-      supabase.from('event_audio_video_details').select('*').eq('event_id', eventId),
-      supabase.from('event_allestimenti_details').select('*').eq('event_id', eventId),
-      supabase.from('event_grafica_stampa_details').select('*').eq('event_id', eventId),
-      supabase.from('event_varie_details').select('*').eq('event_id', eventId),
-    ])
+      const [
+        programRes, transferRes, hotelRes, restRes, expRes, catRes,
+        staffIntRes, staffExtRes, avRes, allestRes, graficaRes, varieRes
+      ] = await Promise.all([
+        supabase.from('event_program').select('*').eq('event_id', eventId),
+        supabase.from('event_supplier_services').select('*').eq('event_id', eventId),
+        supabase.from('event_hotel_details').select('*').eq('event_id', eventId),
+        supabase.from('event_restaurant_details').select('*').eq('event_id', eventId),
+        supabase.from('event_experience_details').select('*').eq('event_id', eventId),
+        supabase.from('event_catering_details').select('*').eq('event_id', eventId),
+        supabase.from('event_staff_interno_details').select('*').eq('event_id', eventId),
+        supabase.from('event_staff_esterno_details').select('*').eq('event_id', eventId),
+        supabase.from('event_audio_video_details').select('*').eq('event_id', eventId),
+        supabase.from('event_allestimenti_details').select('*').eq('event_id', eventId),
+        supabase.from('event_grafica_stampa_details').select('*').eq('event_id', eventId),
+        supabase.from('event_varie_details').select('*').eq('event_id', eventId),
+      ])
 
-    const allServices: TimelineService[] = []
+      const allServices: TimelineService[] = []
 
-    for (const row of (programRes.data ?? [])) {
-      allServices.push(normalizeService(row, 'event_program', 'programma'))
-    }
-    for (const row of (transferRes.data ?? [])) {
-      allServices.push(normalizeService(row, 'event_supplier_services', 'transfer'))
-    }
-    for (const row of (hotelRes.data ?? [])) {
-      allServices.push(normalizeService(row, 'event_hotel_details', 'hotel'))
-    }
-    for (const row of (restRes.data ?? [])) {
-      allServices.push(normalizeService(row, 'event_restaurant_details', 'ristorante'))
-    }
-    for (const row of (expRes.data ?? [])) {
-      allServices.push(normalizeService(row, 'event_experience_details', 'experience'))
-    }
-    for (const row of (catRes.data ?? [])) {
-      allServices.push(normalizeService(row, 'event_catering_details', 'catering'))
-    }
-    for (const row of (staffIntRes.data ?? [])) {
-      allServices.push(normalizeService(row, 'event_staff_interno_details', 'staff_interno'))
-    }
-    for (const row of (staffExtRes.data ?? [])) {
-      allServices.push(normalizeService(row, 'event_staff_esterno_details', 'staff_esterno'))
-    }
-    for (const row of (avRes.data ?? [])) {
-      allServices.push(...normalizeMultiDateService(row, 'event_audio_video_details', 'audio_video', [
-        { col: 'data_montaggio', label: 'Montaggio' },
-        { col: 'data_prove', label: 'Prove' },
-        { col: 'data_evento', label: 'Evento' },
-        { col: 'data_smontaggio', label: 'Smontaggio' },
-      ]))
-    }
-    for (const row of (allestRes.data ?? [])) {
-      allServices.push(...normalizeMultiDateService(row, 'event_allestimenti_details', 'allestimenti', [
-        { col: 'data_montaggio', label: 'Montaggio' },
-        { col: 'data_smontaggio', label: 'Smontaggio' },
-      ]))
-    }
-    for (const row of (graficaRes.data ?? [])) {
-      allServices.push(normalizeService(row, 'event_grafica_stampa_details', 'grafica_stampa'))
-    }
-    for (const row of (varieRes.data ?? [])) {
-      allServices.push(normalizeService(row, 'event_varie_details', 'varie'))
-    }
-
-    const dayStrings = generateDays(ev.dataInizio, ev.dataFine)
-    const dayMap = new Map<string, TimelineService[]>()
-    for (const d of dayStrings) dayMap.set(d, [])
-
-    for (const svc of allServices) {
-      if (!svc.data) continue
-      const bucket = dayMap.get(svc.data)
-      if (bucket) {
-        bucket.push(svc)
+      for (const row of (programRes.data ?? [])) {
+        allServices.push(normalizeService(row, 'event_program', 'programma'))
       }
+      for (const row of (transferRes.data ?? [])) {
+        allServices.push(normalizeService(row, 'event_supplier_services', 'transfer'))
+      }
+      for (const row of (hotelRes.data ?? [])) {
+        allServices.push(normalizeService(row, 'event_hotel_details', 'hotel'))
+      }
+      for (const row of (restRes.data ?? [])) {
+        allServices.push(normalizeService(row, 'event_restaurant_details', 'ristorante'))
+      }
+      for (const row of (expRes.data ?? [])) {
+        allServices.push(normalizeService(row, 'event_experience_details', 'experience'))
+      }
+      for (const row of (catRes.data ?? [])) {
+        allServices.push(normalizeService(row, 'event_catering_details', 'catering'))
+      }
+      for (const row of (staffIntRes.data ?? [])) {
+        allServices.push(normalizeService(row, 'event_staff_interno_details', 'staff_interno'))
+      }
+      for (const row of (staffExtRes.data ?? [])) {
+        allServices.push(normalizeService(row, 'event_staff_esterno_details', 'staff_esterno'))
+      }
+      for (const row of (avRes.data ?? [])) {
+        allServices.push(...normalizeMultiDateService(row, 'event_audio_video_details', 'audio_video', [
+          { col: 'data_montaggio', label: 'Montaggio' },
+          { col: 'data_prove', label: 'Prove' },
+          { col: 'data_evento', label: 'Evento' },
+          { col: 'data_smontaggio', label: 'Smontaggio' },
+        ]))
+      }
+      for (const row of (allestRes.data ?? [])) {
+        allServices.push(...normalizeMultiDateService(row, 'event_allestimenti_details', 'allestimenti', [
+          { col: 'data_montaggio', label: 'Montaggio' },
+          { col: 'data_smontaggio', label: 'Smontaggio' },
+        ]))
+      }
+      for (const row of (graficaRes.data ?? [])) {
+        allServices.push(normalizeService(row, 'event_grafica_stampa_details', 'grafica_stampa'))
+      }
+      for (const row of (varieRes.data ?? [])) {
+        allServices.push(normalizeService(row, 'event_varie_details', 'varie'))
+      }
+
+      const dayStrings = generateDays(ev.dataInizio, ev.dataFine)
+      const dayMap = new Map<string, TimelineService[]>()
+      for (const d of dayStrings) dayMap.set(d, [])
+
+      for (const svc of allServices) {
+        if (!svc.data) continue
+        const bucket = dayMap.get(svc.data)
+        if (bucket) {
+          bucket.push(svc)
+        }
+      }
+
+      const result: DayData[] = dayStrings.map(date => ({
+        date,
+        services: (dayMap.get(date) ?? []).sort((a, b) => (a.ora ?? '99:99').localeCompare(b.ora ?? '99:99')),
+      }))
+
+      setDays(result)
+      setLoading(false)
+    } catch (err) {
+      showToast?.('Errore caricamento timeline')
+      setLoading(false)
     }
-
-    const result: DayData[] = dayStrings.map(date => ({
-      date,
-      services: (dayMap.get(date) ?? []).sort((a, b) => (a.ora ?? '99:99').localeCompare(b.ora ?? '99:99')),
-    }))
-
-    setDays(result)
-    setLoading(false)
-  }, [eventId])
+  }, [eventId, showToast])
 
   useEffect(() => { reload() }, [reload])
 

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   Calendar,
@@ -2550,6 +2550,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [eventTasks, setEventTasks] = useState<Task[]>([])
   const navigateRouter = useNavigate()
+  const tabsContainerRef = useRef<HTMLDivElement>(null)
 
   const navigateToCrm = (clientName: string) => {
     navigateRouter(`/crm?client=${encodeURIComponent(clientName)}`)
@@ -2697,13 +2698,16 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
       </div>
 
       {/* Wire Tabs */}
-      <div style={{ display: 'flex', gap: '18px', overflowX: 'auto', marginBottom: '20px', paddingBottom: '8px' }}>
+      <div ref={tabsContainerRef} className="event-detail-tabs" style={{ display: 'flex', gap: '18px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: '20px', paddingBottom: '8px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+          <button key={tab.id} onClick={(e) => {
+            setActiveTab(tab.id);
+            (e.currentTarget as HTMLElement).scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+          }}
             style={{
               fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em',
               background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-              padding: '4px 0', position: 'relative',
+              padding: '12px 12px', position: 'relative', minHeight: '44px', flexShrink: 0,
               color: activeTab === tab.id ? 'var(--text)' : 'var(--muted)',
               opacity: activeTab === tab.id ? 1 : 0.6,
               fontWeight: activeTab === tab.id ? 600 : 400,

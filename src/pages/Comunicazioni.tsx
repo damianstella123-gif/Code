@@ -4,6 +4,7 @@ import { Search, Plus, ArrowLeft, Send, Check, CheckCheck, MessageSquare, Archiv
 import { loadUser } from '@/lib/auth'
 import { fetchAllProfiles, type Profile } from '@/lib/profiles'
 import { useChatNotifications } from '@/lib/chat-notifications'
+import { useToast } from '@/lib/toast'
 import {
   fetchConversations,
   fetchMessages,
@@ -82,6 +83,7 @@ interface ChatViewProps {
 
 function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const { unread: globalUnread, togglePin, refreshUnread } = useChatNotifications()
   const [conversations, setConversations] = useState<ChatConversation[]>([])
   const [activeConvId, setActiveConvId] = useState<string | null>(null)
@@ -107,28 +109,45 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
   }, [])
 
   useEffect(() => {
-    loadConversations()
-    fetchAllProfiles().then(setProfiles)
-    fetchEvents().then(setEvents)
+    async function load() {
+      try {
+        await loadConversations()
+        await fetchAllProfiles().then(setProfiles).catch(() => {})
+        await fetchEvents().then(setEvents).catch(() => {})
+      } catch (err) {
+        showToast('Errore caricamento dati')
+      }
+    }
+    load()
     // Check if we should show notification permission banner
     const dismissed = localStorage.getItem('chat_notif_dismissed')
     if (!dismissed && typeof Notification !== 'undefined' && Notification.permission === 'default') {
       setShowNotifBanner(true)
     }
-  }, [loadConversations])
+  }, [loadConversations, showToast])
 
   useEffect(() => {
     if (!activeConvId) return
-    loadMessages(activeConvId)
-    markMessagesRead(activeConvId, currentUserId).then(() => refreshUnread())
-  }, [activeConvId, currentUserId, loadMessages, refreshUnread])
+    const convId = activeConvId
+    async function load() {
+      try {
+        await loadMessages(convId)
+        await markMessagesRead(convId, currentUserId).catch(() => {})
+      } catch (err) {
+        showToast('Errore caricamento messaggi')
+      } finally {
+        await refreshUnread()
+      }
+    }
+    load()
+  }, [activeConvId, currentUserId, loadMessages, refreshUnread, showToast])
 
   useEffect(() => {
     let msgChannelId = 0
     const convChannel = supabase
       .channel('chat-convs-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_conversations' }, () => {
-        loadConversations()
+        loadConversations().catch(() => {})
       })
       .subscribe()
 
@@ -142,10 +161,10 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
             return [...prev, newMsg]
           })
           if (newMsg.sender_id !== currentUserId) {
-            markMessagesRead(activeConvId!, currentUserId)
+            markMessagesRead(activeConvId!, currentUserId).catch(() => {})
           }
         }
-        loadConversations()
+        loadConversations().catch(() => {})
       })
       .subscribe()
 

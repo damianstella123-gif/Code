@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logError } from './error-log'
 import type { Task } from '@/data/tasks'
 
 interface TaskRow {
@@ -58,8 +59,8 @@ export async function fetchTasks(): Promise<Task[]> {
     .order('due_date', { ascending: true })
     .limit(500)
   if (error) {
-    console.error('fetchTasks error:', error.message)
-    return []
+    logError('tasks-service', 'fetchTasks', error)
+    throw new Error(error.message)
   }
   return ((data ?? []) as TaskRow[]).map(rowToTask)
 }
@@ -71,8 +72,8 @@ export async function fetchTasksByEvent(eventId: string): Promise<Task[]> {
     .eq('event_id', eventId)
     .order('due_date', { ascending: true })
   if (error) {
-    console.error('fetchTasksByEvent error:', error.message)
-    return []
+    logError('tasks-service', 'fetchTasksByEvent', error)
+    throw new Error(error.message)
   }
   return ((data ?? []) as TaskRow[]).map(rowToTask)
 }
@@ -84,8 +85,8 @@ export async function createTask(task: Task): Promise<Task | null> {
     .select()
     .maybeSingle()
   if (error) {
-    console.error('createTask error:', error.message)
-    return null
+    logError('tasks-service', 'createTask', error)
+    throw new Error(error.message)
   }
   return data ? rowToTask(data as TaskRow) : null
 }
@@ -97,8 +98,8 @@ export async function upsertTask(task: Task): Promise<Task | null> {
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertTask error:', error.message)
-    return null
+    logError('tasks-service', 'upsertTask', error)
+    throw new Error(error.message)
   }
   return data ? rowToTask(data as TaskRow) : null
 }
@@ -123,8 +124,8 @@ export async function updateTask(id: string, patch: Partial<Task>): Promise<Task
     .select()
     .maybeSingle()
   if (error) {
-    console.error('updateTask error:', error.message)
-    return null
+    logError('tasks-service', 'updateTask', error)
+    throw new Error(error.message)
   }
   return data ? rowToTask(data as TaskRow) : null
 }
@@ -136,8 +137,8 @@ export async function changeTaskStatus(id: string, status: Task['stato']): Promi
 export async function deleteTask(id: string): Promise<boolean> {
   const { error } = await supabase.from('tasks').delete().eq('id', id)
   if (error) {
-    console.error('deleteTask error:', error.message)
-    return false
+    logError('tasks-service', 'deleteTask', error)
+    throw new Error(error.message)
   }
   return true
 }

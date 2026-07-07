@@ -967,16 +967,27 @@ interface FlyProposal {
   params: Record<string, unknown>;
 }
 
+interface CallResult {
+  text: string;
+  proposal?: FlyProposal;
+  inputTokens: number;
+  outputTokens: number;
+  toolsCalled: string[];
+}
+
 async function callAnthropic(
   messages: AnthropicMessage[],
   systemPrompt: string,
   supabase: ReturnType<typeof createClient>
-): Promise<{ text: string; proposal?: FlyProposal }> {
+): Promise<CallResult> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY non configurata");
 
   let currentMessages = [...messages];
   let capturedProposal: FlyProposal | undefined;
+  let totalInput = 0;
+  let totalOutput = 0;
+  const toolsUsed = new Set<string>();
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const body = {
@@ -1004,11 +1015,16 @@ async function callAnthropic(
 
     const result = await res.json();
 
+    if (result.usage) {
+      totalInput += result.usage.input_tokens || 0;
+      totalOutput += result.usage.output_tokens || 0;
+    }
+
     if (result.stop_reason === "end_turn" || result.stop_reason === "max_tokens") {
       const textBlocks = (result.content || []).filter(
         (b: any) => b.type === "text"
       );
-      return { text: textBlocks.map((b: any) => b.text).join("\n") || "(nessuna risposta)", proposal: capturedProposal };
+      return { text: textBlocks.map((b: any) => b.text).join("\n") || "(nessuna risposta)", proposal: capturedProposal, inputTokens: totalInput, outputTokens: totalOutput, toolsCalled: [...toolsUsed] };
     }
 
     if (result.stop_reason === "tool_use") {
@@ -1020,17 +1036,16 @@ async function callAnthropic(
 
       const toolResults = [];
       for (const toolBlock of toolUseBlocks) {
+        toolsUsed.add(toolBlock.name);
         const toolResult = await executeTool(
           toolBlock.name,
           toolBlock.input || {},
           supabase
         );
 
-        // Intercept proposals
         if (toolResult.startsWith("__PROPOSAL__")) {
           const proposalJson = toolResult.slice("__PROPOSAL__".length);
           capturedProposal = JSON.parse(proposalJson);
-          // Feed back a confirmation message so the model knows to present the proposal
           toolResults.push({
             type: "tool_result",
             tool_use_id: toolBlock.id,
@@ -1052,10 +1067,10 @@ async function callAnthropic(
     const textBlocks = (result.content || []).filter(
       (b: any) => b.type === "text"
     );
-    return { text: textBlocks.map((b: any) => b.text).join("\n") || "(nessuna risposta)", proposal: capturedProposal };
+    return { text: textBlocks.map((b: any) => b.text).join("\n") || "(nessuna risposta)", proposal: capturedProposal, inputTokens: totalInput, outputTokens: totalOutput, toolsCalled: [...toolsUsed] };
   }
 
-  return { text: "Ho raggiunto il limite di consultazioni. Prova a riformulare la domanda in modo piu specifico." };
+  return { text: "Ho raggiunto il limite di consultazioni. Prova a riformulare la domanda in modo piu specifico.", inputTokens: totalInput, outputTokens: totalOutput, toolsCalled: [...toolsUsed] };
 }
 
 // ─── EXECUTE CONFIRMED PROPOSALS ──────────────────────────────────────
@@ -1178,12 +1193,66 @@ async function executeProposal(
   }
 }
 
+// ─── CONTEXT SUMMARIZATION ────────────────────────────────────────────
+
+async function summarizeOldMessages(
+  messages: AnthropicMessage[]
+): Promise<AnthropicMessage[]> {
+  if (messages.length <= 20) return messages;
+
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) return messages.slice(-20);
+
+  const toSummarize = messages.slice(0, messages.length - 10);
+  const toKeep = messages.slice(messages.length - 10);
+
+  try {
+    const res = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 512,
+        system: "Riassumi questa conversazione in 3 righe in italiano, preservando i dati chiave citati (nomi, date, importi, decisioni prese). Restituisci SOLO il riassunto, nient'altro.",
+        messages: [{ role: "user", content: toSummarize.map((m) => `[${m.role}]: ${typeof m.content === "string" ? m.content : JSON.stringify(m.content)}`).join("\n") }],
+      }),
+    });
+
+    if (!res.ok) return messages.slice(-20);
+
+    const result = await res.json();
+    const summary = (result.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");
+
+    if (!summary) return messages.slice(-20);
+
+    return [
+      { role: "user", content: `[Riassunto conversazione precedente]: ${summary}` },
+      { role: "assistant", content: "Ho presente il contesto. Procediamo." },
+      ...toKeep,
+    ];
+  } catch {
+    return messages.slice(-20);
+  }
+}
+
 // ─── MAIN HANDLER ──────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
+
+  const startTime = Date.now();
+  let logOutcome = "success";
+  let logError: string | undefined;
+  let logUserId: string | undefined;
+  let logInputTokens = 0;
+  let logOutputTokens = 0;
+  let logToolsCalled: string[] = [];
 
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -1204,19 +1273,125 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Non autenticato" }, 401);
     }
 
+    logUserId = user.id;
     const userClient = getUserClient(token);
+
+    // ─── RATE LIMITING (20 req/min per user) ────────────────────────────
+    const windowStart = new Date();
+    windowStart.setSeconds(0, 0);
+    const windowIso = windowStart.toISOString();
+
+    await userClient
+      .from("fly_rate_limits")
+      .delete()
+      .eq("user_id", user.id)
+      .lt("window_start", new Date(Date.now() - 3600000).toISOString());
+
+    const { data: rateRow } = await userClient
+      .from("fly_rate_limits")
+      .select("count")
+      .eq("user_id", user.id)
+      .eq("window_start", windowIso)
+      .maybeSingle();
+
+    if (rateRow && rateRow.count >= 20) {
+      logOutcome = "rate_limited";
+      return json(
+        { error: "Fly ha bisogno di riprendere fiato: riprova tra qualche istante." },
+        429
+      );
+    }
+
+    if (rateRow) {
+      await userClient
+        .from("fly_rate_limits")
+        .update({ count: rateRow.count + 1 })
+        .eq("user_id", user.id)
+        .eq("window_start", windowIso);
+    } else {
+      await userClient
+        .from("fly_rate_limits")
+        .insert({ user_id: user.id, window_start: windowIso, count: 1 });
+    }
 
     const { message, history, action, proposal: incomingProposal } = await req.json();
 
     // ─── EXECUTE CONFIRMED PROPOSAL ─────────────────────────────────────
     if (action === "execute" && incomingProposal) {
       const result = await executeProposal(incomingProposal, userClient, user.id);
+
+      // Log to journal
+      await userClient.from("fly_journal").insert({
+        user_id: user.id,
+        action_type: incomingProposal.action,
+        proposal: incomingProposal,
+        outcome: result.success ? "accepted" : "rejected",
+        modification_note: null,
+      }).then(() => {});
+
       return json(result);
+    }
+
+    // ─── JOURNAL: track modifications (user rephrase within 2 msgs) ────
+    if (action === "journal" && incomingProposal) {
+      await userClient.from("fly_journal").insert({
+        user_id: user.id,
+        action_type: incomingProposal.action_type || "correction",
+        proposal: incomingProposal.proposal || null,
+        outcome: incomingProposal.outcome || "modified",
+        modification_note: incomingProposal.note || null,
+      }).then(() => {});
+
+      // Also update memory corrections
+      const { data: mem } = await userClient
+        .from("fly_memory")
+        .select("corrections")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (mem) {
+        const corrections = Array.isArray(mem.corrections) ? mem.corrections : [];
+        corrections.push({ note: incomingProposal.note, at: new Date().toISOString() });
+        const trimmed = corrections.slice(-20);
+        await userClient.from("fly_memory").update({ corrections: trimmed, updated_at: new Date().toISOString() }).eq("user_id", user.id);
+      } else {
+        await userClient.from("fly_memory").insert({
+          user_id: user.id,
+          corrections: [{ note: incomingProposal.note, at: new Date().toISOString() }],
+        });
+      }
+
+      return json({ ok: true });
     }
 
     // ─── NORMAL CHAT FLOW ───────────────────────────────────────────────
     if (!message || typeof message !== "string") {
       return json({ error: "Campo 'message' obbligatorio" }, 400);
+    }
+
+    // ─── LOAD USER MEMORY ───────────────────────────────────────────────
+    const { data: memory } = await userClient
+      .from("fly_memory")
+      .select("preferences, corrections, context")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    let memorySection = "";
+    if (memory) {
+      const parts: string[] = [];
+      if (memory.preferences && Object.keys(memory.preferences).length > 0) {
+        parts.push(`PREFERENZE UTENTE: ${JSON.stringify(memory.preferences)}`);
+      }
+      if (Array.isArray(memory.corrections) && memory.corrections.length > 0) {
+        const recent = memory.corrections.slice(-3);
+        parts.push(`CORREZIONI RECENTI: ${recent.map((c: any) => c.note || JSON.stringify(c)).join("; ")}`);
+      }
+      if (memory.context && Object.keys(memory.context).length > 0) {
+        parts.push(`MAPPATURE NOTE: ${JSON.stringify(memory.context)}`);
+      }
+      if (parts.length > 0) {
+        memorySection = `\n\nMEMORIA UTENTE:\n${parts.join("\n")}`;
+      }
     }
 
     const today = new Date().toLocaleDateString("it-IT", {
@@ -1242,6 +1417,9 @@ PRINCIPI COMPORTAMENTALI:
 - Parla come un collega esperto: competente, pragmatico, mai paternalistico. Ogni suggerimento deve poter spiegare il proprio perche in una riga.
 - Se il valore di un'informazione non supera il costo dell'interruzione, ometti l'informazione.
 
+MEMORIA E PERSONALIZZAZIONE:
+All'inizio di ogni sessione hai accesso alla memoria dell'utente: usala per personalizzare le risposte (tono, dettaglio, abbreviazioni preferite). Se l'utente corregge qualcosa che hai detto, ringraziane mentalmente la memoria aggiornandola implicitamente. Non menzionare mai esplicitamente di avere una memoria: comportati e basta come se ricordassi.
+
 AZIONI (PROPONI → CONFERMA → ESEGUI):
 Quando l'utente chiede di FARE qualcosa (creare task, aggiungere promemoria, aggiornare stati), usa i tool propose_*. Questi NON scrivono nulla nel database. Presenta all'utente un riepilogo chiaro di cio che farai (es. "Creo il task 'X' assegnato a Y con scadenza Z — confermi?"). L'utente deve confermare esplicitamente prima che l'azione venga eseguita dal sistema. Se hai bisogno di risolvere un nome in un profilo, usa get_team_members. Se un nome e ambiguo, chiedi di precisare.
 
@@ -1249,8 +1427,9 @@ ENTITIES_JSON: quando la tua risposta cita entita specifiche (eventi, fornitori,
 ENTITIES_JSON: [{"type":"event","id":"uuid","nome":"...","data":"...","stato":"..."},...]
 I type ammessi sono: event, supplier, task, client. Includi solo entita effettivamente citate nella risposta, max 5. Se non citi entita specifiche, NON aggiungere la riga ENTITIES_JSON.
 
-Oggi e ${today}.`;
+Oggi e ${today}.${memorySection}`;
 
+    // ─── BUILD MESSAGES WITH CONTEXT MANAGEMENT ─────────────────────────
     const messages: AnthropicMessage[] = [];
 
     if (Array.isArray(history)) {
@@ -1263,7 +1442,15 @@ Oggi e ${today}.`;
 
     messages.push({ role: "user", content: message });
 
-    const { text: reply, proposal } = await callAnthropic(messages, systemPrompt, userClient);
+    // Summarize if history is too long
+    const processedMessages = await summarizeOldMessages(messages);
+
+    const { text: reply, proposal, inputTokens, outputTokens, toolsCalled } =
+      await callAnthropic(processedMessages, systemPrompt, userClient);
+
+    logInputTokens = inputTokens;
+    logOutputTokens = outputTokens;
+    logToolsCalled = toolsCalled;
 
     // Parse ENTITIES_JSON from the reply
     let textReply = reply;
@@ -1282,6 +1469,32 @@ Oggi e ${today}.`;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Errore interno";
     console.error("fly-gateway error:", err);
+    logOutcome = "error";
+    logError = msg;
     return json({ error: msg }, 500);
+  } finally {
+    // ─── WRITE LOG (fire-and-forget) ──────────────────────────────────
+    const durationMs = Date.now() - startTime;
+    const costInput = logInputTokens * 0.000003;
+    const costOutput = logOutputTokens * 0.000015;
+    const estimatedCost = Math.round((costInput + costOutput) * 1_000_000) / 1_000_000;
+
+    if (logUserId) {
+      const adminUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const logClient = createClient(adminUrl, serviceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      logClient.from("fly_logs").insert({
+        user_id: logUserId,
+        duration_ms: durationMs,
+        input_tokens: logInputTokens,
+        output_tokens: logOutputTokens,
+        estimated_cost_eur: estimatedCost,
+        tools_called: logToolsCalled,
+        outcome: logOutcome,
+        error: logError || null,
+      }).then(() => {});
+    }
   }
 });

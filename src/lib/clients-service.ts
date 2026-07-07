@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logError } from './error-log'
 import type { Client, Contatto } from '@/data/clients'
 
 interface ClientRow {
@@ -69,8 +70,8 @@ export async function fetchClients(): Promise<Client[]> {
     .order('created_at', { ascending: false })
     .limit(1000)
   if (error) {
-    console.error('fetchClients error:', error.message)
-    return []
+    logError('clients-service', 'fetchClients', error)
+    throw new Error(error.message)
   }
   return ((data ?? []) as ClientRow[]).map(rowToClient)
 }
@@ -82,8 +83,8 @@ export async function upsertClient(client: Client): Promise<Client | null> {
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertClient error:', error.message)
-    return null
+    logError('clients-service', 'upsertClient', error)
+    throw new Error(error.message)
   }
   return data ? rowToClient(data as ClientRow) : null
 }
@@ -111,8 +112,8 @@ export async function updateClient(id: string, patch: Partial<Client>): Promise<
     .select()
     .maybeSingle()
   if (error) {
-    console.error('updateClient error:', error.message)
-    return null
+    logError('clients-service', 'updateClient', error)
+    throw new Error(error.message)
   }
   return data ? rowToClient(data as ClientRow) : null
 }
@@ -120,8 +121,8 @@ export async function updateClient(id: string, patch: Partial<Client>): Promise<
 export async function deleteClient(id: string): Promise<boolean> {
   const { error } = await supabase.from('clients').delete().eq('id', id)
   if (error) {
-    console.error('deleteClient error:', error.message)
-    return false
+    logError('clients-service', 'deleteClient', error)
+    throw new Error(error.message)
   }
   return true
 }
@@ -157,8 +158,8 @@ export async function fetchContacts(clientId?: string): Promise<Contatto[]> {
   if (clientId) query = query.eq('client_id', clientId)
   const { data, error } = await query
   if (error) {
-    console.error('fetchContacts error:', error.message)
-    return []
+    logError('clients-service', 'fetchContacts', error)
+    throw new Error(error.message)
   }
   return ((data ?? []) as ContactRow[]).map(rowToContatto)
 }
@@ -179,8 +180,8 @@ export async function upsertContact(c: Contatto): Promise<Contatto | null> {
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertContact error:', error.message)
-    return null
+    logError('clients-service', 'upsertContact', error)
+    throw new Error(error.message)
   }
   return data ? rowToContatto(data as ContactRow) : null
 }
@@ -188,8 +189,8 @@ export async function upsertContact(c: Contatto): Promise<Contatto | null> {
 export async function deleteContact(id: string): Promise<boolean> {
   const { error } = await supabase.from('contacts').delete().eq('id', id)
   if (error) {
-    console.error('deleteContact error:', error.message)
-    return false
+    logError('clients-service', 'deleteContact', error)
+    throw new Error(error.message)
   }
   return true
 }
@@ -220,8 +221,8 @@ export async function fetchReferenti(clientId: string): Promise<Referente[]> {
     .order('is_principale', { ascending: false })
     .order('cognome', { ascending: true })
   if (error) {
-    console.error('fetchReferenti error:', error.message)
-    return []
+    logError('clients-service', 'fetchReferenti', error)
+    throw new Error(error.message)
   }
   return (data ?? []) as Referente[]
 }
@@ -233,8 +234,8 @@ export async function fetchAllReferenti(): Promise<Referente[]> {
     .order('is_principale', { ascending: false })
     .order('cognome', { ascending: true })
   if (error) {
-    console.error('fetchAllReferenti error:', error.message)
-    return []
+    logError('clients-service', 'fetchAllReferenti', error)
+    throw new Error(error.message)
   }
   return (data ?? []) as Referente[]
 }
@@ -246,8 +247,8 @@ export async function upsertReferente(r: Omit<Referente, 'created_at' | 'updated
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertReferente error:', error.message)
-    return null
+    logError('clients-service', 'upsertReferente', error)
+    throw new Error(error.message)
   }
   return data as Referente | null
 }
@@ -255,8 +256,8 @@ export async function upsertReferente(r: Omit<Referente, 'created_at' | 'updated
 export async function deleteReferente(id: string): Promise<boolean> {
   const { error } = await supabase.from('referenti').delete().eq('id', id)
   if (error) {
-    console.error('deleteReferente error:', error.message)
-    return false
+    logError('clients-service', 'deleteReferente', error)
+    throw new Error(error.message)
   }
   return true
 }
@@ -267,16 +268,16 @@ export async function setReferentePrincipale(clientId: string, referenteId: stri
     .update({ is_principale: false, updated_at: new Date().toISOString() })
     .eq('client_id', clientId)
   if (clearErr) {
-    console.error('clearPrincipale error:', clearErr.message)
-    return false
+    logError('clients-service', 'clearPrincipale', clearErr)
+    throw new Error(clearErr.message)
   }
   const { error: setErr } = await supabase
     .from('referenti')
     .update({ is_principale: true, updated_at: new Date().toISOString() })
     .eq('id', referenteId)
   if (setErr) {
-    console.error('setPrincipale error:', setErr.message)
-    return false
+    logError('clients-service', 'setPrincipale', setErr)
+    throw new Error(setErr.message)
   }
   return true
 }
@@ -292,8 +293,8 @@ export async function uploadCompanyLogo(companyName: string, file: File): Promis
     .upload(path, file, { upsert: true, contentType: file.type })
 
   if (uploadErr) {
-    console.error('uploadCompanyLogo error:', uploadErr.message)
-    return null
+    logError('clients-service', 'uploadCompanyLogo', uploadErr)
+    throw new Error(uploadErr.message)
   }
 
   const { data: urlData } = supabase.storage.from('company-logos').getPublicUrl(path)
@@ -307,8 +308,8 @@ export async function setCompanyLogo(companyName: string, logoUrl: string): Prom
     .ilike('name', companyName)
 
   if (error) {
-    console.error('setCompanyLogo error:', error.message)
-    return false
+    logError('clients-service', 'setCompanyLogo', error)
+    throw new Error(error.message)
   }
   return true
 }

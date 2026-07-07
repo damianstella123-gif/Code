@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logError } from './error-log'
 import type { Messaggio, Priorita, TipoCanale } from '@/data/comunicazioni'
 
 interface CommunicationRow {
@@ -66,8 +67,8 @@ export async function fetchCommunications(): Promise<Messaggio[]> {
     .order('sent_at', { ascending: false })
     .limit(1000)
   if (error) {
-    console.error('fetchCommunications error:', error.message)
-    return []
+    logError('communications-service', 'fetchCommunications', error)
+    throw new Error(error.message)
   }
   return ((data ?? []) as CommunicationRow[]).map(rowToMsg)
 }
@@ -79,8 +80,8 @@ export async function upsertCommunication(msg: Messaggio): Promise<Messaggio | n
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertCommunication error:', error.message)
-    return null
+    logError('communications-service', 'upsertCommunication', error)
+    throw new Error(error.message)
   }
   return data ? rowToMsg(data as CommunicationRow) : null
 }
@@ -109,8 +110,8 @@ export async function updateCommunication(id: string, patch: Partial<Messaggio>)
     .select()
     .maybeSingle()
   if (error) {
-    console.error('updateCommunication error:', error.message)
-    return null
+    logError('communications-service', 'updateCommunication', error)
+    throw new Error(error.message)
   }
   return data ? rowToMsg(data as CommunicationRow) : null
 }
@@ -122,8 +123,8 @@ export async function markCommunicationRead(id: string, userId: string): Promise
     .eq('id', id)
     .maybeSingle()
   if (getErr) {
-    console.error('markCommunicationRead get error:', getErr.message)
-    return null
+    logError('communications-service', 'markCommunicationRead', getErr)
+    throw new Error(getErr.message)
   }
   const existing: string[] = (current?.read_by ?? []) as string[]
   if (existing.includes(userId)) {
@@ -136,8 +137,8 @@ export async function markCommunicationRead(id: string, userId: string): Promise
 export async function deleteCommunication(id: string): Promise<boolean> {
   const { error } = await supabase.from('communications').delete().eq('id', id)
   if (error) {
-    console.error('deleteCommunication error:', error.message)
-    return false
+    logError('communications-service', 'deleteCommunication', error)
+    throw new Error(error.message)
   }
   return true
 }

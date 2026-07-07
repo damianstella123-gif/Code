@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logError } from './error-log'
 
 export interface ChatConversation {
   id: string
@@ -27,8 +28,8 @@ export async function fetchConversations(): Promise<ChatConversation[]> {
     .select('*')
     .order('last_message_at', { ascending: false, nullsFirst: false })
   if (error) {
-    console.error('fetchConversations error:', error.message)
-    return []
+    logError('chat-service', 'fetchConversations', error)
+    throw new Error(error.message)
   }
   return (data ?? []) as ChatConversation[]
 }
@@ -40,8 +41,8 @@ export async function fetchMessages(conversationId: string): Promise<ChatMessage
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
   if (error) {
-    console.error('fetchMessages error:', error.message)
-    return []
+    logError('chat-service', 'fetchMessages', error)
+    throw new Error(error.message)
   }
   return (data ?? []) as ChatMessage[]
 }
@@ -53,8 +54,8 @@ export async function sendMessage(conversationId: string, senderId: string, cont
     .select()
     .maybeSingle()
   if (error) {
-    console.error('sendMessage error:', error.message)
-    return null
+    logError('chat-service', 'sendMessage', error)
+    throw new Error(error.message)
   }
 
   await supabase
@@ -104,8 +105,8 @@ export async function createConversation(
     .select()
     .maybeSingle()
   if (error) {
-    console.error('createConversation error:', error.message)
-    return null
+    logError('chat-service', 'createConversation', error)
+    throw new Error(error.message)
   }
   return data as ChatConversation | null
 }
@@ -117,8 +118,8 @@ export async function findDirectConversation(userId1: string, userId2: string): 
     .eq('is_group', false)
     .contains('participant_ids', [userId1, userId2])
   if (error) {
-    console.error('findDirectConversation error:', error.message)
-    return null
+    logError('chat-service', 'findDirectConversation', error)
+    throw new Error(error.message)
   }
   const match = (data ?? []).find(
     (c: ChatConversation) => c.participant_ids.length === 2
@@ -132,8 +133,8 @@ export async function updateConversationParticipants(conversationId: string, par
     .update({ participant_ids: participantIds, updated_at: new Date().toISOString() })
     .eq('id', conversationId)
   if (error) {
-    console.error('updateConversationParticipants error:', error.message)
-    return false
+    logError('chat-service', 'updateConversationParticipants', error)
+    throw new Error(error.message)
   }
   return true
 }

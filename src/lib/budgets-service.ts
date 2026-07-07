@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logError } from './error-log'
 import type {
   Uscita,
   StatoPagamento,
@@ -75,8 +76,8 @@ export async function fetchBudgets(): Promise<Uscita[]> {
     .order('due_date', { ascending: true })
     .limit(1000)
   if (error) {
-    console.error('fetchBudgets error:', error.message)
-    return []
+    logError('budgets-service', 'fetchBudgets', error)
+    throw new Error(error.message)
   }
   return ((data ?? []) as BudgetRow[]).map(rowToUscita)
 }
@@ -88,8 +89,8 @@ export async function upsertBudget(uscita: Uscita): Promise<Uscita | null> {
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertBudget error:', error.message)
-    return null
+    logError('budgets-service', 'upsertBudget', error)
+    throw new Error(error.message)
   }
   return data ? rowToUscita(data as BudgetRow) : null
 }
@@ -121,8 +122,8 @@ export async function updateBudget(id: string, patch: Partial<Uscita>): Promise<
     .select()
     .maybeSingle()
   if (error) {
-    console.error('updateBudget error:', error.message)
-    return null
+    logError('budgets-service', 'updateBudget', error)
+    throw new Error(error.message)
   }
   return data ? rowToUscita(data as BudgetRow) : null
 }
@@ -130,8 +131,8 @@ export async function updateBudget(id: string, patch: Partial<Uscita>): Promise<
 export async function deleteBudget(id: string): Promise<boolean> {
   const { error } = await supabase.from('budgets').delete().eq('id', id)
   if (error) {
-    console.error('deleteBudget error:', error.message)
-    return false
+    logError('budgets-service', 'deleteBudget', error)
+    throw new Error(error.message)
   }
   return true
 }

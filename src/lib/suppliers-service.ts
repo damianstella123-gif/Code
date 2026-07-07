@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logError } from './error-log'
 import type { Supplier, StatoContratto, Documento, Recensione, SupplierDetails } from '@/data/suppliers'
 
 interface SupplierRow {
@@ -123,8 +124,8 @@ export async function fetchSuppliers(): Promise<Supplier[]> {
     .order('created_at', { ascending: false })
     .limit(1500)
   if (error) {
-    console.error('fetchSuppliers error:', error.message)
-    return []
+    logError('suppliers-service', 'fetchSuppliers', error)
+    throw new Error(error.message)
   }
   return ((data ?? []) as SupplierRow[]).map(rowToSupplier)
 }
@@ -136,8 +137,8 @@ export async function upsertSupplier(supplier: Supplier): Promise<Supplier | nul
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertSupplier error:', error.message)
-    return null
+    logError('suppliers-service', 'upsertSupplier', error)
+    throw new Error(error.message)
   }
   return data ? rowToSupplier(data as SupplierRow) : null
 }
@@ -181,8 +182,8 @@ export async function updateSupplier(id: string, patch: Partial<Supplier>): Prom
     .select()
     .maybeSingle()
   if (error) {
-    console.error('updateSupplier error:', error.message)
-    return null
+    logError('suppliers-service', 'updateSupplier', error)
+    throw new Error(error.message)
   }
   return data ? rowToSupplier(data as SupplierRow) : null
 }
@@ -190,8 +191,8 @@ export async function updateSupplier(id: string, patch: Partial<Supplier>): Prom
 export async function deleteSupplier(id: string): Promise<boolean> {
   const { error } = await supabase.from('suppliers').delete().eq('id', id)
   if (error) {
-    console.error('deleteSupplier error:', error.message)
-    return false
+    logError('suppliers-service', 'deleteSupplier', error)
+    throw new Error(error.message)
   }
   return true
 }

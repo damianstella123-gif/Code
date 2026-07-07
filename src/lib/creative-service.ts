@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logError } from './error-log'
 
 export interface CreativeProject {
   id: string
@@ -46,8 +47,8 @@ export async function fetchCreativeProjects(): Promise<CreativeProject[]> {
     .order('created_at', { ascending: false })
     .limit(1000)
   if (error) {
-    console.error('fetchCreativeProjects error:', error.message)
-    return []
+    logError('creative-service', 'fetchCreativeProjects', error)
+    throw new Error(error.message)
   }
   return (data ?? []) as CreativeProject[]
 }
@@ -59,8 +60,8 @@ export async function upsertCreativeProject(project: Partial<CreativeProject> & 
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertCreativeProject error:', error.message)
-    return null
+    logError('creative-service', 'upsertCreativeProject', error)
+    throw new Error(error.message)
   }
   return data as CreativeProject | null
 }
@@ -73,8 +74,8 @@ export async function updateCreativeProject(id: string, patch: Partial<CreativeP
     .select()
     .maybeSingle()
   if (error) {
-    console.error('updateCreativeProject error:', error.message)
-    return null
+    logError('creative-service', 'updateCreativeProject', error)
+    throw new Error(error.message)
   }
   return data as CreativeProject | null
 }
@@ -82,8 +83,8 @@ export async function updateCreativeProject(id: string, patch: Partial<CreativeP
 export async function deleteCreativeProject(id: string): Promise<boolean> {
   const { error } = await supabase.from('creative_projects').delete().eq('id', id)
   if (error) {
-    console.error('deleteCreativeProject error:', error.message)
-    return false
+    logError('creative-service', 'deleteCreativeProject', error)
+    throw new Error(error.message)
   }
   return true
 }
@@ -95,8 +96,8 @@ export async function uploadCreativeFile(file: File, projectId: string): Promise
     .from('creative-files')
     .upload(path, file, { upsert: true })
   if (error) {
-    console.error('uploadCreativeFile error:', error.message)
-    return null
+    logError('creative-service', 'uploadCreativeFile', error)
+    throw new Error(error.message)
   }
   const { data: urlData } = supabase.storage.from('creative-files').getPublicUrl(path)
   return urlData.publicUrl

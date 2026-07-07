@@ -73,6 +73,9 @@
     min-height: 44px;
     min-width: 44px;
   }
+  /* Exception: inline text links and nav items shouldn't have large touch targets */
+  .wire-tab, .wire-story, .mobile-bottom-nav a, .mobile-bottom-nav button,
+  [class*="wire-nav"], nav a { min-width: unset; }
   input[type="text"], input[type="email"], input[type="password"],
   input[type="number"], input[type="date"], input[type="tel"],
   textarea, select {
@@ -90,6 +93,11 @@
   .pb-safe {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
+}
+
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 input[type="date"],

@@ -9,6 +9,7 @@ import { fetchTasks } from '@/lib/tasks-service'
 import { fetchClients } from '@/lib/clients-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { useChatNotifications } from '@/lib/chat-notifications'
+import { useToast } from '@/lib/toast'
 import CommandBar from '@/components/CommandBar'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
@@ -46,6 +47,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const currentUser = loadUser()
   const { resolved, toggleTheme } = useTheme()
+  const { showToast } = useToast()
 
   const [liveTasks, setLiveTasks] = useState<Task[]>([])
   const [liveEvents, setLiveEvents] = useState<Event[]>([])
@@ -57,20 +59,25 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      const [ev, tk, cl] = await Promise.all([fetchEvents(), fetchTasks(), fetchClients()])
-      setLiveEvents(ev)
-      setLiveTasks(tk)
-      setLiveClients(cl)
-      setLoading(false)
+      try {
+        const [ev, tk, cl] = await Promise.all([fetchEvents(), fetchTasks(), fetchClients()])
+        setLiveEvents(ev)
+        setLiveTasks(tk)
+        setLiveClients(cl)
+      } catch (err) {
+        showToast('Errore caricamento dati')
+      } finally {
+        setLoading(false)
+      }
     }
     load()
     const clock = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(clock)
   }, [])
 
-  useRealtimeTable('events', () => { fetchEvents().then(setLiveEvents) })
-  useRealtimeTable('tasks', () => { fetchTasks().then(setLiveTasks) })
-  useRealtimeTable('clients', () => { fetchClients().then(setLiveClients) })
+  useRealtimeTable('events', () => { fetchEvents().then(setLiveEvents).catch(() => {}) })
+  useRealtimeTable('tasks', () => { fetchTasks().then(setLiveTasks).catch(() => {}) })
+  useRealtimeTable('clients', () => { fetchClients().then(setLiveClients).catch(() => {}) })
 
   const firstName = currentUser?.first_name ?? currentUser?.nome?.split(' ')[0] ?? ''
 

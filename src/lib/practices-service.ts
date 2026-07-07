@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logError } from './error-log'
 import type {
   Pratica,
   CategoriaPratica,
@@ -68,8 +69,8 @@ export async function fetchPractices(): Promise<Pratica[]> {
     .order('created_at', { ascending: false })
     .limit(500)
   if (error) {
-    console.error('fetchPractices error:', error.message)
-    return []
+    logError('practices-service', 'fetchPractices', error)
+    throw new Error(error.message)
   }
   return ((data ?? []) as PracticeRow[]).map(rowToPratica)
 }
@@ -81,8 +82,8 @@ export async function upsertPractice(pratica: Pratica): Promise<Pratica | null> 
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertPractice error:', error.message)
-    return null
+    logError('practices-service', 'upsertPractice', error)
+    throw new Error(error.message)
   }
   return data ? rowToPratica(data as PracticeRow) : null
 }
@@ -108,8 +109,8 @@ export async function updatePractice(id: string, patch: Partial<Pratica>): Promi
     .select()
     .maybeSingle()
   if (error) {
-    console.error('updatePractice error:', error.message)
-    return null
+    logError('practices-service', 'updatePractice', error)
+    throw new Error(error.message)
   }
   return data ? rowToPratica(data as PracticeRow) : null
 }
@@ -121,8 +122,8 @@ export async function changePracticeStatus(id: string, status: StatoPratica): Pr
 export async function deletePractice(id: string): Promise<boolean> {
   const { error } = await supabase.from('practices').delete().eq('id', id)
   if (error) {
-    console.error('deletePractice error:', error.message)
-    return false
+    logError('practices-service', 'deletePractice', error)
+    throw new Error(error.message)
   }
   return true
 }

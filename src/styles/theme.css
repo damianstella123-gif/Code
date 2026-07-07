@@ -366,8 +366,14 @@ body {
 
 /* ─── SHELL RESPONSIVE ─── */
 @media (max-width: 768px) {
-  .shell-sidebar { width: 240px; }
-  .shell-header { height: 48px; }
+  .shell-sidebar { width: 280px; }
+  .shell-header { height: 48px; padding-top: env(safe-area-inset-top, 0px); }
+}
+
+@media (max-width: 640px) {
+  .shell-header { height: 44px; }
+  .shell-user-chip { padding: 4px 6px 4px 4px; gap: 4px; }
+  .shell-chip-avatar { width: 24px; height: 24px; font-size: 9px; }
 }
 
 /* ─── PANEL / CARD ─────────────────────────────────────────────────────────── */
@@ -1965,8 +1971,16 @@ textarea::placeholder {
 
 @media (max-width: 640px) {
   .wire-story-headline { font-size: 17px; }
-  .wire-ticker { gap: 14px; }
-  .wire-tabs { gap: 14px; overflow-x: auto; }
+  .wire-ticker { gap: 14px; font-size: 11px; }
+  .wire-ticker span { white-space: nowrap; }
+  .wire-tabs { gap: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .wire-page { padding: 0 4px 32px; }
+  .wire-masthead { padding: 20px 0 10px; }
+  .cmd-bar { padding: 10px 14px; border-radius: 10px; }
+  .cmd-bar-input { font-size: 14px; }
+  .cmd-dropdown { border-radius: 10px; }
+  .cmd-suggestions { padding: 10px 12px; gap: 6px; }
+  .cmd-suggestion-pill { font-size: 10px; padding: 4px 10px; }
 }
 
 /* ═══ LIVE DOT ═══ */
@@ -2131,6 +2145,44 @@ textarea::placeholder {
   font-size: 11px;
   color: var(--muted);
   line-height: 1.4;
+}
+
+/* ═══ FLY PANEL (responsive) ═══ */
+
+.fly-panel {
+  position: fixed;
+  top: 72px;
+  right: 24px;
+  width: 420px;
+  max-height: calc(100vh - 96px);
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+@media (max-width: 768px) {
+  .fly-panel {
+    top: 0;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 100vh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .fly-panel {
+    width: 360px;
+    right: 16px;
+  }
 }
 
 /* ═══ CHAT ═══ */
@@ -2450,5 +2502,174 @@ textarea::placeholder {
 
   @keyframes wireLivePulse {
     0%, 100% { opacity: 1; }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — BOTTOM NAV & LAYOUT
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Hide bottom nav on tablet+ */
+@media (min-width: 641px) {
+  .mobile-bottom-nav { display: none !important; }
+  .sm-up\:hidden { }
+}
+
+/* Show bottom nav on phone only */
+@media (max-width: 640px) {
+  .mobile-bottom-nav { display: block; }
+
+  /* Extra bottom padding so content isn't hidden behind bottom nav */
+  .pb-mobile-nav { padding-bottom: 72px !important; }
+
+  /* Hide the sidebar hamburger trigger — replaced by bottom nav */
+  .shell-header button[aria-label="menu"] { display: none; }
+}
+
+/* ─── TABLET (769-1024px): Collapsed sidebar ─── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .shell-sidebar {
+    width: 56px !important;
+    overflow: hidden;
+    transition: width 0.2s ease;
+  }
+
+  .shell-sidebar:hover,
+  .shell-sidebar:focus-within {
+    width: 232px !important;
+    overflow: visible;
+  }
+
+  .shell-sidebar .shell-sidebar-logo {
+    padding: 16px 8px 14px;
+    justify-content: center;
+  }
+
+  .shell-sidebar .shell-sidebar-logo img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    transition: width 0.2s ease;
+  }
+
+  .shell-sidebar:hover .shell-sidebar-logo img,
+  .shell-sidebar:focus-within .shell-sidebar-logo img {
+    width: 128px;
+    height: auto;
+  }
+
+  .shell-sidebar .shell-nav { padding: 8px 6px; }
+
+  .shell-sidebar .shell-nav-label {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    transition: opacity 0.15s ease, width 0.15s ease;
+  }
+
+  .shell-sidebar:hover .shell-nav-label,
+  .shell-sidebar:focus-within .shell-nav-label {
+    opacity: 1;
+    width: auto;
+  }
+
+  .shell-sidebar .shell-nav-item {
+    justify-content: center;
+    padding: 10px;
+  }
+
+  .shell-sidebar:hover .shell-nav-item,
+  .shell-sidebar:focus-within .shell-nav-item {
+    justify-content: flex-start;
+    padding: 9px 14px;
+  }
+
+  .shell-sidebar .shell-sidebar-user {
+    opacity: 0;
+    height: 0;
+    overflow: hidden;
+    transition: opacity 0.15s ease;
+  }
+
+  .shell-sidebar:hover .shell-sidebar-user,
+  .shell-sidebar:focus-within .shell-sidebar-user {
+    opacity: 1;
+    height: auto;
+  }
+
+  .shell-main { padding-left: 56px !important; }
+  .shell-sidebar:hover ~ .shell-main { padding-left: 56px !important; }
+
+  /* Show sidebar always on tablet (collapsed) */
+  .shell-sidebar { transform: translateX(0) !important; }
+
+  /* Hide hamburger on tablet */
+  .shell-header .lg\:hidden { display: none !important; }
+
+  /* Overlay shouldn't show on tablet since sidebar is always visible */
+  .fixed.inset-0.z-40 { display: none !important; }
+}
+
+/* ─── PHONE (≤640px): Responsive masthead ─── */
+@media (max-width: 640px) {
+  .wire-masthead {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 16px 0 10px;
+  }
+
+  .wire-masthead-title { font-size: 12px; }
+
+  .wire-masthead-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Ticker: horizontal scroll */
+  .wire-ticker {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 10px 0;
+    gap: 16px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .wire-ticker::-webkit-scrollbar { display: none; }
+  .wire-ticker span,
+  .wire-ticker > * { white-space: nowrap; flex-shrink: 0; }
+
+  /* Tabs: horizontal scroll */
+  .wire-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    gap: 14px;
+    padding: 12px 0;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .wire-tabs::-webkit-scrollbar { display: none; }
+  .wire-tab { white-space: nowrap; flex-shrink: 0; }
+}
+
+/* Event detail tabs — scrollbar hidden */
+.event-detail-tabs::-webkit-scrollbar { display: none; }
+
+/* ─── RESPONSIVE CARD GRIDS ─── */
+@media (max-width: 640px) {
+  /* Force single column on phone for any auto-fill grid */
+  [style*="grid-template-columns: repeat(auto-fill"] {
+    grid-template-columns: 1fr !important;
+  }
+  .grid-cols-2, .sm\:grid-cols-2, .lg\:grid-cols-3, .lg\:grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  /* Two columns on tablet for auto-fill grids */
+  [style*="grid-template-columns: repeat(auto-fill"] {
+    grid-template-columns: repeat(2, 1fr) !important;
   }
 }

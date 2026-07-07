@@ -22,6 +22,7 @@ import {
   Layers,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
+import { useToast } from '@/lib/toast'
 import { daysLeft, fmtShort, fmtLong, toISO, addDays, addDaysISO, diffDaysISO } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
@@ -1811,6 +1812,7 @@ function MemoEditModal({ item, onClose, onSave }: {
 
 export default function Calendario() {
   const nav = useNavigate()
+  const { showToast } = useToast()
   const [allTasks, setAllTasks] = useState<Task[]>([])
   const [allEvents, setAllEvents] = useState<Event[]>([])
   const [allPratiche, setAllPratiche] = useState<Pratica[]>([])
@@ -1833,15 +1835,19 @@ export default function Calendario() {
   const ruolo = currentUser?.ruolo ?? 'Admin'
 
   const refresh = useCallback(async () => {
-    const [t, e, p, u, cr, so, memos] = await Promise.all([fetchTasks(), fetchEvents(), fetchPractices(), fetchBudgets(), fetchCreativeProjects(), fetchSocialContents(), fetchCalendarItems()])
-    setAllTasks(t)
-    setAllEvents(e)
-    setAllPratiche(p)
-    setAllUscite(u)
-    setAllCreative(cr)
-    setAllSocial(so)
-    setAllMemos(memos)
-  }, [])
+    try {
+      const [t, e, p, u, cr, so, memos] = await Promise.all([fetchTasks(), fetchEvents(), fetchPractices(), fetchBudgets(), fetchCreativeProjects(), fetchSocialContents(), fetchCalendarItems()])
+      setAllTasks(t)
+      setAllEvents(e)
+      setAllPratiche(p)
+      setAllUscite(u)
+      setAllCreative(cr)
+      setAllSocial(so)
+      setAllMemos(memos)
+    } catch (err) {
+      showToast('Errore caricamento calendario')
+    }
+  }, [showToast])
 
   useEffect(() => {
     refresh()

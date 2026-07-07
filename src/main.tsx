@@ -5,6 +5,7 @@ import App from './App'
 import './styles/theme.css'
 import './index.css'
 import { initTheme, ThemeProvider } from './lib/theme'
+import { ToastProvider } from './lib/toast'
 
 initTheme()
 
@@ -41,7 +42,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <BrowserRouter>
         <ThemeProvider>
-          <App />
+          <ToastProvider>
+            <App />
+          </ToastProvider>
         </ThemeProvider>
       </BrowserRouter>
     </ErrorBoundary>

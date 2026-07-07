@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logError } from './error-log'
 
 export interface Invoice {
   id: string
@@ -69,8 +70,8 @@ export async function fetchInvoices(): Promise<Invoice[]> {
     .order('created_at', { ascending: false })
     .limit(500)
   if (error) {
-    console.error('fetchInvoices error:', error.message)
-    return []
+    logError('invoices-service', 'fetchInvoices', error)
+    throw new Error(error.message)
   }
   return (data ?? []).map(d => ({ ...d, amount: Number(d.amount), vat_amount: Number(d.vat_amount) })) as Invoice[]
 }
@@ -82,8 +83,8 @@ export async function upsertInvoice(invoice: Partial<Invoice> & { type: string }
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertInvoice error:', error.message)
-    return null
+    logError('invoices-service', 'upsertInvoice', error)
+    throw new Error(error.message)
   }
   return data ? { ...data, amount: Number(data.amount), vat_amount: Number(data.vat_amount) } as Invoice : null
 }
@@ -96,8 +97,8 @@ export async function updateInvoice(id: string, patch: Partial<Invoice>): Promis
     .select()
     .maybeSingle()
   if (error) {
-    console.error('updateInvoice error:', error.message)
-    return null
+    logError('invoices-service', 'updateInvoice', error)
+    throw new Error(error.message)
   }
   return data ? { ...data, amount: Number(data.amount), vat_amount: Number(data.vat_amount) } as Invoice : null
 }
@@ -105,8 +106,8 @@ export async function updateInvoice(id: string, patch: Partial<Invoice>): Promis
 export async function deleteInvoice(id: string): Promise<boolean> {
   const { error } = await supabase.from('invoices').delete().eq('id', id)
   if (error) {
-    console.error('deleteInvoice error:', error.message)
-    return false
+    logError('invoices-service', 'deleteInvoice', error)
+    throw new Error(error.message)
   }
   return true
 }
@@ -120,8 +121,8 @@ export async function fetchPayments(): Promise<Payment[]> {
     .order('paid_at', { ascending: false })
     .limit(500)
   if (error) {
-    console.error('fetchPayments error:', error.message)
-    return []
+    logError('invoices-service', 'fetchPayments', error)
+    throw new Error(error.message)
   }
   return (data ?? []).map(d => ({ ...d, amount: Number(d.amount) })) as Payment[]
 }
@@ -133,8 +134,8 @@ export async function upsertPayment(payment: Partial<Payment>): Promise<Payment 
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertPayment error:', error.message)
-    return null
+    logError('invoices-service', 'upsertPayment', error)
+    throw new Error(error.message)
   }
   return data ? { ...data, amount: Number(data.amount) } as Payment : null
 }
@@ -142,8 +143,8 @@ export async function upsertPayment(payment: Partial<Payment>): Promise<Payment 
 export async function deletePayment(id: string): Promise<boolean> {
   const { error } = await supabase.from('payments').delete().eq('id', id)
   if (error) {
-    console.error('deletePayment error:', error.message)
-    return false
+    logError('invoices-service', 'deletePayment', error)
+    throw new Error(error.message)
   }
   return true
 }
@@ -157,8 +158,8 @@ export async function fetchAdminDocuments(): Promise<AdminDocument[]> {
     .order('created_at', { ascending: false })
     .limit(500)
   if (error) {
-    console.error('fetchAdminDocuments error:', error.message)
-    return []
+    logError('invoices-service', 'fetchAdminDocuments', error)
+    throw new Error(error.message)
   }
   return (data ?? []) as AdminDocument[]
 }
@@ -170,8 +171,8 @@ export async function upsertAdminDocument(doc: Partial<AdminDocument> & { title:
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertAdminDocument error:', error.message)
-    return null
+    logError('invoices-service', 'upsertAdminDocument', error)
+    throw new Error(error.message)
   }
   return data as AdminDocument | null
 }
@@ -179,8 +180,8 @@ export async function upsertAdminDocument(doc: Partial<AdminDocument> & { title:
 export async function deleteAdminDocument(id: string): Promise<boolean> {
   const { error } = await supabase.from('admin_documents').delete().eq('id', id)
   if (error) {
-    console.error('deleteAdminDocument error:', error.message)
-    return false
+    logError('invoices-service', 'deleteAdminDocument', error)
+    throw new Error(error.message)
   }
   return true
 }
@@ -192,8 +193,8 @@ export async function uploadAdminFile(file: File, docId: string): Promise<string
     .from('admin-files')
     .upload(path, file, { upsert: true })
   if (error) {
-    console.error('uploadAdminFile error:', error.message)
-    return null
+    logError('invoices-service', 'uploadAdminFile', error)
+    throw new Error(error.message)
   }
   const { data: urlData } = supabase.storage.from('admin-files').getPublicUrl(path)
   return urlData.publicUrl

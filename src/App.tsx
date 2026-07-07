@@ -25,8 +25,8 @@ const EventTimeline = lazy(() => import('./pages/EventTimeline'))
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center py-32">
-      <div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</div>
+    <div className="flex items-center justify-center min-h-[40vh]" style={{ background: 'var(--bg)' }}>
+      <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: 'var(--red2)' }} />
     </div>
   )
 }

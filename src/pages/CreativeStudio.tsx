@@ -4,6 +4,7 @@ import {
   Calendar, User, Tag, CheckCircle, Clock, Eye, Download,
   Presentation, Share2, Image, Briefcase, Film, FileText,
 } from 'lucide-react'
+import { useToast } from '@/lib/toast'
 import {
   fetchCreativeProjects, upsertCreativeProject, updateCreativeProject, deleteCreativeProject,
   uploadCreativeFile, CREATIVE_TYPES, CREATIVE_STATUSES, OUTPUT_FORMATS,
@@ -55,6 +56,7 @@ function formatDate(d: string | null) {
 }
 
 export default function CreativeStudio() {
+  const { showToast } = useToast()
   const [projects, setProjects] = useState<CreativeProject[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [clients, setClients] = useState<Client[]>([])
@@ -67,24 +69,29 @@ export default function CreativeStudio() {
   const [mediaDocs, setMediaDocs] = useState<{ id: string; nome: string; file_name: string; file_path: string; file_size: number; categoria: string; created_at: string }[]>([])
 
   const refresh = useCallback(async () => {
-    const [p, e, c, pr, mediaRes] = await Promise.all([
-      fetchCreativeProjects(),
-      fetchEvents(),
-      fetchClients(),
-      fetchAllProfiles(),
-      supabase.from('documents').select('id, nome, file_name, file_path, file_size, categoria, created_at')
-        .in('categoria', ['Foto / Video', 'Presentazioni', 'Materiali Evento'])
-        .eq('scope', 'project')
-        .order('created_at', { ascending: false })
-        .limit(50),
-    ])
-    setProjects(p)
-    setEvents(e)
-    setClients(c as Client[])
-    setProfiles(pr)
-    setMediaDocs(mediaRes.data ?? [])
-    setLoading(false)
-  }, [])
+    try {
+      const [p, e, c, pr, mediaRes] = await Promise.all([
+        fetchCreativeProjects(),
+        fetchEvents(),
+        fetchClients(),
+        fetchAllProfiles(),
+        supabase.from('documents').select('id, nome, file_name, file_path, file_size, categoria, created_at')
+          .in('categoria', ['Foto / Video', 'Presentazioni', 'Materiali Evento'])
+          .eq('scope', 'project')
+          .order('created_at', { ascending: false })
+          .limit(50),
+      ])
+      setProjects(p)
+      setEvents(e)
+      setClients(c as Client[])
+      setProfiles(pr)
+      setMediaDocs(mediaRes.data ?? [])
+    } catch (err) {
+      showToast('Errore caricamento Creative Studio')
+    } finally {
+      setLoading(false)
+    }
+  }, [showToast])
 
   useEffect(() => { refresh() }, [refresh])
 

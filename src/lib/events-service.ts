@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { addDaysISO, diffDaysISO } from './format'
+import { logError } from './error-log'
 import type { Event } from '@/data/events'
 
 interface EventRow {
@@ -72,8 +73,8 @@ export async function fetchEvents(): Promise<Event[]> {
     .order('created_at', { ascending: false })
     .limit(500)
   if (error) {
-    console.error('fetchEvents error:', error.message)
-    return []
+    logError('events-service', 'fetchEvents', error)
+    throw new Error(error.message)
   }
   return ((data ?? []) as EventRow[]).map(rowToEvent)
 }
@@ -86,8 +87,8 @@ export async function createEvent(event: Event): Promise<Event | null> {
     .select()
     .maybeSingle()
   if (error) {
-    console.error('createEvent error:', error.message)
-    return null
+    logError('events-service', 'createEvent', error)
+    throw new Error(error.message)
   }
   return data ? rowToEvent(data as EventRow) : null
 }
@@ -100,8 +101,8 @@ export async function upsertEvent(event: Event): Promise<Event | null> {
     .select()
     .maybeSingle()
   if (error) {
-    console.error('upsertEvent error:', error.message)
-    return null
+    logError('events-service', 'upsertEvent', error)
+    throw new Error(error.message)
   }
   return data ? rowToEvent(data as EventRow) : null
 }
@@ -130,8 +131,8 @@ export async function updateEvent(id: string, patch: Partial<Event>): Promise<Ev
     .select()
     .maybeSingle()
   if (error) {
-    console.error('updateEvent error:', error.message)
-    return null
+    logError('events-service', 'updateEvent', error)
+    throw new Error(error.message)
   }
   return data ? rowToEvent(data as EventRow) : null
 }
@@ -139,8 +140,8 @@ export async function updateEvent(id: string, patch: Partial<Event>): Promise<Ev
 export async function deleteEvent(id: string): Promise<boolean> {
   const { error } = await supabase.from('events').delete().eq('id', id)
   if (error) {
-    console.error('deleteEvent error:', error.message)
-    return false
+    logError('events-service', 'deleteEvent', error)
+    throw new Error(error.message)
   }
   return true
 }
@@ -161,8 +162,8 @@ export async function fetchEventsByClientName(clientName: string): Promise<Event
     .order('start_date', { ascending: false })
     .limit(50)
   if (error) {
-    console.error('fetchEventsByClientName error:', error.message)
-    return []
+    logError('events-service', 'fetchEventsByClientName', error)
+    throw new Error(error.message)
   }
   return ((data ?? []) as EventRow[]).map(rowToEvent)
 }

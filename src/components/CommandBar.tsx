@@ -434,20 +434,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
 
       {/* Fly Conversation Panel */}
       {flyOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 72,
-          right: 24,
-          width: 420,
-          maxHeight: 'calc(100vh - 96px)',
-          background: 'var(--panel-solid)',
-          border: '1px solid var(--line)',
-          borderRadius: 14,
-          display: 'flex',
-          flexDirection: 'column',
-          zIndex: 1000,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        }}>
+        <div className="fly-panel">
           {/* Header */}
           <div style={{
             display: 'flex',
@@ -455,6 +442,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
             justifyContent: 'space-between',
             padding: '12px 16px',
             borderBottom: '1px solid var(--line)',
+            flexShrink: 0,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <PawPrint style={{
@@ -479,7 +467,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
                 </span>
               )}
             </div>
-            <button onClick={() => setFlyOpen(false)} style={{ color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+            <button onClick={() => setFlyOpen(false)} style={{ color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -492,8 +480,8 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
             display: 'flex',
             flexDirection: 'column',
             gap: 12,
-            minHeight: 200,
-            maxHeight: 'calc(100vh - 240px)',
+            minHeight: 0,
+            WebkitOverflowScrolling: 'touch',
           }}>
             {flyHistory.length === 0 && !flyLoading && (
               <div style={{ textAlign: 'center', padding: '32px 16px' }}>
@@ -649,10 +637,12 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
           {/* Input */}
           <div style={{
             padding: '12px 16px',
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))',
             borderTop: '1px solid var(--line)',
             display: 'flex',
             gap: 8,
             alignItems: 'center',
+            flexShrink: 0,
           }}>
             <input
               type="text"

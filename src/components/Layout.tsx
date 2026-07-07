@@ -22,6 +22,8 @@ import {
   GitBranch,
   UserCog,
   BookOpen,
+  Search,
+  MoreHorizontal,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
@@ -171,6 +173,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
   const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [notifToast, setNotifToast] = useState<string | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
@@ -300,6 +303,12 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
           <div className="hidden md:flex flex-1 min-w-0" style={{ maxWidth: 380 }}>
             <GlobalSearch />
           </div>
+          <button
+            onClick={() => setMobileSearchOpen(true)}
+            className="md:hidden p-2 rounded-lg transition-all hover:bg-white/5 flex-shrink-0"
+          >
+            <Search className="w-5 h-5" style={{ color: 'var(--muted)' }} />
+          </button>
         </div>
 
         {/* Right side */}
@@ -453,6 +462,24 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
           )}
         </div>
       </div>
+      {/* Mobile Search Overlay */}
+      {mobileSearchOpen && (
+        <div className="fixed inset-0 z-50 md:hidden" style={{ background: 'var(--panel-solid)' }}>
+          <div className="flex items-center gap-3 px-4 h-14 border-b" style={{ borderColor: 'var(--line)' }}>
+            <div className="flex-1">
+              <GlobalSearch />
+            </div>
+            <button
+              onClick={() => setMobileSearchOpen(false)}
+              className="p-2 rounded-lg"
+              style={{ color: 'var(--muted)' }}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {notifToast && (
         <div
           className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-4 py-2 rounded-2xl text-sm animate-fade-in z-50"
@@ -477,6 +504,103 @@ function ChatBadge() {
     }}>
       {unread.total > 99 ? '99+' : unread.total}
     </span>
+  )
+}
+
+const PRIMARY_MOBILE_PATHS = ['/dashboard', '/eventi', '/crm', '/task', '/calendario', '/fornitori', '/amministrazione']
+const SECONDARY_MOBILE_PATHS = ['/comunicazioni', '/workflow', '/pratiche', '/archivio', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio']
+
+const mobileLabels: Record<string, string> = {
+  '/dashboard': 'Home',
+  '/eventi': 'Eventi',
+  '/crm': 'CRM',
+  '/task': 'Task',
+  '/calendario': 'Agenda',
+  '/fornitori': 'Fornitori',
+  '/amministrazione': 'Admin',
+}
+
+function BottomNav() {
+  const location = useLocation()
+  const [moreOpen, setMoreOpen] = useState(false)
+  const user = loadUser()
+  const navItems = user ? getAllowedNavForRole(user.role) : []
+
+  const primaryItems = navItems.filter(item => PRIMARY_MOBILE_PATHS.includes(item.href))
+  const secondaryItems = navItems.filter(item => SECONDARY_MOBILE_PATHS.includes(item.href))
+
+  const isSecondaryActive = secondaryItems.some(item => item.href === location.pathname)
+
+  return (
+    <>
+      {moreOpen && (
+        <div className="fixed inset-0 z-[99]" onClick={() => setMoreOpen(false)}>
+          <div
+            className="absolute bottom-[60px] left-2 right-2 rounded-2xl overflow-hidden animate-fade-in safe-bottom"
+            style={{ background: 'var(--glass-bg-strong)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid var(--glass-border)', boxShadow: '0 -8px 32px rgba(0,0,0,0.15)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="grid grid-cols-4 gap-1 p-3">
+              {secondaryItems.map(item => {
+                const Icon = iconMap[item.href] ?? LayoutDashboard
+                const isActive = location.pathname === item.href
+                return (
+                  <Link
+                    key={item.href}
+                    to={item.href}
+                    onClick={() => setMoreOpen(false)}
+                    className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl transition-colors"
+                    style={{ background: isActive ? 'rgba(208,0,58,0.08)' : 'transparent' }}
+                  >
+                    <Icon className="w-5 h-5" style={{ color: isActive ? 'var(--red2)' : 'var(--muted)' }} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: isActive ? 'var(--red2)' : 'var(--muted)', textAlign: 'center', lineHeight: 1.2 }}>
+                      {item.name}
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <nav
+        className="mobile-bottom-nav fixed bottom-0 left-0 right-0 z-[98] safe-bottom"
+        style={{ background: 'var(--panel-solid)', borderTop: '1px solid var(--line)' }}
+      >
+        <div className="flex items-center justify-around h-[56px] px-1">
+          {primaryItems.slice(0, 5).map(item => {
+            const Icon = iconMap[item.href] ?? LayoutDashboard
+            const isActive = location.pathname === item.href
+            return (
+              <Link
+                key={item.href}
+                to={item.href}
+                className="flex flex-col items-center justify-center gap-0.5 flex-1 py-1"
+                style={{ minHeight: 44, minWidth: 44 }}
+              >
+                <Icon className="w-[20px] h-[20px]" style={{ color: isActive ? 'var(--red2)' : 'var(--muted)' }} />
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.02em', color: isActive ? 'var(--red2)' : 'var(--muted)' }}>
+                  {mobileLabels[item.href] || item.name}
+                </span>
+              </Link>
+            )
+          })}
+          {secondaryItems.length > 0 && (
+            <button
+              onClick={() => setMoreOpen(!moreOpen)}
+              className="flex flex-col items-center justify-center gap-0.5 flex-1 py-1"
+              style={{ minHeight: 44, minWidth: 44 }}
+            >
+              <MoreHorizontal className="w-[20px] h-[20px]" style={{ color: isSecondaryActive ? 'var(--red2)' : 'var(--muted)' }} />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.02em', color: isSecondaryActive ? 'var(--red2)' : 'var(--muted)' }}>
+                Altro
+              </span>
+            </button>
+          )}
+        </div>
+      </nav>
+    </>
   )
 }
 
@@ -506,10 +630,11 @@ export default function Layout({ children }: { children: ReactNode }) {
         <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
         <div className="shell-main lg:pl-[232px]">
           <Topbar setOpen={setSidebarOpen} />
-          <main className="shell-content">
+          <main className="shell-content pb-mobile-nav">
             {children}
           </main>
         </div>
+        <BottomNav />
         <PinnedChats />
       </div>
     </ChatNotificationsProvider>

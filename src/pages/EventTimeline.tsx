@@ -5,6 +5,7 @@ import {
   Calendar, MapPin, Hash, Search, ChevronRight, ChevronDown, Truck, Building2,
   UtensilsCrossed, Sparkles, Music, Palette, Hammer, UserCheck, Package, X,
 } from 'lucide-react'
+import { useToast } from '@/lib/toast'
 import { useEventTimeline, type TimelineService, type DayData } from '../lib/use-event-timeline'
 
 const DAYS_FULL = ['Domenica', 'Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato']
@@ -75,7 +76,8 @@ function formatCurrencyCompact(n: number): string {
 export default function EventTimeline() {
   const { eventId } = useParams<{ eventId: string }>()
   const navigate = useNavigate()
-  const { event, days, loading, moveService, addDay, removeDay } = useEventTimeline(eventId ?? '')
+  const { showToast } = useToast()
+  const { event, days, loading, moveService, addDay, removeDay } = useEventTimeline(eventId ?? '', showToast)
 
   const [dragItem, setDragItem] = useState<TimelineService | null>(null)
   const [dragOverDay, setDragOverDay] = useState<string | null>(null)

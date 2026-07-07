@@ -22,10 +22,12 @@ import {
   Download,
   User,
   Key,
+  FileWarning,
 } from 'lucide-react'
 import { loadUser, isAdmin } from '@/lib/auth'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { supabase } from '@/lib/supabase'
+import { fetchErrorLog, type ErrorLogEntry } from '@/lib/error-log'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -523,6 +525,42 @@ function NotifichePersonali({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSe
 }
 
 function FlyConfig({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSettings>) => void }) {
+  const [memoryData, setMemoryData] = useState<{ preferences: Record<string, unknown>; corrections: unknown[]; context: Record<string, unknown> } | null>(null)
+  const [memLoading, setMemLoading] = useState(true)
+  const [logsData, setLogsData] = useState<{ totalCost: number; totalCalls: number; topTools: string[] } | null>(null)
+  const showAdmin = isAdmin(loadUser())
+
+  useEffect(() => {
+    async function loadFlyData() {
+      const { data: mem } = await supabase.from('fly_memory').select('preferences, corrections, context').maybeSingle()
+      if (mem) setMemoryData(mem as any)
+      if (showAdmin) {
+        const startOfMonth = new Date()
+        startOfMonth.setDate(1)
+        startOfMonth.setHours(0, 0, 0, 0)
+        const { data: logs } = await supabase.from('fly_logs').select('estimated_cost_eur, tools_called').gte('created_at', startOfMonth.toISOString())
+        if (logs && logs.length > 0) {
+          const totalCost = logs.reduce((s, l) => s + (Number(l.estimated_cost_eur) || 0), 0)
+          const toolCount: Record<string, number> = {}
+          for (const l of logs) {
+            for (const t of (l.tools_called || [])) {
+              toolCount[t] = (toolCount[t] || 0) + 1
+            }
+          }
+          const topTools = Object.entries(toolCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `${name} (${count})`)
+          setLogsData({ totalCost, totalCalls: logs.length, topTools })
+        }
+      }
+      setMemLoading(false)
+    }
+    loadFlyData()
+  }, [showAdmin])
+
+  async function resetMemory() {
+    await supabase.from('fly_memory').delete().not('id', 'is', null)
+    setMemoryData(null)
+  }
+
   return (
     <SectionCard icon={Zap} title="Fly Assistant" subtitle="Comportamento e personalità di Fly">
       <div className="space-y-6">
@@ -564,6 +602,68 @@ function FlyConfig({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSettings>) 
           <ToggleRow label="Modalità proattiva" hint="Fly invia avvisi automatici senza essere interpellato" checked={s.flyModalitaProattiva} onChange={v => upd({ flyModalitaProattiva: v })} />
           <ToggleRow label="Suggerimenti automatici" hint="Propone chip di risposta contestuale" checked={s.flySuggerimentiAutomatici} onChange={v => upd({ flySuggerimentiAutomatici: v })} />
         </div>
+
+        {/* Memory section */}
+        <div style={{ borderTop: '1px solid var(--line)', paddingTop: 20 }}>
+          <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>Memoria Fly</p>
+          {memLoading ? (
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Caricamento...</p>
+          ) : memoryData ? (
+            <div className="space-y-2">
+              {Object.keys(memoryData.preferences).length > 0 && (
+                <div className="px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                  <span className="font-medium" style={{ color: 'var(--text)' }}>Preferenze:</span>{' '}
+                  <span style={{ color: 'var(--muted)' }}>{JSON.stringify(memoryData.preferences)}</span>
+                </div>
+              )}
+              {memoryData.corrections.length > 0 && (
+                <div className="px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                  <span className="font-medium" style={{ color: 'var(--text)' }}>Correzioni memorizzate:</span>{' '}
+                  <span style={{ color: 'var(--muted)' }}>{memoryData.corrections.length}</span>
+                </div>
+              )}
+              {Object.keys(memoryData.context).length > 0 && (
+                <div className="px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                  <span className="font-medium" style={{ color: 'var(--text)' }}>Contesto:</span>{' '}
+                  <span style={{ color: 'var(--muted)' }}>{Object.keys(memoryData.context).length} mappature</span>
+                </div>
+              )}
+              <button onClick={resetMemory} className="mt-2 px-4 py-2 rounded-lg text-xs font-medium transition-all"
+                style={{ background: 'rgba(208,0,58,0.08)', color: 'var(--red2)', border: '1px solid rgba(208,0,58,0.25)' }}>
+                Reimposta memoria
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Fly non ha ancora memorizzato preferenze per il tuo profilo.</p>
+          )}
+        </div>
+
+        {/* Admin logs section */}
+        {showAdmin && logsData && (
+          <div style={{ borderTop: '1px solid var(--line)', paddingTop: 20 }}>
+            <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>Osservabilità (Admin)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="px-4 py-3 rounded-xl text-center" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                <p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{logsData.totalCalls}</p>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>Chiamate mese</p>
+              </div>
+              <div className="px-4 py-3 rounded-xl text-center" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                <p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{logsData.totalCost.toFixed(4)}</p>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>Costo stimato (EUR)</p>
+              </div>
+              <div className="px-4 py-3 rounded-xl text-center" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                <p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{logsData.topTools.length}</p>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>Tool distinti</p>
+              </div>
+            </div>
+            {logsData.topTools.length > 0 && (
+              <div className="mt-3 px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                <span className="font-medium" style={{ color: 'var(--text)' }}>Top tool:</span>{' '}
+                <span style={{ color: 'var(--muted)' }}>{logsData.topTools.join(', ')}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </SectionCard>
   )
@@ -814,6 +914,41 @@ function DatiApplicazione() {
   )
 }
 
+// ─── Registro Errori ─────────────────────────────────────────────────────────
+
+function RegistroErrori() {
+  const [entries, setEntries] = useState<ErrorLogEntry[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchErrorLog(50).then(setEntries).catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  return (
+    <SectionCard icon={FileWarning} title="Registro Errori" subtitle="Ultime 50 segnalazioni di errore nel sistema">
+      {loading ? (
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>
+      ) : entries.length === 0 ? (
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun errore registrato.</p>
+      ) : (
+        <div className="space-y-2 max-h-[520px] overflow-y-auto">
+          {entries.map(e => (
+            <div key={e.id} className="px-3 py-2.5 rounded-lg text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="font-mono font-semibold" style={{ color: 'var(--red2)' }}>{e.pagina}</span>
+                <span style={{ color: 'var(--muted)' }}>
+                  {new Date(e.created_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <p style={{ color: 'var(--text)' }}><strong>{e.azione}</strong>: {e.messaggio}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
 // ─── Sidebar nav ──────────────────────────────────────────────────────────────
 
 type SectionDef = { id: string; icon: React.ElementType; label: string; group: 'personal' | 'admin' }
@@ -830,6 +965,7 @@ const ALL_SECTIONS: SectionDef[] = [
   { id: 'sicurezza', icon: Lock, label: 'Sicurezza Sistema', group: 'admin' },
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard Globale', group: 'admin' },
   { id: 'dati', icon: Database, label: 'Dati Applicazione', group: 'admin' },
+  { id: 'errori', icon: FileWarning, label: 'Registro Errori', group: 'admin' },
 ]
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -995,6 +1131,7 @@ export default function Impostazioni() {
           {showAdmin && activeSection === 'sicurezza' && <SicurezzaSistema s={settings} upd={upd} />}
           {showAdmin && activeSection === 'dashboard' && <ConfigDashboard s={settings} upd={upd} />}
           {showAdmin && activeSection === 'dati' && <DatiApplicazione />}
+          {showAdmin && activeSection === 'errori' && <RegistroErrori />}
         </div>
       </div>
     </div>
