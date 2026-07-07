@@ -128,6 +128,7 @@ Deno.serve(async (req: Request) => {
         reparto: "",
         is_active: true,
         attivo: true,
+        force_password_change: true,
       }).eq("id", userId);
 
       if (updateError) {
@@ -143,6 +144,7 @@ Deno.serve(async (req: Request) => {
           reparto: "",
           is_active: true,
           attivo: true,
+          force_password_change: true,
         }, { onConflict: "id" });
       }
 

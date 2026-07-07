@@ -1,7 +1,9 @@
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import Layout from './components/Layout'
 import Login from './pages/Login'
+import ChangePassword from './pages/ChangePassword'
+import Setup2FA from './pages/Setup2FA'
 import { loadUser, saveUser, clearUser } from './lib/auth'
 import { supabase } from './lib/supabase'
 import { fetchProfile } from './lib/profiles'
@@ -31,10 +33,14 @@ function PageLoader() {
   )
 }
 
+const ROLES_REQUIRING_2FA = ['Super Admin', 'Admin', 'Finance']
+
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
+  const [redirectTo, setRedirectTo] = useState<string | null>(null)
   const navigate = useNavigate()
+  const location = useLocation()
 
   const handleSignOut = useCallback(() => {
     clearUser()
@@ -47,42 +53,64 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const check = async () => {
       const stored = loadUser()
-      if (stored) {
-        if (mounted) {
-          setAuthenticated(true)
-          setChecking(false)
-        }
-        return
-      }
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id)
-        if (profile && !profile.is_active) {
-          clearUser()
-          await supabase.auth.signOut()
-        } else {
+      if (!stored) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id)
+          if (profile && !profile.is_active) {
+            clearUser()
+            await supabase.auth.signOut()
+            if (mounted) setChecking(false)
+            return
+          }
           const meta = session.user.user_metadata || {}
           saveUser({
             id: profile?.id ?? session.user.id,
-            first_name: profile?.first_name ?? meta.first_name ?? '',
-            last_name: profile?.last_name ?? meta.last_name ?? '',
+            first_name: profile?.first_name ?? (meta as any).first_name ?? '',
+            last_name: profile?.last_name ?? (meta as any).last_name ?? '',
             email: profile?.email ?? session.user.email ?? '',
-            role: (profile?.role ?? meta.role ?? 'User') as any,
+            role: (profile?.role ?? (meta as any).role ?? 'User') as any,
             avatar_url: profile?.avatar_url ?? null,
             is_active: profile?.is_active ?? true,
           })
-          if (mounted) setAuthenticated(true)
+        } else {
+          if (mounted) setChecking(false)
+          return
         }
       }
-      if (mounted) setChecking(false)
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        if (mounted) setChecking(false)
+        return
+      }
+
+      const profile = await fetchProfile(session.user.id)
+      if (profile && (profile as any).force_password_change) {
+        if (mounted) { setRedirectTo('/change-password'); setAuthenticated(true); setChecking(false) }
+        return
+      }
+
+      const user = loadUser()
+      if (user && ROLES_REQUIRING_2FA.includes(user.role)) {
+        const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+        if (aalData) {
+          const { data: factorsData } = await supabase.auth.mfa.listFactors()
+          const hasVerifiedFactor = (factorsData?.totp.filter(f => f.status === 'verified') ?? []).length > 0
+          if (!hasVerifiedFactor) {
+            if (mounted) { setRedirectTo('/setup-2fa'); setAuthenticated(true); setChecking(false) }
+            return
+          }
+        }
+      }
+
+      if (mounted) { setAuthenticated(true); setChecking(false) }
     }
     check()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
-        if (event === 'SIGNED_OUT') {
-          handleSignOut()
-        }
+      if (event === 'SIGNED_OUT') {
+        handleSignOut()
       }
     })
 
@@ -104,7 +132,86 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />
   }
 
+  if (redirectTo && location.pathname !== redirectTo) {
+    return <Navigate to={redirectTo} replace />
+  }
+
   return <>{children}</>
+}
+
+function ChangePasswordGuard({ children }: { children: React.ReactNode }) {
+  const [checking, setChecking] = useState(true)
+  const [allowed, setAllowed] = useState(false)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const check = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        navigate('/login', { replace: true })
+        return
+      }
+      const profile = await fetchProfile(session.user.id)
+      if (profile && (profile as any).force_password_change) {
+        setAllowed(true)
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
+      setChecking(false)
+    }
+    check()
+  }, [navigate])
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</div>
+      </div>
+    )
+  }
+
+  return allowed ? <>{children}</> : null
+}
+
+function Setup2FAGuard({ children }: { children: React.ReactNode }) {
+  const [checking, setChecking] = useState(true)
+  const [allowed, setAllowed] = useState(false)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const check = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        navigate('/login', { replace: true })
+        return
+      }
+      const user = loadUser()
+      if (!user || !ROLES_REQUIRING_2FA.includes(user.role)) {
+        navigate('/dashboard', { replace: true })
+        setChecking(false)
+        return
+      }
+      const { data: factorsData } = await supabase.auth.mfa.listFactors()
+      const hasVerifiedFactor = (factorsData?.totp.filter(f => f.status === 'verified') ?? []).length > 0
+      if (hasVerifiedFactor) {
+        navigate('/dashboard', { replace: true })
+      } else {
+        setAllowed(true)
+      }
+      setChecking(false)
+    }
+    check()
+  }, [navigate])
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</div>
+      </div>
+    )
+  }
+
+  return allowed ? <>{children}</> : null
 }
 
 function LazyPage({ children }: { children: React.ReactNode }) {
@@ -119,6 +226,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/change-password" element={<ChangePasswordGuard><ChangePassword /></ChangePasswordGuard>} />
+      <Route path="/setup-2fa" element={<Setup2FAGuard><Setup2FA /></Setup2FAGuard>} />
 
       <Route path="/dashboard" element={<AuthGuard><Layout><LazyPage><Dashboard /></LazyPage></Layout></AuthGuard>} />
       <Route path="/eventi" element={<AuthGuard><Layout><LazyPage><Eventi /></LazyPage></Layout></AuthGuard>} />

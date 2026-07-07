@@ -478,6 +478,247 @@ function CambioPasswordSection() {
   )
 }
 
+function TwoFactorSection() {
+  const [mfaActive, setMfaActive] = useState<boolean | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [enrolling, setEnrolling] = useState(false)
+  const [factorId, setFactorId] = useState('')
+  const [qrUri, setQrUri] = useState('')
+  const [code, setCode] = useState('')
+  const [verifying, setVerifying] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [showDisableConfirm, setShowDisableConfirm] = useState(false)
+  const [disableCode, setDisableCode] = useState('')
+
+  useEffect(() => {
+    checkMfaStatus()
+  }, [])
+
+  async function checkMfaStatus() {
+    try {
+      const { data, error: mfaError } = await supabase.auth.mfa.listFactors()
+      if (mfaError) {
+        setMfaActive(false)
+      } else {
+        const verified = data.totp.filter(f => f.status === 'verified')
+        setMfaActive(verified.length > 0)
+        if (verified.length > 0) setFactorId(verified[0].id)
+      }
+    } catch {
+      setMfaActive(false)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleEnroll() {
+    setEnrolling(true)
+    setError(null)
+    try {
+      const { data, error: enrollError } = await supabase.auth.mfa.enroll({ factorType: 'totp' })
+      if (enrollError) {
+        setError(enrollError.message)
+        setEnrolling(false)
+        return
+      }
+      if (data) {
+        setFactorId(data.id)
+        setQrUri(data.totp.uri)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore')
+    } finally {
+      setEnrolling(false)
+    }
+  }
+
+  async function handleVerifyEnroll() {
+    if (code.length !== 6) {
+      setError('Inserisci un codice di 6 cifre')
+      return
+    }
+    setVerifying(true)
+    setError(null)
+    try {
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId })
+      if (challengeError) { setError(challengeError.message); setVerifying(false); return }
+
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId: challengeData.id,
+        code,
+      })
+      if (verifyError) { setError('Codice non valido. Riprova.'); setVerifying(false); return }
+
+      setMfaActive(true)
+      setQrUri('')
+      setCode('')
+      setSuccess('2FA attivato correttamente')
+      setTimeout(() => setSuccess(null), 4000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore di verifica')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  async function handleDisable() {
+    if (disableCode.length !== 6) {
+      setError('Inserisci il codice corrente')
+      return
+    }
+    setVerifying(true)
+    setError(null)
+    try {
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId })
+      if (challengeError) { setError(challengeError.message); setVerifying(false); return }
+
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId: challengeData.id,
+        code: disableCode,
+      })
+      if (verifyError) { setError('Codice non valido.'); setVerifying(false); return }
+
+      const { error: unenrollError } = await supabase.auth.mfa.unenroll({ factorId })
+      if (unenrollError) { setError(unenrollError.message); setVerifying(false); return }
+
+      setMfaActive(false)
+      setShowDisableConfirm(false)
+      setDisableCode('')
+      setSuccess('2FA disattivato')
+      setTimeout(() => setSuccess(null), 4000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <SectionCard icon={ShieldCheck} title="Autenticazione a Due Fattori" subtitle="Proteggi il tuo account con un codice aggiuntivo">
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>
+      </SectionCard>
+    )
+  }
+
+  return (
+    <SectionCard icon={ShieldCheck} title="Autenticazione a Due Fattori" subtitle="Proteggi il tuo account con un codice aggiuntivo">
+      <div className="space-y-5 max-w-md">
+        {mfaActive && !showDisableConfirm && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs"
+              style={{ background: 'rgba(56,210,125,0.08)', border: '1px solid rgba(56,210,125,0.2)', color: 'var(--green)' }}>
+              <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+              <span className="font-medium">2FA attivo</span>
+            </div>
+            <button
+              onClick={() => setShowDisableConfirm(true)}
+              className="px-4 py-2.5 rounded-xl text-xs font-mono uppercase tracking-wide transition-all"
+              style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--muted)' }}
+            >
+              Disattiva 2FA
+            </button>
+          </div>
+        )}
+
+        {mfaActive && showDisableConfirm && (
+          <div className="space-y-4">
+            <p className="text-sm" style={{ color: 'var(--text)' }}>
+              Inserisci il codice corrente per confermare la disattivazione.
+            </p>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={disableCode}
+              onChange={e => setDisableCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="000000"
+              className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none text-center tracking-[0.3em] font-mono"
+              style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+            />
+            <div className="flex gap-2">
+              <button onClick={handleDisable} disabled={verifying}
+                className="px-4 py-2.5 rounded-xl text-xs font-mono uppercase tracking-wide text-white transition-all"
+                style={{ background: 'var(--red2)', opacity: verifying ? 0.6 : 1 }}>
+                {verifying ? 'Verifica...' : 'Conferma disattivazione'}
+              </button>
+              <button onClick={() => { setShowDisableConfirm(false); setDisableCode(''); setError(null) }}
+                className="px-4 py-2.5 rounded-xl text-xs font-mono uppercase tracking-wide transition-all"
+                style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
+                Annulla
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!mfaActive && !qrUri && (
+          <div className="space-y-4">
+            <p className="text-sm" style={{ color: 'var(--text)' }}>
+              Scarica <strong>Google Authenticator</strong> o <strong>Authy</strong>, poi clicca per generare il codice QR.
+            </p>
+            <button onClick={handleEnroll} disabled={enrolling}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-mono uppercase tracking-wide text-white transition-all"
+              style={{ background: 'var(--red2)', opacity: enrolling ? 0.6 : 1 }}>
+              <ShieldCheck className="w-4 h-4" />
+              {enrolling ? 'Generazione...' : 'Attiva autenticazione a due fattori'}
+            </button>
+          </div>
+        )}
+
+        {!mfaActive && qrUri && (
+          <div className="space-y-4">
+            <p className="text-sm" style={{ color: 'var(--text)' }}>
+              Inquadra il codice QR con la tua app authenticator
+            </p>
+            <div className="flex justify-center p-4 rounded-xl" style={{ background: 'white' }}>
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUri)}`}
+                alt="QR Code"
+                className="w-48 h-48"
+              />
+            </div>
+            <Field label="Codice di verifica">
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={code}
+                onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none text-center tracking-[0.3em] font-mono"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              />
+            </Field>
+            <button onClick={handleVerifyEnroll} disabled={verifying}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-mono uppercase tracking-wide text-white transition-all"
+              style={{ background: 'var(--red2)', opacity: verifying ? 0.6 : 1 }}>
+              {verifying ? 'Verifica...' : 'Verifica e attiva'}
+            </button>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs"
+            style={{ background: 'rgba(208,0,58,0.08)', border: '1px solid rgba(208,0,58,0.2)', color: 'var(--red2)' }}>
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs"
+            style={{ background: 'rgba(56,210,125,0.08)', border: '1px solid rgba(56,210,125,0.2)', color: 'var(--green)' }}>
+            <Check className="w-3.5 h-3.5 flex-shrink-0" />
+            {success}
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  )
+}
+
 function TemaSection() {
   const { theme, setTheme } = useTheme()
 
@@ -1161,6 +1402,7 @@ type SectionDef = { id: string; icon: React.ElementType; label: string; group: '
 const ALL_SECTIONS: SectionDef[] = [
   { id: 'profilo', icon: User, label: 'Il mio Profilo', group: 'personal' },
   { id: 'password', icon: Key, label: 'Cambio Password', group: 'personal' },
+  { id: '2fa', icon: ShieldCheck, label: 'Autenticazione 2FA', group: 'personal' },
   { id: 'tema', icon: Sun, label: 'Tema', group: 'personal' },
   { id: 'notifiche', icon: Bell, label: 'Notifiche', group: 'personal' },
   { id: 'fly', icon: Zap, label: 'Fly Assistant', group: 'personal' },
@@ -1343,6 +1585,7 @@ export default function Impostazioni() {
         <div className="flex-1 min-w-0 space-y-0">
           {activeSection === 'profilo' && <ProfiloPersonale />}
           {activeSection === 'password' && <CambioPasswordSection />}
+          {activeSection === '2fa' && <TwoFactorSection />}
           {activeSection === 'tema' && <TemaSection />}
           {activeSection === 'notifiche' && <NotifichePersonali s={settings} upd={upd} />}
           {activeSection === 'fly' && <FlyConfig s={settings} upd={upd} />}
