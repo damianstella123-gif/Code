@@ -1,10 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShieldCheck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
+// TEMPORANEAMENTE DISATTIVATO — riattivare quando fotocamera disponibile
 export default function Setup2FA() {
   const navigate = useNavigate()
+
+  useEffect(() => { navigate('/dashboard', { replace: true }) }, [navigate])
+
   const [step, setStep] = useState<'enroll' | 'verify'>('enroll')
   const [factorId, setFactorId] = useState('')
   const [qrUri, setQrUri] = useState('')

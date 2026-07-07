@@ -478,7 +478,8 @@ function CambioPasswordSection() {
   )
 }
 
-function TwoFactorSection() {
+// 2FA — temporaneamente disattivato, riattivare quando fotocamera disponibile
+export function TwoFactorSection() {
   const [mfaActive, setMfaActive] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [enrolling, setEnrolling] = useState(false)
@@ -1402,7 +1403,8 @@ type SectionDef = { id: string; icon: React.ElementType; label: string; group: '
 const ALL_SECTIONS: SectionDef[] = [
   { id: 'profilo', icon: User, label: 'Il mio Profilo', group: 'personal' },
   { id: 'password', icon: Key, label: 'Cambio Password', group: 'personal' },
-  { id: '2fa', icon: ShieldCheck, label: 'Autenticazione 2FA', group: 'personal' },
+  /* 2FA — temporaneamente disattivato, riattivare quando fotocamera disponibile */
+  // { id: '2fa', icon: ShieldCheck, label: 'Autenticazione 2FA', group: 'personal' },
   { id: 'tema', icon: Sun, label: 'Tema', group: 'personal' },
   { id: 'notifiche', icon: Bell, label: 'Notifiche', group: 'personal' },
   { id: 'fly', icon: Zap, label: 'Fly Assistant', group: 'personal' },
@@ -1585,7 +1587,8 @@ export default function Impostazioni() {
         <div className="flex-1 min-w-0 space-y-0">
           {activeSection === 'profilo' && <ProfiloPersonale />}
           {activeSection === 'password' && <CambioPasswordSection />}
-          {activeSection === '2fa' && <TwoFactorSection />}
+          {/* 2FA — temporaneamente disattivato, riattivare quando fotocamera disponibile */}
+          {/* activeSection === '2fa' && <TwoFactorSection /> */}
           {activeSection === 'tema' && <TemaSection />}
           {activeSection === 'notifiche' && <NotifichePersonali s={settings} upd={upd} />}
           {activeSection === 'fly' && <FlyConfig s={settings} upd={upd} />}

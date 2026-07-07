@@ -91,6 +91,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
         return
       }
 
+      /* 2FA obbligatorio per Admin — temporaneamente disattivato */
+      /*
       const user = loadUser()
       if (user && ROLES_REQUIRING_2FA.includes(user.role)) {
         const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
@@ -103,6 +105,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
           }
         }
       }
+      */
 
       if (mounted) { setAuthenticated(true); setChecking(false) }
     }

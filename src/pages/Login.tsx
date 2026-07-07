@@ -16,8 +16,11 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null)
   const [showTransition, setShowTransition] = useState(false)
 
-  const [mfaStep, setMfaStep] = useState(false)
-  const [mfaFactorId, setMfaFactorId] = useState('')
+  // 2FA state — temporaneamente disattivato, riattivare rimuovendo commenti sopra
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [mfaStep, _setMfaStep] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [mfaFactorId, _setMfaFactorId] = useState('')
   const [mfaCode, setMfaCode] = useState('')
   const [mfaLoading, setMfaLoading] = useState(false)
 
@@ -55,6 +58,8 @@ export default function Login() {
         return
       }
 
+      /* 2FA step — temporaneamente disattivato */
+      /*
       const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
       if (aalData && aalData.nextLevel === 'aal2' && aalData.currentLevel === 'aal1') {
         const { data: factorsData } = await supabase.auth.mfa.listFactors()
@@ -66,6 +71,7 @@ export default function Login() {
           return
         }
       }
+      */
 
       await completeLogin(authUser)
     } catch (err) {
