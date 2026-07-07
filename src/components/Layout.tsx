@@ -81,14 +81,14 @@ function Sidebar({ open, setOpen, pinned, setPinned }: SidebarProps) {
     <>
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
           onClick={() => setOpen(false)}
         />
       )}
 
       <aside
         className={cn(
-          'shell-sidebar fixed inset-y-0 left-0 z-50 w-[232px] transform transition-transform duration-300 ease-in-out lg:translate-x-0 flex flex-col',
+          'shell-sidebar fixed inset-y-0 left-0 z-50 w-[232px] transform transition-transform duration-300 ease-in-out flex flex-col',
           open ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -311,7 +311,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
         <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
           <button
             onClick={() => setOpen(true)}
-            className="lg:hidden p-2 rounded-lg transition-all hover:bg-white/5 flex-shrink-0"
+            className="p-2 rounded-lg transition-all hover:bg-white/5 flex-shrink-0"
           >
             <Menu className="w-5 h-5" style={{ color: 'var(--muted)' }} />
           </button>
@@ -651,7 +651,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="shell-light-secondary" />
         </div>
         <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} pinned={pinned} setPinned={setPinned} />
-        <div className="shell-main lg:pl-[232px]">
+        <div className="shell-main">
           <Topbar setOpen={setSidebarOpen} />
           <main className="shell-content pb-mobile-nav">
             {children}
