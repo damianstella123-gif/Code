@@ -31,12 +31,23 @@ interface FlyProposal {
   params: Record<string, unknown>
 }
 
+interface EventDraftProposal {
+  nome: string
+  location: string
+  pax: number
+  budget: number
+  giorni: number
+  fornitori: { id: string; nome: string; categoria: string }[]
+}
+
 interface FlyMessage {
   role: 'user' | 'assistant'
   content: string
   entities?: FlyEntity[]
   proposal?: FlyProposal | null
   proposalStatus?: 'pending' | 'confirmed' | 'rejected' | 'executing' | 'done' | 'failed'
+  eventProposal?: EventDraftProposal | null
+  eventProposalStatus?: 'pending' | 'executing' | 'done' | 'failed' | 'rejected'
 }
 
 // ─── Entity Card ──────────────────────────────────────────────────────────────
@@ -285,6 +296,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
       let accumulated = ''
       let entities: FlyEntity[] = []
       let proposal: FlyProposal | null = null
+      let eventProposal: EventDraftProposal | null = null
 
       while (true) {
         const { done, value } = await reader.read()
@@ -310,6 +322,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
             } else if (parsed.type === 'meta') {
               entities = Array.isArray(parsed.entities) ? parsed.entities : []
               proposal = parsed.proposal || null
+              eventProposal = parsed.eventProposal || null
             }
           } catch {}
         }
@@ -324,6 +337,8 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
           entities,
           proposal,
           proposalStatus: proposal ? 'pending' : undefined,
+          eventProposal,
+          eventProposalStatus: eventProposal ? 'pending' : undefined,
         }
         return updated
       })
@@ -374,6 +389,52 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
     const updated = [...flyHistory]
     updated[msgIndex] = { ...msg, proposalStatus: 'rejected' }
     updated.push({ role: 'assistant', content: 'Ok, azione annullata.' })
+    setFlyHistory(updated)
+  }, [flyHistory])
+
+  const confirmEventDraft = useCallback(async (msgIndex: number) => {
+    const msg = flyHistory[msgIndex]
+    if (!msg?.eventProposal || msg.eventProposalStatus !== 'pending') return
+
+    const updated = [...flyHistory]
+    updated[msgIndex] = { ...msg, eventProposalStatus: 'executing' }
+    setFlyHistory(updated)
+
+    try {
+      const { data, error } = await supabase.functions.invoke('fly-gateway', {
+        body: {
+          action: 'execute',
+          proposal: {
+            action: 'create_event_draft',
+            params: msg.eventProposal,
+          },
+        },
+      })
+
+      if (error) throw new Error(error.message)
+      if (!data?.success) throw new Error(data?.message || 'Errore creazione bozza')
+
+      const final = [...updated]
+      final[msgIndex] = { ...msg, eventProposalStatus: 'done' }
+      const linkedCount = data.data?.fornitori_collegati || 0
+      final.push({ role: 'assistant', content: `Bozza creata con ${linkedCount} fornitori precollegati. Aprila in EMS per completarla.` })
+      setFlyHistory(final)
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Errore'
+      const final = [...updated]
+      final[msgIndex] = { ...msg, eventProposalStatus: 'failed' }
+      final.push({ role: 'assistant', content: `Errore: ${errMsg}` })
+      setFlyHistory(final)
+    }
+  }, [flyHistory])
+
+  const rejectEventDraft = useCallback((msgIndex: number) => {
+    const msg = flyHistory[msgIndex]
+    if (!msg?.eventProposal || msg.eventProposalStatus !== 'pending') return
+
+    const updated = [...flyHistory]
+    updated[msgIndex] = { ...msg, eventProposalStatus: 'rejected' }
+    updated.push({ role: 'assistant', content: 'Ok, proposta evento annullata.' })
     setFlyHistory(updated)
   }, [flyHistory])
 
@@ -665,6 +726,93 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
                         <XCircle style={{ width: 12, height: 12, color: 'var(--muted)' }} />
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>Annullata</span>
+                      </div>
+                    )}
+                    {msg.eventProposal && msg.eventProposalStatus === 'pending' && (
+                      <div style={{
+                        marginTop: 12,
+                        padding: '12px 14px',
+                        borderRadius: 10,
+                        border: '1px solid rgba(208,0,58,0.2)',
+                        background: 'rgba(208,0,58,0.03)',
+                      }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 700, color: 'var(--red2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                          PROPOSTA EVENTO
+                        </div>
+                        <div style={{ fontFamily: 'var(--font-serif)', fontSize: '15px', fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
+                          {msg.eventProposal.nome}
+                        </div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+                          {msg.eventProposal.location && <span>{msg.eventProposal.location}</span>}
+                          {msg.eventProposal.pax && <span>{msg.eventProposal.pax} pax</span>}
+                          {msg.eventProposal.budget && <span>Budget: {msg.eventProposal.budget.toLocaleString('it-IT')} EUR</span>}
+                          {msg.eventProposal.giorni && <span>{msg.eventProposal.giorni}g</span>}
+                        </div>
+                        {msg.eventProposal.fornitori && msg.eventProposal.fornitori.length > 0 && (
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>Fornitori</div>
+                            {msg.eventProposal.fornitori.slice(0, 5).map((f, fi) => (
+                              <div key={fi} style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)', padding: '2px 0' }}>
+                                {f.nome} <span style={{ color: 'var(--muted)' }}>({f.categoria})</span>
+                              </div>
+                            ))}
+                            {msg.eventProposal.fornitori.length > 5 && (
+                              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
+                                ...e altri {msg.eventProposal.fornitori.length - 5}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={() => confirmEventDraft(i)}
+                            style={{
+                              padding: '6px 14px', borderRadius: 6,
+                              background: 'var(--red2)', color: '#fff',
+                              border: 'none', cursor: 'pointer',
+                              fontFamily: 'var(--font-mono)', fontSize: '10px',
+                              fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
+                            }}
+                          >
+                            Crea come bozza
+                          </button>
+                          <button
+                            onClick={() => rejectEventDraft(i)}
+                            style={{
+                              padding: '6px 14px', borderRadius: 6,
+                              background: 'transparent', color: 'var(--muted)',
+                              border: '1px solid var(--line)', cursor: 'pointer',
+                              fontFamily: 'var(--font-mono)', fontSize: '10px',
+                              fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em',
+                            }}
+                          >
+                            Annulla
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {msg.eventProposal && msg.eventProposalStatus === 'executing' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                        <PawPrint style={{ width: 12, height: 12, color: 'var(--muted)', animation: 'fly-paw-pulse 1.6s ease-in-out infinite' }} />
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>Creazione bozza...</span>
+                      </div>
+                    )}
+                    {msg.eventProposal && msg.eventProposalStatus === 'done' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                        <Check style={{ width: 12, height: 12, color: 'var(--green)' }} />
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--green)' }}>Bozza creata</span>
+                      </div>
+                    )}
+                    {msg.eventProposal && msg.eventProposalStatus === 'failed' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                        <XCircle style={{ width: 12, height: 12, color: 'var(--red2)' }} />
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--red2)' }}>Creazione fallita</span>
+                      </div>
+                    )}
+                    {msg.eventProposal && msg.eventProposalStatus === 'rejected' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                        <XCircle style={{ width: 12, height: 12, color: 'var(--muted)' }} />
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>Proposta annullata</span>
                       </div>
                     )}
                   </div>

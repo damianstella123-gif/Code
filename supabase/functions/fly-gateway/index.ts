@@ -1177,6 +1177,11 @@ function validateProposalParams(action: string, params: Record<string, unknown>)
       if (se) errors.push(se);
       break;
     }
+    case "create_event_draft": {
+      const ne = validateText(params.nome, "nome", 200, true);
+      if (ne) errors.push(ne);
+      break;
+    }
     default:
       errors.push({ campo: "action", motivo: `azione sconosciuta: ${action}` });
   }
@@ -1301,6 +1306,49 @@ async function executeProposal(
 
         if (error) throw new Error(error.message);
         result = data;
+        break;
+      }
+
+      case "create_event_draft": {
+        const nome = sanitizeString(params.nome);
+        const location = params.location ? sanitizeString(params.location) : null;
+        const pax = typeof params.pax === "number" ? params.pax : null;
+        const budget = typeof params.budget === "number" ? params.budget : null;
+
+        const { data: evData, error: evErr } = await supabaseClient
+          .from("events")
+          .insert({
+            title: nome,
+            location: location,
+            attendees: pax,
+            budget: budget || 0,
+            status: "bozza",
+            start_date: null,
+            created_by: userId,
+          })
+          .select("id, title")
+          .maybeSingle();
+
+        if (evErr) throw new Error(evErr.message);
+        if (!evData) throw new Error("Evento non creato");
+
+        // Link suppliers
+        const fornitori = Array.isArray(params.fornitori) ? params.fornitori : [];
+        let linkedCount = 0;
+        for (const f of fornitori.slice(0, 20)) {
+          const fObj = f as { id?: string; categoria?: string };
+          if (!fObj.id) continue;
+          const { error: linkErr } = await supabaseClient
+            .from("event_suppliers")
+            .insert({
+              event_id: evData.id,
+              supplier_id: fObj.id,
+              service_category: fObj.categoria || null,
+            });
+          if (!linkErr) linkedCount++;
+        }
+
+        result = { event_id: evData.id, nome: evData.title, fornitori_collegati: linkedCount };
         break;
       }
 
@@ -1569,6 +1617,10 @@ ENTITIES_JSON: quando la tua risposta cita entita specifiche (eventi, fornitori,
 ENTITIES_JSON: [{"type":"event","id":"uuid","nome":"...","data":"...","stato":"..."},...]
 I type ammessi sono: event, supplier, task, client. Includi solo entita effettivamente citate nella risposta, max 5. Se non citi entita specifiche, NON aggiungere la riga ENTITIES_JSON.
 
+PROPOSAL_JSON: quando usi propose_event e generi una proposta con fornitori suggeriti, DEVI chiudere la risposta con una riga separata nel formato esatto (dopo ENTITIES_JSON se presente):
+PROPOSAL_JSON:{"nome":"...","location":"...","pax":N,"budget":N,"giorni":N,"fornitori":[{"id":"uuid","nome":"...","categoria":"..."}]}
+Il campo fornitori deve contenere max 10 fornitori suggeriti dall'analisi. Il budget deve essere il totale_costo_stimato dalla proiezione. NON mostrare questa riga nel testo visibile all'utente.
+
 Oggi e ${today}.${memorySection}`;
 
     // ─── BUILD MESSAGES WITH CONTEXT MANAGEMENT ─────────────────────────
@@ -1594,17 +1646,26 @@ Oggi e ${today}.${memorySection}`;
     logOutputTokens = outputTokens;
     logToolsCalled = toolsCalled;
 
-    // Parse ENTITIES_JSON from the reply
+    // Parse ENTITIES_JSON and PROPOSAL_JSON from the reply
     let textReply = reply;
     let entities: unknown[] = [];
-    const entitiesMatch = reply.match(/\nENTITIES_JSON:\s*(\[[\s\S]*?\])\s*$/);
+    let eventProposal: unknown = null;
+
+    // Extract PROPOSAL_JSON first (it comes after ENTITIES_JSON)
+    const proposalJsonMatch = textReply.match(/\n?PROPOSAL_JSON:(\{[\s\S]*?\})\s*$/);
+    if (proposalJsonMatch) {
+      textReply = textReply.slice(0, proposalJsonMatch.index).trimEnd();
+      try {
+        eventProposal = JSON.parse(proposalJsonMatch[1]);
+      } catch {}
+    }
+
+    const entitiesMatch = textReply.match(/\nENTITIES_JSON:\s*(\[[\s\S]*?\])\s*$/);
     if (entitiesMatch) {
-      textReply = reply.slice(0, entitiesMatch.index).trimEnd();
+      textReply = textReply.slice(0, entitiesMatch.index).trimEnd();
       try {
         entities = JSON.parse(entitiesMatch[1]);
-      } catch {
-        // If parsing fails, just return text without entities
-      }
+      } catch {}
     }
 
     // ─── SSE STREAMING RESPONSE ──────────────────────────────────────────
@@ -1620,7 +1681,7 @@ Oggi e ${today}.${memorySection}`;
           await new Promise(r => setTimeout(r, 30));
         }
         // Send metadata (entities + proposal) as a final event
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "meta", entities, proposal: proposal || null })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "meta", entities, proposal: proposal || null, eventProposal: eventProposal || null })}\n\n`));
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       },
