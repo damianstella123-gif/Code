@@ -1,9 +1,9 @@
 export type StatoContratto = 'attivo' | 'in_scadenza' | 'scaduto' | 'in_rinnovo' | 'sospeso'
 
-export type SupplierCategory = 'Hotel' | 'Ristorante' | 'Location' | 'Attività' | 'Trasporti' | 'Catering' | 'Audio Video' | 'Allestimenti' | 'Hostess' | 'Entertainment' | 'Fotografia' | 'Video' | 'Sicurezza' | 'DMC' | 'Altro'
+export type SupplierCategory = 'Hotel' | 'Ristorante' | 'Location' | 'Attività' | 'Trasporti' | 'Catering' | 'Audio Video' | 'Allestimenti' | 'Hostess' | 'Entertainment' | 'Fotografia' | 'Video' | 'Sicurezza' | 'DMC' | 'Agenzia di Viaggi' | 'Grafica & Stampa' | 'Staff' | 'Esperienze' | 'Transfer' | 'Altro'
 
 export const SUPPLIER_CATEGORIES: SupplierCategory[] = [
-  'Hotel', 'Ristorante', 'Audio Video', 'Catering', 'Location', 'Trasporti', 'Allestimenti', 'DMC', 'Hostess', 'Entertainment', 'Fotografia', 'Video', 'Sicurezza', 'Altro',
+  'Hotel', 'Ristorante', 'Audio Video', 'Allestimenti', 'Catering', 'Staff', 'Transfer', 'Grafica & Stampa', 'Location', 'Esperienze', 'DMC', 'Agenzia di Viaggi', 'Altro',
 ]
 
 export interface Documento {
@@ -160,6 +160,7 @@ export interface Supplier {
   email: string
   telefono: string
   categoria: string
+  categorie?: string[]
   referente: string
   referenteTelefono: string
   rating: number

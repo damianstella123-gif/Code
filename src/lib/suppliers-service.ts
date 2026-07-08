@@ -6,6 +6,7 @@ interface SupplierRow {
   id: string
   name: string
   category: string
+  categorie: string[]
   contact_name: string
   email: string
   phone: string
@@ -45,12 +46,14 @@ function num(x: number | string | null | undefined): number {
 }
 
 function rowToSupplier(r: SupplierRow): Supplier {
+  const cats = (r.categorie && r.categorie.length > 0) ? r.categorie : (r.category ? [r.category] : [])
   return {
     id: r.id,
     nome: r.name,
     email: r.email ?? '',
     telefono: r.phone ?? '',
-    categoria: r.category ?? '',
+    categoria: cats[0] ?? r.category ?? '',
+    categorie: cats,
     referente: r.contact_name ?? '',
     referenteTelefono: r.contact_phone ?? '',
     rating: num(r.rating),
@@ -84,7 +87,8 @@ function supplierToRow(s: Supplier): Omit<SupplierRow, 'created_at' | 'updated_a
   return {
     id: s.id,
     name: s.nome,
-    category: s.categoria ?? '',
+    category: s.categorie?.[0] ?? s.categoria ?? '',
+    categorie: s.categorie ?? (s.categoria ? [s.categoria] : []),
     contact_name: s.referente ?? '',
     email: s.email ?? '',
     phone: s.telefono ?? '',
@@ -147,6 +151,7 @@ export async function updateSupplier(id: string, patch: Partial<Supplier>): Prom
   const dbPatch: Partial<SupplierRow> = {}
   if (patch.nome !== undefined) dbPatch.name = patch.nome
   if (patch.categoria !== undefined) dbPatch.category = patch.categoria
+  if ((patch as any).categorie !== undefined) (dbPatch as any).categorie = (patch as any).categorie
   if (patch.referente !== undefined) dbPatch.contact_name = patch.referente
   if (patch.email !== undefined) dbPatch.email = patch.email
   if (patch.telefono !== undefined) dbPatch.phone = patch.telefono

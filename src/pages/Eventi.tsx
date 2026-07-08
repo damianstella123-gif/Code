@@ -41,7 +41,7 @@ import type { Client } from '@/data/clients'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
-import { detectSupplierCategory, isDmcCategory, SupplierCategoryPanel, type CategoryType } from '@/components/TabOperativo'
+import { detectSupplierCategory, isDmcFromArray, SupplierCategoryPanel, type CategoryType } from '@/components/TabOperativo'
 import TabBudget from '@/components/TabBudget'
 import { setFlyContext } from '@/lib/fly'
 import { daysLeft, fmtShort, fmtLong, fmtFullLong, toISO } from '@/lib/format'
@@ -1405,7 +1405,7 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
           {linkedSuppliers.map(sup => {
             const summary = summaries.find(s => s.supplierId === sup.id)
             const link = summary?.link || links.find(l => l.supplier_id === sup.id)
-            const catType = (link?.service_category as CategoryType) || detectSupplierCategory(sup.categoria)
+            const catType = (link?.service_category as CategoryType) || detectSupplierCategory(sup.categorie?.[0] || sup.categoria)
             const isExpanded = expandedSupplier === sup.id
             const stato = (link?.stato_conferma || 'richiesto') as keyof typeof STATO_CONFERMA_CONFIG
             const statoConf = STATO_CONFERMA_CONFIG[stato]
@@ -1531,7 +1531,7 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
                 {/* Expanded services panel */}
                 {isExpanded && (
                   <div className="px-4 pb-4 pt-2" style={{ borderTop: '1px solid var(--line)', background: 'var(--bg)' }}>
-                    <SupplierCategoryPanel event={event} supplierId={sup.id} category={catType} isDmc={isDmcCategory(sup.categoria)} otherSupplierCategories={linkedSuppliers.filter(s => s.id !== sup.id).map(s => s.categoria)} />
+                    <SupplierCategoryPanel event={event} supplierId={sup.id} category={catType} isDmc={isDmcFromArray(sup.categorie ?? [], sup.categoria)} otherSupplierCategories={linkedSuppliers.filter(s => s.id !== sup.id).flatMap(s => s.categorie?.length ? s.categorie : [s.categoria])} />
                   </div>
                 )}
               </div>

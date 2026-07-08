@@ -80,7 +80,7 @@ export function detectSupplierCategory(supplierCategory: string): CategoryType {
   if (c.includes('transfer') || c.includes('trasporto') || c.includes('ncc') || c.includes('bus') || c.includes('noleggio')) return 'transfer'
   if (c.includes('ristorante') || c.includes('ristorazione')) return 'ristorante'
   if (c.includes('catering')) return 'catering'
-  if (c.includes('experience') || c.includes('location') || c.includes('team building')) return 'experience'
+  if (c.includes('experience') || c.includes('location') || c.includes('team building') || c.includes('esperienze')) return 'experience'
   if (c.includes('audio') || c.includes('video') || c.includes('luci') || c.includes('tecnic')) return 'audio_video'
   if (c.includes('dmc') || c.includes('destination management')) return 'experience'
   if (c.includes('allestiment')) return 'allestimenti'
@@ -90,9 +90,20 @@ export function detectSupplierCategory(supplierCategory: string): CategoryType {
   return 'varie'
 }
 
+export function detectSupplierCategoryFromArray(categorie: string[], fallbackCategoria?: string): CategoryType {
+  const list = categorie?.length ? categorie : (fallbackCategoria ? [fallbackCategoria] : [])
+  if (!list.length) return 'varie'
+  return detectSupplierCategory(list[0])
+}
+
 export function isDmcCategory(supplierCategory: string): boolean {
   const c = supplierCategory.toLowerCase()
   return c.includes('dmc') || c.includes('destination management')
+}
+
+export function isDmcFromArray(categorie: string[], fallbackCategoria?: string): boolean {
+  const list = categorie?.length ? categorie : (fallbackCategoria ? [fallbackCategoria] : [])
+  return list.some(c => isDmcCategory(c))
 }
 
 export type DmcCategoria = 'hotel' | 'voli' | 'transfer' | 'location' | 'attivita' | 'fee_dmc' | 'altro'

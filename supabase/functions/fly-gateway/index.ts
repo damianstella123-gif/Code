@@ -353,7 +353,7 @@ async function executeTool(
     case "get_suppliers": {
       let q = supabase
         .from("suppliers")
-        .select("id, name, category, city, rating, status, contract_status, contract_expiry, email, phone")
+        .select("id, name, category, categorie, city, rating, status, contract_status, contract_expiry, email, phone")
         .order("name")
         .limit(30);
 
@@ -361,12 +361,48 @@ async function executeTool(
         q = q.ilike("name", `%${input.ricerca}%`);
       }
       if (input.categoria) {
-        q = q.ilike("category", `%${input.categoria}%`);
+        q = q.contains("categorie", [input.categoria]);
       }
 
       const { data, error } = await q;
       if (error) return JSON.stringify({ error: error.message });
-      if (!data || data.length === 0) return "Nessun fornitore trovato.";
+      if (!data || data.length === 0) {
+        // Fallback: try ilike on legacy category field
+        if (input.categoria) {
+          const { data: fallback } = await supabase
+            .from("suppliers")
+            .select("id, name, category, categorie, city, rating, status, contract_status, contract_expiry, email, phone")
+            .ilike("category", `%${input.categoria}%`)
+            .order("name")
+            .limit(30);
+          if (fallback && fallback.length > 0) {
+            const supplierIds = fallback.map((s: any) => s.id);
+            const { data: contacts } = await supabase
+              .from("supplier_contacts")
+              .select("supplier_id, nome, ruolo, email, telefono, is_primary")
+              .in("supplier_id", supplierIds);
+            const contactsMap: Record<string, any[]> = {};
+            for (const c of contacts || []) {
+              if (!contactsMap[c.supplier_id]) contactsMap[c.supplier_id] = [];
+              contactsMap[c.supplier_id]!.push(c);
+            }
+            return JSON.stringify(
+              fallback.map((s: any) => ({
+                id: s.id,
+                nome: s.name,
+                categorie: (s.categorie && s.categorie.length > 0) ? s.categorie : (s.category ? [s.category] : []),
+                citta: s.city,
+                rating: s.rating,
+                stato: s.status,
+                contratto: s.contract_status,
+                scadenza_contratto: s.contract_expiry,
+                contacts: (contactsMap[s.id] || []).map((c: any) => ({ nome: c.nome, ruolo: c.ruolo, email: c.email, telefono: c.telefono, is_primary: c.is_primary })),
+              }))
+            );
+          }
+        }
+        return "Nessun fornitore trovato.";
+      }
       const supplierIds = data.map((s) => s.id);
       const { data: contacts } = await supabase
         .from("supplier_contacts")
@@ -381,7 +417,7 @@ async function executeTool(
         data.map((s) => ({
           id: s.id,
           nome: s.name,
-          categoria: s.category,
+          categorie: (s.categorie && s.categorie.length > 0) ? s.categorie : (s.category ? [s.category] : []),
           citta: s.city,
           rating: s.rating,
           stato: s.status,

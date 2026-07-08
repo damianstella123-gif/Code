@@ -39,15 +39,19 @@ function matchesCategory(supplierCat: string, filterCat: string): boolean {
     'audio video': ['audio video', 'audio/video', 'audiovideo', 'av'],
     'location': ['location', 'locations', 'venue'],
     'attività': ['attività', 'attivita', 'team building', 'activities'],
-    'trasporti': ['trasporti', 'trasporto', 'transfer', 'transport'],
+    'trasporti': ['trasporti', 'trasporto', 'transport'],
+    'transfer': ['transfer', 'trasferimenti', 'navette', 'ncc'],
     'catering': ['catering'],
     'allestimenti': ['allestimenti', 'allestimento', 'scenografia'],
-    'hostess': ['hostess', 'staff', 'personale'],
+    'staff': ['staff', 'hostess', 'personale', 'steward'],
     'entertainment': ['entertainment', 'intrattenimento', 'spettacolo'],
     'fotografia': ['fotografia', 'foto', 'photographer'],
     'video': ['video', 'videomaking', 'video making'],
     'sicurezza': ['sicurezza', 'security'],
     'dmc': ['dmc', 'destination management', 'destination management company'],
+    'grafica & stampa': ['grafica & stampa', 'grafica', 'stampa', 'tipografia', 'grafica e stampa'],
+    'esperienze': ['esperienze', 'experience', 'experiences'],
+    'agenzia di viaggi': ['agenzia di viaggi', 'agenzia viaggi', 'travel agency'],
     'altro': ['altro', 'varie', 'tecnologia', 'other'],
   }
   for (const [, vals] of Object.entries(aliases)) {
@@ -161,7 +165,10 @@ function parseSearchQuery(raw: string): ParsedSearch {
 }
 
 function supplierMatchesSearch(s: Supplier, parsed: ParsedSearch): boolean {
-  if (parsed.categoryHint && !matchesCategory(s.categoria, parsed.categoryHint)) return false
+  if (parsed.categoryHint) {
+    const cats = s.categorie?.length ? s.categorie : [s.categoria]
+    if (!cats.some(c => matchesCategory(c, parsed.categoryHint!))) return false
+  }
   if (parsed.minCapacity > 0 && getCapacity(s) < parsed.minCapacity) return false
   if (parsed.minRooms > 0 && getRooms(s) < parsed.minRooms) return false
   if (parsed.minMeetingRooms > 0 && getMeetingRooms(s) < parsed.minMeetingRooms) return false
@@ -172,6 +179,7 @@ function supplierMatchesSearch(s: Supplier, parsed: ParsedSearch): boolean {
     s.nome,
     s.city, s.region, s.province, s.country, s.location, s.address,
     s.categoria,
+    ...(s.categorie ?? []),
     s.email, s.telefono, s.sito,
     s.referente, s.referenteTelefono,
     s.noteOperative,
@@ -388,10 +396,22 @@ function SupplierCard({ supplier, onClick }: { supplier: Supplier; onClick: () =
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)' }}>Inattivo</span>
         )}
       </div>
-      <div className="flex items-center gap-2 mb-2">
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>
-          {normalizeCategory(supplier.categoria)}
-        </span>
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        {(() => {
+          const cats = supplier.categorie?.length ? supplier.categorie : [supplier.categoria]
+          const shown = cats.slice(0, 2)
+          const rest = cats.length - 2
+          return (
+            <>
+              {shown.map(c => (
+                <span key={c} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>
+                  {normalizeCategory(c)}
+                </span>
+              ))}
+              {rest > 0 && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)' }}>+{rest} altre</span>}
+            </>
+          )
+        })()}
         <div className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
           {rooms > 0 && <span>{rooms} camere</span>}
           {capacity > 0 && <span>cap. {capacity}</span>}
@@ -644,7 +664,8 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const d = supplier.details ?? {}
-  const cat = normalizeCategory(supplier.categoria)
+  const supplierCats = supplier.categorie?.length ? supplier.categorie : [supplier.categoria]
+  const cat = normalizeCategory(supplierCats[0])
 
   async function handleRating(v: number) {
     setRating(v)
@@ -711,9 +732,11 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-1">
+            <div className="flex items-center gap-3 mb-1 flex-wrap">
               <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '26px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.2 }}>{supplier.nome}</h1>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '2px 7px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>{cat}</span>
+              {supplierCats.map(c => (
+                <span key={c} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '2px 7px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>{normalizeCategory(c)}</span>
+              ))}
             </div>
             {(geoLine || supplier.location) && (
               <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)', marginTop: '4px' }}>
@@ -748,7 +771,7 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
 
       <SupplierContactsSection supplierId={supplier.id} />
 
-      {(supplier.categoria.toLowerCase().includes('dmc') || supplier.categoria.toLowerCase().includes('destination management')) && (
+      {supplierCats.some(c => c.toLowerCase().includes('dmc') || c.toLowerCase().includes('destination management')) && (
         <DmcHistorySection supplierId={supplier.id} />
       )}
 
@@ -811,7 +834,7 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
   const [nome, setNome] = useState(supplier?.nome ?? initialName ?? '')
   const [email, setEmail] = useState(supplier?.email ?? '')
   const [telefono, setTelefono] = useState(supplier?.telefono ?? '')
-  const [categoria, setCategoria] = useState(supplier?.categoria ?? '')
+  const [categorie, setCategorie] = useState<string[]>(supplier?.categorie?.length ? supplier.categorie : (supplier?.categoria ? [supplier.categoria] : []))
   const [referente, setReferente] = useState(supplier?.referente ?? '')
   const [referenteTelefono, setReferenteTelefono] = useState(supplier?.referenteTelefono ?? '')
   const [location, setLocation] = useState(supplier?.location ?? '')
@@ -844,7 +867,7 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
   const [hotelCapienzaSalaMassima, setHotelCapienzaSalaMassima] = useState<number | ''>(det?.capienza_sala_massima ?? '')
   const [hotelCapienzaTotaleMeeting, setHotelCapienzaTotaleMeeting] = useState<number | ''>(det?.capienza_totale_meeting ?? '')
 
-  const isHotel = matchesCategory(categoria, 'Hotel')
+  const isHotel = categorie.some(c => matchesCategory(c, 'Hotel'))
 
   function buildDetails(): SupplierDetails | undefined {
     if (isHotel) {
@@ -886,13 +909,14 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!nome.trim()) return
+    if (categorie.length === 0) return
     setDetailsError(null)
     const parsedDetails = buildDetails()
     if (parsedDetails === null) return
     const updated: Supplier = {
       id: supplier?.id ?? `sup_${Date.now()}`,
       nome: nome.trim(), email: email.trim(), telefono: telefono.trim(),
-      categoria: categoria.trim() || 'Altro', referente: referente.trim(),
+      categoria: categorie[0] || 'Altro', categorie: categorie.length > 0 ? categorie : ['Altro'], referente: referente.trim(),
       referenteTelefono: referenteTelefono.trim(), rating: supplier?.rating ?? 0,
       stato, statoContratto,
       scadenzaContratto: supplier?.scadenzaContratto ?? '',
@@ -944,12 +968,21 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
                 className={inputCls} style={inputStyle} />
             </div>
             <div>
-              <label style={labelStyle}>Categoria</label>
-              <select value={categoria} onChange={e => setCategoria(e.target.value)}
-                className={inputCls} style={inputStyle}>
-                <option value="">-- Seleziona --</option>
-                {SUPPLIER_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <label style={labelStyle}>Categorie *</label>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 p-3 rounded-xl" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+                {SUPPLIER_CATEGORIES.map(c => (
+                  <label key={c} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={categorie.includes(c)}
+                      onChange={e => {
+                        if (e.target.checked) setCategorie(prev => [...prev, c])
+                        else setCategorie(prev => prev.filter(x => x !== c))
+                      }}
+                      className="rounded" style={{ accentColor: 'var(--red2)' }} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase', color: 'var(--text)' }}>{c}</span>
+                  </label>
+                ))}
+              </div>
+              {categorie.length === 0 && <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--red2)', marginTop: '4px' }}>Seleziona almeno 1 categoria</p>}
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1311,7 +1344,10 @@ export default function Fornitori() {
 
   const categorySuppliers = useMemo(() => {
     if (!navCategory) return supplierList
-    return supplierList.filter(s => matchesCategory(s.categoria, navCategory))
+    return supplierList.filter(s => {
+      const cats = s.categorie?.length ? s.categorie : [s.categoria]
+      return cats.some(c => matchesCategory(c, navCategory))
+    })
   }, [supplierList, navCategory])
 
   const countryGroups = useMemo(() => {
@@ -1362,8 +1398,11 @@ export default function Fornitori() {
   const categoryCounts = useMemo(() => {
     const map: Record<string, number> = {}
     for (const s of supplierList) {
-      const c = normalizeCategory(s.categoria)
-      map[c] = (map[c] || 0) + 1
+      const cats = s.categorie?.length ? s.categorie : [s.categoria]
+      for (const cat of cats) {
+        const c = normalizeCategory(cat)
+        map[c] = (map[c] || 0) + 1
+      }
     }
     return map
   }, [supplierList])
