@@ -1197,6 +1197,139 @@ function DatiApplicazione() {
 
 // ─── Registro Errori ─────────────────────────────────────────────────────────
 
+// ─── Sentinel Section (Admin / Super Admin) ─────────────────────────────────
+
+interface SentinelAlert {
+  id: string
+  created_at: string
+  severity: 'info' | 'warning' | 'critical'
+  category: string
+  message: string
+  detail: Record<string, unknown> | null
+  status: 'new' | 'acknowledged' | 'resolved'
+  resolved_at: string | null
+  resolved_by: string | null
+}
+
+function SentinelSection() {
+  const [alerts, setAlerts] = useState<SentinelAlert[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'all' | 'critical' | 'warning' | 'info'>('all')
+
+  useEffect(() => {
+    loadAlerts()
+  }, [])
+
+  async function loadAlerts() {
+    setLoading(true)
+    const { data } = await supabase
+      .from('sentinel_alerts')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (data) setAlerts(data as SentinelAlert[])
+    setLoading(false)
+  }
+
+  async function resolve(alertId: string) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase
+      .from('sentinel_alerts')
+      .update({ status: 'resolved', resolved_at: new Date().toISOString(), resolved_by: user.id })
+      .eq('id', alertId)
+    setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, status: 'resolved', resolved_at: new Date().toISOString(), resolved_by: user.id } : a))
+  }
+
+  const filtered = filter === 'all' ? alerts : alerts.filter(a => a.severity === filter)
+  const criticalNew = alerts.filter(a => a.severity === 'critical' && a.status === 'new').length
+
+  const severityIcon = (s: string) => {
+    switch (s) {
+      case 'critical': return { color: '#dc2626', bg: 'rgba(220,38,38,0.10)', label: 'CRITICO' }
+      case 'warning': return { color: '#d97706', bg: 'rgba(217,119,6,0.10)', label: 'WARNING' }
+      default: return { color: '#2563eb', bg: 'rgba(37,99,235,0.10)', label: 'INFO' }
+    }
+  }
+
+  const timeAgo = (d: string) => {
+    const diff = Date.now() - new Date(d).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 60) return `${mins}m fa`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h fa`
+    return `${Math.floor(hrs / 24)}g fa`
+  }
+
+  return (
+    <SectionCard icon={AlertTriangle} title="Sentinel" subtitle="Monitoraggio automatico del sistema">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        {(['all', 'critical', 'warning', 'info'] as const).map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            className="px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wide transition-all"
+            style={{
+              background: filter === f ? 'var(--red2)' : 'var(--bg)',
+              color: filter === f ? 'white' : 'var(--muted)',
+              border: `1px solid ${filter === f ? 'transparent' : 'var(--line)'}`,
+            }}>
+            {f === 'all' ? 'Tutti' : f === 'critical' ? 'Critici' : f === 'warning' ? 'Warning' : 'Info'}
+            {f === 'critical' && criticalNew > 0 && (
+              <span style={{ marginLeft: 6, background: '#dc2626', color: 'white', borderRadius: 99, fontSize: 9, padding: '1px 5px' }}>
+                {criticalNew}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-8">
+          <ShieldCheck className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--muted)', opacity: 0.4 }} />
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun alert {filter !== 'all' ? `di tipo ${filter}` : ''}</p>
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-[520px] overflow-y-auto">
+          {filtered.map(a => {
+            const sev = severityIcon(a.severity)
+            return (
+              <div key={a.id} className="px-3 py-3 rounded-lg text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded font-mono font-bold uppercase" style={{ background: sev.bg, color: sev.color, fontSize: 9 }}>
+                      {sev.label}
+                    </span>
+                    <span className="font-mono" style={{ color: 'var(--muted)' }}>{a.category}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span style={{ color: 'var(--muted)' }}>{timeAgo(a.created_at)}</span>
+                    {a.status === 'new' ? (
+                      <span className="px-2 py-0.5 rounded font-mono" style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626', fontSize: 9 }}>NEW</span>
+                    ) : a.status === 'resolved' ? (
+                      <span className="px-2 py-0.5 rounded font-mono" style={{ background: 'rgba(22,163,74,0.1)', color: '#16a34a', fontSize: 9 }}>RISOLTO</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded font-mono" style={{ background: 'rgba(217,119,6,0.1)', color: '#d97706', fontSize: 9 }}>ACK</span>
+                    )}
+                  </div>
+                </div>
+                <p className="mb-2" style={{ color: 'var(--text)', fontSize: 13 }}>{a.message}</p>
+                {a.status === 'new' && (
+                  <button onClick={() => resolve(a.id)}
+                    className="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+                    style={{ background: 'rgba(22,163,74,0.1)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.2)' }}>
+                    Segna come risolto
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
 function RegistroErrori() {
   const [entries, setEntries] = useState<ErrorLogEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -1415,6 +1548,7 @@ const ALL_SECTIONS: SectionDef[] = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard Globale', group: 'admin' },
   { id: 'dati', icon: Database, label: 'Dati Applicazione', group: 'admin' },
   { id: 'errori', icon: FileWarning, label: 'Registro Errori', group: 'admin' },
+  { id: 'sentinel', icon: AlertTriangle, label: 'Sentinel', group: 'admin' },
   { id: 'audit', icon: ScrollText, label: 'Audit Log', group: 'admin' },
 ]
 
@@ -1599,6 +1733,7 @@ export default function Impostazioni() {
           {showAdmin && activeSection === 'dashboard' && <ConfigDashboard s={settings} upd={upd} />}
           {showAdmin && activeSection === 'dati' && <DatiApplicazione />}
           {showAdmin && activeSection === 'errori' && <RegistroErrori />}
+          {showAdmin && activeSection === 'sentinel' && <SentinelSection />}
           {currentUser?.role === 'Super Admin' && activeSection === 'audit' && <AuditLogSection />}
         </div>
       </div>

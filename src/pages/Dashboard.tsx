@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sun, Moon } from 'lucide-react'
-import { loadUser } from '@/lib/auth'
+import { loadUser, isAdmin } from '@/lib/auth'
 import { useTheme } from '@/lib/theme'
 import { daysLeft } from '@/lib/format'
 import { fetchEvents } from '@/lib/events-service'
@@ -58,6 +58,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState<'tutto' | Category>('tutto')
   const [now, setNow] = useState(new Date())
   const [feedFilter, setFeedFilter] = useState<string | null>(null)
+  const [sentinelAlerts, setSentinelAlerts] = useState<{ id: string; message: string; created_at: string }[]>([])
 
   useEffect(() => {
     async function load() {
@@ -95,6 +96,16 @@ export default function Dashboard() {
       }
     }
     load()
+    // Fetch sentinel critical alerts for admins
+    if (isAdmin(currentUser)) {
+      supabase.from('sentinel_alerts')
+        .select('id, message, created_at')
+        .eq('status', 'new')
+        .eq('severity', 'critical')
+        .order('created_at', { ascending: false })
+        .limit(5)
+        .then(({ data }) => { if (data) setSentinelAlerts(data) })
+    }
     const clock = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(clock)
   }, [])
@@ -239,8 +250,23 @@ export default function Dashboard() {
       })
     }
 
+    // Sentinel critical alerts
+    sentinelAlerts.forEach(a => {
+      items.push({
+        id: `sentinel-${a.id}`,
+        tag: 'urgente',
+        tagLabel: 'SENTINEL',
+        headline: a.message,
+        dek: 'Allarme di sistema rilevato da Sentinel. Verifica nella sezione Impostazioni.',
+        meta: `sentinel · ${timeAgoLabel(Math.abs(daysLeft(a.created_at)))}`,
+        category: 'task',
+        score: 200,
+        action: () => navigate('/impostazioni'),
+      })
+    })
+
     return items.sort((a, b) => b.score - a.score)
-  }, [liveTasks, liveEvents, liveClients, eventById, profileMap, navigate])
+  }, [liveTasks, liveEvents, liveClients, eventById, profileMap, navigate, sentinelAlerts])
 
   const filteredByTab = tab === 'tutto' ? stories : stories.filter(s => s.category === tab)
 

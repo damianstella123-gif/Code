@@ -120,6 +120,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                 <Icon className="shell-nav-icon" />
                 <span className="shell-nav-label">{item.name}</span>
                 {item.href === '/comunicazioni' && <ChatBadge />}
+                {item.href === '/impostazioni' && <SentinelBadge />}
               </Link>
             )
           })}
@@ -507,6 +508,32 @@ function ChatBadge() {
       justifyContent: 'center', padding: '0 5px',
     }}>
       {unread.total > 99 ? '99+' : unread.total}
+    </span>
+  )
+}
+
+function SentinelBadge() {
+  const [count, setCount] = useState(0)
+  const user = loadUser()
+
+  useEffect(() => {
+    if (!user || (user.role !== 'Admin' && user.role !== 'Super Admin')) return
+    supabase.from('sentinel_alerts')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'new')
+      .eq('severity', 'critical')
+      .then(({ count: c }) => { if (c) setCount(c) })
+  }, [])
+
+  if (count === 0) return null
+  return (
+    <span style={{
+      marginLeft: 'auto', minWidth: '18px', height: '18px', borderRadius: '9px',
+      background: '#dc2626', color: '#fff', fontFamily: 'var(--font-mono)',
+      fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center',
+      justifyContent: 'center', padding: '0 5px',
+    }}>
+      {count > 9 ? '9+' : count}
     </span>
   )
 }
