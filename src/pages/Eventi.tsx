@@ -41,7 +41,7 @@ import type { Client } from '@/data/clients'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
-import { detectSupplierCategory, SupplierCategoryPanel, type CategoryType } from '@/components/TabOperativo'
+import { detectSupplierCategory, isDmcCategory, SupplierCategoryPanel, type CategoryType } from '@/components/TabOperativo'
 import TabBudget from '@/components/TabBudget'
 import { setFlyContext } from '@/lib/fly'
 import { daysLeft, fmtShort, fmtLong, fmtFullLong, toISO } from '@/lib/format'
@@ -1531,7 +1531,7 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
                 {/* Expanded services panel */}
                 {isExpanded && (
                   <div className="px-4 pb-4 pt-2" style={{ borderTop: '1px solid var(--line)', background: 'var(--bg)' }}>
-                    <SupplierCategoryPanel event={event} supplierId={sup.id} category={catType} />
+                    <SupplierCategoryPanel event={event} supplierId={sup.id} category={catType} isDmc={isDmcCategory(sup.categoria)} otherSupplierCategories={linkedSuppliers.filter(s => s.id !== sup.id).map(s => s.categoria)} />
                   </div>
                 )}
               </div>

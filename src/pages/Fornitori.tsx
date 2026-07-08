@@ -583,6 +583,54 @@ function SupplierContactsSection({ supplierId }: { supplierId: string }) {
   )
 }
 
+// ─── DMC History Section ────────────────────────────────────────────────────
+
+const DMC_CAT_LABELS: Record<string, string> = {
+  hotel: 'Hotel', voli: 'Voli', transfer: 'Transfer', location: 'Location',
+  attivita: 'Attivita', fee_dmc: 'Fee DMC', altro: 'Altro',
+}
+
+function DmcHistorySection({ supplierId }: { supplierId: string }) {
+  const [stats, setStats] = useState<{ eventCount: number; avgByCat: Record<string, number> } | null>(null)
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('event_experience_details')
+        .select('event_id, dmc_categoria, costo_totale, costo_unitario, costo_per_persona, pax, quantita')
+        .eq('supplier_id', supplierId)
+      if (!data || data.length === 0) { setStats(null); return }
+      const events = new Set(data.map(r => r.event_id))
+      const totByCat: Record<string, number> = {}
+      for (const row of data) {
+        const cat = row.dmc_categoria || 'altro'
+        const qty = row.pax || row.quantita || 1
+        const costo = row.costo_totale || ((row.costo_unitario || row.costo_per_persona || 0) * qty)
+        totByCat[cat] = (totByCat[cat] || 0) + costo
+      }
+      const n = events.size || 1
+      const avgByCat: Record<string, number> = {}
+      for (const [k, v] of Object.entries(totByCat)) {
+        avgByCat[k] = Math.round(v / n)
+      }
+      setStats({ eventCount: events.size, avgByCat })
+    })()
+  }, [supplierId])
+
+  if (!stats || Object.keys(stats.avgByCat).length === 0) return null
+
+  return (
+    <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '12px' }}>
+        STORICO DMC ({stats.eventCount} eventi)
+      </p>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>
+        {Object.entries(stats.avgByCat).filter(([, v]) => v > 0).map(([k, v]) => `${DMC_CAT_LABELS[k] || k} \u20AC${v.toLocaleString('it-IT')} medio`).join(', ')}
+      </p>
+    </div>
+  )
+}
+
 // ─── Supplier Detail ────────────────────────────────────────────────────────
 
 function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
@@ -699,6 +747,10 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
       </div>
 
       <SupplierContactsSection supplierId={supplier.id} />
+
+      {(supplier.categoria.toLowerCase().includes('dmc') || supplier.categoria.toLowerCase().includes('destination management')) && (
+        <DmcHistorySection supplierId={supplier.id} />
+      )}
 
       {d && Object.keys(d).length > 0 && (
         <DetailSection title={`SCHEDA ${cat.toUpperCase()}`}>

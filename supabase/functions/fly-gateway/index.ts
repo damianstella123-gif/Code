@@ -530,7 +530,7 @@ async function executeTool(
         ];
 
         let totVenduto = 0, totCosto = 0, totCommissioni = 0;
-        const righe: { fornitore: string; categoria: string; costo: number; venduto: number; margine: number; margine_pct: number }[] = [];
+        const righe: { fornitore: string; categoria: string; dmc_categoria: string | null; costo: number; venduto: number; margine: number; margine_pct: number }[] = [];
 
         for (const { category, rows } of catTables) {
           for (const row of rows) {
@@ -543,6 +543,7 @@ async function executeTool(
             righe.push({
               fornitore: suppMap[suppId] || suppId || "(interno)",
               categoria: category,
+              dmc_categoria: (row.dmc_categoria as string) || null,
               costo: Math.round(econ.costo * 100) / 100,
               venduto: Math.round(econ.venduto * 100) / 100,
               margine: Math.round(margine * 100) / 100,

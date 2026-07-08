@@ -90,7 +90,27 @@ export function detectSupplierCategory(supplierCategory: string): CategoryType {
   return 'varie'
 }
 
-export function SupplierCategoryPanel({ event, supplierId, category }: { event: { id: string; dataInizio?: string }; supplierId: string; category: CategoryType }) {
+export function isDmcCategory(supplierCategory: string): boolean {
+  const c = supplierCategory.toLowerCase()
+  return c.includes('dmc') || c.includes('destination management')
+}
+
+export type DmcCategoria = 'hotel' | 'voli' | 'transfer' | 'location' | 'attivita' | 'fee_dmc' | 'altro'
+
+const DMC_CATEGORIE: { key: DmcCategoria; label: string; color: string }[] = [
+  { key: 'hotel', label: 'Hotel & Accommodation', color: 'var(--blue)' },
+  { key: 'voli', label: 'Voli & Trasporto aereo', color: 'var(--yellow)' },
+  { key: 'transfer', label: 'Transfer & Navette', color: 'var(--green)' },
+  { key: 'location', label: 'Location & Venue', color: 'color-mix(in srgb, var(--red2) 70%, transparent)' },
+  { key: 'attivita', label: 'Attivita & Esperienze', color: 'color-mix(in srgb, var(--yellow) 70%, transparent)' },
+  { key: 'fee_dmc', label: 'Fee DMC', color: 'var(--muted)' },
+  { key: 'altro', label: 'Altro', color: 'var(--muted)' },
+]
+
+const DMC_CAT_COLOR: Record<string, string> = Object.fromEntries(DMC_CATEGORIE.map(d => [d.key, d.color]))
+const DMC_CAT_LABEL: Record<string, string> = Object.fromEntries(DMC_CATEGORIE.map(d => [d.key, d.label]))
+
+export function SupplierCategoryPanel({ event, supplierId, category, isDmc, otherSupplierCategories }: { event: { id: string; dataInizio?: string }; supplierId: string; category: CategoryType; isDmc?: boolean; otherSupplierCategories?: string[] }) {
   const [items, setItems] = useState<Record<string, unknown>[]>([])
   const [extras, setExtras] = useState<Record<string, unknown>[]>([])
   const [loading, setLoading] = useState(true)
@@ -137,7 +157,7 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
     } else if (category === 'ristorante') {
       Object.assign(base, { tipologia_servizio: '', data: '', ora_inizio: '', ora_fine: '', pax_previsti: '', pax_confermati: '', menu_portate: '', menu_descrizione: '', beverage_incluso: false, area_riservata: false, sala_privata: false, esclusiva_parziale: false, esclusiva_totale: false, nome_sala: '', note_location: '', num_vegetariani: '', num_vegani: '', allergie: '', intolleranze: '', richieste_alimentari: '', note_operative: '', budget_per_persona: '', budget_totale: '', costo_per_persona: '', costo_totale_reale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10' })
     } else if (category === 'experience') {
-      Object.assign(base, { nome_attivita: '', tipologia: '', data: '', ora_inizio: '', ora_fine: '', location: '', pax: '', durata_minuti: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+      Object.assign(base, { nome_attivita: '', tipologia: '', data: '', ora_inizio: '', ora_fine: '', location: '', pax: '', durata_minuti: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', ...(isDmc ? { dmc_categoria: '' } : {}) })
     } else if (category === 'catering') {
       Object.assign(base, { tipologia: '', data: '', ora_inizio: '', ora_fine: '', pax: '', note: '', venduto_per_persona: '', venduto_totale: '', costo_per_persona: '', costo_totale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10' })
     } else if (category === 'audio_video') {
@@ -269,7 +289,7 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
       Object.assign(record, { tipologia_servizio: strOrEmpty('tipologia_servizio'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), pax_previsti: paxP, pax_confermati: paxC, menu_portate: strOrEmpty('menu_portate'), menu_descrizione: strOrEmpty('menu_descrizione'), beverage_incluso: !!form.beverage_incluso, area_riservata: !!form.area_riservata, sala_privata: !!form.sala_privata, esclusiva_parziale: !!form.esclusiva_parziale, esclusiva_totale: !!form.esclusiva_totale, nome_sala: strOrEmpty('nome_sala'), note_location: strOrEmpty('note_location'), num_vegetariani: numOrNull('num_vegetariani'), num_vegani: numOrNull('num_vegani'), allergie: strOrEmpty('allergie'), intolleranze: strOrEmpty('intolleranze'), richieste_alimentari: strOrEmpty('richieste_alimentari'), note_operative: strOrEmpty('note_operative'), budget_per_persona: bpp, budget_totale: numOrNull('budget_totale') ?? (bpp ? bpp * pax : null), costo_per_persona: cpp, costo_totale_reale: numOrNull('costo_totale_reale') ?? (cpp ? cpp * pax : null) })
     } else if (category === 'experience') {
       const pax = numOrNull('pax') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
-      Object.assign(record, { nome_attivita: strOrEmpty('nome_attivita'), tipologia: strOrEmpty('tipologia'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), location: strOrEmpty('location'), pax, durata_minuti: numOrNull('durata_minuti'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * pax : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * pax : null) })
+      Object.assign(record, { nome_attivita: strOrEmpty('nome_attivita'), tipologia: strOrEmpty('tipologia'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), location: strOrEmpty('location'), pax, durata_minuti: numOrNull('durata_minuti'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * pax : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * pax : null), ...(isDmc ? { dmc_categoria: strOrEmpty('dmc_categoria') || null } : {}) })
     } else if (category === 'catering') {
       const pax = numOrNull('pax') ?? 1; const vpp = numOrNull('venduto_per_persona'); const cpp = numOrNull('costo_per_persona')
       Object.assign(record, { tipologia: strOrEmpty('tipologia'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), pax, note: strOrEmpty('note'), venduto_per_persona: vpp, venduto_totale: numOrNull('venduto_totale') ?? (vpp ? vpp * pax : null), costo_per_persona: cpp, costo_totale: numOrNull('costo_totale') ?? (cpp ? cpp * pax : null) })
@@ -631,6 +651,15 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
     )
     if (category === 'experience') return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {isDmc && (
+          <div>
+            <label className="text-[10px] uppercase tracking-wide block mb-1" style={{ color: 'var(--muted)' }}>Categoria servizio DMC</label>
+            <select value={String(form.dmc_categoria ?? '')} onChange={e => upd('dmc_categoria', e.target.value)} className="w-full px-3 py-2 rounded-lg text-xs" style={{ background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>
+              <option value="">-- Seleziona --</option>
+              {DMC_CATEGORIE.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
+            </select>
+          </div>
+        )}
         {inp('nome_attivita', 'Nome attivita')}{sel('tipologia', 'Tipologia', EXPERIENCE_TIPOLOGIE)}
         {inp('data', 'Data', 'date')}{inp('ora_inizio', 'Ora inizio', 'time')}{inp('ora_fine', 'Ora fine', 'time')}
         {inp('location', 'Location')}{inp('pax', 'Pax', 'number')}{inp('durata_minuti', 'Durata (min)', 'number')}
@@ -771,6 +800,11 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{getItemTitle(item)}</span>
+                    {isDmc && (item.dmc_categoria as string) && (
+                      <span className="text-[9px] uppercase px-1.5 py-0.5 rounded" style={{ fontFamily: 'var(--font-mono)', background: DMC_CAT_COLOR[item.dmc_categoria as string] || 'var(--muted)', color: '#fff', letterSpacing: '0.03em' }}>
+                        {DMC_CAT_LABEL[item.dmc_categoria as string] || (item.dmc_categoria as string)}
+                      </span>
+                    )}
                     {(econ.venduto > 0 || econ.costo > 0) && (
                       <span className="text-xs" style={{ color: margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>
                         {'\u20AC'}{margine.toLocaleString('it-IT', { minimumFractionDigits: 0 })}
@@ -796,6 +830,35 @@ export function SupplierCategoryPanel({ event, supplierId, category }: { event: 
           })}
         </div>
       ) : null}
+
+      {isDmc && items.length > 0 && (() => {
+        const breakdown: Record<string, number> = {}
+        let total = 0
+        for (const item of items) {
+          const econ = getItemEcon(item)
+          const cat = (item.dmc_categoria as string) || 'altro'
+          breakdown[cat] = (breakdown[cat] || 0) + econ.costo
+          total += econ.costo
+        }
+        const hasOverlap = otherSupplierCategories && (
+          otherSupplierCategories.some(c => c.toLowerCase().includes('hotel') || c.toLowerCase().includes('albergo')) && breakdown['hotel'] ||
+          otherSupplierCategories.some(c => c.toLowerCase().includes('transfer') || c.toLowerCase().includes('trasporto') || c.toLowerCase().includes('ncc')) && breakdown['transfer']
+        )
+        return (
+          <div className="mt-3 p-3 rounded-lg" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+            <p className="text-[9px] uppercase tracking-wider mb-2 font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>Breakdown DMC</p>
+            <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+              {Object.entries(breakdown).filter(([, v]) => v > 0).map(([k, v]) => `${DMC_CAT_LABEL[k] || k}: \u20AC${v.toLocaleString('it-IT')}`).join(' \u00B7 ')}
+              {total > 0 && ` \u00B7 Totale: \u20AC${total.toLocaleString('it-IT')}`}
+            </p>
+            {hasOverlap && (
+              <p className="text-xs mt-2 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)', color: 'var(--yellow)' }}>
+                \u26A0\uFE0F Hai fornitori Hotel/Transfer separati oltre al DMC — verifica il doppio conteggio
+              </p>
+            )}
+          </div>
+        )
+      })()}
 
       {deletingId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDeletingId(null)}>
