@@ -411,6 +411,178 @@ function SupplierCard({ supplier, onClick }: { supplier: Supplier; onClick: () =
   )
 }
 
+// ─── Supplier Contacts Section ─────────────────────────────────────────────
+
+interface SupplierContact {
+  id: string
+  supplier_id: string
+  nome: string
+  ruolo: string | null
+  email: string | null
+  telefono: string | null
+  note: string | null
+  is_primary: boolean
+}
+
+function SupplierContactsSection({ supplierId }: { supplierId: string }) {
+  const [contacts, setContacts] = useState<SupplierContact[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [form, setForm] = useState({ nome: '', ruolo: '', email: '', telefono: '', note: '', is_primary: false })
+  const { showToast } = useToast()
+
+  const fetchContacts = useCallback(async () => {
+    const { data } = await supabase.from('supplier_contacts').select('*').eq('supplier_id', supplierId).order('is_primary', { ascending: false }).order('created_at', { ascending: true })
+    setContacts(data || [])
+    setLoading(false)
+  }, [supplierId])
+
+  useEffect(() => { fetchContacts() }, [fetchContacts])
+
+  async function handleSave() {
+    if (!form.nome.trim()) return
+    if (form.is_primary) {
+      await supabase.from('supplier_contacts').update({ is_primary: false }).eq('supplier_id', supplierId).eq('is_primary', true)
+    }
+    if (editingId) {
+      await supabase.from('supplier_contacts').update({ nome: form.nome.trim(), ruolo: form.ruolo.trim() || null, email: form.email.trim() || null, telefono: form.telefono.trim() || null, note: form.note.trim() || null, is_primary: form.is_primary }).eq('id', editingId)
+      showToast('Contatto aggiornato', 'success')
+    } else {
+      await supabase.from('supplier_contacts').insert({ supplier_id: supplierId, nome: form.nome.trim(), ruolo: form.ruolo.trim() || null, email: form.email.trim() || null, telefono: form.telefono.trim() || null, note: form.note.trim() || null, is_primary: form.is_primary })
+      showToast('Contatto aggiunto', 'success')
+    }
+    setForm({ nome: '', ruolo: '', email: '', telefono: '', note: '', is_primary: false })
+    setShowForm(false)
+    setEditingId(null)
+    fetchContacts()
+  }
+
+  async function handleDelete(id: string) {
+    await supabase.from('supplier_contacts').delete().eq('id', id)
+    setConfirmDeleteId(null)
+    showToast('Contatto eliminato', 'success')
+    fetchContacts()
+  }
+
+  function startEdit(c: SupplierContact) {
+    setForm({ nome: c.nome, ruolo: c.ruolo || '', email: c.email || '', telefono: c.telefono || '', note: c.note || '', is_primary: c.is_primary })
+    setEditingId(c.id)
+    setShowForm(true)
+  }
+
+  const inputCls = "w-full px-3 py-2 rounded-lg text-xs focus:outline-none"
+  const inputStyle: React.CSSProperties = { background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }
+  const labelStyle: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', display: 'block', marginBottom: '4px' }
+
+  return (
+    <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
+      <div className="flex items-center justify-between mb-4">
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)' }}>CONTATTI</p>
+        {!showForm && (
+          <button onClick={() => { setForm({ nome: '', ruolo: '', email: '', telefono: '', note: '', is_primary: contacts.length === 0 }); setEditingId(null); setShowForm(true) }}
+            className="flex items-center gap-1 transition-all hover:opacity-80"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            <Plus className="w-3 h-3" /> AGGIUNGI CONTATTO
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>Caricamento...</p>
+      ) : contacts.length === 0 && !showForm ? (
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>Nessun contatto registrato.</p>
+      ) : (
+        <div className="space-y-3">
+          {contacts.map(c => (
+            <div key={c.id} className="flex items-start justify-between gap-3 py-2" style={{ borderBottom: '1px solid var(--line)' }}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: '13px', color: 'var(--text)', fontWeight: 500 }}>{c.nome}</span>
+                  {c.is_primary && (
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '1px 5px', borderRadius: '3px', background: 'var(--yellow)', color: '#1a1a1a' }}>PRINCIPALE</span>
+                  )}
+                  {c.ruolo && (
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', padding: '1px 6px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>{c.ruolo}</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-3" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
+                  {c.email && <a href={`mailto:${c.email}`} className="flex items-center gap-1 hover:opacity-80"><Mail className="w-2.5 h-2.5" />{c.email}</a>}
+                  {c.telefono && <a href={`tel:${c.telefono}`} className="flex items-center gap-1 hover:opacity-80"><Phone className="w-2.5 h-2.5" />{c.telefono}</a>}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {confirmDeleteId === c.id ? (
+                  <div className="flex items-center gap-1">
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--red2)' }}>Sei sicuro?</span>
+                    <button onClick={() => handleDelete(c.id)} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--red2)', background: 'none', border: 'none', cursor: 'pointer' }}>Si</button>
+                    <button onClick={() => setConfirmDeleteId(null)} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>No</button>
+                  </div>
+                ) : (
+                  <>
+                    <button onClick={() => startEdit(c)} className="p-1 rounded hover:bg-white/5 transition-all" style={{ color: 'var(--muted)' }}><Edit3 className="w-3 h-3" /></button>
+                    <button onClick={() => setConfirmDeleteId(c.id)} className="p-1 rounded hover:bg-white/5 transition-all" style={{ color: 'var(--muted)' }}><Trash2 className="w-3 h-3" /></button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <div className="mt-4 p-4 rounded-xl space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label style={labelStyle}>Nome *</label>
+              <input type="text" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} className={inputCls} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Ruolo</label>
+              <input type="text" value={form.ruolo} onChange={e => setForm({ ...form, ruolo: e.target.value })} className={inputCls} style={inputStyle} placeholder="es. Banqueting Manager" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label style={labelStyle}>Email</label>
+              <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={inputCls} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Telefono</label>
+              <input type="text" value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} className={inputCls} style={inputStyle} />
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Note</label>
+            <input type="text" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} className={inputCls} style={inputStyle} />
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" checked={form.is_primary} onChange={e => setForm({ ...form, is_primary: e.target.checked })} className="sr-only peer" />
+              <div className="w-8 h-4 rounded-full peer-checked:bg-[var(--red2)] transition-colors" style={{ background: form.is_primary ? undefined : 'var(--line)' }} />
+              <div className="absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white transition-transform peer-checked:translate-x-4" />
+            </label>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>Contatto principale</span>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button onClick={handleSave}
+              className="px-4 py-2 rounded-lg"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 600, background: 'var(--red2)', color: 'white' }}>
+              {editingId ? 'SALVA' : 'AGGIUNGI'}
+            </button>
+            <button onClick={() => { setShowForm(false); setEditingId(null) }}
+              className="px-4 py-2 rounded-lg"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'transparent', color: 'var(--muted)', border: '1px solid var(--line)' }}>
+              ANNULLA
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Supplier Detail ────────────────────────────────────────────────────────
 
 function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
@@ -522,11 +694,11 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <MiniCard icon={Building2} label="Referente" value={supplier.referente || '-'} />
-        <MiniCard icon={Phone} label="Tel. Referente" value={supplier.referenteTelefono || '-'} />
         <MiniCard icon={FileText} label="P.IVA" value={supplier.piva || '-'} />
         <MiniCard icon={Euro} label="Costo medio" value={supplier.costoMedioPerEvento ? `${supplier.costoMedioPerEvento.toLocaleString('it-IT')} EUR` : '-'} />
       </div>
+
+      <SupplierContactsSection supplierId={supplier.id} />
 
       {d && Object.keys(d).length > 0 && (
         <DetailSection title={`SCHEDA ${cat.toUpperCase()}`}>
@@ -601,6 +773,10 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
   const [province, setProvince] = useState(supplier?.province ?? '')
   const [region, setRegion] = useState(supplier?.region ?? '')
   const [country, setCountry] = useState(supplier?.country ?? 'Italia')
+  const [contactNome, setContactNome] = useState('')
+  const [contactRuolo, setContactRuolo] = useState('')
+  const [contactEmail, setContactEmail] = useState('')
+  const [contactTelefono, setContactTelefono] = useState('')
   const [detailsJson, setDetailsJson] = useState(supplier?.details ? JSON.stringify(supplier.details, null, 2) : '')
   const [detailsError, setDetailsError] = useState<string | null>(null)
   const [showAdvancedJson, setShowAdvancedJson] = useState(false)
@@ -655,7 +831,7 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
     return supplier?.details
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!nome.trim()) return
     setDetailsError(null)
@@ -678,6 +854,18 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
       city: city.trim(), province: province.trim(), region: region.trim(), country: country.trim(),
     }
     onSave(updated)
+    if (!supplier && contactNome.trim()) {
+      setTimeout(async () => {
+        await supabase.from('supplier_contacts').insert({
+          supplier_id: updated.id,
+          nome: contactNome.trim(),
+          ruolo: contactRuolo.trim() || null,
+          email: contactEmail.trim() || null,
+          telefono: contactTelefono.trim() || null,
+          is_primary: true,
+        })
+      }, 300)
+    }
   }
 
   const inputCls = "w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
@@ -806,6 +994,34 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
               <option value="sospeso">Sospeso</option>
             </select>
           </div>
+
+          {!supplier && (
+            <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }} className="flex items-center gap-2">
+                <Building2 className="w-4 h-4" /> CONTATTO PRINCIPALE
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label style={labelStyle}>Nome contatto</label>
+                  <input type="text" value={contactNome} onChange={e => setContactNome(e.target.value)} className={inputCls} style={inputStyle} placeholder="Mario Rossi" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Ruolo</label>
+                  <input type="text" value={contactRuolo} onChange={e => setContactRuolo(e.target.value)} className={inputCls} style={inputStyle} placeholder="Banqueting Manager" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label style={labelStyle}>Email contatto</label>
+                  <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} className={inputCls} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Telefono contatto</label>
+                  <input type="text" value={contactTelefono} onChange={e => setContactTelefono(e.target.value)} className={inputCls} style={inputStyle} />
+                </div>
+              </div>
+            </div>
+          )}
 
           {isHotel && (
             <div className="rounded-xl p-4 space-y-4" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>

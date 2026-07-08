@@ -367,6 +367,16 @@ async function executeTool(
       const { data, error } = await q;
       if (error) return JSON.stringify({ error: error.message });
       if (!data || data.length === 0) return "Nessun fornitore trovato.";
+      const supplierIds = data.map((s) => s.id);
+      const { data: contacts } = await supabase
+        .from("supplier_contacts")
+        .select("supplier_id, nome, ruolo, email, telefono, is_primary")
+        .in("supplier_id", supplierIds);
+      const contactsMap: Record<string, typeof contacts> = {};
+      for (const c of contacts || []) {
+        if (!contactsMap[c.supplier_id]) contactsMap[c.supplier_id] = [];
+        contactsMap[c.supplier_id]!.push(c);
+      }
       return JSON.stringify(
         data.map((s) => ({
           id: s.id,
@@ -377,6 +387,7 @@ async function executeTool(
           stato: s.status,
           contratto: s.contract_status,
           scadenza_contratto: s.contract_expiry,
+          contacts: (contactsMap[s.id] || []).map((c) => ({ nome: c.nome, ruolo: c.ruolo, email: c.email, telefono: c.telefono, is_primary: c.is_primary })),
         }))
       );
     }
