@@ -5,7 +5,7 @@ import {
   Search, X, Plus, Trash2, Save, Upload, Building2, Edit3, Link2,
   Hotel, UtensilsCrossed, MapPinned, Sparkles, Bus, CookingPot,
   Speaker, PaintBucket, Users, MoreHorizontal, Camera, Video, Shield,
-  Music, ChevronRight, Navigation,
+  Music, ChevronRight, Navigation, Plane,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
@@ -17,14 +17,14 @@ import { SUPPLIER_CATEGORIES } from '@/data/suppliers'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const NAV_CATEGORIES = ['Hotel', 'Ristorante', 'Audio Video', 'Catering', 'Location', 'Trasporti', 'Allestimenti', 'DMC', 'Altro'] as const
+const NAV_CATEGORIES = ['Hotel', 'Ristorante', 'Audio Video', 'Catering', 'Location', 'Trasporti', 'Allestimenti', 'DMC', 'Agenzia di Viaggi', 'Altro'] as const
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   Hotel, Ristorante: UtensilsCrossed, Location: MapPinned,
   'Attività': Sparkles, Trasporti: Bus, Catering: CookingPot,
   'Audio Video': Speaker, Allestimenti: PaintBucket, DMC: Navigation,
-  Hostess: Users, Entertainment: Music, Fotografia: Camera, Video: Video,
-  Sicurezza: Shield, Altro: MoreHorizontal,
+  'Agenzia di Viaggi': Plane, Hostess: Users, Entertainment: Music,
+  Fotografia: Camera, Video: Video, Sicurezza: Shield, Altro: MoreHorizontal,
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -1399,8 +1399,8 @@ export default function Fornitori() {
     const map: Record<string, number> = {}
     for (const s of supplierList) {
       const cats = s.categorie?.length ? s.categorie : [s.categoria]
-      for (const cat of cats) {
-        const c = normalizeCategory(cat)
+      const normalized = new Set(cats.map(c => normalizeCategory(c)))
+      for (const c of normalized) {
         map[c] = (map[c] || 0) + 1
       }
     }
