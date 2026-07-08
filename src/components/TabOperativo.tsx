@@ -82,6 +82,7 @@ export function detectSupplierCategory(supplierCategory: string): CategoryType {
   if (c.includes('catering')) return 'catering'
   if (c.includes('experience') || c.includes('location') || c.includes('team building')) return 'experience'
   if (c.includes('audio') || c.includes('video') || c.includes('luci') || c.includes('tecnic')) return 'audio_video'
+  if (c.includes('dmc') || c.includes('destination management')) return 'experience'
   if (c.includes('allestiment')) return 'allestimenti'
   if (c.includes('staff') && c.includes('intern')) return 'staff_interno'
   if (c.includes('staff') || c.includes('hostess') || c.includes('steward') || c.includes('promoter')) return 'staff_esterno'

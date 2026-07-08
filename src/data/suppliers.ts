@@ -1,9 +1,9 @@
 export type StatoContratto = 'attivo' | 'in_scadenza' | 'scaduto' | 'in_rinnovo' | 'sospeso'
 
-export type SupplierCategory = 'Hotel' | 'Ristorante' | 'Location' | 'Attività' | 'Trasporti' | 'Catering' | 'Audio Video' | 'Allestimenti' | 'Hostess' | 'Entertainment' | 'Fotografia' | 'Video' | 'Sicurezza' | 'Altro'
+export type SupplierCategory = 'Hotel' | 'Ristorante' | 'Location' | 'Attività' | 'Trasporti' | 'Catering' | 'Audio Video' | 'Allestimenti' | 'Hostess' | 'Entertainment' | 'Fotografia' | 'Video' | 'Sicurezza' | 'DMC' | 'Altro'
 
 export const SUPPLIER_CATEGORIES: SupplierCategory[] = [
-  'Hotel', 'Ristorante', 'Audio Video', 'Catering', 'Location', 'Trasporti', 'Allestimenti', 'Hostess', 'Entertainment', 'Fotografia', 'Video', 'Sicurezza', 'Altro',
+  'Hotel', 'Ristorante', 'Audio Video', 'Catering', 'Location', 'Trasporti', 'Allestimenti', 'DMC', 'Hostess', 'Entertainment', 'Fotografia', 'Video', 'Sicurezza', 'Altro',
 ]
 
 export interface Documento {

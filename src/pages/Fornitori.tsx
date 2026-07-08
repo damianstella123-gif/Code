@@ -17,14 +17,14 @@ import { SUPPLIER_CATEGORIES } from '@/data/suppliers'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const NAV_CATEGORIES = ['Hotel', 'Ristorante', 'Audio Video', 'Catering', 'Location', 'Trasporti', 'Allestimenti', 'Altro'] as const
+const NAV_CATEGORIES = ['Hotel', 'Ristorante', 'Audio Video', 'Catering', 'Location', 'Trasporti', 'Allestimenti', 'DMC', 'Altro'] as const
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   Hotel, Ristorante: UtensilsCrossed, Location: MapPinned,
   'Attività': Sparkles, Trasporti: Bus, Catering: CookingPot,
-  'Audio Video': Speaker, Allestimenti: PaintBucket, Hostess: Users,
-  Entertainment: Music, Fotografia: Camera, Video: Video, Sicurezza: Shield,
-  Altro: MoreHorizontal,
+  'Audio Video': Speaker, Allestimenti: PaintBucket, DMC: Navigation,
+  Hostess: Users, Entertainment: Music, Fotografia: Camera, Video: Video,
+  Sicurezza: Shield, Altro: MoreHorizontal,
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -47,6 +47,7 @@ function matchesCategory(supplierCat: string, filterCat: string): boolean {
     'fotografia': ['fotografia', 'foto', 'photographer'],
     'video': ['video', 'videomaking', 'video making'],
     'sicurezza': ['sicurezza', 'security'],
+    'dmc': ['dmc', 'destination management', 'destination management company'],
     'altro': ['altro', 'varie', 'tecnologia', 'other'],
   }
   for (const [, vals] of Object.entries(aliases)) {
