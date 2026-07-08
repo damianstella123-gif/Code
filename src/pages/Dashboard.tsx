@@ -110,18 +110,22 @@ export default function Dashboard() {
       ...liveTasks.map(t => t.assegnatario).filter(Boolean),
     ])].filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}/.test(id)) as string[]
     if (userIds.length === 0) return
+
+    const missing = userIds.filter(id => !profileMap[id])
+    if (missing.length === 0) return
+
     supabase.from('profiles')
       .select('id, nome, first_name, last_name')
-      .in('id', userIds)
+      .in('id', missing)
       .then(({ data }) => {
         if (!data) return
-        const map: Record<string, string> = {}
+        const newMap: Record<string, string> = {}
         data.forEach((p: any) => {
           const fullName = [p.first_name, p.last_name]
             .filter(Boolean).join(' ').trim()
-          map[p.id] = fullName || p.nome || 'Utente'
+          newMap[p.id] = fullName || p.nome || 'Utente'
         })
-        setProfileMap(map)
+        setProfileMap(prev => ({ ...prev, ...newMap }))
       })
   }, [liveEvents, liveTasks])
 
@@ -135,8 +139,9 @@ export default function Dashboard() {
 
   function resolveName(id: string | null | undefined): string {
     if (!id) return 'non assegnato'
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}/.test(id)) return id
-    return profileMap[id] || 'N/D'
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}/.test(id)
+    if (!isUUID) return id
+    return profileMap[id] || 'caricamento...'
   }
 
   const stories = useMemo<Story[]>(() => {
