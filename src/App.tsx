@@ -17,9 +17,8 @@ const Fornitori = lazy(() => import('./pages/Fornitori'))
 const Amministrazione = lazy(() => import('./pages/Amministrazione'))
 const Comunicazioni = lazy(() => import('./pages/Comunicazioni'))
 const Workflow = lazy(() => import('./pages/Workflow'))
-const Pratiche = lazy(() => import('./pages/Pratiche'))
+const Dossier = lazy(() => import('./pages/Dossier'))
 const CreativeStudio = lazy(() => import('./pages/CreativeStudio'))
-const Archivio = lazy(() => import('./pages/Archivio'))
 const Utenti = lazy(() => import('./pages/Utenti'))
 const Impostazioni = lazy(() => import('./pages/Impostazioni'))
 const FeedbackBeta = lazy(() => import('./pages/FeedbackBeta'))
@@ -237,9 +236,10 @@ export default function App() {
       <Route path="/amministrazione" element={<AuthGuard><Layout><LazyPage><Amministrazione /></LazyPage></Layout></AuthGuard>} />
       <Route path="/comunicazioni" element={<AuthGuard><Layout><LazyPage><Comunicazioni /></LazyPage></Layout></AuthGuard>} />
       <Route path="/workflow" element={<AuthGuard><Layout><LazyPage><Workflow /></LazyPage></Layout></AuthGuard>} />
-      <Route path="/pratiche" element={<AuthGuard><Layout><LazyPage><Pratiche /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/dossier" element={<AuthGuard><Layout><LazyPage><Dossier /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/pratiche" element={<Navigate to="/dossier" replace />} />
+      <Route path="/archivio" element={<Navigate to="/dossier" replace />} />
       <Route path="/creative-studio" element={<AuthGuard><Layout><LazyPage><CreativeStudio /></LazyPage></Layout></AuthGuard>} />
-      <Route path="/archivio" element={<AuthGuard><Layout><LazyPage><Archivio /></LazyPage></Layout></AuthGuard>} />
       <Route path="/utenti" element={<AuthGuard><Layout><LazyPage><Utenti /></LazyPage></Layout></AuthGuard>} />
       <Route path="/impostazioni" element={<AuthGuard><Layout><LazyPage><Impostazioni /></LazyPage></Layout></AuthGuard>} />
       <Route path="/feedback-beta" element={<AuthGuard><Layout><LazyPage><FeedbackBeta /></LazyPage></Layout></AuthGuard>} />

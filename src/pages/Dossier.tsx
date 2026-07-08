@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import {
   FileText,
   Search,
@@ -13,13 +13,16 @@ import {
   Shield,
   Receipt,
   ScrollText,
+  Upload,
+  Download,
+  Paperclip,
 } from 'lucide-react'
 import { type Pratica, type CategoriaPratica, type StatoPratica, type PrioritaPratica } from '@/data/pratiche'
 import type { Event } from '@/data/events'
 import { loadUser } from '@/lib/auth'
-import { daysLeft, fmtShort, toISO } from '@/lib/format'
+import { daysLeft, fmtShort, fmtLong, toISO } from '@/lib/format'
 import { cachePraticheSnapshot } from '@/lib/storage'
-import { fetchPractices, upsertPractice, deletePractice as deletePracticeRemote } from '@/lib/practices-service'
+import { fetchDossiers, upsertDossier, deleteDossier as deleteDossierRemote } from '@/lib/dossier-service'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchAllProfiles, type Profile } from '@/lib/profiles'
 import { useRealtimeTable } from '@/lib/use-realtime'
@@ -62,86 +65,102 @@ function priColor(pri: PrioritaPratica) {
   return 'var(--muted)'
 }
 
+const ALLOWED_EXTENSIONS = ['.pdf', '.xlsx', '.xls', '.docx', '.doc', '.pptx', '.ppt', '.jpg', '.jpeg', '.png']
+
+interface DossierDocument {
+  id: string
+  nome: string
+  categoria: string
+  file_path: string
+  file_name: string
+  file_size: number
+  file_type: string
+  note: string
+  created_at: string
+  dossier_id: string | null
+}
+
+function fileColor(name: string) {
+  const ext = name.split('.').pop()?.toLowerCase()
+  switch (ext) {
+    case 'pdf': return '#ef4444'
+    case 'xlsx': case 'xls': return '#22c55e'
+    case 'docx': case 'doc': return '#3b82f6'
+    case 'pptx': case 'ppt': return '#f97316'
+    case 'png': case 'jpg': case 'jpeg': return '#a855f7'
+    default: return 'var(--muted)'
+  }
+}
+function fileExt(name: string) { return name.split('.').pop()?.toUpperCase() ?? '' }
+function formatSize(bytes: number) {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1048576) return (bytes / 1024).toFixed(0) + ' KB'
+  return (bytes / 1048576).toFixed(1) + ' MB'
+}
+
 type View = 'list' | 'detail' | 'form'
 
-export default function Pratiche() {
+export default function Dossier() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [allPratiche, setAllPratiche] = useState<Pratica[]>([])
+  const [allDossiers, setAllDossiers] = useState<Pratica[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [view, setView] = useState<View>('list')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [allEvents, setAllEvents] = useState<Event[]>([])
   const [allUsers, setAllUsers] = useState<Profile[]>([])
 
-  // Filters
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategoria, setFilterCategoria] = useState<CategoriaPratica | 'tutti'>('tutti')
   const [filterStato, setFilterStato] = useState<StatoPratica | 'tutti'>('tutti')
   const [filterEvento, setFilterEvento] = useState<string | 'tutti'>('tutti')
   const [filterPriorita, setFilterPriorita] = useState<PrioritaPratica | 'tutti'>('tutti')
 
-  // Pratiche: fonte di verita' Supabase. Nessun fallback mock.
-  // La snapshot in localStorage resta solo per Calendario che la legge.
   useEffect(() => {
     let cancelled = false
-    fetchPractices().then(remote => {
+    fetchDossiers().then(remote => {
       if (cancelled) return
-      setAllPratiche(remote)
+      setAllDossiers(remote)
       cachePraticheSnapshot(remote)
     })
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [])
 
-  useRealtimeTable('practices', () => {
-    fetchPractices().then(remote => { setAllPratiche(remote); cachePraticheSnapshot(remote) })
+  useRealtimeTable('dossiers', () => {
+    fetchDossiers().then(remote => { setAllDossiers(remote); cachePraticheSnapshot(remote) })
   })
 
-  // Load events from Supabase
   useEffect(() => {
     let cancelled = false
-    fetchEvents().then(events => {
-      if (cancelled) return
-      setAllEvents(events)
-    })
-    return () => {
-      cancelled = true
-    }
+    fetchEvents().then(events => { if (!cancelled) setAllEvents(events) })
+    return () => { cancelled = true }
   }, [])
 
-  // Load users from Supabase
   useEffect(() => {
     let cancelled = false
-    fetchAllProfiles().then(profiles => {
-      if (cancelled) return
-      setAllUsers(profiles)
-    })
-    return () => {
-      cancelled = true
-    }
+    fetchAllProfiles().then(profiles => { if (!cancelled) setAllUsers(profiles) })
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
     const targetId = searchParams.get('id')
-    if (!targetId || allPratiche.length === 0) return
-    const found = allPratiche.find(p => p.id === targetId)
+    if (!targetId || allDossiers.length === 0) return
+    const found = allDossiers.find(p => p.id === targetId)
     if (found) {
       setSelectedId(found.id)
       setView('detail')
       setSearchParams({}, { replace: true })
     }
-  }, [allPratiche, searchParams, setSearchParams])
+  }, [allDossiers, searchParams, setSearchParams])
 
-  const refreshPractices = useCallback(async () => {
-    const remote = await fetchPractices()
-    setAllPratiche(remote)
+  const refreshDossiers = useCallback(async () => {
+    const remote = await fetchDossiers()
+    setAllDossiers(remote)
     cachePraticheSnapshot(remote)
     return remote
   }, [])
 
   const filtered = useMemo(() => {
-    let list = allPratiche
+    let list = allDossiers
     if (searchTerm) {
       const q = searchTerm.toLowerCase()
       list = list.filter(p =>
@@ -155,114 +174,77 @@ export default function Pratiche() {
     if (filterEvento !== 'tutti') list = list.filter(p => p.eventoId === filterEvento)
     if (filterPriorita !== 'tutti') list = list.filter(p => p.priorita === filterPriorita)
     return list.sort((a, b) => new Date(b.creatoIl).getTime() - new Date(a.creatoIl).getTime())
-  }, [allPratiche, searchTerm, filterCategoria, filterStato, filterEvento, filterPriorita])
+  }, [allDossiers, searchTerm, filterCategoria, filterStato, filterEvento, filterPriorita])
 
-  // Dashboard KPIs
   const kpi = useMemo(() => {
-    const totali = allPratiche.length
-    const inCorso = allPratiche.filter(p => p.stato === 'in_lavorazione' || p.stato === 'in_attesa').length
-    const scadute = allPratiche.filter(p => p.stato !== 'completata' && daysLeft(p.scadenza) < 0).length
-    const inRitardo = allPratiche.filter(p => p.stato !== 'completata' && daysLeft(p.scadenza) >= 0 && daysLeft(p.scadenza) <= 7).length
-    const approvate = allPratiche.filter(p => p.stato === 'completata').length
-    const importoTotale = allPratiche.filter(p => p.importo).reduce((s, p) => s + (p.importo ?? 0), 0)
-    return { totali, inCorso, scadute, inRitardo, approvate, importoTotale }
-  }, [allPratiche])
+    const aperti = allDossiers.filter(p => p.stato === 'da_aprire' || p.stato === 'in_attesa').length
+    const inCorso = allDossiers.filter(p => p.stato === 'in_lavorazione').length
+    const chiusi = allDossiers.filter(p => p.stato === 'completata').length
+    return { aperti, inCorso, chiusi }
+  }, [allDossiers])
 
-  const selected = selectedId ? allPratiche.find(p => p.id === selectedId) : null
+  const selected = selectedId ? allDossiers.find(p => p.id === selectedId) : null
 
-  function openDetail(id: string) {
-    setSelectedId(id)
-    setView('detail')
-  }
+  function openDetail(id: string) { setSelectedId(id); setView('detail') }
+  function openNew() { setEditingId(null); setView('form') }
+  function openEdit(id: string) { setEditingId(id); setView('form') }
 
-  function openNew() {
-    setEditingId(null)
-    setView('form')
-  }
-
-  function openEdit(id: string) {
-    setEditingId(id)
-    setView('form')
-  }
-
-  function deletePratica(id: string) {
-    deletePracticeRemote(id).then(ok => {
+  function deleteDossier(id: string) {
+    deleteDossierRemote(id).then(ok => {
       if (!ok) return
-      refreshPractices()
+      refreshDossiers()
       setView('list')
       setSelectedId(null)
     })
   }
 
-  function savePratica(pratica: Pratica) {
-    upsertPractice(pratica).then(saved => {
-      const finalPratica = saved ?? pratica
-      refreshPractices()
-      setSelectedId(finalPratica.id)
+  function saveDossier(pratica: Pratica) {
+    upsertDossier(pratica).then(saved => {
+      const final = saved ?? pratica
+      refreshDossiers()
+      setSelectedId(final.id)
       setView('detail')
     })
   }
 
   if (view === 'detail' && selected) {
-    return <DetailView pratica={selected} onBack={() => setView('list')} onEdit={() => openEdit(selected.id)} onDelete={() => deletePratica(selected.id)} allEvents={allEvents} allUsers={allUsers} />
+    return <DetailView dossier={selected} onBack={() => setView('list')} onEdit={() => openEdit(selected.id)} onDelete={() => deleteDossier(selected.id)} allEvents={allEvents} allUsers={allUsers} />
   }
 
   if (view === 'form') {
-    const editing = editingId ? allPratiche.find(p => p.id === editingId) : undefined
-    return <FormView pratica={editing} onSave={savePratica} onCancel={() => { setView(selectedId ? 'detail' : 'list') }} allEvents={allEvents} allUsers={allUsers} />
+    const editing = editingId ? allDossiers.find(p => p.id === editingId) : undefined
+    return <FormView pratica={editing} onSave={saveDossier} onCancel={() => { setView(selectedId ? 'detail' : 'list') }} allEvents={allEvents} allUsers={allUsers} />
   }
 
   return (
     <div>
-      {/* Wire masthead */}
       <div className="wire-masthead">
         <div>
-          <span className="wire-masthead-title">PRATICHE</span>
+          <span className="wire-masthead-title" style={{ fontFamily: 'var(--font-mono)' }}>DOSSIER</span>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>
-            {filtered.length} PRATICH{filtered.length !== 1 ? 'E' : 'A'}
+            {filtered.length}
           </span>
         </div>
         <div className="wire-masthead-right">
           <span onClick={openNew}
             style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--red2)', cursor: 'pointer' }}>
-            + NUOVA
+            + NUOVO
           </span>
         </div>
       </div>
 
-      {/* Wire ticker: KPIs */}
       <div className="wire-ticker">
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-          <strong>{kpi.totali}</strong> totali
+          <strong>{kpi.aperti}</strong> aperti
         </span>
-        {kpi.inCorso > 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-            <strong>{kpi.inCorso}</strong> in corso
-          </span>
-        )}
-        {kpi.scadute > 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--red2)' }}>
-            <strong>{kpi.scadute}</strong> scadute
-          </span>
-        )}
-        {kpi.inRitardo > 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--yellow)' }}>
-            <strong>{kpi.inRitardo}</strong> in scadenza
-          </span>
-        )}
-        {kpi.approvate > 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-            <strong>{kpi.approvate}</strong> approvate
-          </span>
-        )}
-        {kpi.importoTotale > 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--green)' }}>
-            <strong>€{(kpi.importoTotale / 1000).toFixed(0)}K</strong> valore
-          </span>
-        )}
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--blue)' }}>
+          <strong>{kpi.inCorso}</strong> in corso
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--green)' }}>
+          <strong>{kpi.chiusi}</strong> chiusi
+        </span>
       </div>
 
-      {/* Search + Filters */}
       <div className="space-y-4 animate-fade-in" style={{ marginTop: '20px' }}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
@@ -270,7 +252,7 @@ export default function Pratiche() {
             type="text"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            placeholder="Cerca pratiche..."
+            placeholder="Cerca dossier..."
             className="w-full pl-10 pr-9 py-2.5 text-sm rounded-lg focus:outline-none"
             style={{ background: 'transparent', border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
           />
@@ -281,7 +263,6 @@ export default function Pratiche() {
           )}
         </div>
 
-        {/* Inline filters */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
             <label className="text-xs font-medium mb-1 block" style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Categoria</label>
@@ -325,12 +306,11 @@ export default function Pratiche() {
         </div>
       </div>
 
-      {/* List */}
       <div className="space-y-2" style={{ marginTop: '20px' }}>
         {filtered.length === 0 ? (
           <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 48, textAlign: 'center' }}>
             <FileText className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--muted)', opacity: 0.4 }} />
-            <p className="text-sm" style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessuna pratica trovata</p>
+            <p className="text-sm" style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessun dossier trovato</p>
           </div>
         ) : (
           filtered.map((p, i) => {
@@ -390,38 +370,169 @@ export default function Pratiche() {
           })
         )}
       </div>
+
+      <UnassignedDocumentsSection />
     </div>
   )
 }
 
-// ─── Detail View ──────────────────────────────────────────────────────────────
+// ─── Unassigned Documents (Archivio Generale) ────────────────────────────────
 
-function DetailView({ pratica, onBack, onEdit, onDelete, allEvents, allUsers }: {
-  pratica: Pratica; onBack: () => void; onEdit: () => void; onDelete: () => void; allEvents: Event[]; allUsers: Profile[]
-}) {
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [linkedTaskTitle, setLinkedTaskTitle] = useState<string | null>(null)
-  const navigate = useNavigate()
-  const evento = pratica.eventoId ? allEvents.find(e => e.id === pratica.eventoId) : null
-  const responsabile = pratica.responsabileId ? allUsers.find(u => u.id === pratica.responsabileId) : null
-  const responsabileLabel = responsabile ? `${responsabile.first_name} ${responsabile.last_name}`.trim() : (pratica.responsabileId ?? '—')
-  const dl = daysLeft(pratica.scadenza)
-  const overdue = pratica.stato !== 'completata' && dl < 0
+function UnassignedDocumentsSection() {
+  const [docs, setDocs] = useState<DossierDocument[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
-    if (pratica.task_id) {
-      supabase.from('tasks').select('titolo').eq('id', pratica.task_id).maybeSingle().then(({ data }) => {
-        setLinkedTaskTitle(data?.titolo ?? null)
+    supabase
+      .from('documents')
+      .select('id, nome, categoria, file_path, file_name, file_size, file_type, note, created_at, dossier_id')
+      .eq('scope', 'knowledge_base')
+      .is('dossier_id', null)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setDocs((data ?? []) as DossierDocument[])
+        setLoading(false)
       })
-    } else {
-      setLinkedTaskTitle(null)
+  }, [])
+
+  if (loading || docs.length === 0) return null
+
+  return (
+    <div style={{ marginTop: 32 }}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 w-full text-left"
+        style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+      >
+        <FileText className="w-3.5 h-3.5" />
+        ARCHIVIO GENERALE — {docs.length} file non assegnati
+        <span style={{ marginLeft: 'auto' }}>{expanded ? '−' : '+'}</span>
+      </button>
+      {expanded && (
+        <div className="mt-3 space-y-1 animate-fade-in">
+          {docs.map(doc => (
+            <DocRow key={doc.id} doc={doc} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Document Row ──────────────────────────────────────────────────────────────
+
+function DocRow({ doc, onRemove }: { doc: DossierDocument; onRemove?: () => void }) {
+  async function handleDownload() {
+    const { data, error } = await supabase.storage.from('documents').download(doc.file_path)
+    if (error || !data) return
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = doc.file_name
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="flex items-center gap-3 p-2.5 rounded-lg transition-all hover:bg-white/[0.02]"
+      style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+        style={{ background: `${fileColor(doc.file_name)}15` }}>
+        <FileText className="w-3.5 h-3.5" style={{ color: fileColor(doc.file_name) }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{doc.nome}</p>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)' }} className="truncate">
+          {fileExt(doc.file_name)} — {formatSize(doc.file_size)} — {fmtLong(doc.created_at)}
+        </p>
+      </div>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button onClick={handleDownload} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Scarica">
+          <Download className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+        </button>
+        {onRemove && (
+          <button onClick={onRemove} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi dal dossier">
+            <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Detail View ─────────────────────────────────────────────────────────────
+
+function DetailView({ dossier, onBack, onEdit, onDelete, allEvents, allUsers }: {
+  dossier: Pratica; onBack: () => void; onEdit: () => void; onDelete: () => void; allEvents: Event[]; allUsers: Profile[]
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [docs, setDocs] = useState<DossierDocument[]>([])
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const evento = dossier.eventoId ? allEvents.find(e => e.id === dossier.eventoId) : null
+  const responsabile = dossier.responsabileId ? allUsers.find(u => u.id === dossier.responsabileId) : null
+  const responsabileLabel = responsabile ? `${responsabile.first_name} ${responsabile.last_name}`.trim() : (dossier.responsabileId ?? '—')
+  const dl = daysLeft(dossier.scadenza)
+  const overdue = dossier.stato !== 'completata' && dl < 0
+  const CatIcon = catIcon(dossier.categoria)
+
+  const loadDocs = useCallback(() => {
+    supabase
+      .from('documents')
+      .select('id, nome, categoria, file_path, file_name, file_size, file_type, note, created_at, dossier_id')
+      .eq('dossier_id', dossier.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { setDocs((data ?? []) as DossierDocument[]) })
+  }, [dossier.id])
+
+  useEffect(() => { loadDocs() }, [loadDocs])
+
+  async function handleUploadFile(file: File) {
+    setUploading(true)
+    const filePath = `dossier/${dossier.id}/${crypto.randomUUID()}/${file.name}`
+    const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file)
+    if (uploadError) {
+      alert('Errore upload: ' + uploadError.message)
+      setUploading(false)
+      return
     }
-  }, [pratica.task_id])
-  const CatIcon = catIcon(pratica.categoria)
+    await supabase.from('documents').insert({
+      nome: file.name.replace(/\.[^/.]+$/, ''),
+      categoria: 'Varie',
+      scope: 'knowledge_base',
+      note: '',
+      file_path: filePath,
+      file_name: file.name,
+      file_size: file.size,
+      file_type: file.type,
+      uploaded_by: '',
+      dossier_id: dossier.id,
+    })
+    setUploading(false)
+    loadDocs()
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      alert(`Formato non supportato. Formati ammessi: ${ALLOWED_EXTENSIONS.join(', ')}`)
+      return
+    }
+    handleUploadFile(file)
+    e.target.value = ''
+  }
+
+  async function handleRemoveDoc(docId: string) {
+    await supabase.from('documents').update({ dossier_id: null }).eq('id', docId)
+    loadDocs()
+  }
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* Back + actions */}
       <div className="flex items-center justify-between gap-3">
         <button onClick={onBack}
           className="flex items-center gap-2 text-sm transition-all hover:opacity-80"
@@ -457,16 +568,15 @@ function DetailView({ pratica, onBack, onEdit, onDelete, allEvents, allUsers }: 
         </div>
       </div>
 
-      {/* Header */}
       <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 24 }}>
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: `${catColor(pratica.categoria)}12` }}>
-            <CatIcon className="w-6 h-6" style={{ color: catColor(pratica.categoria) }} />
+            style={{ background: `${catColor(dossier.categoria)}12` }}>
+            <CatIcon className="w-6 h-6" style={{ color: catColor(dossier.categoria) }} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{pratica.titolo}</h1>
+              <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{dossier.titolo}</h1>
               {overdue && (
                 <span className="text-xs px-2 py-0.5 rounded animate-pulse"
                   style={{ background: 'rgba(255,49,95,0.1)', color: 'var(--red2)', border: '1px solid rgba(255,49,95,0.2)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -474,55 +584,61 @@ function DetailView({ pratica, onBack, onEdit, onDelete, allEvents, allUsers }: 
                 </span>
               )}
             </div>
-            <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{pratica.descrizione}</p>
+            <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{dossier.descrizione}</p>
           </div>
         </div>
       </div>
 
-      {/* Info grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <InfoCard label="Categoria" value={catLabel(pratica.categoria)} color={catColor(pratica.categoria)} />
-        <InfoCard label="Stato" value={statoLabel(pratica.stato)} color={statoColor(pratica.stato)} />
-        <InfoCard label="Priorita" value={(pratica.priorita || '').charAt(0).toUpperCase() + (pratica.priorita || '').slice(1)} color={priColor(pratica.priorita)} />
-        <InfoCard label="Creazione" value={fmtShort(pratica.creatoIl)} color="var(--muted)" />
-        <InfoCard label="Scadenza" value={`${fmtShort(pratica.scadenza)} (${overdue ? `${Math.abs(dl)}g fa` : dl === 0 ? 'Oggi' : `tra ${dl}g`})`} color={overdue ? 'var(--red2)' : dl <= 7 ? 'var(--yellow)' : 'var(--muted)'} />
-        {pratica.importo && (
-          <InfoCard label="Importo" value={`€${pratica.importo.toLocaleString('it-IT')}`} color="var(--green)" />
-        )}
+        <InfoCard label="Categoria" value={catLabel(dossier.categoria)} color={catColor(dossier.categoria)} />
+        <InfoCard label="Stato" value={statoLabel(dossier.stato)} color={statoColor(dossier.stato)} />
+        <InfoCard label="Priorita" value={(dossier.priorita || '').charAt(0).toUpperCase() + (dossier.priorita || '').slice(1)} color={priColor(dossier.priorita)} />
+        <InfoCard label="Creazione" value={fmtShort(dossier.creatoIl)} color="var(--muted)" />
+        <InfoCard label="Scadenza" value={`${fmtShort(dossier.scadenza)} (${overdue ? `${Math.abs(dl)}g fa` : dl === 0 ? 'Oggi' : `tra ${dl}g`})`} color={overdue ? 'var(--red2)' : dl <= 7 ? 'var(--yellow)' : 'var(--muted)'} />
+        {dossier.importo && <InfoCard label="Importo" value={`€${dossier.importo.toLocaleString('it-IT')}`} color="var(--green)" />}
         <InfoCard label="Responsabile" value={responsabileLabel} color="var(--blue)" />
-        <InfoCard label="Controparte" value={pratica.controparte} color="var(--text)" />
-        {evento && (
-          <InfoCard label="Evento" value={evento.nome} color="var(--red2)" />
-        )}
+        <InfoCard label="Controparte" value={dossier.controparte} color="var(--text)" />
+        {evento && <InfoCard label="Evento" value={evento.nome} color="var(--red2)" />}
       </div>
 
-      {/* Linked task */}
-      {pratica.task_id && linkedTaskTitle && (
+      {dossier.note && (
         <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
-          <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TASK COLLEGATO</h3>
-          <button onClick={() => navigate(`/task?id=${pratica.task_id}`)}
-            className="flex items-center gap-2 text-sm transition-all hover:opacity-80"
-            style={{ color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-            <FileText className="w-3.5 h-3.5" />
-            {linkedTaskTitle}
-          </button>
+          <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>NOTE</h3>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{dossier.note}</p>
         </div>
       )}
 
-      {/* Note */}
-      {pratica.note && (
-        <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
-          <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>NOTE</h3>
-          <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{pratica.note}</p>
+      {/* Documents Section */}
+      <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="flex items-center gap-2" style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+            <Paperclip className="w-3.5 h-3.5" /> DOCUMENTI ALLEGATI ({docs.length})
+          </h3>
+          <label
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all hover:bg-white/5 cursor-pointer"
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--blue)', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <Upload className="w-3.5 h-3.5" />
+            {uploading ? 'CARICAMENTO...' : 'ALLEGA FILE'}
+            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} accept={ALLOWED_EXTENSIONS.join(',')} disabled={uploading} />
+          </label>
         </div>
-      )}
+        {docs.length === 0 ? (
+          <p className="text-sm text-center py-6" style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+            Nessun documento allegato
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {docs.map(doc => (
+              <DocRow key={doc.id} doc={doc} onRemove={() => handleRemoveDoc(doc.id)} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function InfoCard({ label, value, color }: {
-  label: string; value: string; color: string
-}) {
+function InfoCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 16 }}>
       <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>{label}</p>
@@ -547,35 +663,6 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
   const [note, setNote] = useState(pratica?.note ?? '')
   const [importo, setImporto] = useState(pratica?.importo?.toString() ?? '')
   const [controparte, setControparte] = useState(pratica?.controparte ?? '')
-  const [taskId, setTaskId] = useState(pratica?.task_id ?? '')
-  const [taskSearch, setTaskSearch] = useState('')
-  const [taskLabel, setTaskLabel] = useState('')
-  const [taskDropOpen, setTaskDropOpen] = useState(false)
-  const [availableTasks, setAvailableTasks] = useState<{ id: string; titolo: string }[]>([])
-  const taskDropRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    supabase.from('tasks').select('id, titolo').neq('stato', 'completato').order('scadenza').then(({ data }) => {
-      const tasks = data ?? []
-      setAvailableTasks(tasks)
-      if (pratica?.task_id) {
-        const found = tasks.find(t => t.id === pratica.task_id)
-        if (found) setTaskLabel(found.titolo)
-      }
-    })
-  }, [pratica?.task_id])
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (taskDropRef.current && !taskDropRef.current.contains(e.target as Node)) setTaskDropOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
-
-  const filteredTasks = taskSearch.length > 0
-    ? availableTasks.filter(t => t.titolo.toLowerCase().includes(taskSearch.toLowerCase()))
-    : availableTasks.slice(0, 8)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -595,7 +682,6 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
       note: note.trim(),
       importo: importo ? parseFloat(importo) : null,
       controparte: controparte.trim(),
-      task_id: taskId || null,
     }
     onSave(result)
   }
@@ -609,19 +695,18 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
           <ArrowLeft className="w-4 h-4" /> ANNULLA
         </button>
         <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
-          {pratica ? 'Modifica pratica' : 'Nuova pratica'}
+          {pratica ? 'Modifica dossier' : 'Nuovo dossier'}
         </h1>
       </div>
 
       <form onSubmit={handleSubmit} style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 24 }} className="space-y-5">
-        {/* Row 1 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Titolo *</label>
             <input type="text" value={titolo} onChange={e => setTitolo(e.target.value)}
               className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
               style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
-              placeholder="Titolo pratica" required />
+              placeholder="Titolo dossier" required />
           </div>
           <div>
             <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Controparte *</label>
@@ -632,7 +717,6 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
           </div>
         </div>
 
-        {/* Row 2 */}
         <div>
           <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descrizione</label>
           <textarea value={descrizione} onChange={e => setDescrizione(e.target.value)}
@@ -641,7 +725,6 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
             rows={3} placeholder="Descrizione dettagliata..." />
         </div>
 
-        {/* Row 3 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Categoria</label>
@@ -670,7 +753,7 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Importo (€)</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Importo</label>
             <input type="number" value={importo} onChange={e => setImporto(e.target.value)}
               className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
               style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
@@ -678,7 +761,6 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
           </div>
         </div>
 
-        {/* Row 4 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evento collegato</label>
@@ -709,35 +791,6 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
           </div>
         </div>
 
-        {/* Row 4b - Task collegato */}
-        <div>
-          <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Task collegato</label>
-          <div ref={taskDropRef} style={{ position: 'relative' }}>
-            <input
-              type="text"
-              value={taskLabel}
-              placeholder="Cerca task..."
-              onChange={e => { setTaskLabel(e.target.value); setTaskSearch(e.target.value); setTaskId(''); setTaskDropOpen(true) }}
-              onFocus={() => setTaskDropOpen(true)}
-              className="w-full py-2.5 text-sm rounded-lg focus:outline-none"
-              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
-            />
-            {taskDropOpen && filteredTasks.length > 0 && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: 200, overflowY: 'auto', background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 12, boxShadow: 'var(--shadow-md)', marginTop: 4 }}>
-                {filteredTasks.map(t => (
-                  <button key={t.id} type="button"
-                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors"
-                    style={{ color: 'var(--text)', borderBottom: '1px solid var(--line)' }}
-                    onClick={() => { setTaskId(t.id); setTaskLabel(t.titolo); setTaskSearch(''); setTaskDropOpen(false) }}>
-                    {t.titolo}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Row 5 */}
         <div>
           <label className="text-xs font-medium mb-1.5 block" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Note</label>
           <textarea value={note} onChange={e => setNote(e.target.value)}
@@ -746,7 +799,6 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
             rows={3} placeholder="Note aggiuntive..." />
         </div>
 
-        {/* Actions */}
         <div className="flex items-center justify-end gap-3 pt-3" style={{ borderTop: '1px solid var(--line)' }}>
           <button type="button" onClick={onCancel}
             className="px-4 py-2.5 rounded-lg text-sm transition-all hover:bg-white/5"
@@ -756,7 +808,7 @@ function FormView({ pratica, onSave, onCancel, allEvents, allUsers }: {
           <button type="submit"
             className="btn-primary px-5 py-2.5 rounded-lg text-sm font-medium"
             style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {pratica ? 'SALVA MODIFICHE' : 'CREA PRATICA'}
+            {pratica ? 'SALVA MODIFICHE' : 'CREA DOSSIER'}
           </button>
         </div>
       </form>

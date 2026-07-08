@@ -646,7 +646,7 @@ function TaskDetailPanel({ task, events, getInitials, getFullName, onClose, onEd
 
   useEffect(() => {
     supabase.from('documents').select('id, nome').eq('task_id', task.id).then(({ data }) => setLinkedDocs(data ?? []))
-    supabase.from('practices').select('id, titolo').eq('task_id', task.id).then(({ data }) => setLinkedPratiche(data ?? []))
+    supabase.from('dossiers').select('id, titolo').eq('task_id', task.id).then(({ data }) => setLinkedPratiche(data ?? []))
   }, [task.id])
 
   const evento = task.evento ? events.find(e => e.id === task.evento) : null
@@ -828,7 +828,7 @@ function TaskDetailPanel({ task, events, getInitials, getFullName, onClose, onEd
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {linkedDocs.map(doc => (
-                  <button key={doc.id} onClick={() => navigate('/archivio')}
+                  <button key={doc.id} onClick={() => navigate('/dossier')}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '8px',
                       padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--line)',
@@ -839,7 +839,7 @@ function TaskDetailPanel({ task, events, getInitials, getFullName, onClose, onEd
                   </button>
                 ))}
                 {linkedPratiche.map(p => (
-                  <button key={p.id} onClick={() => navigate(`/pratiche?id=${p.id}`)}
+                  <button key={p.id} onClick={() => navigate(`/dossier?id=${p.id}`)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '8px',
                       padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--line)',

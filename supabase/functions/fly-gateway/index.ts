@@ -109,7 +109,7 @@ const TOOLS = [
   {
     name: "get_scadenze",
     description:
-      "Vista unificata di tutto cio che scade nei prossimi N giorni: task, pratiche, fatture.",
+      "Vista unificata di tutto cio che scade nei prossimi N giorni: task, dossier, fatture.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -394,7 +394,7 @@ async function executeTool(
           .order("due_date", { ascending: true })
           .limit(20),
         supabase
-          .from("practices")
+          .from("dossiers")
           .select("id, title, due_date, status, priority, responsible")
           .neq("status", "completata")
           .lte("due_date", limit)
@@ -428,7 +428,7 @@ async function executeTool(
       if (practicesRes.data?.length) {
         results.push(
           ...practicesRes.data.map((p) => ({
-            tipo: "pratica",
+            tipo: "dossier",
             titolo: p.title,
             scadenza: p.due_date,
             stato: p.status,
@@ -1549,6 +1549,8 @@ Per domande su costi, ricavi, margini o budget degli eventi usa get_event_econom
 
 Quando noti una criticita nei dati che hai appena letto (scadenze superate, eventi imminenti con poca preparazione), segnalala in una riga finale. Non prendere decisioni: proponi.
 
+I Dossier sono processi burocratici e operativi con documenti allegati (contratti, preventivi, permessi, assicurazioni, fatture). Non confonderli con gli eventi, che nel linguaggio aziendale si chiamano anche "pratiche" in senso colloquiale. La tabella dei dossier si chiama "dossiers" nel database.
+
 PRINCIPI COMPORTAMENTALI:
 - Chiarezza prima dell'eleganza: usa il linguaggio piu semplice che trasmette il significato corretto.
 - Dichiara sempre l'incertezza: distingui tra cio che risulta dai dati, cio che deduci e cio che ipotizzi. Preferisci "con le informazioni disponibili..." a certezze non giustificate.
@@ -1605,7 +1607,33 @@ Oggi e ${today}.${memorySection}`;
       }
     }
 
-    return json({ reply: textReply, entities, proposal: proposal || null });
+    // ─── SSE STREAMING RESPONSE ──────────────────────────────────────────
+    const words = textReply.split(/(\s+)/);
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        // Stream words in small chunks
+        const chunkSize = 3;
+        for (let i = 0; i < words.length; i += chunkSize) {
+          const chunk = words.slice(i, i + chunkSize).join("");
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "text", content: chunk })}\n\n`));
+          await new Promise(r => setTimeout(r, 30));
+        }
+        // Send metadata (entities + proposal) as a final event
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "meta", entities, proposal: proposal || null })}\n\n`));
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Errore interno";
     console.error("fly-gateway error:", err);

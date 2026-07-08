@@ -15,7 +15,7 @@ const PRIORITA: Feedback['priorita'][] = ['Bassa', 'Media', 'Alta']
 const MODULI = [
   'Dashboard', 'Eventi', 'CRM', 'Task', 'Calendario', 'Fornitori',
   'Amministrazione', 'Creative Studio', 'Social Studio', 'Presentazioni',
-  'Archivio', 'Comunicazioni', 'Workflow', 'Pratiche', 'Utenti', 'Impostazioni', 'Altro',
+  'Dossier', 'Comunicazioni', 'Workflow', 'Utenti', 'Impostazioni', 'Altro',
 ]
 
 function categoriaIcon(cat: Feedback['categoria']) {

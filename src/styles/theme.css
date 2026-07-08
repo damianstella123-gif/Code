@@ -1723,6 +1723,21 @@ textarea::placeholder {
   50%      { opacity: 0.4; }
 }
 
+@keyframes fly-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+.fly-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 14px;
+  background: var(--red2);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: fly-cursor-blink 0.8s step-end infinite;
+}
+
 /* ─── ANIMATED LASER BORDER ───────────────────────────────────────────────── */
 
 @property --laser-angle {

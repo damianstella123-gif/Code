@@ -7,10 +7,9 @@ import type {
   StatoPratica,
 } from '@/data/pratiche'
 
-interface PracticeRow {
+interface DossierRow {
   id: string
   event_id: string | null
-  task_id: string | null
   title: string
   description: string
   category: CategoriaPratica
@@ -25,7 +24,7 @@ interface PracticeRow {
   updated_at: string
 }
 
-function rowToPratica(r: PracticeRow): Pratica {
+function rowToDossier(r: DossierRow): Pratica {
   return {
     id: r.id,
     titolo: r.title,
@@ -42,15 +41,13 @@ function rowToPratica(r: PracticeRow): Pratica {
       ? null
       : typeof r.amount === 'string' ? Number(r.amount) : r.amount,
     controparte: r.counterparty ?? '',
-    task_id: r.task_id ?? null,
   }
 }
 
-function praticaToRow(p: Pratica): Omit<PracticeRow, 'updated_at'> {
+function dossierToRow(p: Pratica): Omit<DossierRow, 'updated_at'> {
   return {
     id: p.id,
     event_id: p.eventoId && p.eventoId.length > 0 ? p.eventoId : null,
-    task_id: p.task_id || null,
     title: p.titolo,
     description: p.descrizione ?? '',
     category: p.categoria,
@@ -65,34 +62,34 @@ function praticaToRow(p: Pratica): Omit<PracticeRow, 'updated_at'> {
   }
 }
 
-export async function fetchPractices(): Promise<Pratica[]> {
+export async function fetchDossiers(): Promise<Pratica[]> {
   const { data, error } = await supabase
-    .from('practices')
+    .from('dossiers')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(500)
   if (error) {
-    logError('practices-service', 'fetchPractices', error)
+    logError('dossier-service', 'fetchDossiers', error)
     throw new Error(error.message)
   }
-  return ((data ?? []) as PracticeRow[]).map(rowToPratica)
+  return ((data ?? []) as DossierRow[]).map(rowToDossier)
 }
 
-export async function upsertPractice(pratica: Pratica): Promise<Pratica | null> {
+export async function upsertDossier(pratica: Pratica): Promise<Pratica | null> {
   const { data, error } = await supabase
-    .from('practices')
-    .upsert(praticaToRow(pratica), { onConflict: 'id' })
+    .from('dossiers')
+    .upsert(dossierToRow(pratica), { onConflict: 'id' })
     .select()
     .maybeSingle()
   if (error) {
-    logError('practices-service', 'upsertPractice', error)
+    logError('dossier-service', 'upsertDossier', error)
     throw new Error(error.message)
   }
-  return data ? rowToPratica(data as PracticeRow) : null
+  return data ? rowToDossier(data as DossierRow) : null
 }
 
-export async function updatePractice(id: string, patch: Partial<Pratica>): Promise<Pratica | null> {
-  const dbPatch: Partial<PracticeRow> = {}
+export async function updateDossier(id: string, patch: Partial<Pratica>): Promise<Pratica | null> {
+  const dbPatch: Partial<DossierRow> = {}
   if (patch.titolo !== undefined) dbPatch.title = patch.titolo
   if (patch.descrizione !== undefined) dbPatch.description = patch.descrizione
   if (patch.eventoId !== undefined) dbPatch.event_id = patch.eventoId && patch.eventoId.length > 0 ? patch.eventoId : null
@@ -106,27 +103,32 @@ export async function updatePractice(id: string, patch: Partial<Pratica>): Promi
   if (patch.controparte !== undefined) dbPatch.counterparty = patch.controparte
 
   const { data, error } = await supabase
-    .from('practices')
+    .from('dossiers')
     .update(dbPatch)
     .eq('id', id)
     .select()
     .maybeSingle()
   if (error) {
-    logError('practices-service', 'updatePractice', error)
+    logError('dossier-service', 'updateDossier', error)
     throw new Error(error.message)
   }
-  return data ? rowToPratica(data as PracticeRow) : null
+  return data ? rowToDossier(data as DossierRow) : null
 }
 
-export async function changePracticeStatus(id: string, status: StatoPratica): Promise<Pratica | null> {
-  return updatePractice(id, { stato: status })
+export async function changeDossierStatus(id: string, status: StatoPratica): Promise<Pratica | null> {
+  return updateDossier(id, { stato: status })
 }
 
-export async function deletePractice(id: string): Promise<boolean> {
-  const { error } = await supabase.from('practices').delete().eq('id', id)
+export async function deleteDossier(id: string): Promise<boolean> {
+  const { error } = await supabase.from('dossiers').delete().eq('id', id)
   if (error) {
-    logError('practices-service', 'deletePractice', error)
+    logError('dossier-service', 'deleteDossier', error)
     throw new Error(error.message)
   }
   return true
 }
+
+// Keep backward-compatible exports
+export { fetchDossiers as fetchPractices }
+export { upsertDossier as upsertPractice }
+export { deleteDossier as deletePractice }

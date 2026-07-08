@@ -21,7 +21,6 @@ import {
   MessageSquare,
   GitBranch,
   UserCog,
-  BookOpen,
   Search,
   MoreHorizontal,
 } from 'lucide-react'
@@ -31,7 +30,7 @@ import PinnedChats from '@/components/PinnedChats'
 import { loadUser, getAllowedNavForRole, signOutEverywhere } from '@/lib/auth'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
-import { fetchPractices } from '@/lib/practices-service'
+import { fetchPractices } from '@/lib/dossier-service'
 import { fetchClients } from '@/lib/clients-service'
 import { cacheEventsSnapshot, cacheTasksSnapshot, cachePraticheSnapshot, cacheClientsSnapshot } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
@@ -49,11 +48,10 @@ const iconMap: Record<string, React.ElementType> = {
   '/creative-studio': Palette,
   '/comunicazioni': MessageSquare,
   '/workflow': GitBranch,
-  '/pratiche': FileText,
+  '/dossier': FileText,
   '/utenti': UserCog,
   '/impostazioni': SlidersHorizontal,
   '/feedback-beta': MessageCircle,
-  '/archivio': BookOpen,
 }
 
 interface SidebarProps {
@@ -246,7 +244,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
         break
       case 'practice':
       case 'pratica':
-        navigate(`/pratiche?id=${entityId}`)
+        navigate(`/dossier?id=${entityId}`)
         break
       case 'budget':
         navigate(`/amministrazione?tab=uscite`)
@@ -258,7 +256,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
         navigate(`/crm`)
         break
       case 'archive_item':
-        navigate(`/archivio`)
+        navigate(`/dossier`)
         break
       case 'communication':
       case 'comunicazione':
@@ -508,7 +506,7 @@ function ChatBadge() {
 }
 
 const PRIMARY_MOBILE_PATHS = ['/dashboard', '/eventi', '/crm', '/task', '/calendario', '/fornitori', '/amministrazione']
-const SECONDARY_MOBILE_PATHS = ['/comunicazioni', '/workflow', '/pratiche', '/archivio', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio']
+const SECONDARY_MOBILE_PATHS = ['/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio']
 
 const mobileLabels: Record<string, string> = {
   '/dashboard': 'Home',

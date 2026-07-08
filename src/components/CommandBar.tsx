@@ -238,6 +238,8 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
     else navigate('/crm')
   }, [navigate])
 
+  const [flyStreaming, setFlyStreaming] = useState(false)
+
   const askFly = useCallback(async (text: string) => {
     if (!text.trim() || flyLoading) return
 
@@ -247,33 +249,92 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
     setFlyInput('')
     setFlyError(null)
     setFlyLoading(true)
+    setFlyStreaming(true)
+
+    // Add a placeholder assistant message for streaming
+    const assistantIdx = newHistory.length
+    const streamingHistory = [...newHistory, { role: 'assistant' as const, content: '' }]
+    setFlyHistory(streamingHistory)
 
     try {
-      const { data, error } = await supabase.functions.invoke('fly-gateway', {
-        body: {
-          message: text.trim(),
-          history: flyHistory,
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Non autenticato')
+
+      const res = await fetch('https://vbsligpuwjzvywkpkhdn.supabase.co/functions/v1/fly-gateway', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZic2xpZ3B1d2p6dnl3a3BraGRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNDIyNDAsImV4cCI6MjA5NjgxODI0MH0.YaHlfxvKtht8WSg9xWxT3nrFxsJAmC4HcgunLqZwiOQ',
         },
+        body: JSON.stringify({ message: text.trim(), history: flyHistory }),
       })
 
-      if (error) throw new Error(error.message || 'Errore di connessione')
-      if (data?.error) throw new Error(data.error)
+      if (!res.ok) {
+        const errBody = await res.text()
+        let errMsg = 'Errore di connessione'
+        try { errMsg = JSON.parse(errBody).error || errMsg } catch {}
+        throw new Error(errMsg)
+      }
 
-      const reply = data?.reply || '(nessuna risposta)'
-      const entities: FlyEntity[] = Array.isArray(data?.entities) ? data.entities : []
-      const proposal: FlyProposal | null = data?.proposal || null
-      setFlyHistory([...newHistory, {
-        role: 'assistant',
-        content: reply,
-        entities,
-        proposal,
-        proposalStatus: proposal ? 'pending' : undefined,
-      }])
+      const reader = res.body?.getReader()
+      if (!reader) throw new Error('Stream non disponibile')
+
+      const decoder = new TextDecoder()
+      let accumulated = ''
+      let entities: FlyEntity[] = []
+      let proposal: FlyProposal | null = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const payload = line.slice(6)
+          if (payload === '[DONE]') break
+
+          try {
+            const parsed = JSON.parse(payload)
+            if (parsed.type === 'text') {
+              accumulated += parsed.content
+              setFlyHistory(prev => {
+                const updated = [...prev]
+                updated[assistantIdx] = { ...updated[assistantIdx], content: accumulated }
+                return updated
+              })
+            } else if (parsed.type === 'meta') {
+              entities = Array.isArray(parsed.entities) ? parsed.entities : []
+              proposal = parsed.proposal || null
+            }
+          } catch {}
+        }
+      }
+
+      // Finalize with entities and proposal
+      setFlyHistory(prev => {
+        const updated = [...prev]
+        updated[assistantIdx] = {
+          ...updated[assistantIdx],
+          content: accumulated || '(nessuna risposta)',
+          entities,
+          proposal,
+          proposalStatus: proposal ? 'pending' : undefined,
+        }
+        return updated
+      })
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Errore imprevisto'
       setFlyError(msg)
+      // Remove the empty assistant placeholder on error
+      setFlyHistory(newHistory)
     } finally {
       setFlyLoading(false)
+      setFlyStreaming(false)
     }
   }, [flyHistory, flyLoading])
 
@@ -533,6 +594,9 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
                       whiteSpace: 'pre-wrap',
                     }}>
                       {msg.content}
+                      {flyStreaming && i === flyHistory.length - 1 && msg.role === 'assistant' && (
+                        <span className="fly-cursor" />
+                      )}
                     </div>
                     {msg.entities && msg.entities.length > 0 && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
