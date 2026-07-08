@@ -95,6 +95,11 @@ body {
   background: #0a0c10 !important;
 }
 
+html, body {
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
 .app-background {
   background: var(--bg);
   min-height: 100vh;
@@ -374,7 +379,7 @@ body {
 }
 @media (max-width: 640px) {
   .shell-content {
-    padding: 14px 16px 80px;
+    padding: 14px 14px calc(80px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -416,7 +421,13 @@ body {
 }
 
 @media (max-width: 640px) {
-  .shell-header { height: 44px; }
+  .shell-header {
+    height: 52px;
+    padding: 0 !important;
+  }
+  .shell-header > * {
+    padding: 0 14px !important;
+  }
   .shell-user-chip { padding: 4px 6px 4px 4px; gap: 4px; }
   .shell-chip-avatar { width: 24px; height: 24px; font-size: 14px; }
 }
@@ -2038,7 +2049,7 @@ textarea::placeholder {
   .wire-page { padding: 0 4px 32px; }
   .wire-masthead { padding: 20px 0 10px; }
   .cmd-bar { padding: 10px 14px; border-radius: 10px; }
-  .cmd-bar-input { font-size: 14px; }
+  .cmd-bar-input { font-size: 16px; }
   .cmd-dropdown { border-radius: 10px; }
   .cmd-suggestions { padding: 10px 12px; gap: 6px; }
   .cmd-suggestion-pill { font-size: 14px; padding: 4px 10px; }
@@ -2578,10 +2589,34 @@ textarea::placeholder {
 
 /* Show bottom nav on phone only */
 @media (max-width: 640px) {
-  .mobile-bottom-nav { display: block; }
+  .mobile-bottom-nav {
+    display: block;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    display: flex !important;
+    justify-content: space-around !important;
+    align-items: center !important;
+    background: var(--panel-solid) !important;
+    border-top: 1px solid var(--line) !important;
+    z-index: 50 !important;
+    padding-bottom: env(safe-area-inset-bottom, 8px) !important;
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-bottom-nav a,
+  .mobile-bottom-nav button {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
 
   /* Extra bottom padding so content isn't hidden behind bottom nav */
-  .pb-mobile-nav { padding-bottom: 72px !important; }
+  .pb-mobile-nav { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
 
   /* Hide the sidebar hamburger trigger — replaced by bottom nav */
   .shell-header button[aria-label="menu"] { display: none; }
@@ -2637,7 +2672,17 @@ textarea::placeholder {
     -ms-overflow-style: none;
   }
   .wire-tabs::-webkit-scrollbar { display: none; }
+  .wire-tabs > * { white-space: nowrap !important; flex-shrink: 0 !important; }
   .wire-tab { white-space: nowrap; flex-shrink: 0; }
+
+  /* Event detail tabs */
+  .event-detail-tabs {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none;
+  }
+  .event-detail-tabs::-webkit-scrollbar { display: none; }
 }
 
 /* Event detail tabs — scrollbar hidden */
@@ -2682,6 +2727,18 @@ textarea::placeholder {
     z-index: 1001 !important;
   }
 
+  .fly-response-panel {
+    position: fixed !important;
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 0 !important;
+    right: 0 !important;
+    max-height: 70vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    z-index: 100 !important;
+  }
+
   .cmd-bar-wrapper {
     width: 100%;
   }
@@ -2719,14 +2776,23 @@ textarea::placeholder {
 
   .fixed.inset-0.z-50.flex > div[class*="w-full"],
   .fixed.inset-0.z-50.flex > div[class*="max-w-"],
-  .fixed.inset-0.z-50.flex > .w-full {
+  .fixed.inset-0.z-50.flex > .w-full,
+  .fixed.inset-0.flex.items-center.justify-center > div,
+  .fixed.inset-0.flex.items-end > div {
     max-width: 100% !important;
     width: 100% !important;
-    max-height: 85vh !important;
+    max-height: 92vh !important;
     border-radius: 20px 20px 0 0 !important;
-    overflow-y: auto;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
     animation: mobileSheetUp 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
     margin: 0 !important;
+  }
+
+  /* Any modal overlay that uses items-center on desktop → bottom on mobile */
+  .fixed.inset-0.flex.items-center.justify-center {
+    align-items: flex-end !important;
+    padding: 0 !important;
   }
 }
 
@@ -2797,6 +2863,40 @@ textarea::placeholder {
   h1[style*="font-serif"][style*="28px"],
   h1[style*="font-serif"][style*="26px"] {
     font-size: 22px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SAFARI iOS — INPUT ZOOM PREVENTION & SAFE AREA
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* 1. Prevent Safari auto-zoom on input focus (requires >= 16px) */
+@media (max-width: 640px) {
+  input, select, textarea,
+  [contenteditable] {
+    font-size: 16px !important;
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+/* 2. Prevent horizontal overflow on all child elements */
+@media (max-width: 640px) {
+  .shell-content > * {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Tables: scroll instead of overflow */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Gap reduction on mobile */
+  [style*="gap: 12px"],
+  [style*="gap: 16px"] {
+    gap: 8px !important;
   }
 }
 
