@@ -59,7 +59,7 @@ export default function Dashboard() {
   const [now, setNow] = useState(new Date())
   const [feedFilter, setFeedFilter] = useState<string | null>(null)
   const [sentinelAlerts, setSentinelAlerts] = useState<{ id: string; message: string; created_at: string }[]>([])
-
+  const [morningEdition, setMorningEdition] = useState<{ id: string; message: string; created_at: string } | null>(null)
   useEffect(() => {
     async function load() {
       try {
@@ -105,6 +105,20 @@ export default function Dashboard() {
         .order('created_at', { ascending: false })
         .limit(5)
         .then(({ data }) => { if (data) setSentinelAlerts(data) })
+    }
+    // Fetch today's morning edition for current user
+    if (currentUser) {
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      supabase.from('notifications')
+        .select('id, message, created_at')
+        .eq('user_id', currentUser.id)
+        .eq('type', 'morning_edition')
+        .gte('created_at', todayStart.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => { if (data) setMorningEdition(data) })
     }
     const clock = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(clock)
@@ -363,6 +377,7 @@ export default function Dashboard() {
       ) : (
         <>
           <UnreadMessagesCard />
+          {morningEdition && <MorningEditionCard edition={morningEdition} />}
           {filteredStories.map((s, i) => (
             <button
               key={s.id}
@@ -418,5 +433,48 @@ function UnreadMessagesCard() {
         <p className="wire-story-meta">adesso</p>
       </span>
     </button>
+  )
+}
+
+function MorningEditionCard({ edition }: { edition: { id: string; message: string; created_at: string } }) {
+  const [expanded, setExpanded] = useState(false)
+  const text = edition.message || ''
+  const truncated = text.length > 500 && !expanded
+
+  return (
+    <div
+      className="wire-story"
+      style={{
+        background: 'var(--panel2)',
+        borderTop: '3px solid var(--yellow, #eab308)',
+        borderBottom: '3px solid var(--yellow, #eab308)',
+        cursor: 'default',
+      }}
+    >
+      <span
+        className="wire-story-tag"
+        style={{ color: '#ca8a04', borderColor: '#ca8a04', fontSize: 10 }}
+      >
+        EDIZIONE DEL MATTINO
+      </span>
+      <span className="wire-story-body">
+        <p className="wire-story-headline" style={{ fontSize: 14 }}>Briefing di oggi</p>
+        <p className="wire-story-dek" style={{ whiteSpace: 'pre-wrap', maxHeight: truncated ? 180 : undefined, overflow: truncated ? 'hidden' : undefined }}>
+          {truncated ? text.slice(0, 500) + '...' : text}
+        </p>
+        {text.length > 500 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
+            className="text-xs font-medium mt-1"
+            style={{ color: 'var(--red2)' }}
+          >
+            {expanded ? 'Riduci' : 'Leggi tutto'}
+          </button>
+        )}
+        <p className="wire-story-meta">
+          {new Date(edition.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} · fly
+        </p>
+      </span>
+    </div>
   )
 }

@@ -69,6 +69,7 @@ export interface AppSettings {
   flySuggerimentiAutomatici: boolean
   flyRisposteVeloce: boolean
   flyFocusArea: string[]
+  morningEdition: boolean
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -107,6 +108,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   flySuggerimentiAutomatici: true,
   flyRisposteVeloce: true,
   flyFocusArea: ['task', 'workflow', 'budget'],
+  morningEdition: true,
 }
 
 const SK = 'simmetria_settings'
@@ -880,6 +882,7 @@ function FlyConfig({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSettings>) 
         <div style={{ opacity: s.flyAbilitato ? 1 : 0.4, pointerEvents: s.flyAbilitato ? 'auto' : 'none' }}>
           <ToggleRow label="Modalità proattiva" hint="Fly invia avvisi automatici senza essere interpellato" checked={s.flyModalitaProattiva} onChange={v => upd({ flyModalitaProattiva: v })} />
           <ToggleRow label="Suggerimenti automatici" hint="Propone chip di risposta contestuale" checked={s.flySuggerimentiAutomatici} onChange={v => upd({ flySuggerimentiAutomatici: v })} />
+          <ToggleRow label="Edizione del mattino" hint="Ricevi ogni mattina una sintesi operativa personalizzata da Fly" checked={s.morningEdition} onChange={v => upd({ morningEdition: v })} />
         </div>
 
         {/* Memory section */}
