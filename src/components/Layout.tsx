@@ -329,7 +329,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
             {notifOpen && (
               <div
                 className="absolute right-0 top-full mt-2 w-[calc(100vw-32px)] sm:w-80 rounded-3xl overflow-hidden animate-fade-in"
-                style={{ background: 'var(--glass-bg-strong)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid var(--glass-border)', boxShadow: '0 20px 60px rgba(211,28,48,0.08)' }}
+                style={{ background: 'var(--panel-solid)', backdropFilter: 'none', WebkitBackdropFilter: 'none', border: '1px solid var(--line)', boxShadow: '0 8px 32px rgba(0,0,0,0.14)' }}
               >
                 <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>
                   <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Notifiche</p>
@@ -401,14 +401,14 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                 <div
                   className="absolute right-0 top-full mt-2 w-64 rounded-3xl overflow-hidden animate-fade-in"
                   style={{
-                    background: 'var(--glass-bg-strong)',
-                    backdropFilter: 'blur(24px)',
-                    WebkitBackdropFilter: 'blur(24px)',
-                    border: '1px solid var(--glass-border)',
-                    boxShadow: '0 20px 60px rgba(211,28,48,0.08)',
+                    background: 'var(--panel-solid)',
+                    backdropFilter: 'none',
+                    WebkitBackdropFilter: 'none',
+                    border: '1px solid var(--line)',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
                   }}
                 >
-                  <div className="p-4 border-b" style={{ borderColor: 'var(--glass-border)' }}>
+                  <div className="p-4 border-b" style={{ borderColor: 'var(--line)' }}>
                     <div className="flex items-center gap-3">
                       <div
                         className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold text-white"
@@ -481,7 +481,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
       {notifToast && (
         <div
           className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-4 py-2 rounded-2xl text-sm animate-fade-in z-50"
-          style={{ background: 'var(--glass-bg-strong)', backdropFilter: 'blur(16px)', border: '1px solid var(--glass-border)', color: 'var(--muted)', boxShadow: '0 8px 24px rgba(211,28,48,0.08)' }}
+          style={{ background: 'var(--panel-solid)', backdropFilter: 'none', WebkitBackdropFilter: 'none', border: '1px solid var(--line)', color: 'var(--muted)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
         >
           {notifToast}
         </div>
@@ -535,7 +535,7 @@ function BottomNav() {
         <div className="fixed inset-0 z-[99]" onClick={() => setMoreOpen(false)}>
           <div
             className="absolute bottom-[60px] left-2 right-2 rounded-2xl overflow-hidden animate-fade-in safe-bottom"
-            style={{ background: 'var(--glass-bg-strong)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid var(--glass-border)', boxShadow: '0 -8px 32px rgba(0,0,0,0.15)' }}
+            style={{ background: 'var(--panel-solid)', backdropFilter: 'none', WebkitBackdropFilter: 'none', border: '1px solid var(--line)', boxShadow: '0 -8px 32px rgba(0,0,0,0.12)' }}
             onClick={e => e.stopPropagation()}
           >
             <div className="grid grid-cols-4 gap-1 p-3">
