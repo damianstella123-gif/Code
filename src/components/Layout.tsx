@@ -225,6 +225,35 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
     return () => { supabase.removeChannel(channel) }
   }, [user])
 
+  useEffect(() => {
+    if (!notifOpen && !userMenuOpen) return
+    function handleClick(e: MouseEvent) {
+      const notifEl = document.getElementById('notif-panel')
+      const accountEl = document.getElementById('account-panel')
+      const notifBtn = document.getElementById('notif-btn')
+      const accountBtn = document.getElementById('account-btn')
+      if (notifOpen && notifEl && !notifEl.contains(e.target as Node) && !notifBtn?.contains(e.target as Node)) {
+        setNotifOpen(false)
+      }
+      if (userMenuOpen && accountEl && !accountEl.contains(e.target as Node) && !accountBtn?.contains(e.target as Node)) {
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [notifOpen, userMenuOpen])
+
+  useEffect(() => {
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setNotifOpen(false)
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [])
+
   const handleNotificationClick = async (n: Notification) => {
     await markAsRead(n.id)
     setNotifications(prev => prev.filter(x => x.id !== n.id))
@@ -317,6 +346,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
         <div className="flex items-center gap-2">
           <div className="relative">
             <button
+              id="notif-btn"
               onClick={() => { setNotifOpen(v => !v); setUserMenuOpen(false) }}
               className="relative p-2 rounded-lg transition-all hover:bg-white/5"
             >
@@ -332,6 +362,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
             </button>
             {notifOpen && (
               <div
+                id="notif-panel"
                 className="absolute right-0 top-full mt-2 w-[calc(100vw-32px)] sm:w-80 rounded-2xl overflow-hidden animate-fade-in"
                 style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: '0 8px 32px rgba(0,0,0,0.14)' }}
               >
@@ -387,6 +418,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
           {user && (
             <div className="relative">
               <button
+                id="account-btn"
                 onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false) }}
                 className="shell-user-chip"
               >
@@ -406,6 +438,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
 
               {userMenuOpen && (
                 <div
+                  id="account-panel"
                   className="absolute right-0 top-full mt-2 w-64 rounded-3xl overflow-hidden animate-fade-in"
                   style={{
                     background: 'var(--panel-solid)',

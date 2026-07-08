@@ -47,10 +47,13 @@ export async function fetchMessages(conversationId: string): Promise<ChatMessage
   return (data ?? []) as ChatMessage[]
 }
 
-export async function sendMessage(conversationId: string, senderId: string, content: string): Promise<ChatMessage | null> {
+export async function sendMessage(conversationId: string, _senderId: string, content: string): Promise<ChatMessage | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Sessione scaduta')
+  const authorId = user.id
   const { data, error } = await supabase
     .from('chat_messages')
-    .insert({ conversation_id: conversationId, sender_id: senderId, content, read_by: [senderId] })
+    .insert({ conversation_id: conversationId, sender_id: authorId, content, read_by: [authorId] })
     .select()
     .maybeSingle()
   if (error) {
