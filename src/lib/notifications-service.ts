@@ -18,8 +18,10 @@ export async function fetchNotifications(userId: string): Promise<Notification[]
     .from('notifications')
     .select('*')
     .eq('user_id', userId)
+    .eq('is_read', false)
+    .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
     .order('created_at', { ascending: false })
-    .limit(50)
+    .limit(20)
   if (error) {
     logError('notifications-service', 'fetchNotifications', error)
     throw new Error(error.message)
@@ -60,5 +62,17 @@ export async function markAllAsRead(userId: string): Promise<void> {
   if (error) {
     logError('notifications-service', 'markAllAsRead', error)
     throw new Error(error.message)
+  }
+}
+
+export async function archiveOldNotifications(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('user_id', userId)
+    .eq('is_read', false)
+    .lt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+  if (error) {
+    logError('notifications-service', 'archiveOldNotifications', error)
   }
 }

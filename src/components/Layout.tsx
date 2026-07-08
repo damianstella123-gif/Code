@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Bell,
+  BellOff,
   LogOut,
   ChevronDown,
   SlidersHorizontal,
@@ -34,7 +35,7 @@ import { fetchPractices } from '@/lib/dossier-service'
 import { fetchClients } from '@/lib/clients-service'
 import { cacheEventsSnapshot, cacheTasksSnapshot, cachePraticheSnapshot, cacheClientsSnapshot } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
-import { fetchNotifications, fetchUnreadCount, markAsRead, markAllAsRead } from '@/lib/notifications-service'
+import { fetchNotifications, fetchUnreadCount, markAsRead, markAllAsRead, archiveOldNotifications } from '@/lib/notifications-service'
 import type { Notification } from '@/lib/notifications-service'
 
 const iconMap: Record<string, React.ElementType> = {
@@ -192,6 +193,10 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
 
   useEffect(() => {
     loadNotifications()
+    // Archive old unread notifications once per session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) archiveOldNotifications(session.user.id)
+    })
   }, [loadNotifications])
 
   useEffect(() => {
@@ -208,7 +213,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
         if (!user) return
         supabase.auth.getSession().then(({ data: { session } }) => {
           if (session && row.user_id === session.user.id) {
-            setNotifications(prev => [row, ...prev].slice(0, 50))
+            setNotifications(prev => [row, ...prev].slice(0, 20))
             setUnreadCount(prev => prev + 1)
             setNotifToast(row.title)
             setTimeout(() => setNotifToast(null), 4000)
@@ -220,11 +225,9 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
   }, [user])
 
   const handleNotificationClick = async (n: Notification) => {
-    if (!n.is_read) {
-      await markAsRead(n.id)
-      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x))
-      setUnreadCount(prev => Math.max(0, prev - 1))
-    }
+    await markAsRead(n.id)
+    setNotifications(prev => prev.filter(x => x.id !== n.id))
+    setUnreadCount(prev => Math.max(0, prev - 1))
     setNotifOpen(false)
 
     if (!n.related_entity_type || !n.related_entity_id) {
@@ -277,7 +280,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
     await markAllAsRead(session.user.id)
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+    setNotifications([])
     setUnreadCount(0)
   }
 
@@ -328,50 +331,53 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
             </button>
             {notifOpen && (
               <div
-                className="absolute right-0 top-full mt-2 w-[calc(100vw-32px)] sm:w-80 rounded-3xl overflow-hidden animate-fade-in"
-                style={{ background: 'var(--panel-solid)', backdropFilter: 'none', WebkitBackdropFilter: 'none', border: '1px solid var(--line)', boxShadow: '0 8px 32px rgba(0,0,0,0.14)' }}
+                className="absolute right-0 top-full mt-2 w-[calc(100vw-32px)] sm:w-80 rounded-2xl overflow-hidden animate-fade-in"
+                style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: '0 8px 32px rgba(0,0,0,0.14)' }}
               >
-                <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Notifiche</p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    NOTIFICHE
+                    {unreadCount > 0 && (
+                      <span style={{ background: 'var(--red2)', color: 'white', borderRadius: 99, fontSize: '9px', padding: '1px 6px' }}>
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </span>
                   {unreadCount > 0 && (
-                    <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(208,0,58,0.15)', color: 'var(--red2)' }}>
-                      {unreadCount}
-                    </span>
+                    <button onClick={handleMarkAllRead} style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      Segna tutte lette
+                    </button>
                   )}
                 </div>
-                <div className="max-h-72 overflow-y-auto">
+                <div style={{ maxHeight: 320, overflowY: 'auto' }}>
                   {notifications.length === 0 ? (
-                    <div className="px-4 py-8 text-center">
-                      <Bell className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--muted)', opacity: 0.4 }} />
-                      <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessuna notifica</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: 10 }}>
+                      <BellOff size={20} style={{ color: 'var(--muted)' }} />
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)' }}>
+                        Nessuna notifica
+                      </span>
                     </div>
                   ) : (
                     notifications.map(n => (
-                      <button
+                      <div
                         key={n.id}
-                        type="button"
                         onClick={() => handleNotificationClick(n)}
-                        className="w-full text-left px-4 py-3 flex items-start gap-3 transition-all hover:bg-white/5"
-                        style={{ borderBottom: '1px solid var(--line)' }}
+                        style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid var(--line)', transition: 'background .15s' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--panel2)' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                       >
-                        {!n.is_read && <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'var(--red)' }} />}
-                        {n.is_read && <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'transparent' }} />}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate" style={{ color: n.is_read ? 'var(--muted)' : 'var(--text)' }}>{n.title}</p>
-                          <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--muted)' }}>{n.message}</p>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--muted)', opacity: 0.7 }}>{formatTimeAgo(n.created_at)}</p>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red2)', marginTop: 5, flexShrink: 0, boxShadow: '0 0 5px rgba(200,25,46,.5)' }} />
+                        <div style={{ flex: 1, fontSize: '13px', color: 'var(--text)', lineHeight: 1.4 }}>{n.message}</div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', flexShrink: 0, marginTop: 2 }}>
+                          {formatTimeAgo(n.created_at)}
                         </div>
-                      </button>
+                      </div>
                     ))
                   )}
                 </div>
-                {notifications.length > 0 && (
-                  <div className="px-4 py-2.5 border-t" style={{ borderColor: 'var(--line)' }}>
-                    <button onClick={handleMarkAllRead} className="text-xs font-medium" style={{ color: 'var(--red2)' }}>
-                      Segna tutte come lette
-                    </button>
-                  </div>
-                )}
+                <div style={{ padding: '10px 16px', borderTop: '1px solid var(--line)', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
+                  Le notifiche lette spariscono dopo 24 ore
+                </div>
               </div>
             )}
           </div>
