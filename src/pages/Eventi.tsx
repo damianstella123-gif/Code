@@ -7,8 +7,6 @@ import {
   CheckSquare,
   Truck,
   Clock,
-  ChevronRight,
-  ChevronDown,
   Search,
   X,
   ArrowLeft,
@@ -1171,6 +1169,7 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
   const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null)
+  const [hoveredSup, setHoveredSup] = useState<string | null>(null)
   const [confirmUnlink, setConfirmUnlink] = useState<string | null>(null)
   const [toast, setToast] = useState<{ supplierId: string; nome: string } | null>(null)
   const [toastTimer, setToastTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
@@ -1420,19 +1419,18 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
             const isEditingContact = editingContact === sup.id
 
             return (
-              <div key={sup.id} className="panel overflow-hidden" style={{ border: `1px solid ${hasWarning ? 'var(--yellow)' : 'var(--line)'}` }}>
+              <div key={sup.id} className="panel overflow-hidden"
+                onClick={() => setExpandedSupplier(isExpanded ? null : sup.id)}
+                onMouseEnter={() => setHoveredSup(sup.id)}
+                onMouseLeave={() => setHoveredSup(null)}
+                style={{
+                  border: `1px solid ${hasWarning ? 'var(--yellow)' : 'var(--line)'}`,
+                  cursor: 'pointer',
+                  background: hoveredSup === sup.id ? 'var(--panel2)' : 'var(--panel-solid)',
+                }}>
                 {/* Header row */}
                 <div className="p-4">
                   <div className="flex items-start gap-3">
-                    <button
-                      onClick={() => setExpandedSupplier(isExpanded ? null : sup.id)}
-                      className="p-1 rounded transition-transform mt-0.5"
-                      style={{ color: 'var(--muted)' }}>
-                      {isExpanded
-                        ? <ChevronDown className="w-4 h-4" />
-                        : <ChevronRight className="w-4 h-4" />}
-                    </button>
-
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{sup.nome}</p>
@@ -1482,7 +1480,7 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
                       <select value={stato}
                         onChange={async (e) => {
                           if (link) await updateLinkStatus(link.id, e.target.value as 'richiesto' | 'confermato' | 'contrattualizzato')
@@ -1509,7 +1507,7 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
 
                   {/* Inline contact edit */}
                   {isEditingContact && link && (
-                    <div className="mt-3 pt-3 flex items-center gap-2 flex-wrap" style={{ borderTop: '1px solid var(--line)' }}>
+                    <div className="mt-3 pt-3 flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()} style={{ borderTop: '1px solid var(--line)' }}>
                       <input type="text" value={contactForm.contatto_operativo} onChange={e => setContactForm(p => ({ ...p, contatto_operativo: e.target.value }))}
                         placeholder="Nome contatto" className="px-2 py-1.5 rounded-lg text-xs flex-1 min-w-[120px]"
                         style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
@@ -1536,7 +1534,7 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
 
                 {/* Expanded services panel */}
                 {isExpanded && (
-                  <div className="px-4 pb-4 pt-2" style={{ borderTop: '1px solid var(--line)', background: 'var(--bg)' }}>
+                  <div className="px-4 pb-4 pt-2" onClick={e => e.stopPropagation()} style={{ borderTop: '1px solid var(--line)', background: 'var(--bg)' }}>
                     <SupplierCategoryPanel event={event} supplierId={sup.id} category={catType} isDmc={isDmcFromArray(sup.categorie ?? [], sup.categoria)} otherSupplierCategories={linkedSuppliers.filter(s => s.id !== sup.id).flatMap(s => s.categorie?.length ? s.categorie : [s.categoria])} />
                   </div>
                 )}
