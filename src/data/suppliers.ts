@@ -1,10 +1,26 @@
 export type StatoContratto = 'attivo' | 'in_scadenza' | 'scaduto' | 'in_rinnovo' | 'sospeso'
 
-export type SupplierCategory = 'Hotel' | 'Ristorante' | 'Location' | 'Attività' | 'Trasporti' | 'Catering' | 'Audio Video' | 'Allestimenti' | 'Hostess' | 'Entertainment' | 'Fotografia' | 'Video' | 'Sicurezza' | 'DMC' | 'Agenzia di Viaggi' | 'Grafica & Stampa' | 'Staff' | 'Esperienze' | 'Transfer' | 'Altro'
+export type SupplierCategory = 'Hotel' | 'Ristorante' | 'Audio Video' | 'Catering' | 'Allestimenti' | 'Location' | 'Staff' | 'Transfer' | 'Grafica & Stampa' | 'Esperienze' | 'DMC' | 'Agenzia di Viaggi' | 'Entertainment' | 'Fotografia' | 'Video' | 'Sicurezza' | 'Altro'
 
-export const SUPPLIER_CATEGORIES: SupplierCategory[] = [
-  'Hotel', 'Ristorante', 'Audio Video', 'Allestimenti', 'Catering', 'Staff', 'Transfer', 'Grafica & Stampa', 'Location', 'Esperienze', 'DMC', 'Agenzia di Viaggi', 'Altro',
-]
+export const SUPPLIER_CATEGORIES = [
+  'Hotel',
+  'Ristorante',
+  'Audio Video',
+  'Catering',
+  'Allestimenti',
+  'Location',
+  'Staff',
+  'Transfer',
+  'Grafica & Stampa',
+  'Esperienze',
+  'DMC',
+  'Agenzia di Viaggi',
+  'Entertainment',
+  'Fotografia',
+  'Video',
+  'Sicurezza',
+  'Altro',
+] as const
 
 export interface Documento {
   id: string

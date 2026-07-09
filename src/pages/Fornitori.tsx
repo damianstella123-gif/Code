@@ -3,9 +3,9 @@ import { useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Phone, Mail, MapPin, Globe, Star, FileText, Euro,
   Search, X, Plus, Trash2, Save, Upload, Building2, Edit3, Link2,
-  Hotel, UtensilsCrossed, MapPinned, Sparkles, Bus, CookingPot,
+  Hotel, UtensilsCrossed, MapPinned, CookingPot,
   Speaker, PaintBucket, Users, MoreHorizontal, Camera, Video, Shield,
-  Music, ChevronRight, Navigation, Plane,
+  Music, ChevronRight, Navigation, Plane, Car, Printer,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
@@ -17,14 +17,13 @@ import { SUPPLIER_CATEGORIES } from '@/data/suppliers'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const NAV_CATEGORIES = ['Hotel', 'Ristorante', 'Audio Video', 'Catering', 'Location', 'Trasporti', 'Allestimenti', 'DMC', 'Agenzia di Viaggi', 'Altro'] as const
-
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   Hotel, Ristorante: UtensilsCrossed, Location: MapPinned,
-  'Attività': Sparkles, Trasporti: Bus, Catering: CookingPot,
-  'Audio Video': Speaker, Allestimenti: PaintBucket, DMC: Navigation,
-  'Agenzia di Viaggi': Plane, Hostess: Users, Entertainment: Music,
-  Fotografia: Camera, Video: Video, Sicurezza: Shield, Altro: MoreHorizontal,
+  'Audio Video': Speaker, Catering: CookingPot, Allestimenti: PaintBucket,
+  Staff: Users, Transfer: Car, 'Grafica & Stampa': Printer,
+  Esperienze: Star, DMC: Navigation, 'Agenzia di Viaggi': Plane,
+  Entertainment: Music, Fotografia: Camera, Video: Video,
+  Sicurezza: Shield, Altro: MoreHorizontal,
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -39,8 +38,7 @@ function matchesCategory(supplierCat: string, filterCat: string): boolean {
     'audio video': ['audio video', 'audio/video', 'audiovideo', 'av'],
     'location': ['location', 'locations', 'venue'],
     'attività': ['attività', 'attivita', 'team building', 'activities'],
-    'trasporti': ['trasporti', 'trasporto', 'transport'],
-    'transfer': ['transfer', 'trasferimenti', 'navette', 'ncc'],
+    'transfer': ['transfer', 'trasferimenti', 'navette', 'ncc', 'trasporti', 'trasporto', 'transport'],
     'catering': ['catering'],
     'allestimenti': ['allestimenti', 'allestimento', 'scenografia'],
     'staff': ['staff', 'hostess', 'personale', 'steward'],
@@ -140,7 +138,7 @@ function parseSearchQuery(raw: string): ParsedSearch {
   const meetingMatch = text.match(/(\d+)\s*sal[ea](?:\s*meeting)?/i)
   if (meetingMatch) result.minMeetingRooms = parseInt(meetingMatch[1])
 
-  for (const cat of NAV_CATEGORIES) {
+  for (const cat of SUPPLIER_CATEGORIES) {
     if (text.includes(cat.toLowerCase())) {
       result.categoryHint = cat
       break
@@ -1650,7 +1648,7 @@ export default function Fornitori() {
           {/* Level: Categories */}
           {!navCategory && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {NAV_CATEGORIES.map(cat => {
+              {SUPPLIER_CATEGORIES.map(cat => {
                 const Icon = CATEGORY_ICONS[cat] ?? MoreHorizontal
                 const count = categoryCounts[cat] ?? 0
                 return (
