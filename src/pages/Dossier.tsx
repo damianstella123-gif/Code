@@ -261,6 +261,9 @@ export default function Dossier() {
               <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
             </button>
           )}
+          {!searchTerm && (
+            <span className="absolute right-3 top-1/2 -translate-y-1/2" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>Usa Fly ↑ per domande complesse</span>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">

@@ -643,6 +643,9 @@ export default function CRM() {
               <X className="w-3 h-3" style={{ color: 'var(--muted)' }} />
             </button>
           )}
+          {!search && (
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>Usa Fly ↑</span>
+          )}
         </div>
       </div>
 

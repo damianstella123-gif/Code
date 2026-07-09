@@ -3067,6 +3067,9 @@ export default function Eventi() {
               <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
             </button>
           )}
+          {!search && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>Usa Fly ↑ per domande complesse</span>
+          )}
         </div>
       </div>
 

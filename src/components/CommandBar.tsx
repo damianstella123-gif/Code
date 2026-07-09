@@ -473,7 +473,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
   return (
     <div ref={containerRef} className="cmd-bar-wrapper">
       <div className="cmd-bar">
-        <PawPrint style={{ width: 16, height: 16, color: 'var(--muted)', flexShrink: 0 }} />
+        <PawPrint style={{ width: 14, height: 14, color: 'var(--red2)', flexShrink: 0 }} />
         <input
           ref={inputRef}
           type="text"

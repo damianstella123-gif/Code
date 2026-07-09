@@ -432,6 +432,7 @@ export default function TaskPage() {
           <input type="text" placeholder="Cerca..." value={search} onChange={e => setSearch(e.target.value)}
             style={{ background: 'none', border: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)', width: '100px' }} />
           {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X className="w-3 h-3" style={{ color: 'var(--muted)' }} /></button>}
+          {!search && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>Usa Fly ↑ per domande complesse</span>}
         </div>
       </div>
 

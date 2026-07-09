@@ -1599,6 +1599,9 @@ export default function Fornitori() {
                 <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
               </button>
             )}
+            {!searchQuery && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>Usa Fly ↑ per domande complesse</span>
+            )}
           </div>
 
           {searchQuery.trim() && (
