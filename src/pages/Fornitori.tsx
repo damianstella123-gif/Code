@@ -1281,7 +1281,7 @@ export default function Fornitori() {
   const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const [mode, setMode] = useState<'navigate' | 'search'>('navigate')
+  const [mode, setMode] = useState<'navigate' | 'search'>('search')
 
   const [navCategory, setNavCategory] = useState<string | null>(null)
   const [navCountryGroup, setNavCountryGroup] = useState<string | null>(null)
