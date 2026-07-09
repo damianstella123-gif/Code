@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
+import { displayUrl, ensureHttps } from '@/lib/format'
 import { fetchSuppliers, upsertSupplier, deleteSupplier as deleteSupplierRemote, updateSupplier } from '@/lib/suppliers-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { supabase } from '@/lib/supabase'
@@ -758,7 +759,7 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
         <div className="flex flex-wrap items-center gap-4 mt-4" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
           {supplier.telefono && <a href={`tel:${supplier.telefono}`} className="flex items-center gap-1 hover:opacity-80"><Phone className="w-3 h-3" />{supplier.telefono}</a>}
           {supplier.email && <a href={`mailto:${supplier.email}`} className="flex items-center gap-1 truncate hover:opacity-80"><Mail className="w-3 h-3" /><span className="truncate">{supplier.email}</span></a>}
-          {supplier.sito && <a href={supplier.sito.startsWith('http') ? supplier.sito : `https://${supplier.sito}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 truncate hover:opacity-80"><Globe className="w-3 h-3" /><span className="truncate">{supplier.sito}</span></a>}
+          {supplier.sito && <a href={ensureHttps(supplier.sito)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 truncate hover:opacity-80" title={supplier.sito}><Globe className="w-3 h-3" /><span className="truncate">{displayUrl(supplier.sito)}</span></a>}
         </div>
       </div>
 

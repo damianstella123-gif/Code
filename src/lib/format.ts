@@ -89,3 +89,18 @@ export function taskPriColor(priorita: string, stato: string): string {
   if (priorita === 'media') return 'var(--yellow)'
   return 'var(--muted)'
 }
+
+export function ensureHttps(url: string): string {
+  if (!url) return ''
+  return url.startsWith('http') ? url : `https://${url}`
+}
+
+export function displayUrl(url: string): string {
+  if (!url) return ''
+  try {
+    const u = new URL(url.startsWith('http') ? url : `https://${url}`)
+    return u.hostname.replace(/^www\./, '')
+  } catch {
+    return url.length > 30 ? url.slice(0, 28) + '\u2026' : url
+  }
+}
