@@ -104,3 +104,87 @@ export function displayUrl(url: string): string {
     return url.length > 30 ? url.slice(0, 28) + '\u2026' : url
   }
 }
+
+export const CITY_TO_REGION: Record<string, string> = {
+  'Milano': 'Lombardia', 'Bergamo': 'Lombardia',
+  'Brescia': 'Lombardia', 'Como': 'Lombardia',
+  'Monza': 'Lombardia', 'Pavia': 'Lombardia',
+  'Varese': 'Lombardia', 'Lecco': 'Lombardia',
+  'Mantova': 'Lombardia', 'Cremona': 'Lombardia',
+  'Lodi': 'Lombardia', 'Sondrio': 'Lombardia',
+  'Roma': 'Lazio', 'Frosinone': 'Lazio',
+  'Latina': 'Lazio', 'Rieti': 'Lazio',
+  'Viterbo': 'Lazio',
+  'Napoli': 'Campania', 'Salerno': 'Campania',
+  'Caserta': 'Campania', 'Benevento': 'Campania',
+  'Avellino': 'Campania',
+  'Palermo': 'Sicilia', 'Catania': 'Sicilia',
+  'Messina': 'Sicilia', 'Siracusa': 'Sicilia',
+  'Agrigento': 'Sicilia', 'Trapani': 'Sicilia',
+  'Ragusa': 'Sicilia', 'Caltanissetta': 'Sicilia',
+  'Enna': 'Sicilia',
+  'Venezia': 'Veneto', 'Verona': 'Veneto',
+  'Padova': 'Veneto', 'Vicenza': 'Veneto',
+  'Treviso': 'Veneto', 'Belluno': 'Veneto',
+  'Rovigo': 'Veneto',
+  'Torino': 'Piemonte', 'Cuneo': 'Piemonte',
+  'Asti': 'Piemonte', 'Alessandria': 'Piemonte',
+  'Novara': 'Piemonte', 'Vercelli': 'Piemonte',
+  'Biella': 'Piemonte', 'Verbania': 'Piemonte',
+  'Firenze': 'Toscana', 'Siena': 'Toscana',
+  'Pisa': 'Toscana', 'Lucca': 'Toscana',
+  'Arezzo': 'Toscana', 'Grosseto': 'Toscana',
+  'Livorno': 'Toscana', 'Pistoia': 'Toscana',
+  'Prato': 'Toscana', 'Massa': 'Toscana',
+  'Bologna': 'Emilia-Romagna',
+  'Modena': 'Emilia-Romagna',
+  'Parma': 'Emilia-Romagna',
+  'Reggio Emilia': 'Emilia-Romagna',
+  'Ferrara': 'Emilia-Romagna',
+  'Rimini': 'Emilia-Romagna',
+  'Ravenna': 'Emilia-Romagna',
+  'Forlì': 'Emilia-Romagna',
+  'Piacenza': 'Emilia-Romagna',
+  'Bari': 'Puglia', 'Lecce': 'Puglia',
+  'Taranto': 'Puglia', 'Foggia': 'Puglia',
+  'Brindisi': 'Puglia', 'Barletta': 'Puglia',
+  'Reggio Calabria': 'Calabria',
+  'Catanzaro': 'Calabria', 'Cosenza': 'Calabria',
+  'Crotone': 'Calabria', 'Vibo Valentia': 'Calabria',
+  'Cagliari': 'Sardegna', 'Sassari': 'Sardegna',
+  'Nuoro': 'Sardegna', 'Oristano': 'Sardegna',
+  'Olbia': 'Sardegna', 'Porto Cervo': 'Sardegna',
+  'Arzachena': 'Sardegna',
+  'Genova': 'Liguria', 'La Spezia': 'Liguria',
+  'Savona': 'Liguria', 'Imperia': 'Liguria',
+  'Portofino': 'Liguria', 'Santa Margherita': 'Liguria',
+  'Ancona': 'Marche', 'Pesaro': 'Marche',
+  'Macerata': 'Marche', 'Ascoli Piceno': 'Marche',
+  'Fermo': 'Marche',
+  'Perugia': 'Umbria', 'Terni': 'Umbria',
+  'Assisi': 'Umbria',
+  "L'Aquila": 'Abruzzo', 'Pescara': 'Abruzzo',
+  'Chieti': 'Abruzzo', 'Teramo': 'Abruzzo',
+  'Trieste': 'Friuli-Venezia Giulia',
+  'Udine': 'Friuli-Venezia Giulia',
+  'Pordenone': 'Friuli-Venezia Giulia',
+  'Gorizia': 'Friuli-Venezia Giulia',
+  'Trento': 'Trentino-Alto Adige',
+  'Bolzano': 'Trentino-Alto Adige',
+  'Merano': 'Trentino-Alto Adige',
+  'Aosta': "Valle d'Aosta",
+  'Courmayeur': "Valle d'Aosta",
+  'Campobasso': 'Molise', 'Isernia': 'Molise',
+  'Potenza': 'Basilicata', 'Matera': 'Basilicata',
+}
+
+export function inferRegion(city: string, region: string): string {
+  if (region) return region
+  if (!city) return ''
+  if (CITY_TO_REGION[city]) return CITY_TO_REGION[city]
+  const found = Object.keys(CITY_TO_REGION).find(k =>
+    city.toLowerCase().includes(k.toLowerCase()) ||
+    k.toLowerCase().includes(city.toLowerCase())
+  )
+  return found ? CITY_TO_REGION[found] : ''
+}

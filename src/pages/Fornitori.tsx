@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
-import { displayUrl, ensureHttps } from '@/lib/format'
+import { displayUrl, ensureHttps, inferRegion } from '@/lib/format'
 import { fetchSuppliers, upsertSupplier, deleteSupplier as deleteSupplierRemote, updateSupplier } from '@/lib/suppliers-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { supabase } from '@/lib/supabase'
@@ -72,7 +72,7 @@ function getSupplierCity(s: Supplier): string {
 }
 
 function getSupplierRegion(s: Supplier): string {
-  return s.region || ''
+  return inferRegion(s.city || s.province || '', s.region || '')
 }
 
 function getSupplierCountry(s: Supplier): string {
@@ -1011,7 +1011,13 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <label style={labelStyle}>Citta</label>
-              <input type="text" value={city} onChange={e => setCity(e.target.value)}
+              <input type="text" value={city} onChange={e => {
+                setCity(e.target.value)
+                if (!region) {
+                  const inferred = inferRegion(e.target.value, '')
+                  if (inferred) setRegion(inferred)
+                }
+              }}
                 className={inputCls} style={inputStyle} />
             </div>
             <div>
