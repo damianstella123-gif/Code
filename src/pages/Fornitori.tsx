@@ -5,7 +5,7 @@ import {
   Search, X, Plus, Trash2, Save, Upload, Building2, Edit3, Link2,
   Hotel, UtensilsCrossed, MapPinned, CookingPot,
   Speaker, PaintBucket, Users, MoreHorizontal, Camera, Video, Shield,
-  Music, ChevronRight, Navigation, Plane, Car, Printer,
+  Music, ChevronRight, Navigation, Plane, Car, Printer, Umbrella,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
@@ -24,7 +24,7 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   Staff: Users, Transfer: Car, 'Grafica & Stampa': Printer,
   Esperienze: Star, DMC: Navigation, 'Agenzia di Viaggi': Plane,
   Entertainment: Music, Fotografia: Camera, Video: Video,
-  Sicurezza: Shield, Altro: MoreHorizontal,
+  Sicurezza: Shield, Assicurazioni: Umbrella, Altro: MoreHorizontal,
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -47,6 +47,7 @@ function matchesCategory(supplierCat: string, filterCat: string): boolean {
     'fotografia': ['fotografia', 'foto', 'photographer'],
     'video': ['video', 'videomaking', 'video making'],
     'sicurezza': ['sicurezza', 'security'],
+    'assicurazioni': ['assicurazioni', 'assicurazione', 'insurance'],
     'dmc': ['dmc', 'destination management', 'destination management company'],
     'grafica & stampa': ['grafica & stampa', 'grafica', 'stampa', 'tipografia', 'grafica e stampa'],
     'esperienze': ['esperienze', 'experience', 'experiences'],

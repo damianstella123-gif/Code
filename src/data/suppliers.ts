@@ -1,6 +1,6 @@
 export type StatoContratto = 'attivo' | 'in_scadenza' | 'scaduto' | 'in_rinnovo' | 'sospeso'
 
-export type SupplierCategory = 'Hotel' | 'Ristorante' | 'Audio Video' | 'Catering' | 'Allestimenti' | 'Location' | 'Staff' | 'Transfer' | 'Grafica & Stampa' | 'Esperienze' | 'DMC' | 'Agenzia di Viaggi' | 'Entertainment' | 'Fotografia' | 'Video' | 'Sicurezza' | 'Altro'
+export type SupplierCategory = 'Hotel' | 'Ristorante' | 'Audio Video' | 'Catering' | 'Allestimenti' | 'Location' | 'Staff' | 'Transfer' | 'Grafica & Stampa' | 'Esperienze' | 'DMC' | 'Agenzia di Viaggi' | 'Entertainment' | 'Fotografia' | 'Video' | 'Sicurezza' | 'Assicurazioni' | 'Altro'
 
 export const SUPPLIER_CATEGORIES = [
   'Hotel',
@@ -19,6 +19,7 @@ export const SUPPLIER_CATEGORIES = [
   'Fotografia',
   'Video',
   'Sicurezza',
+  'Assicurazioni',
   'Altro',
 ] as const
 
