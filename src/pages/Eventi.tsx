@@ -55,7 +55,7 @@ import type { EventoWorkflow } from '@/data/workflow'
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 type StatoEvento = Event['stato']
 
-type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'pagamenti' | 'comunicazioni' | 'documenti' | 'programma' | 'timeline'
+type TabId = 'overview' | 'fornitori' | 'budget' | 'pagamenti' | 'comunicazioni' | 'documenti' | 'programma' | 'timeline'
 
 function statoColor(stato: string) {
   switch (stato) {
@@ -474,7 +474,7 @@ function EventEconomicSummary({ event }: { event: Event }) {
   )
 }
 
-function TabOverview({ event, progress, completedTasks, totalTasks, budgets, clients, onClientClick }: {
+function TabOverview({ event, progress, completedTasks, totalTasks, budgets, clients, onClientClick, internalUsers }: {
   event: Event
   progress: number
   completedTasks: number
@@ -482,12 +482,32 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets, cli
   budgets: Uscita[]
   clients: Client[]
   onClientClick?: (clientName: string) => void
+  internalUsers: InternalUser[]
 }) {
   const eventUscite = budgets.filter(u => u.eventoId === event.id)
   const totUscite = eventUscite.reduce((s, u) => s + u.importo, 0)
   const hasRealData = eventUscite.length > 0
 
   const cliente = clients.find(c => c.id === event.cliente)
+
+  const [taskList, setTaskList] = useState<Task[]>([])
+  useEffect(() => {
+    supabase.from('tasks').select('*')
+      .eq('event_id', event.id)
+      .neq('stato', 'completato')
+      .order('scadenza', { ascending: true })
+      .limit(5)
+      .then(({ data }) => {
+        if (data) setTaskList(data as unknown as Task[])
+      })
+  }, [event.id])
+
+  async function handleCheckTask(taskId: string) {
+    await supabase.from('tasks')
+      .update({ stato: 'completato' })
+      .eq('id', taskId)
+    setTaskList(prev => prev.filter(t => t.id !== taskId))
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -549,6 +569,61 @@ function TabOverview({ event, progress, completedTasks, totalTasks, budgets, cli
           </div>
         </div>
       </div>
+
+      {/* Team Section */}
+      <div className="md:col-span-2" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--muted)', marginBottom: '10px' }}>Team</p>
+        {event.team.length === 0 ? (
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>Nessun membro nel team</p>
+        ) : (
+          <div className="space-y-0">
+            {event.team.map(memberId => {
+              const u = internalUsers.find(x => x.id === memberId)
+              if (!u) return null
+              const isResp = memberId === event.responsabile
+              return (
+                <div key={memberId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
+                  <img src={u.avatar} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: 'var(--text)' }}>{u.nome}</span>
+                  {isResp && (
+                    <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--red2)', marginLeft: 'auto' }}>RESPONSABILE</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Task Section */}
+      <div className="md:col-span-2" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--muted)' }}>Task</p>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>{completedTasks}/{totalTasks} completati</span>
+        </div>
+        {taskList.length === 0 && totalTasks === 0 ? (
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>Nessun task per questo evento</p>
+        ) : taskList.length === 0 ? (
+          <p style={{ color: 'var(--green)', fontSize: 13 }}>Tutti i task completati</p>
+        ) : (
+          <div>
+            {taskList.map(t => (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--line)' }}>
+                <input type="checkbox" checked={false} onChange={() => handleCheckTask(t.id)} style={{ flexShrink: 0, accentColor: 'var(--red2)' }} />
+                <span style={{ fontSize: 13, flex: 1, color: 'var(--text)' }}>{t.titolo}</span>
+                {t.scadenza && (
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', flexShrink: 0 }}>{fmtShort(t.scadenza)}</span>
+                )}
+              </div>
+            ))}
+            {totalTasks > 5 && (
+              <p style={{ fontSize: 12, color: 'var(--red2)', marginTop: 8, cursor: 'pointer' }}>
+                Vedi tutti i task &rarr;
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -571,6 +646,8 @@ const TASK_TEMPLATES: { titolo: string; fase: string; categoria: string; offsetD
   { titolo: 'Report finale evento', fase: 'chiusura', categoria: 'amministrativo', offsetDays: 10, priorita: 'media' },
 ]
 
+// @ts-ignore — kept for future use
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function TabTask({ event, suppliers, internalUsers }: { event: Event; suppliers: Supplier[]; internalUsers: InternalUser[] }) {
   const [filter, setFilter] = useState<'tutti' | 'da_fare' | 'in_corso' | 'completato'>('tutti')
   const [tasks, setTasks] = useState<Task[]>([])
@@ -898,6 +975,8 @@ function TabTask({ event, suppliers, internalUsers }: { event: Event; suppliers:
   )
 }
 
+// @ts-ignore — kept for future use
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function TabTeam({ event, internalUsers }: { event: Event; internalUsers: InternalUser[] }) {
   const teamMembers = internalUsers.filter(u => event.team.includes(u.id))
   const responsabile = internalUsers.find(u => u.id === event.responsabile)
@@ -2622,8 +2701,6 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
     { id: 'programma', label: 'Programma' },
     { id: 'budget', label: 'Budget' },
     { id: 'pagamenti', label: 'Pagamenti' },
-    { id: 'task', label: `Task${totalTasks > 0 ? ` (${totalTasks})` : ''}` },
-    { id: 'team', label: `Team (${event.team.length})` },
     { id: 'documenti', label: 'Documenti' },
     { id: 'comunicazioni', label: `Comunicazioni${eventMsg.length > 0 ? ` (${eventMsg.length})` : ''}` },
     { id: 'timeline', label: 'Timeline' },
@@ -2768,10 +2845,8 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
       {/* Tab Content */}
       <div key={activeTab} className="animate-fade-in">
         {activeTab === 'overview' && (
-          <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} clients={clients} onClientClick={navigateToCrm} />
+          <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} clients={clients} onClientClick={navigateToCrm} internalUsers={internalUsers} />
         )}
-        {activeTab === 'task' && <TabTask event={event} suppliers={suppliers} internalUsers={internalUsers} />}
-        {activeTab === 'team' && <TabTeam event={event} internalUsers={internalUsers} />}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} onSuppliersChanged={onSuppliersChanged} />}
         {activeTab === 'budget' && <BudgetTabContainer event={event} suppliers={suppliers} />}
         {activeTab === 'pagamenti' && <TabPagamenti event={event} suppliers={suppliers} />}
