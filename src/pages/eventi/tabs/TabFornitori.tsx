@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, X, Plus, Truck, AlertTriangle, MapPin, User, Edit3, Trash2 } from 'lucide-react'
+import { Plus, Truck, AlertTriangle, User, Edit3, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useEventServices } from '@/lib/use-event-services'
 import { upsertSupplier } from '@/lib/suppliers-service'
@@ -8,89 +8,8 @@ import { SupplierFormModal } from '@/pages/Fornitori'
 import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
 import { LINK_CATEGORIES, STATO_CONFERMA_CONFIG } from '../supplier-details-types'
-
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371
-  const toRad = (d: number) => (d * Math.PI) / 180
-  const dLat = toRad(lat2 - lat1)
-  const dLon = toRad(lon2 - lon1)
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
-function DistanceLogistics({ linkedSuppliers, eventLocation }: { linkedSuppliers: Supplier[]; eventLocation: string }) {
-  const geoSuppliers = linkedSuppliers.filter(s => s.latitude && s.longitude)
-  if (geoSuppliers.length < 2) return null
-
-  const pairs: { from: Supplier; to: Supplier; km: number }[] = []
-  for (let i = 0; i < geoSuppliers.length; i++) {
-    for (let j = i + 1; j < geoSuppliers.length; j++) {
-      const a = geoSuppliers[i]
-      const b = geoSuppliers[j]
-      const km = haversineKm(a.latitude!, a.longitude!, b.latitude!, b.longitude!)
-      pairs.push({ from: a, to: b, km })
-    }
-  }
-  pairs.sort((a, b) => a.km - b.km)
-
-  return (
-    <div className="panel p-5 mt-4">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--blue) 10%, transparent)' }}>
-          <MapPin className="w-4 h-4" style={{ color: 'var(--blue)' }} />
-        </div>
-        <div>
-          <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>Distanze e logistica</p>
-          <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
-            Distanze approssimative tra i fornitori con coordinate ({geoSuppliers.length} su {linkedSuppliers.length})
-            {eventLocation && <> · Evento: {eventLocation}</>}
-          </p>
-        </div>
-      </div>
-      <div className="overflow-x-auto rounded-lg" style={{ border: '1px solid var(--line)' }}>
-        <table className="w-full text-[11px]">
-          <thead>
-            <tr style={{ background: 'var(--panel2)' }}>
-              <th className="text-left px-3 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Da</th>
-              <th className="text-left px-3 py-2 font-semibold" style={{ color: 'var(--muted)' }}>A</th>
-              <th className="text-right px-3 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Distanza</th>
-              <th className="text-right px-3 py-2 font-semibold" style={{ color: 'var(--muted)' }}>Tempo stimato</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pairs.map((p, i) => {
-              const driveMin = Math.round((p.km / 60) * 60)
-              return (
-                <tr key={i} style={{ borderTop: '1px solid var(--line)' }}>
-                  <td className="px-3 py-2 font-medium" style={{ color: 'var(--text)' }}>
-                    <span>{p.from.nome}</span>
-                    <span className="ml-1 text-[10px]" style={{ color: 'var(--muted)' }}>({p.from.city || p.from.location})</span>
-                  </td>
-                  <td className="px-3 py-2 font-medium" style={{ color: 'var(--text)' }}>
-                    <span>{p.to.nome}</span>
-                    <span className="ml-1 text-[10px]" style={{ color: 'var(--muted)' }}>({p.to.city || p.to.location})</span>
-                  </td>
-                  <td className="text-right px-3 py-2 font-semibold" style={{ color: p.km < 10 ? 'var(--green)' : p.km < 50 ? 'var(--blue)' : 'var(--red2)' }}>
-                    {p.km < 1 ? `${Math.round(p.km * 1000)} m` : `${p.km.toFixed(1)} km`}
-                  </td>
-                  <td className="text-right px-3 py-2" style={{ color: 'var(--muted)' }}>
-                    {driveMin < 60 ? `~${driveMin} min` : `~${Math.floor(driveMin / 60)}h ${driveMin % 60}min`}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-      {geoSuppliers.length < linkedSuppliers.length && (
-        <p className="text-[10px] mt-2" style={{ color: 'var(--muted)' }}>
-          {linkedSuppliers.length - geoSuppliers.length} fornitori senza coordinate non sono inclusi nel calcolo.
-          Aggiungi latitudine/longitudine nella scheda fornitore per includerli.
-        </p>
-      )}
-    </div>
-  )
-}
+import { DistanceLogistics } from './fornitori/DistanceLogistics'
+import { AddSupplierPanel } from './fornitori/AddSupplierPanel'
 
 export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; suppliers: Supplier[]; onSuppliersChanged: () => void }) {
   const { links, summaries, loading, reload, updateLinkStatus } = useEventServices(event.id)
@@ -239,91 +158,20 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
         )}
       </div>
 
-      {/* Search panel for linking */}
-      {adding && (
-        <div className="panel p-4 space-y-3" style={{ border: '1px solid var(--red2)' }}>
-          <div className="flex items-center gap-2">
-            <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Cerca fornitore per nome o categoria..."
-              className="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none"
-              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
-              autoFocus />
-            <button onClick={() => { setAdding(false); setSearch('') }}
-              className="p-1.5 rounded-lg" style={{ color: 'var(--muted)' }}>
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="max-h-48 overflow-y-auto space-y-1">
-            {search.trim().length > 0 ? (
-              availableSuppliers.length === 0 ? (
-                <div className="text-center py-3">
-                  <p className="text-xs p-2" style={{ color: 'var(--muted)' }}>
-                    Nessun fornitore trovato per "{search}"
-                  </p>
-                  <button onClick={() => setShowNewSupplier(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mt-1"
-                    style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)', border: '1px solid var(--red2)' }}>
-                    <Plus className="w-3.5 h-3.5" /> Crea nuovo fornitore
-                  </button>
-                </div>
-              ) : availableSuppliers.slice(0, 10).map(s => (
-                <button key={s.id} onClick={() => beginLink(s.id)}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all hover:bg-[var(--line)]"
-                  style={{ border: '1px solid var(--line)' }}>
-                  <Truck className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--red2)' }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{s.nome}</p>
-                    <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{s.categoria} · {s.location}</p>
-                  </div>
-                </button>
-              ))
-            ) : (
-              <p style={{ color: 'var(--muted)', fontSize: '13px', padding: '8px 12px' }}>
-                Digita per cercare un fornitore...
-              </p>
-            )}
-          </div>
-          <div className="pt-2 border-t" style={{ borderColor: 'var(--line)' }}>
-            <button onClick={() => setShowNewSupplier(true)}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:opacity-80"
-              style={{ color: 'var(--red2)' }}>
-              <Plus className="w-3.5 h-3.5" /> Crea nuovo fornitore
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Category selection modal */}
-      {pendingLink && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPendingLink(null)}>
-          <div className="panel p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
-            <p className="font-semibold mb-1" style={{ color: 'var(--text)' }}>Seleziona categoria</p>
-            <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
-              Come verra utilizzato questo fornitore in questo evento?
-            </p>
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              {LINK_CATEGORIES.map(cat => (
-                <button key={cat.value} onClick={() => setLinkCategory(cat.value)}
-                  className="px-3 py-2 rounded-lg text-xs font-medium text-left transition-all"
-                  style={{
-                    background: linkCategory === cat.value ? 'color-mix(in srgb, var(--red2) 15%, transparent)' : 'var(--panel2)',
-                    border: `1px solid ${linkCategory === cat.value ? 'var(--red2)' : 'var(--line)'}`,
-                    color: linkCategory === cat.value ? 'var(--red2)' : 'var(--text)',
-                  }}>
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button className="px-4 py-2 rounded-lg text-sm" style={{ background: 'var(--panel2)', color: 'var(--text)' }} onClick={() => setPendingLink(null)}>Annulla</button>
-              <button disabled={!linkCategory} onClick={confirmLink}
-                className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-40"
-                style={{ background: 'var(--red2)', color: '#fff' }}>Conferma</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddSupplierPanel
+        adding={adding}
+        setAdding={setAdding}
+        search={search}
+        setSearch={setSearch}
+        availableSuppliers={availableSuppliers}
+        beginLink={beginLink}
+        pendingLink={pendingLink}
+        setPendingLink={setPendingLink}
+        linkCategory={linkCategory}
+        setLinkCategory={setLinkCategory}
+        confirmLink={confirmLink}
+        onShowNewSupplier={() => setShowNewSupplier(true)}
+      />
 
       {/* Empty state */}
       {linkedSuppliers.length === 0 && !adding ? (
