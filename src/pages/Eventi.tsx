@@ -1491,13 +1491,6 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
                         <option value="confermato">Confermato</option>
                         <option value="contrattualizzato">Contrattualizzato</option>
                       </select>
-                      <button
-                        onClick={() => setExpandedSupplier(isExpanded ? null : sup.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
-                        style={{ background: isExpanded ? 'color-mix(in srgb, var(--red2) 15%, transparent)' : 'color-mix(in srgb, var(--red2) 8%, transparent)', color: 'var(--red2)', border: '1px solid var(--red2)' }}>
-                        <Plus className="w-3.5 h-3.5 inline mr-1" />
-                        Servizi
-                      </button>
                       <button onClick={() => setConfirmUnlink(sup.id)}
                         className="p-1.5 rounded-lg transition-all hover:bg-[var(--line)]" title="Rimuovi fornitore dall'evento">
                         <Trash2 className="w-4 h-4" style={{ color: 'var(--muted)' }} />
