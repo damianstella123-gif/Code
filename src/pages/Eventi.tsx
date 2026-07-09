@@ -1329,28 +1329,34 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
             </button>
           </div>
           <div className="max-h-48 overflow-y-auto space-y-1">
-            {availableSuppliers.length === 0 ? (
-              <div className="text-center py-3">
-                <p className="text-xs p-2" style={{ color: 'var(--muted)' }}>
-                  {suppliers.length === 0 ? 'Nessun fornitore nel sistema' : 'Nessun fornitore trovato'}
-                </p>
-                <button onClick={() => setShowNewSupplier(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mt-1"
-                  style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)', border: '1px solid var(--red2)' }}>
-                  <Plus className="w-3.5 h-3.5" /> Crea nuovo fornitore
-                </button>
-              </div>
-            ) : availableSuppliers.slice(0, 10).map(s => (
-              <button key={s.id} onClick={() => beginLink(s.id)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all hover:bg-[var(--line)]"
-                style={{ border: '1px solid var(--line)' }}>
-                <Truck className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--red2)' }} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{s.nome}</p>
-                  <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{s.categoria} · {s.location}</p>
+            {search.trim().length > 0 ? (
+              availableSuppliers.length === 0 ? (
+                <div className="text-center py-3">
+                  <p className="text-xs p-2" style={{ color: 'var(--muted)' }}>
+                    Nessun fornitore trovato per "{search}"
+                  </p>
+                  <button onClick={() => setShowNewSupplier(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mt-1"
+                    style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)', border: '1px solid var(--red2)' }}>
+                    <Plus className="w-3.5 h-3.5" /> Crea nuovo fornitore
+                  </button>
                 </div>
-              </button>
-            ))}
+              ) : availableSuppliers.slice(0, 10).map(s => (
+                <button key={s.id} onClick={() => beginLink(s.id)}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all hover:bg-[var(--line)]"
+                  style={{ border: '1px solid var(--line)' }}>
+                  <Truck className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--red2)' }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{s.nome}</p>
+                    <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{s.categoria} · {s.location}</p>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <p style={{ color: 'var(--muted)', fontSize: '13px', padding: '8px 12px' }}>
+                Digita per cercare un fornitore...
+              </p>
+            )}
           </div>
           <div className="pt-2 border-t" style={{ borderColor: 'var(--line)' }}>
             <button onClick={() => setShowNewSupplier(true)}
