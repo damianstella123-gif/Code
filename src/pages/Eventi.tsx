@@ -633,7 +633,7 @@ export default function Eventi() {
                 </p>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--muted)' }}>
-                  <span>{fmtShort(event.dataInizio)}</span>
+                  <span>{fmtShort(event.dataInizio)}{event.dataFine && event.dataFine !== event.dataInizio ? ` - ${fmtShort(event.dataFine)}` : ''}</span>
                   <span>{event.partecipanti} pax</span>
                   <span style={{ color: 'var(--text)', fontWeight: 600 }}>{'\u20AC'}{Math.round(event.budget / 1000)}K</span>
                 </div>
