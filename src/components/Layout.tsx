@@ -692,9 +692,9 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="shell-light-secondary" />
         </div>
         <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-        <div className="shell-main" style={{ alignItems: 'center' }}>
+        <div className="shell-main">
           <Topbar setOpen={setSidebarOpen} />
-          <main className="shell-content pb-mobile-nav" style={{ alignSelf: 'center', width: '100%' }}>
+          <main className="shell-content pb-mobile-nav" style={{ alignSelf: 'center', width: '100%', maxWidth: '1280px', marginLeft: 'auto', marginRight: 'auto' }}>
             {children}
           </main>
         </div>
