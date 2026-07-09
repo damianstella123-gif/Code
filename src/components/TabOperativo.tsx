@@ -983,7 +983,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
                         <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--line)', color: 'var(--muted)' }}>Extra</span>
                         <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{(item.descrizione as string) || 'Extra'}</span>
                         {(item.data as string) && <span className="text-xs" style={{ color: 'var(--muted)' }}>{fmtDate(item.data as string)}</span>}
-                        {(item.ora_inizio as string) && <span className="text-xs" style={{ color: 'var(--muted)' }}>{(item.ora_inizio as string).slice(0, 5)}{(item.ora_fine as string) ? `–${(item.ora_fine as string).slice(0, 5)}` : ''}</span>}
+                        {(item.ora_inizio as string) && <span className="text-xs" style={{ color: 'var(--muted)' }}>{(item.ora_inizio as string).slice(0, 5)}{(item.ora_fine as string) ? ` - ${(item.ora_fine as string).slice(0, 5)}` : ''}</span>}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
                         {venduto > 0 && <span>Venduto: {'\u20AC'}{venduto.toLocaleString('it-IT')}</span>}

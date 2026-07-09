@@ -1085,8 +1085,8 @@ function DayView(props: {
   const creativeItems = dayItems.filter(i => i.type === 'creative')
   const socialItems = dayItems.filter(i => i.type === 'social')
   const blocks = [
-    { label: 'Mattina', range: '08:00 – 12:00', emoji: '🌅', items: evItems.slice(0, Math.ceil(evItems.length / 2)) },
-    { label: 'Pomeriggio', range: '13:00 – 18:00', emoji: '☀️', items: evItems.slice(Math.ceil(evItems.length / 2)) },
+    { label: 'Mattina', range: '08:00 - 12:00', emoji: '🌅', items: evItems.slice(0, Math.ceil(evItems.length / 2)) },
+    { label: 'Pomeriggio', range: '13:00 - 18:00', emoji: '☀️', items: evItems.slice(Math.ceil(evItems.length / 2)) },
     { label: 'Scadenze task', range: 'Task del giorno', emoji: '📋', items: taskItems },
     { label: 'Pratiche', range: 'Scadenze pratiche', emoji: '📄', items: praticaItems },
     { label: 'Creatività', range: 'Deadline materiali', emoji: '🎨', items: creativeItems },
@@ -2014,7 +2014,7 @@ export default function Calendario() {
 
   const navLabel = useMemo(() => {
     if (view === 'month') return `${MONTHS_IT[cursor.getMonth()]} ${cursor.getFullYear()}`
-    if (view === 'week') return `${fmtShort(toISO(weekStart))} – ${fmtShort(toISO(weekEnd))}`
+    if (view === 'week') return `${fmtShort(toISO(weekStart))} - ${fmtShort(toISO(weekEnd))}`
     if (view === 'day') return `${DAYS_FULL[cursor.getDay()]} ${cursor.getDate()} ${MONTHS_IT[cursor.getMonth()]}`
     return 'Prossime scadenze'
   }, [view, cursor, weekStart, weekEnd])
