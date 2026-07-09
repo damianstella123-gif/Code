@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { fmtDate } from '@/lib/format'
 
 
-export type CategoryType = 'hotel' | 'transfer' | 'ristorante' | 'experience' | 'catering' | 'audio_video' | 'allestimenti' | 'staff_interno' | 'staff_esterno' | 'grafica_stampa' | 'varie'
+export type CategoryType = 'hotel' | 'transfer' | 'ristorante' | 'experience' | 'catering' | 'audio_video' | 'allestimenti' | 'staff_interno' | 'staff_esterno' | 'grafica_stampa' | 'assicurazioni' | 'agenzia_viaggi' | 'varie'
 
 const CATEGORIES: { key: CategoryType; label: string; table: string }[] = [
   { key: 'hotel', label: 'Hotel', table: 'event_hotel_details' },
@@ -17,6 +17,8 @@ const CATEGORIES: { key: CategoryType; label: string; table: string }[] = [
   { key: 'staff_interno', label: 'Staff Simmetria', table: 'event_staff_interno_details' },
   { key: 'staff_esterno', label: 'Staff Esterno', table: 'event_staff_esterno_details' },
   { key: 'grafica_stampa', label: 'Grafica / Stampa', table: 'event_grafica_stampa_details' },
+  { key: 'assicurazioni', label: 'Assicurazioni', table: 'event_assicurazioni_details' },
+  { key: 'agenzia_viaggi', label: 'Agenzia di Viaggi', table: 'event_agenzia_viaggi_details' },
   { key: 'varie', label: 'Varie', table: 'event_varie_details' },
 ]
 
@@ -29,6 +31,8 @@ const RISTORANTE_TIPOLOGIE = ['Pranzo', 'Cena', 'Aperitivo', 'Aperitivo Rinforza
 const RISTORANTE_MENU_TYPES = ['2 Portate', '3 Portate', '4 Portate', 'Menu Personalizzato']
 const GRAFICA_TIPI = ['Badge', 'Menu', 'Cartelli', 'Segnaletica', 'Materiale Stampato', 'Altro']
 const VARIE_TIPOLOGIE = ['Assicurazione', 'Permessi / SIAE', 'Spedizioni', 'Gadget / Omaggi', 'Consulenza', 'Voli / Viaggi', 'Licenze / Diritti', 'Commissioni', 'Materiale consumabile', 'Altro']
+const ASSICURAZIONE_TIPI_COPERTURA = ['Responsabilita civile', 'Annullamento evento', 'Infortuni', 'Furto/Danni attrezzature', 'Altro']
+const AGENZIA_VIAGGI_TIPI_SERVIZIO = ['Voli', 'Hotel extra evento', 'Pacchetto viaggio', 'Visti/Documenti', 'Altro']
 
 const HOTEL_SERVIZI: { key: string; label: string; group: 'alloggio' | 'meeting' | 'fb' | 'servizi' }[] = [
   { key: 'pernottamento', label: 'Pernottamento', group: 'alloggio' },
@@ -71,7 +75,8 @@ export function calcIva(imponibile: number, aliquota: string): number {
 export const CATEGORY_LABELS: Record<CategoryType, string> = {
   hotel: 'Hotel', transfer: 'Transfer', ristorante: 'Ristorante', experience: 'Location / Experience',
   catering: 'Catering', audio_video: 'Audio Video', allestimenti: 'Allestimenti',
-  staff_interno: 'Staff Simmetria', staff_esterno: 'Staff Esterno', grafica_stampa: 'Grafica / Stampa', varie: 'Varie',
+  staff_interno: 'Staff Simmetria', staff_esterno: 'Staff Esterno', grafica_stampa: 'Grafica / Stampa',
+  assicurazioni: 'Assicurazioni', agenzia_viaggi: 'Agenzia di Viaggi', varie: 'Varie',
 }
 
 export function detectSupplierCategory(supplierCategory: string): CategoryType {
@@ -87,6 +92,8 @@ export function detectSupplierCategory(supplierCategory: string): CategoryType {
   if (c.includes('staff') && c.includes('intern')) return 'staff_interno'
   if (c.includes('staff') || c.includes('hostess') || c.includes('steward') || c.includes('promoter')) return 'staff_esterno'
   if (c.includes('grafi') || c.includes('stamp') || c.includes('tipografi')) return 'grafica_stampa'
+  if (c.includes('assicura')) return 'assicurazioni'
+  if (c.includes('viaggi') || c.includes('agenzia')) return 'agenzia_viaggi'
   return 'varie'
 }
 
@@ -181,6 +188,10 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
       Object.assign(base, { nome: '', cognome: '', ruolo: '', quantita: '1', data: '', ora_inizio: '', ora_fine: '', lingue: '', abbigliamento: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else if (category === 'grafica_stampa') {
       Object.assign(base, { tipo_materiale: '', quantita: '1', formato: '', data_consegna: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+    } else if (category === 'assicurazioni') {
+      Object.assign(base, { compagnia: '', numero_polizza: '', tipo_copertura: '', massimale: '', quantita: '1', data_inizio_copertura: '', data_fine_copertura: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+    } else if (category === 'agenzia_viaggi') {
+      Object.assign(base, { tipo_servizio: '', numero_pratica: '', destinazione: '', data_partenza: '', data_rientro: '', num_passeggeri: '', quantita: '1', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else {
       Object.assign(base, { descrizione: '', quantita: '1', data: '', ora_inizio: '', note: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     }
@@ -319,6 +330,12 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
     } else if (category === 'grafica_stampa') {
       const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
       Object.assign(record, { tipo_materiale: strOrEmpty('tipo_materiale'), quantita: qty, formato: strOrEmpty('formato'), data_consegna: strOrNull('data_consegna'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
+    } else if (category === 'assicurazioni') {
+      const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
+      Object.assign(record, { compagnia: strOrEmpty('compagnia'), numero_polizza: strOrEmpty('numero_polizza'), tipo_copertura: strOrEmpty('tipo_copertura'), massimale: numOrNull('massimale'), quantita: qty, data_inizio_copertura: strOrNull('data_inizio_copertura'), data_fine_copertura: strOrNull('data_fine_copertura'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
+    } else if (category === 'agenzia_viaggi') {
+      const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
+      Object.assign(record, { tipo_servizio: strOrEmpty('tipo_servizio'), numero_pratica: strOrEmpty('numero_pratica'), destinazione: strOrEmpty('destinazione'), data_partenza: strOrNull('data_partenza'), data_rientro: strOrNull('data_rientro'), num_passeggeri: numOrNull('num_passeggeri'), quantita: qty, note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
     } else {
       const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
       Object.assign(record, { tipologia: strOrEmpty('tipologia') || null, descrizione: strOrEmpty('descrizione'), quantita: qty, data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), note: strOrEmpty('note'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
@@ -420,6 +437,8 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
       case 'staff_interno': { const sn = [(item.nome as string), (item.cognome as string)].filter(Boolean).join(' ') || (item.risorsa as string); return sn ? `${sn} - ${(item.ruolo as string) || 'Staff'}` : (item.ruolo as string) || 'Staff Simmetria' }
       case 'staff_esterno': { const sn = [(item.nome as string), (item.cognome as string)].filter(Boolean).join(' '); return sn ? `${sn} - ${(item.ruolo as string) || 'Staff'}` : (item.ruolo as string) || 'Staff Esterno' }
       case 'grafica_stampa': return (item.tipo_materiale as string) || 'Grafica'
+      case 'assicurazioni': return (item.compagnia as string) || 'Polizza assicurativa'
+      case 'agenzia_viaggi': return (item.destinazione as string) || (item.tipo_servizio as string) || 'Agenzia di viaggi'
       default: { const tip = (item.tipologia as string); const desc = (item.descrizione as string) || 'Voce'; return tip ? `${tip} — ${desc}` : desc }
     }
   }
@@ -743,6 +762,30 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {sel('tipo_materiale', 'Tipo materiale', GRAFICA_TIPI)}{inp('quantita', 'Quantita', 'number')}{inp('formato', 'Formato')}
         {inp('data_consegna', 'Data consegna', 'date')}
+        {inp('venduto_unitario', 'Venduto unit.', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_unitario', 'Costo unit.', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+        {ivaFields()}
+      </div>
+    )
+    if (category === 'assicurazioni') return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {inp('compagnia', 'Compagnia')}{inp('numero_polizza', 'Numero polizza')}
+        {sel('tipo_copertura', 'Tipo copertura', ASSICURAZIONE_TIPI_COPERTURA)}
+        {inp('massimale', 'Massimale', 'number')}{inp('quantita', 'Quantita', 'number')}
+        {inp('data_inizio_copertura', 'Inizio copertura', 'date')}{inp('data_fine_copertura', 'Fine copertura', 'date')}
+        {inp('venduto_unitario', 'Venduto unit.', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
+        {inp('costo_unitario', 'Costo unit.', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
+        <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
+        {ivaFields()}
+      </div>
+    )
+    if (category === 'agenzia_viaggi') return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {sel('tipo_servizio', 'Tipo servizio', AGENZIA_VIAGGI_TIPI_SERVIZIO)}{inp('numero_pratica', 'Numero pratica')}
+        {inp('destinazione', 'Destinazione')}{inp('num_passeggeri', 'Passeggeri', 'number')}
+        {inp('data_partenza', 'Data partenza', 'date')}{inp('data_rientro', 'Data rientro', 'date')}
+        {inp('quantita', 'Quantita', 'number')}
         {inp('venduto_unitario', 'Venduto unit.', 'number')}{inp('venduto_totale', 'Venduto totale', 'number')}
         {inp('costo_unitario', 'Costo unit.', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
         <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>

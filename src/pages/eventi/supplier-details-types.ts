@@ -212,6 +212,8 @@ export const LINK_CATEGORIES: { value: CategoryType; label: string }[] = [
   { value: 'staff_interno', label: 'Staff Simmetria' },
   { value: 'staff_esterno', label: 'Staff Esterno' },
   { value: 'grafica_stampa', label: 'Grafica / Stampa' },
+  { value: 'assicurazioni', label: 'Assicurazioni' },
+  { value: 'agenzia_viaggi', label: 'Agenzia di Viaggi' },
   { value: 'varie', label: 'Varie' },
 ]
 
