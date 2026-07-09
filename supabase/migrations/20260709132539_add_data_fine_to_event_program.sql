@@ -1,0 +1,1 @@
+ALTER TABLE event_program ADD COLUMN data_fine date DEFAULT NULL;

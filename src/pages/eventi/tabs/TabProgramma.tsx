@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Clock, Plus, X, Edit3, Trash2, Users, Truck, MapPin, Link2 } from 'lucide-react'
+import { Clock, Plus, X, Edit3, Trash2, Users, Truck, MapPin, Link2, Copy } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { fmtFullLong } from '@/lib/format'
 import type { Event } from '@/data/events'
@@ -17,6 +17,7 @@ interface ProgramEntry {
   titolo: string
   categoria: string
   data: string
+  data_fine?: string | null
   ora_inizio: string
   ora_fine: string | null
   luogo: string
@@ -33,6 +34,7 @@ interface ManualProgramRow {
   titolo: string
   categoria: string
   data: string
+  data_fine: string | null
   ora_inizio: string
   ora_fine: string | null
   luogo: string
@@ -58,6 +60,7 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
     titolo: '',
     categoria: 'Altro',
     data: event.dataInizio || '',
+    data_fine: '',
     ora_inizio: '09:00',
     ora_fine: '',
     luogo: '',
@@ -72,6 +75,7 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
       titolo: '',
       categoria: 'Altro',
       data: event.dataInizio || '',
+      data_fine: '',
       ora_inizio: '09:00',
       ora_fine: '',
       luogo: '',
@@ -218,6 +222,7 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
         titolo: m.titolo,
         categoria: m.categoria,
         data: m.data,
+        data_fine: m.data_fine,
         ora_inizio: m.ora_inizio,
         ora_fine: m.ora_fine,
         luogo: m.luogo,
@@ -249,6 +254,7 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
       titolo: m.titolo,
       categoria: m.categoria,
       data: m.data,
+      data_fine: m.data_fine || '',
       ora_inizio: m.ora_inizio,
       ora_fine: m.ora_fine || '',
       luogo: m.luogo,
@@ -260,14 +266,39 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
     setShowForm(true)
   }
 
+  function openDuplicate(entry: ProgramEntry) {
+    const m = manualEntries.find(r => r.id === entry.id)
+    if (!m) return
+    const nextDay = new Date(m.data)
+    nextDay.setDate(nextDay.getDate() + 1)
+    const nextDayStr = nextDay.toISOString().split('T')[0]
+    setFormData({
+      supplier_id: m.supplier_id || '',
+      titolo: m.titolo,
+      categoria: m.categoria,
+      data: nextDayStr,
+      data_fine: '',
+      ora_inizio: m.ora_inizio,
+      ora_fine: m.ora_fine || '',
+      luogo: m.luogo,
+      note: m.note,
+      pax: m.pax ? String(m.pax) : '',
+      servizio: m.servizio,
+    })
+    setEditingId(null)
+    setShowForm(true)
+  }
+
   async function handleSave() {
     if (!formData.titolo.trim() || !formData.data || !formData.ora_inizio) return
+    if (formData.data_fine && formData.data_fine < formData.data) return
     const payload = {
       event_id: event.id,
       supplier_id: formData.supplier_id || null,
       titolo: formData.titolo.trim(),
       categoria: formData.categoria,
       data: formData.data,
+      data_fine: formData.data_fine || null,
       ora_inizio: formData.ora_inizio,
       ora_fine: formData.ora_fine || null,
       luogo: formData.luogo.trim(),
@@ -384,6 +415,21 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
               />
             </div>
 
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Data fine</label>
+              <input
+                type="date"
+                value={formData.data_fine}
+                min={formData.data || undefined}
+                onChange={e => setFormData(prev => ({ ...prev, data_fine: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+              />
+              <p className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>
+                Lascia vuoto se dura un solo giorno. Es. pernottamento 27-28: data 27, data fine 29 (check-out).
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Ora inizio *</label>
@@ -492,6 +538,11 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
                               style={{ background: entry.manual ? 'color-mix(in srgb, var(--blue) 10%, transparent)' : 'color-mix(in srgb, var(--red2) 10%, transparent)', color: entry.manual ? 'var(--blue)' : 'var(--red2)' }}>
                               {entry.categoria}
                             </span>
+                            {entry.data_fine && entry.data_fine !== entry.data && (
+                              <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                                fino al {fmtFullLong(entry.data_fine)}
+                              </span>
+                            )}
                             {entry.pax && (
                               <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>
                                 <Users className="w-3 h-3 inline mr-0.5" />{entry.pax} pax
@@ -520,6 +571,9 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
                         </div>
                         {entry.manual && (
                           <div className="flex items-center gap-1 flex-shrink-0">
+                            <button onClick={() => openDuplicate(entry)} className="p-1.5 rounded-lg hover:bg-[var(--line)] transition-colors" title="Duplica (es. per un'altra notte)">
+                              <Copy className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+                            </button>
                             <button onClick={() => openEdit(entry)} className="p-1.5 rounded-lg hover:bg-[var(--line)] transition-colors">
                               <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
                             </button>
