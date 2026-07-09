@@ -324,32 +324,7 @@ html, body {
 
 .shell-header > * {
   width: 100%;
-  max-width: 1380px;
-  margin: 0 auto;
-  padding: 0 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-@media (max-width: 1440px) {
-  .shell-header > * {
-    max-width: 1280px;
-    padding: 0 36px;
-  }
-}
-
-@media (max-width: 1280px) {
-  .shell-header > * {
-    max-width: 100%;
-    padding: 0 32px;
-  }
-}
-
-@media (max-width: 1024px) {
-  .shell-header > * {
-    padding: 0 20px;
-  }
+  height: 100%;
 }
 
 /* ─── Main Content: Directly in the Cockpit ─── */
@@ -359,36 +334,17 @@ html, body {
   min-height: 100vh;
   position: relative;
   z-index: 1;
-  align-items: center;
   width: 100%;
 }
 
 .shell-content {
-  flex: 1;
   width: 100%;
-  max-width: 1380px;
-  padding: 28px 40px 48px;
-  position: relative;
+  flex: 1;
+  padding: 28px 32px 48px;
   box-sizing: border-box;
-  align-self: center;
+  position: relative;
 }
-@media (max-width: 1440px) {
-  .shell-content {
-    max-width: 1240px;
-    padding: 24px 36px 44px;
-  }
-}
-@media (max-width: 1280px) {
-  .shell-content {
-    max-width: 100%;
-    padding: 22px 32px 40px;
-  }
-}
-@media (max-width: 1024px) {
-  .shell-content {
-    padding: 20px 24px 32px;
-  }
-}
+
 @media (max-width: 640px) {
   .shell-content {
     padding: 14px 16px 80px;

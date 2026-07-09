@@ -322,7 +322,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
 
   return (
     <header className="shell-header sticky top-0 z-30">
-      <div className="shell-header-inner">
+      <div className="shell-header-inner" style={{ width: '100%', maxWidth: '1280px', marginLeft: 'auto', marginRight: 'auto', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%' }}>
         {/* Left side */}
         <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
           <button
@@ -692,9 +692,9 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="shell-light-secondary" />
         </div>
         <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-        <div className="shell-main">
+        <div className="shell-main" style={{ width: '100%' }}>
           <Topbar setOpen={setSidebarOpen} />
-          <main className="shell-content pb-mobile-nav">
+          <main className="shell-content pb-mobile-nav" style={{ width: '100%', maxWidth: '1280px', marginLeft: 'auto', marginRight: 'auto' }}>
             {children}
           </main>
         </div>
