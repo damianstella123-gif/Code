@@ -361,10 +361,18 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{sup.nome}</p>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                        <select
+                          value={stato}
+                          onClick={e => e.stopPropagation()}
+                          onChange={async (e) => {
+                            if (link) await updateLinkStatus(link.id, e.target.value as 'richiesto' | 'confermato' | 'contrattualizzato')
+                          }}
+                          className="text-[10px] px-2 py-0.5 rounded-full font-medium cursor-pointer appearance-none"
                           style={{ background: statoConf.bg, color: statoConf.color, border: `1px solid ${statoConf.border}` }}>
-                          {statoConf.label}
-                        </span>
+                          <option value="richiesto">Richiesto</option>
+                          <option value="confermato">Confermato</option>
+                          <option value="contrattualizzato">Contrattualizzato</option>
+                        </select>
                         {hasWarning && !summary?.hasServices && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--yellow) 15%, transparent)', color: 'var(--yellow)' }}>
                             Nessun servizio
@@ -408,16 +416,6 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
                     </div>
 
                     <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                      <select value={stato}
-                        onChange={async (e) => {
-                          if (link) await updateLinkStatus(link.id, e.target.value as 'richiesto' | 'confermato' | 'contrattualizzato')
-                        }}
-                        className="px-2 py-1 rounded-lg text-[11px] font-medium cursor-pointer"
-                        style={{ background: statoConf.bg, border: `1px solid ${statoConf.border}`, color: statoConf.color }}>
-                        <option value="richiesto">Richiesto</option>
-                        <option value="confermato">Confermato</option>
-                        <option value="contrattualizzato">Contrattualizzato</option>
-                      </select>
                       <button onClick={() => setConfirmUnlink(sup.id)}
                         className="p-1.5 rounded-lg transition-all hover:bg-[var(--line)]" title="Rimuovi fornitore dall'evento">
                         <Trash2 className="w-4 h-4" style={{ color: 'var(--muted)' }} />
