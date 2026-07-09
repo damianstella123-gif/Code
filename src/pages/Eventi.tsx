@@ -1303,6 +1303,13 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
             </span>
           )}
         </div>
+        {!adding && (
+          <button onClick={() => setAdding(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+            style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)', border: '1px solid var(--red2)' }}>
+            <Plus className="w-3.5 h-3.5" /> Collega fornitore
+          </button>
+        )}
       </div>
 
       {/* Search panel for linking */}
@@ -1393,10 +1400,10 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
 
       {/* Empty state */}
       {linkedSuppliers.length === 0 && !adding ? (
-        <div className="panel p-10 text-center cursor-pointer transition-all hover:opacity-80" style={{ color: 'var(--muted)' }} onClick={() => setAdding(true)}>
+        <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <Truck className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p>Nessun fornitore collegato a questo evento</p>
-          <p className="text-xs mt-1">Clicca qui per collegarne uno</p>
+          <p className="text-xs mt-1">Usa il pulsante "Collega fornitore" per aggiungerne uno</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -1534,13 +1541,6 @@ function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: Event; 
               </div>
             )
           })}
-          {!adding && (
-            <button onClick={() => setAdding(true)}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
-              style={{ color: 'var(--red2)', border: '1px dashed var(--line)' }}>
-              <Plus className="w-3.5 h-3.5" /> Collega fornitore
-            </button>
-          )}
         </div>
       )}
 
