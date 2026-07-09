@@ -2703,7 +2703,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
           {event.location}
           {clienteObj ? ` \u00B7 ${clienteObj.nome}` : ''}
           {' \u00B7 '}{event.partecipanti} partecipanti
-          {' \u00B7 '}{fmtShort(event.dataInizio)}\u2013{fmtShort(event.dataFine)}
+          {' \u00B7 '}{fmtShort(event.dataInizio)} - {fmtShort(event.dataFine)}
         </p>
 
         {/* Row 4: Data line in mono */}
