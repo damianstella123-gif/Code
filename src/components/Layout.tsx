@@ -55,6 +55,14 @@ const iconMap: Record<string, React.ElementType> = {
   '/feedback-beta': MessageCircle,
 }
 
+const NAV_GROUPS: { label: string; paths: string[] }[] = [
+  { label: '', paths: ['/dashboard'] },
+  { label: 'Operativo', paths: ['/eventi', '/task', '/calendario', '/fornitori'] },
+  { label: 'Business', paths: ['/crm', '/amministrazione'] },
+  { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
+  { label: 'Sistema', paths: ['/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta'] },
+]
+
 interface SidebarProps {
   open: boolean
   setOpen: (open: boolean) => void
@@ -106,22 +114,31 @@ function Sidebar({ open, setOpen }: SidebarProps) {
 
         {/* Navigation — instruments, not buttons */}
         <nav className="shell-nav flex-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const Icon = iconMap[item.href] ?? LayoutDashboard
-            const isActive = location.pathname === item.href
+          {NAV_GROUPS.map((group) => {
+            const groupItems = navItems.filter(item => group.paths.includes(item.href))
+            if (groupItems.length === 0) return null
             return (
-              <Link
-                key={item.href}
-                to={item.href}
-                onClick={() => setOpen(false)}
-                className={cn('shell-nav-item', isActive && 'shell-nav-item--active')}
-              >
-                <div className="shell-nav-indicator" />
-                <Icon className="shell-nav-icon" />
-                <span className="shell-nav-label">{item.name}</span>
-                {item.href === '/comunicazioni' && <ChatBadge />}
-                {item.href === '/impostazioni' && <SentinelBadge />}
-              </Link>
+              <div key={group.label || '_root'} className="shell-nav-group">
+                {group.label && <p className="shell-nav-group-label">{group.label}</p>}
+                {groupItems.map((item) => {
+                  const Icon = iconMap[item.href] ?? LayoutDashboard
+                  const isActive = location.pathname === item.href
+                  return (
+                    <Link
+                      key={item.href}
+                      to={item.href}
+                      onClick={() => setOpen(false)}
+                      className={cn('shell-nav-item', isActive && 'shell-nav-item--active')}
+                    >
+                      <div className="shell-nav-indicator" />
+                      <Icon className="shell-nav-icon" />
+                      <span className="shell-nav-label">{item.name}</span>
+                      {item.href === '/comunicazioni' && <ChatBadge />}
+                      {item.href === '/impostazioni' && <SentinelBadge />}
+                    </Link>
+                  )
+                })}
+              </div>
             )
           })}
         </nav>

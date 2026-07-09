@@ -245,6 +245,26 @@ html, body {
   text-overflow: ellipsis;
 }
 
+.shell-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.shell-nav-group + .shell-nav-group {
+  margin-top: 14px;
+}
+.shell-nav-group-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.6;
+  padding: 6px 14px 4px;
+  margin: 0;
+}
+
 /* Sidebar user section */
 .shell-sidebar-user {
   padding: 12px;
