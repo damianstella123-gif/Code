@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   TrendingUp,
   Lock,
+  PawPrint,
 } from 'lucide-react'
 import { loadClientsFromStorage } from '@/lib/storage'
 import { suppliers } from '@/data/suppliers'
@@ -558,7 +559,7 @@ export default function GlobalSearch() {
           boxShadow: open ? '0 0 0 3px rgba(208,0,58,0.08)' : 'none',
         }}
       >
-        <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: open ? 'var(--red2)' : 'var(--muted)' }} />
+        <PawPrint className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--red2)' }} />
         <input
           ref={inputRef}
           type="text"
@@ -567,7 +568,7 @@ export default function GlobalSearch() {
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onKeyDown={handleKey}
-          placeholder="Cerca eventi, task, clienti…"
+          placeholder="Chiedi a Fly o cerca qualsiasi cosa..."
           style={{
             flex: 1,
             background: 'transparent',
@@ -584,10 +585,6 @@ export default function GlobalSearch() {
             <X className="w-3 h-3" style={{ color: 'var(--muted)' }} />
           </button>
         )}
-        <kbd className="hidden lg:flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs flex-shrink-0"
-          style={{ background: 'var(--bg)', color: 'var(--muted)', border: '1px solid var(--line)', fontSize: 10 }}>
-          <span style={{ fontSize: 11 }}>⌘</span>K
-        </kbd>
       </div>
 
       {/* Dropdown */}
