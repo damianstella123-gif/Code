@@ -105,6 +105,25 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // e) Payments due today/tomorrow or overdue
+      const { data: paymentsDue } = await sb
+        .from("event_payments")
+        .select("id, event_id, tipo, descrizione, importo, data_scadenza")
+        .is("data_pagamento", null)
+        .lte("data_scadenza", tomorrow);
+
+      const paymentAlerts: { descrizione: string; importo: number; scadenza: string; in_ritardo: boolean }[] = [];
+      if (paymentsDue) {
+        for (const p of paymentsDue) {
+          paymentAlerts.push({
+            descrizione: p.descrizione,
+            importo: p.importo,
+            scadenza: p.data_scadenza,
+            in_ritardo: p.data_scadenza < today,
+          });
+        }
+      }
+
       // Build data payload for Fly
       const datiUtente = {
         task_scaduti: (overdueTasks || []).map((t) => ({
@@ -123,6 +142,7 @@ Deno.serve(async (req: Request) => {
           location: e.location,
         })),
         budget_warning: budgetWarnings,
+        pagamenti_scadenza: paymentAlerts,
       };
 
       // Skip if there's nothing to report
@@ -130,7 +150,8 @@ Deno.serve(async (req: Request) => {
         datiUtente.task_scaduti.length > 0 ||
         datiUtente.task_oggi_domani.length > 0 ||
         datiUtente.eventi_72h.length > 0 ||
-        datiUtente.budget_warning.length > 0;
+        datiUtente.budget_warning.length > 0 ||
+        datiUtente.pagamenti_scadenza.length > 0;
 
       if (!hasContent) continue;
 
@@ -170,6 +191,12 @@ Deno.serve(async (req: Request) => {
           lines.push(`${datiUtente.eventi_72h.length} eventi nelle prossime 72 ore.`);
         if (datiUtente.budget_warning.length > 0)
           lines.push(`${datiUtente.budget_warning.length} budget in zona critica (>90%).`);
+        const overdue = datiUtente.pagamenti_scadenza.filter(p => p.in_ritardo);
+        const due = datiUtente.pagamenti_scadenza.filter(p => !p.in_ritardo);
+        if (overdue.length > 0)
+          lines.push(`${overdue.length} pagamenti in ritardo.`);
+        if (due.length > 0)
+          lines.push(`${due.length} pagamenti in scadenza oggi/domani.`);
         briefText = lines.join(" ");
       }
 

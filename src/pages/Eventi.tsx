@@ -41,6 +41,7 @@ import { supabase } from '@/lib/supabase'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { detectSupplierCategory, isDmcFromArray, SupplierCategoryPanel, type CategoryType } from '@/components/TabOperativo'
 import TabBudget from '@/components/TabBudget'
+import TabPagamenti from '@/components/TabPagamenti'
 import { setFlyContext } from '@/lib/fly'
 import { daysLeft, fmtShort, fmtLong, fmtFullLong, toISO } from '@/lib/format'
 import type { Event } from '@/data/events'
@@ -54,7 +55,7 @@ import type { EventoWorkflow } from '@/data/workflow'
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 type StatoEvento = Event['stato']
 
-type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'comunicazioni' | 'documenti' | 'programma' | 'timeline'
+type TabId = 'overview' | 'task' | 'team' | 'fornitori' | 'budget' | 'pagamenti' | 'comunicazioni' | 'documenti' | 'programma' | 'timeline'
 
 function statoColor(stato: string) {
   switch (stato) {
@@ -2620,6 +2621,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
     { id: 'fornitori', label: `Fornitori${eventSuppliers.length > 0 ? ` (${eventSuppliers.length})` : ''}` },
     { id: 'programma', label: 'Programma' },
     { id: 'budget', label: 'Budget' },
+    { id: 'pagamenti', label: 'Pagamenti' },
     { id: 'task', label: `Task${totalTasks > 0 ? ` (${totalTasks})` : ''}` },
     { id: 'team', label: `Team (${event.team.length})` },
     { id: 'documenti', label: 'Documenti' },
@@ -2772,6 +2774,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
         {activeTab === 'team' && <TabTeam event={event} internalUsers={internalUsers} />}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} onSuppliersChanged={onSuppliersChanged} />}
         {activeTab === 'budget' && <BudgetTabContainer event={event} suppliers={suppliers} />}
+        {activeTab === 'pagamenti' && <TabPagamenti event={event} suppliers={suppliers} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} />}
         {activeTab === 'programma' && <TabProgramma event={event} suppliers={suppliers} />}

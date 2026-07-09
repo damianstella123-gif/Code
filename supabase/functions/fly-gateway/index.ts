@@ -432,7 +432,7 @@ async function executeTool(
       const days = (input.giorni as number) || 7;
       const limit = futureISO(days);
 
-      const [tasksRes, practicesRes, fattureRes] = await Promise.all([
+      const [tasksRes, practicesRes, fattureRes, paymentsRes] = await Promise.all([
         supabase
           .from("tasks")
           .select("id, title, due_date, status, priority, assigned_to")
@@ -453,6 +453,13 @@ async function executeTool(
           .neq("stato", "pagata")
           .lte("scadenza", limit)
           .order("scadenza", { ascending: true })
+          .limit(20),
+        supabase
+          .from("event_payments")
+          .select("id, event_id, tipo, descrizione, importo, data_scadenza, stato")
+          .is("data_pagamento", null)
+          .lte("data_scadenza", limit)
+          .order("data_scadenza", { ascending: true })
           .limit(20),
       ]);
 
@@ -496,6 +503,20 @@ async function executeTool(
             scadenza: f.scadenza,
             stato: f.stato,
             scaduta: f.scadenza < today,
+          }))
+        );
+      }
+
+      if (paymentsRes.data?.length) {
+        results.push(
+          ...paymentsRes.data.map((p) => ({
+            tipo: p.tipo === "incasso_cliente" ? "incasso_evento" : "pagamento_fornitore_evento",
+            descrizione: p.descrizione,
+            importo: p.importo,
+            scadenza: p.data_scadenza,
+            stato: p.data_scadenza < today ? "in_ritardo" : p.stato,
+            event_id: p.event_id,
+            scaduto: p.data_scadenza < today,
           }))
         );
       }
