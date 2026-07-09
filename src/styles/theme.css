@@ -324,24 +324,30 @@ html, body {
 
 .shell-header > * {
   width: 100%;
-  max-width: 1120px;
+  max-width: 1380px;
   margin: 0 auto;
-  padding: 0 48px;
+  padding: 0 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
+@media (max-width: 1440px) {
+  .shell-header > * {
+    max-width: 1280px;
+    padding: 0 36px;
+  }
+}
+
 @media (max-width: 1280px) {
   .shell-header > * {
-    max-width: 960px;
-    padding: 0 40px;
+    max-width: 100%;
+    padding: 0 32px;
   }
 }
 
 @media (max-width: 1024px) {
   .shell-header > * {
-    max-width: 100%;
     padding: 0 20px;
   }
 }
@@ -358,15 +364,23 @@ html, body {
 .shell-content {
   flex: 1;
   width: 100%;
+  max-width: 1380px;
+  margin-left: auto;
+  margin-right: auto;
   padding: 28px 40px 48px;
   position: relative;
   box-sizing: border-box;
 }
-@media (min-width: 1600px) {
+@media (max-width: 1440px) {
   .shell-content {
-    max-width: 1500px;
-    margin: 0 auto;
-    padding: 32px 48px 48px;
+    max-width: 1280px;
+    padding: 24px 36px 44px;
+  }
+}
+@media (max-width: 1280px) {
+  .shell-content {
+    max-width: 100%;
+    padding: 22px 32px 40px;
   }
 }
 @media (max-width: 1024px) {
