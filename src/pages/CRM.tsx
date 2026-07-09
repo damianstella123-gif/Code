@@ -654,7 +654,7 @@ export default function CRM() {
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessuna azienda trovata</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
             {filtered.map((group) => (
               <div
                 key={group.companyName}

@@ -3076,7 +3076,7 @@ export default function Eventi() {
           <p>Nessun evento trovato</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px', marginTop: '18px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px', marginTop: '18px' }}>
           {filtered.map((event) => {
             const cliente = clientsList.find(c => c.id === event.cliente)
             const allTasks = loadTasksFromStorage()
@@ -3105,12 +3105,12 @@ export default function Eventi() {
                   background: 'var(--panel-solid)',
                   border: '1px solid var(--line)',
                   borderRadius: '14px',
-                  padding: '16px',
+                  padding: '20px',
                   cursor: 'pointer',
                   transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '10px',
+                  gap: '12px',
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)' }}
@@ -3136,7 +3136,7 @@ export default function Eventi() {
 
                 {/* Row 2: name */}
                 <p style={{
-                  fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600,
+                  fontFamily: 'var(--font-serif)', fontSize: '18px', fontWeight: 600,
                   color: 'var(--text)', lineHeight: 1.3, margin: 0,
                   display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                 }}>
@@ -3144,12 +3144,12 @@ export default function Eventi() {
                 </p>
 
                 {/* Row 3: location + client */}
-                <p style={{ fontSize: '11.5px', color: 'var(--muted)', margin: 0, lineHeight: 1.4 }}>
+                <p style={{ fontSize: '13px', color: 'var(--muted)', margin: 0, lineHeight: 1.4 }}>
                   {event.location}{cliente ? ` · ${cliente.nome}` : ''}
                 </p>
 
                 {/* Row 4: data, pax, budget */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--muted)' }}>
                   <span>{fmtShort(event.dataInizio)}</span>
                   <span>{event.partecipanti} pax</span>
                   <span style={{ color: 'var(--text)', fontWeight: 600 }}>{'\u20AC'}{Math.round(event.budget / 1000)}K</span>

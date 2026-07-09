@@ -396,7 +396,7 @@ export default function Utenti() {
       {/* User Cards Grid */}
       <div style={{ marginTop: 20 }}>
         {loading ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
             {[1, 2, 3, 4, 5, 6].map(i => (
               <div key={i} style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 14, animationDelay: `${i * 50}ms` }}>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -415,7 +415,7 @@ export default function Utenti() {
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', marginTop: 6 }}>Prova a modificare i filtri di ricerca</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
             {filtered.map((u, i) => (
               <UserCard
                 key={u.id}
