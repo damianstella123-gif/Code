@@ -130,7 +130,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
   let countdownColor: string
   if (isOver) { countdownLabel = '\u2014'; countdownColor = 'var(--muted)' }
   else if (isLive) { countdownLabel = 'LIVE'; countdownColor = 'var(--red2)' }
-  else { countdownLabel = `T-${days}`; countdownColor = days <= 7 ? 'var(--red2)' : 'var(--muted)' }
+  else { countdownLabel = days === 0 ? 'OGGI' : days === 1 ? 'DOMANI' : `tra ${days}gg`; countdownColor = days <= 7 ? 'var(--red2)' : 'var(--muted)' }
 
   const statoBadge = (() => {
     switch (event.stato) {
@@ -450,7 +450,7 @@ export default function Eventi() {
         e.location.toLowerCase().includes(search.toLowerCase())
       const matchStato = filterStato === 'Tutti' || e.stato === filterStato
       return matchSearch && matchStato
-    })
+    }).sort((a, b) => (a.dataInizio || '').localeCompare(b.dataInizio || ''))
   }, [visibleEvents, search, filterStato])
 
   const overlays = (
@@ -580,7 +580,7 @@ export default function Eventi() {
             let countdownColor: string
             if (isOver) { countdownLabel = '\u2014'; countdownColor = 'var(--muted)' }
             else if (isLive) { countdownLabel = 'LIVE'; countdownColor = 'var(--red2)' }
-            else { countdownLabel = `T-${days}`; countdownColor = days <= 7 ? 'var(--red2)' : 'var(--muted)' }
+            else { countdownLabel = days === 0 ? 'OGGI' : days === 1 ? 'DOMANI' : `tra ${days}gg`; countdownColor = days <= 7 ? 'var(--red2)' : 'var(--muted)' }
 
             const progressColor = progressPct >= 80 ? 'var(--green)' : progressPct >= 50 ? 'var(--blue)' : 'var(--red2)'
 
