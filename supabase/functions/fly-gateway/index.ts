@@ -1002,8 +1002,19 @@ async function executeTool(
 // ─── ANTHROPIC API CALL WITH TOOL LOOP ─────────────────────────────────
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-6";
+const MODEL_SONNET = "claude-sonnet-4-6";
+const MODEL_HAIKU = "claude-haiku-4-5-20251001";
 const MAX_TOOL_ROUNDS = 8;
+const DAILY_LIMIT = 50;
+
+const COMPLEX_KEYWORDS = ["proponi", "analizza", "confronta", "calcola", "crea", "genera", "pianifica", "budget", "margine", "economics", "preventivo", "benchmark"];
+
+function pickModel(message: string): string {
+  const msg = message.toLowerCase().trim();
+  if (msg.length > 50) return MODEL_SONNET;
+  if (COMPLEX_KEYWORDS.some(kw => msg.includes(kw))) return MODEL_SONNET;
+  return MODEL_HAIKU;
+}
 
 interface AnthropicMessage {
   role: "user" | "assistant";
@@ -1026,7 +1037,8 @@ interface CallResult {
 async function callAnthropic(
   messages: AnthropicMessage[],
   systemPrompt: string,
-  supabase: ReturnType<typeof createClient>
+  supabase: ReturnType<typeof createClient>,
+  model: string = MODEL_SONNET
 ): Promise<CallResult> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY non configurata");
@@ -1039,7 +1051,7 @@ async function callAnthropic(
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const body = {
-      model: MODEL,
+      model: model,
       max_tokens: 2048,
       system: systemPrompt,
       tools: TOOLS,
@@ -1451,7 +1463,7 @@ async function summarizeOldMessages(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: MODEL,
+        model: MODEL_HAIKU,
         max_tokens: 512,
         system: "Riassumi questa conversazione in 3 righe in italiano, preservando i dati chiave citati (nomi, date, importi, decisioni prese). Restituisci SOLO il riassunto, nient'altro.",
         messages: [{ role: "user", content: toSummarize.map((m) => `[${m.role}]: ${typeof m.content === "string" ? m.content : JSON.stringify(m.content)}`).join("\n") }],
@@ -1550,6 +1562,39 @@ Deno.serve(async (req: Request) => {
         .insert({ user_id: user.id, window_start: windowIso, count: 1 });
     }
 
+    // ─── DAILY RATE LIMITING (50 req/day per user) ──────────────────────
+    const todayDate = todayISO();
+    const { data: dayRow } = await userClient
+      .from("fly_rate_limits")
+      .select("day_count, day_date")
+      .eq("user_id", user.id)
+      .eq("window_start", windowIso)
+      .maybeSingle();
+
+    let currentDayCount = dayRow?.day_count ?? 0;
+    const storedDate = dayRow?.day_date ?? null;
+
+    if (storedDate !== todayDate) {
+      currentDayCount = 0;
+      await userClient
+        .from("fly_rate_limits")
+        .update({ day_count: 1, day_date: todayDate })
+        .eq("user_id", user.id)
+        .eq("window_start", windowIso);
+    } else if (currentDayCount >= DAILY_LIMIT) {
+      logOutcome = "daily_limit";
+      return json(
+        { error: "Hai raggiunto il limite giornaliero di 50 richieste a Fly. Riprova domani." },
+        429
+      );
+    } else {
+      await userClient
+        .from("fly_rate_limits")
+        .update({ day_count: currentDayCount + 1 })
+        .eq("user_id", user.id)
+        .eq("window_start", windowIso);
+    }
+
     const { message, history, action, proposal: incomingProposal } = await req.json();
 
     // ─── EXECUTE CONFIRMED PROPOSAL ─────────────────────────────────────
@@ -1637,39 +1682,17 @@ Deno.serve(async (req: Request) => {
       year: "numeric",
     });
 
-    const systemPrompt = `Sei Fly, il Chief of Staff digitale di Simmetria Synergy, azienda che organizza eventi corporate e istituzionali. Rispondi in italiano, in modo sintetico, preciso e orientato ai risultati: prima la risposta in una frase, poi solo i dettagli utili. Usa i tool per basarti SOLO su dati reali: se un dato non c'e, dillo chiaramente, non inventare mai numeri, nomi o date.
+    const systemPrompt = `Sei Fly, Chief of Staff digitale di Simmetria Synergy (agenzia eventi corporate). Rispondi in italiano, sintetico e preciso. Usa i tool per dati reali, non inventare mai. Segnala criticita. Non decidere: proponi.
 
-REGOLE DI STILE: rispondi come un collega sintetico. Quando elenchi entita (eventi, fornitori, task, clienti): massimo 5 voci con solo le informazioni rilevanti alla domanda, chiudi con il conteggio dei restanti ("...e altri N"). Mai riversare tutti i campi di un record. Niente markdown pesante: no tabelle, no titoli; al massimo elenchi brevi con trattini.
+STILE: max 5 voci negli elenchi, chiudi con "...e altri N". No tabelle, no markdown pesante. Una frase di risposta, poi solo dettagli utili.
 
-Per domande su costi, ricavi, margini o budget degli eventi usa get_event_economics. Riporta i numeri esatti che ricevi, indicando che sono valori previsionali dai servizi censiti; non stimare mai importi non presenti nei dati.
+AZIONI: usa tool propose_* per proposte. Presenta riepilogo e chiedi conferma. Mai scrivere nel DB senza conferma.
 
-Quando noti una criticita nei dati che hai appena letto (scadenze superate, eventi imminenti con poca preparazione), segnalala in una riga finale. Non prendere decisioni: proponi.
+ENTITIES_JSON: chiudi la risposta con ENTITIES_JSON: [...] se citi entita specifiche (max 5, type: event/supplier/task/client).
+PROPOSAL_JSON: dopo propose_event, chiudi con PROPOSAL_JSON:{...} (nome, location, pax, budget, giorni, fornitori).
 
-I Dossier sono processi burocratici e operativi con documenti allegati (contratti, preventivi, permessi, assicurazioni, fatture). Non confonderli con gli eventi, che nel linguaggio aziendale si chiamano anche "pratiche" in senso colloquiale. La tabella dei dossier si chiama "dossiers" nel database.
-
-PRINCIPI COMPORTAMENTALI:
-- Chiarezza prima dell'eleganza: usa il linguaggio piu semplice che trasmette il significato corretto.
-- Dichiara sempre l'incertezza: distingui tra cio che risulta dai dati, cio che deduci e cio che ipotizzi. Preferisci "con le informazioni disponibili..." a certezze non giustificate.
-- Evita "sempre", "mai", "certamente", "ovviamente".
-- Tono calmo e costruttivo anche su criticita: orientamento, mai allarmismo.
-- Parla come un collega esperto: competente, pragmatico, mai paternalistico. Ogni suggerimento deve poter spiegare il proprio perche in una riga.
-- Se il valore di un'informazione non supera il costo dell'interruzione, ometti l'informazione.
-
-MEMORIA E PERSONALIZZAZIONE:
-All'inizio di ogni sessione hai accesso alla memoria dell'utente: usala per personalizzare le risposte (tono, dettaglio, abbreviazioni preferite). Se l'utente corregge qualcosa che hai detto, ringraziane mentalmente la memoria aggiornandola implicitamente. Non menzionare mai esplicitamente di avere una memoria: comportati e basta come se ricordassi.
-
-AZIONI (PROPONI → CONFERMA → ESEGUI):
-Quando l'utente chiede di FARE qualcosa (creare task, aggiungere promemoria, aggiornare stati), usa i tool propose_*. Questi NON scrivono nulla nel database. Presenta all'utente un riepilogo chiaro di cio che farai (es. "Creo il task 'X' assegnato a Y con scadenza Z — confermi?"). L'utente deve confermare esplicitamente prima che l'azione venga eseguita dal sistema. Se hai bisogno di risolvere un nome in un profilo, usa get_team_members. Se un nome e ambiguo, chiedi di precisare.
-
-ENTITIES_JSON: quando la tua risposta cita entita specifiche (eventi, fornitori, task, clienti), DEVI chiudere la risposta con una riga separata nel formato esatto:
-ENTITIES_JSON: [{"type":"event","id":"uuid","nome":"...","data":"...","stato":"..."},...]
-I type ammessi sono: event, supplier, task, client. Includi solo entita effettivamente citate nella risposta, max 5. Se non citi entita specifiche, NON aggiungere la riga ENTITIES_JSON.
-
-PROPOSAL_JSON: quando usi propose_event e generi una proposta con fornitori suggeriti, DEVI chiudere la risposta con una riga separata nel formato esatto (dopo ENTITIES_JSON se presente):
-PROPOSAL_JSON:{"nome":"...","location":"...","pax":N,"budget":N,"giorni":N,"fornitori":[{"id":"uuid","nome":"...","categoria":"..."}]}
-Il campo fornitori deve contenere max 10 fornitori suggeriti dall'analisi. Il budget deve essere il totale_costo_stimato dalla proiezione. NON mostrare questa riga nel testo visibile all'utente.
-
-Oggi e ${today}.${memorySection}`;
+Dossier = processi burocratici (tabella "dossiers"), non confondere con eventi.
+Oggi: ${today}.${memorySection}`;
 
     // ─── BUILD MESSAGES WITH CONTEXT MANAGEMENT ─────────────────────────
     const messages: AnthropicMessage[] = [];
@@ -1684,11 +1707,57 @@ Oggi e ${today}.${memorySection}`;
 
     messages.push({ role: "user", content: message });
 
+    // ─── CACHE CHECK ────────────────────────────────────────────────────
+    const queryHash = btoa(unescape(encodeURIComponent(message.slice(0, 100))));
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+
+    // Clean stale cache entries (> 2 hours)
+    userClient
+      .from("fly_cache")
+      .delete()
+      .eq("user_id", user.id)
+      .lt("created_at", new Date(Date.now() - 7200000).toISOString())
+      .then(() => {});
+
+    const { data: cached } = await userClient
+      .from("fly_cache")
+      .select("response")
+      .eq("user_id", user.id)
+      .eq("query_hash", queryHash)
+      .gte("created_at", oneHourAgo)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (cached?.response && (!Array.isArray(history) || history.length === 0)) {
+      // Return cached response as SSE stream
+      const encoder = new TextEncoder();
+      const cachedStream = new ReadableStream({
+        async start(controller) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "text", content: cached.response })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "meta", entities: [], proposal: null, eventProposal: null })}\n\n`));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        },
+      });
+      return new Response(cachedStream, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
+    }
+
+    // ─── MODEL ROUTING ──────────────────────────────────────────────────
+    const selectedModel = pickModel(message);
+
     // Summarize if history is too long
     const processedMessages = await summarizeOldMessages(messages);
 
     const { text: reply, proposal, inputTokens, outputTokens, toolsCalled } =
-      await callAnthropic(processedMessages, systemPrompt, userClient);
+      await callAnthropic(processedMessages, systemPrompt, userClient, selectedModel);
 
     logInputTokens = inputTokens;
     logOutputTokens = outputTokens;
@@ -1714,6 +1783,14 @@ Oggi e ${today}.${memorySection}`;
       try {
         entities = JSON.parse(entitiesMatch[1]);
       } catch {}
+    }
+
+    // ─── SAVE TO CACHE (fire-and-forget) ─────────────────────────────────
+    if (textReply && !proposal) {
+      userClient
+        .from("fly_cache")
+        .insert({ user_id: user.id, query_hash: queryHash, response: textReply })
+        .then(() => {});
     }
 
     // ─── SSE STREAMING RESPONSE ──────────────────────────────────────────
