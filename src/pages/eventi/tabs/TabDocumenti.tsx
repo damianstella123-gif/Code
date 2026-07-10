@@ -114,13 +114,30 @@ export function TabDocumenti({ event }: { event: Event }) {
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewName, setPreviewName] = useState('')
+  const [previewType, setPreviewType] = useState<'image' | 'pdf' | 'office' | null>(null)
 
   function handlePreview(doc: EventDocument) {
     const ext = doc.file_name.split('.').pop()?.toLowerCase() ?? ''
-    const previewable = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp']
+    const previewable = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt']
     if (!previewable.includes(ext)) { handleDownload(doc); return }
+
     const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path)
-    if (data?.publicUrl) { setPreviewUrl(data.publicUrl); setPreviewName(doc.nome || doc.file_name) }
+    if (!data?.publicUrl) return
+
+    const publicUrl = data.publicUrl
+
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+      setPreviewUrl(publicUrl)
+      setPreviewType('image')
+    } else if (ext === 'pdf') {
+      setPreviewUrl(publicUrl)
+      setPreviewType('pdf')
+    } else {
+      const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(publicUrl)}`
+      setPreviewUrl(viewerUrl)
+      setPreviewType('office')
+    }
+    setPreviewName(doc.nome || doc.file_name)
   }
 
   async function handleDelete(id: string) {
@@ -217,16 +234,26 @@ export function TabDocumenti({ event }: { event: Event }) {
         <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(0,0,0,0.85)' }}>
           <div className="flex items-center justify-between px-4 py-3" style={{ background: 'var(--panel)', borderBottom: '1px solid var(--line)' }}>
             <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{previewName}</p>
-            <button onClick={() => { setPreviewUrl(null); setPreviewName('') }}
+            <button onClick={() => { setPreviewUrl(null); setPreviewName(''); setPreviewType(null) }}
               className="p-2 rounded-lg hover:bg-[var(--line)]">
               <X className="w-5 h-5" style={{ color: 'var(--muted)' }} />
             </button>
           </div>
           <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
-            {previewUrl.match(/\.(jpg|jpeg|png|gif|webp)/i)
-              ? <img src={previewUrl} alt={previewName} className="max-w-full max-h-[85vh] rounded-lg object-contain" />
-              : <iframe src={previewUrl} className="w-full h-full rounded-lg" style={{ maxWidth: 900, minHeight: '80vh' }} />
-            }
+            {previewType === 'image' && (
+              <img src={previewUrl} alt={previewName} className="max-w-full max-h-[85vh] rounded-lg object-contain" />
+            )}
+            {previewType === 'pdf' && (
+              <iframe src={previewUrl} style={{ width: '100%', height: '85vh', border: 'none', borderRadius: 12, maxWidth: 900 }} title={previewName} />
+            )}
+            {previewType === 'office' && (
+              <div style={{ width: '100%', maxWidth: 960 }}>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginBottom: 8, textAlign: 'center' }}>
+                  Anteprima via Microsoft Office Online
+                </p>
+                <iframe src={previewUrl} style={{ width: '100%', height: '80vh', border: 'none', borderRadius: 12 }} title={previewName} />
+              </div>
+            )}
           </div>
         </div>
       )}

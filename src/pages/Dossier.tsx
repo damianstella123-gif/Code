@@ -16,6 +16,7 @@ import {
   Upload,
   Download,
   Paperclip,
+  Eye,
 } from 'lucide-react'
 import { type Pratica, type CategoriaPratica, type StatoPratica, type PrioritaPratica } from '@/data/pratiche'
 import type { Event } from '@/data/events'
@@ -426,6 +427,9 @@ function UnassignedDocumentsSection() {
 // ─── Document Row ──────────────────────────────────────────────────────────────
 
 function DocRow({ doc, onRemove }: { doc: DossierDocument; onRemove?: () => void }) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewType, setPreviewType] = useState<'image' | 'pdf' | 'office' | null>(null)
+
   async function handleDownload() {
     const { data, error } = await supabase.storage.from('documents').download(doc.file_path)
     if (error || !data) return
@@ -437,30 +441,83 @@ function DocRow({ doc, onRemove }: { doc: DossierDocument; onRemove?: () => void
     URL.revokeObjectURL(url)
   }
 
+  function handlePreview() {
+    const ext = doc.file_name.split('.').pop()?.toLowerCase() ?? ''
+    const previewable = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt']
+    if (!previewable.includes(ext)) { handleDownload(); return }
+
+    const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path)
+    if (!data?.publicUrl) return
+
+    const publicUrl = data.publicUrl
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+      setPreviewUrl(publicUrl)
+      setPreviewType('image')
+    } else if (ext === 'pdf') {
+      setPreviewUrl(publicUrl)
+      setPreviewType('pdf')
+    } else {
+      setPreviewUrl(`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(publicUrl)}`)
+      setPreviewType('office')
+    }
+  }
+
   return (
-    <div className="flex items-center gap-3 p-2.5 rounded-lg transition-all hover:bg-white/[0.02]"
-      style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-        style={{ background: `${fileColor(doc.file_name)}15` }}>
-        <FileText className="w-3.5 h-3.5" style={{ color: fileColor(doc.file_name) }} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{doc.nome}</p>
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)' }} className="truncate">
-          {fileExt(doc.file_name)} — {formatSize(doc.file_size)} — {fmtLong(doc.created_at)}
-        </p>
-      </div>
-      <div className="flex items-center gap-1 flex-shrink-0">
-        <button onClick={handleDownload} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Scarica">
-          <Download className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-        </button>
-        {onRemove && (
-          <button onClick={onRemove} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi dal dossier">
-            <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+    <>
+      <div className="flex items-center gap-3 p-2.5 rounded-lg transition-all hover:bg-white/[0.02]"
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: `${fileColor(doc.file_name)}15` }}>
+          <FileText className="w-3.5 h-3.5" style={{ color: fileColor(doc.file_name) }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{doc.nome}</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)' }} className="truncate">
+            {fileExt(doc.file_name)} — {formatSize(doc.file_size)} — {fmtLong(doc.created_at)}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button onClick={handlePreview} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Anteprima">
+            <Eye className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />
           </button>
-        )}
+          <button onClick={handleDownload} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Scarica">
+            <Download className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+          </button>
+          {onRemove && (
+            <button onClick={onRemove} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Rimuovi dal dossier">
+              <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+      {previewUrl && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(0,0,0,0.85)' }}>
+          <div className="flex items-center justify-between px-4 py-3" style={{ background: 'var(--panel)', borderBottom: '1px solid var(--line)' }}>
+            <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{doc.nome || doc.file_name}</p>
+            <button onClick={() => { setPreviewUrl(null); setPreviewType(null) }}
+              className="p-2 rounded-lg hover:bg-[var(--line)]">
+              <X className="w-5 h-5" style={{ color: 'var(--muted)' }} />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+            {previewType === 'image' && (
+              <img src={previewUrl} alt={doc.nome} className="max-w-full max-h-[85vh] rounded-lg object-contain" />
+            )}
+            {previewType === 'pdf' && (
+              <iframe src={previewUrl} style={{ width: '100%', height: '85vh', border: 'none', borderRadius: 12, maxWidth: 900 }} title={doc.nome} />
+            )}
+            {previewType === 'office' && (
+              <div style={{ width: '100%', maxWidth: 960 }}>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginBottom: 8, textAlign: 'center' }}>
+                  Anteprima via Microsoft Office Online
+                </p>
+                <iframe src={previewUrl} style={{ width: '100%', height: '80vh', border: 'none', borderRadius: 12 }} title={doc.nome} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
