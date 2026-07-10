@@ -1152,14 +1152,15 @@ ${synergyContext}
 ${guestContext}
 
 ISTRUZIONI:
-1. Usa web_search per:
-   - Verificare certificazioni ambientali reali dei fornitori (cerca nome + "green certification" o "ISO 14001" o "certificazione ambientale")
-   - Trovare fattori CO2 aggiornati per le rotte di trasporto specifiche
-   - Distanze reali tra citta di provenienza degli ospiti e la location "${location}"
+1. Usa i fattori di emissione DEFRA 2024 standard per calcolare la CO2:
+   - Auto: 0.170 kg CO2/km/pax
+   - Treno: 0.041 kg CO2/km/pax
+   - Aereo: 0.255 kg CO2/km/pax
+   - Misto: 0.105 kg CO2/km/pax
+   Per ogni rotta segnala "fonte_distanza: DEFRA 2024 standard".
 
-2. Per ogni dato cercato online, includi un campo "fonte" con l'URL o la fonte trovata.
-   Se non trovi dati reali, usa i fattori DEFRA 2024 standard e segnala "fonte: DEFRA 2024 standard".
-   Non inventare mai certificazioni o dati.
+2. Per i fornitori, assegna stime di CO2 basate sulla categoria e il carbon_score fornito (1=ottimo, 5=pessimo).
+   Non inventare certificazioni. Se non conosci con certezza una certificazione reale, lascia il campo vuoto.
 
 3. Se hai la lista ospiti, calcola le rotte per citta. Altrimenti usa i dati manuali.
 
@@ -1230,12 +1231,9 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: MODEL_SONNET,
+            model: MODEL_HAIKU,
             max_tokens: 4096,
             system: "Sei un consulente ambientale esperto. Rispondi SOLO con JSON valido, senza markdown o backtick.",
-            tools: [
-              { type: "web_search_20250305", name: "web_search" }
-            ],
             messages: [{ role: "user", content: greenPrompt }],
           }),
         });
@@ -1245,50 +1243,7 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
           throw new Error(`Anthropic ${greenRes.status}: ${errText}`);
         }
 
-        let result = await greenRes.json();
-        let iterations = 0;
-        const maxIterations = 6;
-        let currentMsgs: any[] = [{ role: "user", content: greenPrompt }];
-
-        while (result.stop_reason !== "end_turn" && iterations < maxIterations) {
-          iterations++;
-          if (result.stop_reason === "tool_use") {
-            currentMsgs.push({ role: "assistant", content: result.content });
-            const toolResults = [];
-            for (const block of (result.content || [])) {
-              if (block.type === "tool_use") {
-                toolResults.push({
-                  type: "tool_result",
-                  tool_use_id: block.id,
-                  content: "Search completed - integrate results into response.",
-                });
-              }
-            }
-            currentMsgs.push({ role: "user", content: toolResults });
-
-            const nextRes = await fetch(ANTHROPIC_URL, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "x-api-key": apiKey,
-                "anthropic-version": "2023-06-01",
-              },
-              body: JSON.stringify({
-                model: MODEL_SONNET,
-                max_tokens: 4096,
-                system: "Sei un consulente ambientale esperto. Rispondi SOLO con JSON valido, senza markdown o backtick.",
-                tools: [
-                  { type: "web_search_20250305", name: "web_search" }
-                ],
-                messages: currentMsgs,
-              }),
-            });
-            if (!nextRes.ok) break;
-            result = await nextRes.json();
-          } else {
-            break;
-          }
-        }
+        const result = await greenRes.json();
 
         // Extract text from final result
         const textBlocks = (result.content || []).filter((b: any) => b.type === "text");
