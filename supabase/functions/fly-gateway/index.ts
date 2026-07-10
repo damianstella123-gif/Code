@@ -1137,6 +1137,8 @@ CO2 RISPARMIATA DA SYNERGY: ${totalSynergyCO2.toFixed(0)} kg totali
 
       const greenPrompt = `Sei un consulente ambientale. Genera un Green Report JSON per questo evento.
 
+REGOLA FONDAMENTALE: Ogni numero deve avere accanto il suo termine di paragone. Mai un numero da solo senza contesto. Ogni sezione del report deve includere un campo "confronto" che spiega rispetto a cosa viene calcolato il risparmio.
+
 DATI EVENTO:
 - Nome: ${evt?.nome || eventId}
 - Location: ${location}
@@ -1159,12 +1161,31 @@ ISTRUZIONI:
    - Misto: 0.105 kg CO2/km/pax
    Per ogni rotta segnala "fonte_distanza: DEFRA 2024 standard".
 
-2. Per i fornitori, assegna stime di CO2 basate sulla categoria e il carbon_score fornito (1=ottimo, 5=pessimo).
+2. CONFRONTO TRASPORTI: Per ogni rotta, calcola anche lo scenario alternativo realistico.
+   Esempio: se il mezzo scelto e treno, l'alternativa e aereo (per >500km) o auto (per <500km).
+   Il campo "confronto" nella sezione trasporti deve dire: "Rispetto a [alternativa realistica]: risparmiati X kg CO2 (Y% in meno)".
+   Formato: "Treno vs aereo Roma-Milano: 12 kg vs 72 kg CO2 per pax (-83%)"
+
+3. Per i fornitori, assegna stime di CO2 basate sulla categoria e il carbon_score fornito (1=ottimo, 5=pessimo).
    Non inventare certificazioni. Se non conosci con certezza una certificazione reale, lascia il campo vuoto.
+   CONFRONTO FORNITORI: L'alternativa e un fornitore standard non certificato (score 4/5) della stessa categoria.
+   Formato campo confronto: "Fornitore certificato vs standard: X kg vs Y kg CO2 (-Z%)"
 
-3. Se hai la lista ospiti, calcola le rotte per citta. Altrimenti usa i dati manuali.
+4. Se hai la lista ospiti, calcola le rotte per citta. Altrimenti usa i dati manuali.
 
-4. Includi nella narrativa un paragrafo dedicato al contributo digitale di Synergy nella riduzione dell'impatto, presentandolo come valore aggiunto dell'approccio tecnologico di Simmetria.
+5. Includi nella narrativa un paragrafo dedicato al contributo digitale di Synergy nella riduzione dell'impatto, presentandolo come valore aggiunto dell'approccio tecnologico di Simmetria.
+
+6. CONFRONTO SYNERGY: L'alternativa e il workflow tradizionale (email stampate, documenti cartacei, riunioni in presenza con spostamenti).
+   Formato: "Piattaforma digitale vs gestione tradizionale: X kg CO2 risparmiati (equivalente a Y fogli A4 non stampati, Z riunioni in presenza evitate)"
+
+7. TOTALE E BENCHMARK: Confronta le emissioni totali dell'evento con la media MICE Italia.
+   Benchmark: media eventi MICE Italia = 150-200 kg CO2/partecipante (fonte: DEFRA 2024 + ICCA Statistics Report).
+   Formato campo confronto totale: "Questo evento: X kg/pax vs media MICE Italia: 175 kg/pax (-Y%)"
+
+8. EQUIVALENTI CONTESTUALIZZATI: Non solo numeri ma descrizioni comprensibili.
+   Formato: "X alberi = la CO2 assorbita da X alberi in un anno (un parco urbano di circa Y mq)"
+   "X km auto = Y viaggi Roma-Milano in auto"
+   "X voli = Y volte il tragitto Roma-Milano in aereo"
 
 RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa struttura esatta:
 {
@@ -1178,10 +1199,15 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
         "distanza_km": number,
         "mezzo": "auto|treno|aereo",
         "co2_kg": number,
-        "fonte_distanza": "string (URL o 'DEFRA 2024 standard')"
+        "fonte_distanza": "string (URL o 'DEFRA 2024 standard')",
+        "alternativa_mezzo": "string (il mezzo alternativo realistico)",
+        "co2_alternativa_kg": number,
+        "risparmio_pct": number
       }
     ],
     "totale_co2_kg": number,
+    "totale_alternativa_kg": number,
+    "confronto": "string (es: 'Scelta treno vs aereo per le tratte >500km: 320 kg vs 1840 kg CO2 totali, -83%')",
     "nota": "string"
   },
   "fornitori": [
@@ -1192,6 +1218,8 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
       "certificazioni_trovate": ["string"] oppure [],
       "fonte_certificazione": "string URL" oppure null,
       "co2_kg": number,
+      "co2_alternativa_standard_kg": number,
+      "confronto": "string (es: 'Fornitore certificato vs standard: 45 kg vs 120 kg CO2, -62%')",
       "alternativa_green": "string suggerimento" oppure null
     }
   ],
@@ -1203,17 +1231,29 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
       "riunioni_evitate_kg": ${Math.round(byFonte.riunione_evitata || 0)}
     },
     "equivalente_fogli_carta": ${Math.round(totalSynergyCO2 * 120)},
-    "descrizione_it": "string (2 righe, tono positivo)",
+    "confronto": "string (es: 'Piattaforma digitale vs gestione tradizionale: 85 kg CO2 risparmiati, equivalente a 10200 fogli A4 non stampati e 12 riunioni in presenza evitate')",
+    "alternativa_tradizionale_kg": number,
+    "descrizione_it": "string (2 righe, tono positivo, con confronto esplicito)",
     "descrizione_en": "string"
   },
   "totale_co2_kg": number,
   "impatto_netto_kg": number (= totale_co2_kg - synergy_impact.co2_risparmiata_kg),
+  "benchmark": {
+    "media_mice_italia_kg_pax": 175,
+    "questo_evento_kg_pax": number (= totale_co2_kg / pax),
+    "differenza_pct": number,
+    "confronto": "string (es: 'Questo evento: 62 kg/pax vs media MICE Italia: 175 kg/pax (-65%). Fonte: DEFRA 2024 + ICCA Statistics Report')",
+    "fonte": "DEFRA 2024 + ICCA Statistics Report"
+  },
   "equivalenti": {
     "alberi_salvati": number (impatto_netto_kg / 21),
+    "alberi_descrizione": "string (es: 'La CO2 assorbita da 8 alberi in un anno, un parco urbano di circa 50 mq')",
     "km_auto": number (impatto_netto_kg * 6),
-    "voli_roma_milano": number (impatto_netto_kg / 45)
+    "km_auto_descrizione": "string (es: '3 viaggi Roma-Milano in auto')",
+    "voli_roma_milano": number (impatto_netto_kg / 45),
+    "voli_descrizione": "string (es: '2 volte il tragitto Roma-Milano in aereo')"
   },
-  "narrativa_it": "string (3-4 paragrafi con sezione Synergy)",
+  "narrativa_it": "string (3-4 paragrafi con sezione Synergy e confronti espliciti in ogni sezione)",
   "narrativa_en": "string",
   "fonti": ["string - tutte le URL e fonti consultate"]
 }`;
@@ -1265,24 +1305,37 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
           const co2Fornitori = supplierNames.length * pax * 2;
           const co2Totale = co2Trasporti + co2Fornitori;
           const impattoNetto = Math.max(0, co2Totale - totalSynergyCO2);
+          const kgPax = pax > 0 ? Math.round(co2Totale / pax) : 0;
+          const altFactor = mezzo === "treno" ? 0.255 : mezzo === "aereo" ? 0.041 : 0.170;
+          const co2Alt = pax * distanza * 2 * altFactor;
+          const altMezzo = mezzo === "treno" ? "aereo" : mezzo === "aereo" ? "treno" : "aereo";
 
           return JSON.stringify({
             trasporti: {
               fonte_dati: "stima_manuale",
               documento_usato: null,
-              rotte: citta ? [{ citta_origine: citta, n_partecipanti: pax, distanza_km: distanza, mezzo, co2_kg: Math.round(co2Trasporti), fonte_distanza: "DEFRA 2024 standard" }] : [],
+              rotte: citta ? [{ citta_origine: citta, n_partecipanti: pax, distanza_km: distanza, mezzo, co2_kg: Math.round(co2Trasporti), fonte_distanza: "DEFRA 2024 standard", alternativa_mezzo: altMezzo, co2_alternativa_kg: Math.round(co2Alt), risparmio_pct: Math.round((1 - co2Trasporti / co2Alt) * 100) }] : [],
               totale_co2_kg: Math.round(co2Trasporti),
+              totale_alternativa_kg: Math.round(co2Alt),
+              confronto: `Scelta ${mezzo} vs ${altMezzo}: ${Math.round(co2Trasporti)} kg vs ${Math.round(co2Alt)} kg CO2 totali (${Math.round((1 - co2Trasporti / co2Alt) * 100)}%)`,
               nota: "Stima basata su dati inseriti manualmente",
             },
-            fornitori: supplierNames.map((s: any) => ({
-              nome: s.nome,
-              categoria: s.categoria,
-              carbon_score: supplierScores[s.id] ?? 3,
-              certificazioni_trovate: [],
-              fonte_certificazione: null,
-              co2_kg: Math.round(pax * 2),
-              alternativa_green: null,
-            })),
+            fornitori: supplierNames.map((s: any) => {
+              const score = supplierScores[s.id] ?? 3;
+              const co2F = Math.round(pax * 2);
+              const co2Std = Math.round(pax * 2 * (4 / Math.max(score, 1)));
+              return {
+                nome: s.nome,
+                categoria: s.categoria,
+                carbon_score: score,
+                certificazioni_trovate: [],
+                fonte_certificazione: null,
+                co2_kg: co2F,
+                co2_alternativa_standard_kg: co2Std,
+                confronto: `Fornitore score ${score}/5 vs standard 4/5: ${co2F} kg vs ${co2Std} kg CO2`,
+                alternativa_green: null,
+              };
+            }),
             synergy_impact: {
               co2_risparmiata_kg: Math.round(totalSynergyCO2),
               breakdown: {
@@ -1291,19 +1344,31 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
                 riunioni_evitate_kg: Math.round(byFonte.riunione_evitata || 0),
               },
               equivalente_fogli_carta: Math.round(totalSynergyCO2 * 120),
-              descrizione_it: `Gestendo questo evento con Synergy, il team ha risparmiato ${Math.round(totalSynergyCO2)} kg CO2.`,
-              descrizione_en: `By managing this event with Synergy, the team saved ${Math.round(totalSynergyCO2)} kg CO2.`,
+              confronto: `Piattaforma digitale vs gestione tradizionale: ${Math.round(totalSynergyCO2)} kg CO2 risparmiati (equivalente a ${Math.round(totalSynergyCO2 * 120)} fogli A4 non stampati)`,
+              alternativa_tradizionale_kg: Math.round(totalSynergyCO2),
+              descrizione_it: `Gestendo questo evento con Synergy invece del workflow tradizionale, il team ha risparmiato ${Math.round(totalSynergyCO2)} kg CO2, equivalenti a ${Math.round(totalSynergyCO2 * 120)} fogli A4 non stampati.`,
+              descrizione_en: `By managing this event with Synergy instead of traditional workflow, the team saved ${Math.round(totalSynergyCO2)} kg CO2.`,
             },
             totale_co2_kg: Math.round(co2Totale),
             impatto_netto_kg: Math.round(impattoNetto),
+            benchmark: {
+              media_mice_italia_kg_pax: 175,
+              questo_evento_kg_pax: kgPax,
+              differenza_pct: Math.round((1 - kgPax / 175) * 100),
+              confronto: `Questo evento: ${kgPax} kg/pax vs media MICE Italia: 175 kg/pax (${Math.round((1 - kgPax / 175) * 100)}%). Fonte: DEFRA 2024 + ICCA Statistics Report`,
+              fonte: "DEFRA 2024 + ICCA Statistics Report",
+            },
             equivalenti: {
               alberi_salvati: Math.ceil(impattoNetto / 21),
+              alberi_descrizione: `La CO2 assorbita da ${Math.ceil(impattoNetto / 21)} alberi in un anno`,
               km_auto: Math.round(impattoNetto * 6),
+              km_auto_descrizione: `${Math.round(impattoNetto * 6 / 580)} viaggi Roma-Milano in auto`,
               voli_roma_milano: Number((impattoNetto / 45).toFixed(1)),
+              voli_descrizione: `${(impattoNetto / 45).toFixed(1)} volte il tragitto Roma-Milano in aereo`,
             },
             narrativa_it: rawText || "Report non generato correttamente.",
             narrativa_en: "",
-            fonti: ["DEFRA 2024 standard"],
+            fonti: ["DEFRA 2024 standard", "ICCA Statistics Report"],
           });
         }
       } catch (err: any) {
@@ -1312,17 +1377,19 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
         const co2Trasporti = pax * distanza * 2 * (factors[mezzo] || 0.105);
         const co2Totale = co2Trasporti;
         const impattoNetto = Math.max(0, co2Totale - totalSynergyCO2);
+        const kgPax = pax > 0 ? Math.round(co2Totale / pax) : 0;
 
         return JSON.stringify({
-          trasporti: { fonte_dati: "stima_manuale", documento_usato: null, rotte: [], totale_co2_kg: Math.round(co2Trasporti), nota: "Errore nella generazione AI: " + err.message },
+          trasporti: { fonte_dati: "stima_manuale", documento_usato: null, rotte: [], totale_co2_kg: Math.round(co2Trasporti), totale_alternativa_kg: 0, confronto: "Dati insufficienti per confronto", nota: "Errore nella generazione AI: " + err.message },
           fornitori: [],
-          synergy_impact: { co2_risparmiata_kg: Math.round(totalSynergyCO2), breakdown: { documenti_digitali_kg: Math.round(byFonte.documento_digitale || 0), comunicazioni_interne_kg: Math.round(byFonte.comunicazione_interna || 0), riunioni_evitate_kg: Math.round(byFonte.riunione_evitata || 0) }, equivalente_fogli_carta: Math.round(totalSynergyCO2 * 120), descrizione_it: "", descrizione_en: "" },
+          synergy_impact: { co2_risparmiata_kg: Math.round(totalSynergyCO2), breakdown: { documenti_digitali_kg: Math.round(byFonte.documento_digitale || 0), comunicazioni_interne_kg: Math.round(byFonte.comunicazione_interna || 0), riunioni_evitate_kg: Math.round(byFonte.riunione_evitata || 0) }, equivalente_fogli_carta: Math.round(totalSynergyCO2 * 120), confronto: `Piattaforma digitale vs gestione tradizionale: ${Math.round(totalSynergyCO2)} kg CO2 risparmiati`, alternativa_tradizionale_kg: Math.round(totalSynergyCO2), descrizione_it: "", descrizione_en: "" },
           totale_co2_kg: Math.round(co2Totale),
           impatto_netto_kg: Math.round(impattoNetto),
-          equivalenti: { alberi_salvati: Math.ceil(impattoNetto / 21), km_auto: Math.round(impattoNetto * 6), voli_roma_milano: Number((impattoNetto / 45).toFixed(1)) },
+          benchmark: { media_mice_italia_kg_pax: 175, questo_evento_kg_pax: kgPax, differenza_pct: Math.round((1 - kgPax / 175) * 100), confronto: `Questo evento: ${kgPax} kg/pax vs media MICE Italia: 175 kg/pax`, fonte: "DEFRA 2024 + ICCA Statistics Report" },
+          equivalenti: { alberi_salvati: Math.ceil(impattoNetto / 21), alberi_descrizione: `La CO2 assorbita da ${Math.ceil(impattoNetto / 21)} alberi in un anno`, km_auto: Math.round(impattoNetto * 6), km_auto_descrizione: `${Math.round(impattoNetto * 6 / 580)} viaggi Roma-Milano in auto`, voli_roma_milano: Number((impattoNetto / 45).toFixed(1)), voli_descrizione: `${(impattoNetto / 45).toFixed(1)} volte il tragitto Roma-Milano in aereo` },
           narrativa_it: "",
           narrativa_en: "",
-          fonti: ["DEFRA 2024 standard"],
+          fonti: ["DEFRA 2024 standard", "ICCA Statistics Report"],
         });
       }
     }
