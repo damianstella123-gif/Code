@@ -25,6 +25,7 @@ import {
   FileWarning,
   ScrollText,
   Filter,
+  Calendar,
 } from 'lucide-react'
 import { loadUser, isAdmin } from '@/lib/auth'
 import { useTheme, type ThemeMode } from '@/lib/theme'
@@ -1532,6 +1533,112 @@ function AuditLogSection() {
   )
 }
 
+// ─── Le mie Ferie Section ────────────────────────────────────────────────────
+
+function LeMieFerieSection() {
+  const user = loadUser()
+  const [leaves, setLeaves] = useState<{ id: string; tipo: string; data_inizio: string; data_fine: string; stato: string; note_admin: string | null; motivo: string | null }[]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [tipo, setTipo] = useState<'ferie' | 'permesso' | 'malattia' | 'recupero'>('ferie')
+  const [dataInizio, setDataInizio] = useState('')
+  const [dataFine, setDataFine] = useState('')
+  const [oraInizio, setOraInizio] = useState('')
+  const [oraFine, setOraFine] = useState('')
+  const [motivo, setMotivo] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const load = async () => {
+    if (!user?.id) return
+    const { data } = await supabase.from('leave_requests').select('id, tipo, data_inizio, data_fine, stato, note_admin, motivo').eq('user_id', user.id).order('created_at', { ascending: false })
+    setLeaves(data ?? [])
+  }
+  useEffect(() => { load() }, [])
+
+  const calcDays = (d1: string, d2: string) => Math.max(1, Math.round((new Date(d2).getTime() - new Date(d1).getTime()) / 86400000) + 1)
+
+  const cancel = async (id: string, row: typeof leaves[0]) => {
+    await supabase.from('leave_requests').update({ stato: 'annullata' }).eq('id', id)
+    const { data: admins } = await supabase.from('profiles').select('id').in('role', ['Admin', 'Super Admin', 'Amministrazione'])
+    const nots = (admins ?? []).map(a => ({ user_id: a.id, is_read: false, link: '/amministrazione', message: `${user?.nome || user?.first_name || ''} ha annullato la richiesta di ${row.tipo} dal ${row.data_inizio}` }))
+    if (nots.length > 0) await supabase.from('notifications').insert(nots)
+    load()
+  }
+
+  const submit = async () => {
+    if (!dataInizio || !dataFine || !user?.id) return
+    setSaving(true)
+    try {
+      await supabase.from('leave_requests').insert({ user_id: user.id, tipo, data_inizio: dataInizio, data_fine: dataFine, ora_inizio: tipo === 'permesso' && oraInizio ? oraInizio : null, ora_fine: tipo === 'permesso' && oraFine ? oraFine : null, motivo: motivo || null })
+      const { data: admins } = await supabase.from('profiles').select('id').in('role', ['Admin', 'Super Admin', 'Amministrazione'])
+      const days = calcDays(dataInizio, dataFine)
+      const nots = (admins ?? []).map(a => ({ user_id: a.id, is_read: false, link: '/amministrazione', message: `${user?.nome || user?.first_name || ''} ha richiesto ${tipo} dal ${dataInizio} al ${dataFine} (${days} giorni)` }))
+      if (nots.length > 0) await supabase.from('notifications').insert(nots)
+      setShowForm(false); setDataInizio(''); setDataFine(''); setMotivo('')
+      load()
+    } catch { /* handled */ } finally { setSaving(false) }
+  }
+
+  const TIPO_COLORS: Record<string, string> = { ferie: 'var(--blue)', permesso: '#eab308', malattia: '#6b7280', recupero: '#22c55e' }
+  const STATO_COLORS: Record<string, string> = { in_attesa: '#eab308', approvata: '#22c55e', negata: 'var(--red2)', annullata: '#6b7280' }
+  const TIPI = [{ value: 'ferie' as const, label: 'Ferie' }, { value: 'permesso' as const, label: 'Permesso' }, { value: 'malattia' as const, label: 'Malattia' }, { value: 'recupero' as const, label: 'Recupero' }]
+
+  return (
+    <SectionCard icon={Calendar} title="Le mie Ferie" subtitle="Storico e nuove richieste">
+      <button onClick={() => setShowForm(!showForm)} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '5px 14px', borderRadius: 6, border: '1px solid var(--line)', background: showForm ? 'rgba(208,0,58,0.06)' : 'transparent', color: showForm ? 'var(--red2)' : 'var(--muted)', cursor: 'pointer', marginBottom: 14 }}>
+        {showForm ? 'Chiudi form' : '+ Nuova richiesta'}
+      </button>
+
+      {showForm && (
+        <div style={{ padding: 14, borderRadius: 8, border: '1px solid var(--line)', marginBottom: 16, background: 'var(--bg)' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            {TIPI.map(t => (
+              <button key={t.value} onClick={() => setTipo(t.value)}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 10px', borderRadius: 6, border: tipo === t.value ? '1.5px solid var(--red2)' : '1px solid var(--line)', background: tipo === t.value ? 'rgba(208,0,58,0.08)' : 'transparent', color: tipo === t.value ? 'var(--red2)' : 'var(--muted)', cursor: 'pointer' }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <input type="date" value={dataInizio} onChange={e => { setDataInizio(e.target.value); if (!dataFine || e.target.value > dataFine) setDataFine(e.target.value) }} placeholder="Dal" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)' }} />
+            <input type="date" value={dataFine} min={dataInizio} onChange={e => setDataFine(e.target.value)} placeholder="Al" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)' }} />
+          </div>
+          {tipo === 'permesso' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <input type="time" value={oraInizio} onChange={e => setOraInizio(e.target.value)} placeholder="Dalle" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)' }} />
+              <input type="time" value={oraFine} onChange={e => setOraFine(e.target.value)} placeholder="Alle" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)' }} />
+            </div>
+          )}
+          <textarea value={motivo} onChange={e => setMotivo(e.target.value)} rows={2} placeholder="Motivo (opzionale)" style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', resize: 'vertical', marginBottom: 10 }} />
+          <button onClick={submit} disabled={!dataInizio || !dataFine || saving} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 14px', borderRadius: 6, border: 'none', background: 'var(--red2)', color: '#fff', cursor: 'pointer', opacity: (!dataInizio || !dataFine || saving) ? 0.5 : 1 }}>
+            {saving ? 'Invio...' : 'Invia richiesta'}
+          </button>
+        </div>
+      )}
+
+      {leaves.length === 0 && !showForm && (
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>Nessuna richiesta presente.</p>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {leaves.map(l => (
+          <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 8px', borderRadius: 4, background: `${TIPO_COLORS[l.tipo] || '#888'}20`, color: TIPO_COLORS[l.tipo] || '#888' }}>{l.tipo}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{l.data_inizio} — {l.data_fine}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)', fontWeight: 600 }}>{calcDays(l.data_inizio, l.data_fine)}gg</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 8px', borderRadius: 4, background: `${STATO_COLORS[l.stato] || '#888'}20`, color: STATO_COLORS[l.stato] || '#888', marginLeft: 'auto' }}>{l.stato.replace('_', ' ')}</span>
+            {l.stato === 'in_attesa' && (
+              <button onClick={() => cancel(l.id, l)} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 8px', borderRadius: 4, border: '1px solid var(--line)', background: 'transparent', color: 'var(--muted)', cursor: 'pointer' }}>Annulla</button>
+            )}
+            {l.stato === 'negata' && l.note_admin && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', fontStyle: 'italic', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.note_admin}>{l.note_admin}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  )
+}
+
 // ─── Sidebar nav ──────────────────────────────────────────────────────────────
 
 type SectionDef = { id: string; icon: React.ElementType; label: string; group: 'personal' | 'admin' }
@@ -1543,6 +1650,7 @@ const ALL_SECTIONS: SectionDef[] = [
   // { id: '2fa', icon: ShieldCheck, label: 'Autenticazione 2FA', group: 'personal' },
   { id: 'tema', icon: Sun, label: 'Tema', group: 'personal' },
   { id: 'notifiche', icon: Bell, label: 'Notifiche', group: 'personal' },
+  { id: 'ferie', icon: Calendar, label: 'Le mie Ferie', group: 'personal' },
   { id: 'fly', icon: Zap, label: 'Fly Assistant', group: 'personal' },
   { id: 'azienda', icon: Building2, label: 'Profilo Azienda', group: 'admin' },
   { id: 'branding', icon: Palette, label: 'Branding', group: 'admin' },
@@ -1728,6 +1836,7 @@ export default function Impostazioni() {
           {/* activeSection === '2fa' && <TwoFactorSection /> */}
           {activeSection === 'tema' && <TemaSection />}
           {activeSection === 'notifiche' && <NotifichePersonali s={settings} upd={upd} />}
+          {activeSection === 'ferie' && <LeMieFerieSection />}
           {activeSection === 'fly' && <FlyConfig s={settings} upd={upd} />}
           {showAdmin && activeSection === 'azienda' && <ProfiloAzienda s={settings} upd={upd} />}
           {showAdmin && activeSection === 'branding' && <Branding s={settings} upd={upd} />}

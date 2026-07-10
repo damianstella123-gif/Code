@@ -47,6 +47,72 @@ Deno.serve(async (req: Request) => {
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
     const in72h = new Date(Date.now() + 72 * 3600000).toISOString();
 
+    // ─── Leave alerts for admins ──────────────────────────────────────────────
+    const in7days = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+
+    const { data: admins } = await sb
+      .from("profiles")
+      .select("id")
+      .in("role", ["Admin", "Super Admin", "Amministrazione"]);
+
+    const adminIds = (admins ?? []).map((a: { id: string }) => a.id);
+
+    // Leaves starting in 7 days
+    const { data: leaves7 } = await sb
+      .from("leave_requests")
+      .select("tipo, data_inizio, data_fine, profiles(first_name, last_name)")
+      .eq("stato", "approvata")
+      .eq("data_inizio", in7days);
+
+    // Leaves starting tomorrow
+    const { data: leaves1 } = await sb
+      .from("leave_requests")
+      .select("tipo, data_inizio, data_fine, profiles(first_name, last_name)")
+      .eq("stato", "approvata")
+      .eq("data_inizio", tomorrow);
+
+    // Leaves active today
+    const { data: leavesToday } = await sb
+      .from("leave_requests")
+      .select("tipo, data_inizio, data_fine, profiles(first_name, last_name)")
+      .eq("stato", "approvata")
+      .lte("data_inizio", today)
+      .gte("data_fine", today);
+
+    const EMOJI: Record<string, string> = { ferie: "🏖️", permesso: "⏰", malattia: "🤒", recupero: "💤" };
+
+    for (const l of leaves7 ?? []) {
+      const prof = l.profiles as unknown as { first_name: string; last_name: string };
+      const nome = `${prof.first_name} ${prof.last_name}`;
+      const nots = adminIds.map((aid: string) => ({
+        user_id: aid, is_read: false, link: "/amministrazione",
+        message: `📅 ${nome} ha ${l.tipo} tra 7 giorni (${l.data_inizio} → ${l.data_fine}). Verifica la copertura.`,
+      }));
+      if (nots.length > 0) await sb.from("notifications").insert(nots);
+    }
+
+    for (const l of leaves1 ?? []) {
+      const prof = l.profiles as unknown as { first_name: string; last_name: string };
+      const nome = `${prof.first_name} ${prof.last_name}`;
+      const nots = adminIds.map((aid: string) => ({
+        user_id: aid, is_read: false, link: "/calendario",
+        message: `⚠️ Domani ${nome} è in ${l.tipo} (fino al ${l.data_fine}). Verifica la copertura.`,
+      }));
+      if (nots.length > 0) await sb.from("notifications").insert(nots);
+    }
+
+    for (const l of leavesToday ?? []) {
+      const prof = l.profiles as unknown as { first_name: string; last_name: string };
+      const nome = `${prof.first_name} ${prof.last_name}`;
+      const em = EMOJI[l.tipo] || "📅";
+      const nots = adminIds.map((aid: string) => ({
+        user_id: aid, is_read: false, link: "/calendario",
+        message: `${em} Oggi ${nome} è in ${l.tipo} (rientra il ${l.data_fine})`,
+      }));
+      if (nots.length > 0) await sb.from("notifications").insert(nots);
+    }
+    // ─── End leave alerts ─────────────────────────────────────────────────────
+
     let processed = 0;
 
     for (const user of users) {

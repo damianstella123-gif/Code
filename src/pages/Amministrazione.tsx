@@ -407,7 +407,7 @@ function StatoBadge({ stato }: { stato: StatoPagamento }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-type TabId = 'dashboard' | 'entrate' | 'uscite' | 'fatture' | 'invoices' | 'documenti'
+type TabId = 'dashboard' | 'entrate' | 'uscite' | 'fatture' | 'invoices' | 'documenti' | 'ferie'
 
 export default function Amministrazione() {
   const currentUser = loadUser()
@@ -433,7 +433,7 @@ export default function Amministrazione() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     const paramTab = searchParams.get('tab')
-    if (paramTab === 'entrate' || paramTab === 'uscite' || paramTab === 'fatture' || paramTab === 'invoices' || paramTab === 'documenti') return paramTab
+    if (paramTab === 'entrate' || paramTab === 'uscite' || paramTab === 'fatture' || paramTab === 'invoices' || paramTab === 'documenti' || paramTab === 'ferie') return paramTab
     return 'dashboard'
   })
   const [entrate, setEntrate] = useState<Entrata[]>([])
@@ -916,6 +916,7 @@ export default function Amministrazione() {
     { id: 'fatture', label: `Fatture (${filteredFatture.length})` },
     { id: 'invoices', label: `Fatture DB (${invoices.length})` },
     { id: 'documenti', label: `Documenti (${adminDocs.length})` },
+    { id: 'ferie', label: 'Ferie & Permessi' },
   ]
 
   // ─── Shared styles ──────────────────────────────────────────────────────────
@@ -1728,6 +1729,10 @@ export default function Amministrazione() {
         </div>
       )}
 
+      {activeTab === 'ferie' && (
+        <FeriePermessiTab currentUserId={currentUser?.id ?? ''} />
+      )}
+
       {/* Invoice Form Modal */}
       {showInvoiceForm && (
         <InvoiceFormModal
@@ -2015,6 +2020,213 @@ function DocFormModal({ doc, events, clients, suppliers, onClose, onSave }: {
           {doc ? 'Salva Modifiche' : 'Crea Documento'}
         </button>
       </div>
+    </div>
+  )
+}
+
+// ─── Ferie & Permessi Tab ────────────────────────────────────────────────────
+
+interface LeaveRow {
+  id: string; user_id: string; tipo: string; data_inizio: string; data_fine: string
+  stato: string; motivo: string | null; note_admin: string | null
+  approvato_da: string | null; approvato_at: string | null; created_at: string
+  profiles?: { first_name: string; last_name: string; avatar_url: string | null; role: string }
+}
+
+function FeriePermessiTab({ currentUserId }: { currentUserId: string }) {
+  const [leaves, setLeaves] = useState<LeaveRow[]>([])
+  const [filter, setFilter] = useState<'tutti' | 'in_attesa' | 'approvata' | 'negata'>('tutti')
+  const [filterUser, setFilterUser] = useState('tutti')
+  const [profiles, setProfiles] = useState<{ id: string; first_name: string; last_name: string }[]>([])
+  const [denyingId, setDenyingId] = useState<string | null>(null)
+  const [denyNote, setDenyNote] = useState('')
+  const [showAnnual, setShowAnnual] = useState(false)
+  const [annualData, setAnnualData] = useState<{ user_id: string; tipo: string; giorni: number }[]>([])
+
+  const loadLeaves = useCallback(async () => {
+    const { data } = await supabase.from('leave_requests')
+      .select('*, profiles(first_name, last_name, avatar_url, role)')
+      .order('created_at', { ascending: false })
+    setLeaves((data ?? []) as LeaveRow[])
+  }, [])
+
+  useEffect(() => {
+    loadLeaves()
+    supabase.from('profiles').select('id, first_name, last_name').eq('stato', 'attivo').order('first_name').then(r => setProfiles(r.data ?? []))
+  }, [loadLeaves])
+
+  const filtered = useMemo(() => {
+    let list = leaves
+    if (filter !== 'tutti') list = list.filter(l => l.stato === filter)
+    if (filterUser !== 'tutti') list = list.filter(l => l.user_id === filterUser)
+    return list
+  }, [leaves, filter, filterUser])
+
+  const countInAttesa = leaves.filter(l => l.stato === 'in_attesa').length
+  const countApprovate = leaves.filter(l => l.stato === 'approvata' && new Date(l.data_inizio).getMonth() === new Date().getMonth()).length
+  const totalGiorni = leaves.filter(l => l.stato === 'approvata').reduce((s, l) => {
+    const d = Math.max(1, Math.round((new Date(l.data_fine).getTime() - new Date(l.data_inizio).getTime()) / 86400000) + 1)
+    return s + d
+  }, 0)
+
+  const approve = async (id: string, row: LeaveRow) => {
+    await supabase.from('leave_requests').update({ stato: 'approvata', approvato_da: currentUserId, approvato_at: new Date().toISOString() }).eq('id', id)
+    await supabase.from('notifications').insert({ user_id: row.user_id, is_read: false, link: '/impostazioni', message: `La tua richiesta di ${row.tipo} dal ${row.data_inizio} al ${row.data_fine} e stata approvata!` })
+    loadLeaves()
+  }
+
+  const deny = async (id: string, row: LeaveRow) => {
+    if (denyNote.length < 10) return
+    await supabase.from('leave_requests').update({ stato: 'negata', note_admin: denyNote, approvato_da: currentUserId, approvato_at: new Date().toISOString() }).eq('id', id)
+    await supabase.from('notifications').insert({ user_id: row.user_id, is_read: false, link: '/impostazioni', message: `La tua richiesta di ${row.tipo} e stata negata. Motivazione: ${denyNote}` })
+    setDenyingId(null); setDenyNote('')
+    loadLeaves()
+  }
+
+  const loadAnnual = async () => {
+    const year = new Date().getFullYear()
+    const { data } = await supabase.from('leave_requests').select('user_id, tipo, data_inizio, data_fine').eq('stato', 'approvata').gte('data_inizio', `${year}-01-01`).lte('data_inizio', `${year}-12-31`)
+    const map: Record<string, Record<string, number>> = {}
+    for (const row of data ?? []) {
+      const days = Math.max(1, Math.round((new Date(row.data_fine).getTime() - new Date(row.data_inizio).getTime()) / 86400000) + 1)
+      if (!map[row.user_id]) map[row.user_id] = {}
+      map[row.user_id][row.tipo] = (map[row.user_id][row.tipo] || 0) + days
+    }
+    const result: { user_id: string; tipo: string; giorni: number }[] = []
+    for (const [uid, tipos] of Object.entries(map)) {
+      for (const [t, g] of Object.entries(tipos)) result.push({ user_id: uid, tipo: t, giorni: g })
+    }
+    setAnnualData(result)
+    setShowAnnual(true)
+  }
+
+  const TIPO_COLORS: Record<string, string> = { ferie: 'var(--blue)', permesso: '#eab308', malattia: '#6b7280', recupero: '#22c55e' }
+  const STATO_COLORS: Record<string, string> = { in_attesa: '#eab308', approvata: '#22c55e', negata: 'var(--red2)', annullata: '#6b7280' }
+
+  const calcDays = (d1: string, d2: string) => Math.max(1, Math.round((new Date(d2).getTime() - new Date(d1).getTime()) / 86400000) + 1)
+
+  return (
+    <div className="animate-fade-in" style={{ paddingTop: 14 }}>
+      {/* Ticker */}
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginBottom: 14, display: 'flex', gap: 16 }}>
+        <span><b style={{ color: '#eab308' }}>{countInAttesa}</b> in attesa</span>
+        <span><b style={{ color: '#22c55e' }}>{countApprovate}</b> approvate questo mese</span>
+        <span><b style={{ color: 'var(--text)' }}>{totalGiorni}</b> giorni totali approvati</span>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        {(['tutti', 'in_attesa', 'approvata', 'negata'] as const).map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 10px', borderRadius: 6, border: filter === f ? '1.5px solid var(--red2)' : '1px solid var(--line)', background: filter === f ? 'rgba(208,0,58,0.06)' : 'transparent', color: filter === f ? 'var(--red2)' : 'var(--muted)', cursor: 'pointer', textTransform: 'capitalize' }}>
+            {f === 'tutti' ? 'Tutti' : f.replace('_', ' ')}
+          </button>
+        ))}
+        <select value={filterUser} onChange={e => setFilterUser(e.target.value)}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--text)' }}>
+          <option value="tutti">Tutti gli utenti</option>
+          {profiles.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
+        </select>
+        <button onClick={loadAnnual} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', marginLeft: 'auto' }}>
+          Riepilogo annuale
+        </button>
+      </div>
+
+      {/* Table */}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--line)' }}>
+              {['Utente', 'Tipo', 'Dal', 'Al', 'Giorni', 'Stato', 'Azioni'].map(h => (
+                <th key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', padding: '8px 10px', textAlign: 'left' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(row => (
+              <tr key={row.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }}>
+                  {row.profiles?.first_name} {row.profiles?.last_name}
+                </td>
+                <td style={{ padding: '8px 10px' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 8px', borderRadius: 4, background: `${TIPO_COLORS[row.tipo] || '#888'}20`, color: TIPO_COLORS[row.tipo] || '#888' }}>{row.tipo}</span>
+                </td>
+                <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{row.data_inizio}</td>
+                <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{row.data_fine}</td>
+                <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)', fontWeight: 600 }}>{calcDays(row.data_inizio, row.data_fine)}</td>
+                <td style={{ padding: '8px 10px' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 8px', borderRadius: 4, background: `${STATO_COLORS[row.stato] || '#888'}20`, color: STATO_COLORS[row.stato] || '#888' }}>{row.stato.replace('_', ' ')}</span>
+                </td>
+                <td style={{ padding: '8px 10px' }}>
+                  {row.stato === 'in_attesa' && (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => approve(row.id, row)} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 8px', borderRadius: 4, border: 'none', background: '#22c55e20', color: '#22c55e', cursor: 'pointer' }}>Approva</button>
+                      <button onClick={() => { setDenyingId(row.id); setDenyNote('') }} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 8px', borderRadius: 4, border: 'none', background: 'rgba(208,0,58,0.1)', color: 'var(--red2)', cursor: 'pointer' }}>Nega</button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={7} style={{ padding: 20, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>Nessuna richiesta trovata</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Deny form inline */}
+      {denyingId && (
+        <div style={{ margin: '12px 0', padding: 14, borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg)' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginBottom: 8 }}>Motivazione per il rifiuto (min 10 caratteri):</p>
+          <textarea value={denyNote} onChange={e => setDenyNote(e.target.value)} rows={2} placeholder="Motivazione obbligatoria..."
+            style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', resize: 'vertical', marginBottom: 8 }} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => { const row = leaves.find(l => l.id === denyingId); if (row) deny(denyingId, row) }} disabled={denyNote.length < 10}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '5px 12px', borderRadius: 6, border: 'none', background: 'var(--red2)', color: '#fff', cursor: 'pointer', opacity: denyNote.length < 10 ? 0.4 : 1 }}>Conferma negazione</button>
+            <button onClick={() => setDenyingId(null)} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '5px 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--muted)', cursor: 'pointer' }}>Annulla</button>
+          </div>
+        </div>
+      )}
+
+      {/* Annual summary */}
+      {showAnnual && (
+        <div style={{ marginTop: 20, padding: 14, borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h4 style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text)' }}>Riepilogo annuale {new Date().getFullYear()}</h4>
+            <button onClick={() => setShowAnnual(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14 }}>X</button>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                {['Utente', 'Ferie', 'Permessi', 'Malattia', 'Recupero', 'Totale'].map(h => (
+                  <th key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', color: 'var(--muted)', padding: '6px 8px', textAlign: h === 'Utente' ? 'left' : 'center' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {profiles.map(p => {
+                const userRows = annualData.filter(a => a.user_id === p.id)
+                const ferie = userRows.find(r => r.tipo === 'ferie')?.giorni ?? 0
+                const permessi = userRows.find(r => r.tipo === 'permesso')?.giorni ?? 0
+                const malattia = userRows.find(r => r.tipo === 'malattia')?.giorni ?? 0
+                const recupero = userRows.find(r => r.tipo === 'recupero')?.giorni ?? 0
+                const tot = ferie + permessi + malattia + recupero
+                if (tot === 0) return null
+                return (
+                  <tr key={p.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                    <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{p.first_name} {p.last_name}</td>
+                    <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--blue)', textAlign: 'center' }}>{ferie || '-'}</td>
+                    <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#eab308', textAlign: 'center' }}>{permessi || '-'}</td>
+                    <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#6b7280', textAlign: 'center' }}>{malattia || '-'}</td>
+                    <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#22c55e', textAlign: 'center' }}>{recupero || '-'}</td>
+                    <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)', fontWeight: 700, textAlign: 'center' }}>{tot}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
