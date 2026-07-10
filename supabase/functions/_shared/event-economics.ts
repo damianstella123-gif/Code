@@ -50,6 +50,9 @@ export function calcRowEconomics(row: RawRow, category: string): RowEconomics {
     hasDate = !!(row.data && row.ora_inizio)
   }
 
+  venduto += (row.venduto_area_speciale as number) || 0
+  costo += (row.costo_area_speciale as number) || 0
+
   return { venduto, costo, hasDate }
 }
 

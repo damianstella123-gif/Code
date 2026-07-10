@@ -169,11 +169,11 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
       aliquota_iva_costo: '22', iva_inclusa_costo: false,
     }
     if (category === 'hotel') {
-      Object.assign(base, { sotto_categoria: 'pernottamento', titolo: '', data: '', ora_inizio: '', ora_fine: '', check_in_date: '', check_in_time: '', check_out_date: '', check_out_time: '', quantita: '1', pax: '', room_type: '', luogo: '', meeting_pax: '', meeting_setup: '', meeting_equipment: '', natural_light_preference: false, note: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10', payment_mode: 'cliente', rooms_client_count: '', rooms_simmetria_count: '', rooms_total_count: '', room_rate_client: '', room_cost_simmetria: '', commissione_attiva: false, commissione_percentuale: '', commissione_base: '', commissione_importo: '', commissione_note: '' })
+      Object.assign(base, { sotto_categoria: 'pernottamento', titolo: '', data: '', ora_inizio: '', ora_fine: '', check_in_date: '', check_in_time: '', check_out_date: '', check_out_time: '', quantita: '1', pax: '', room_type: '', luogo: '', meeting_pax: '', meeting_setup: '', meeting_equipment: '', natural_light_preference: false, note: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10', payment_mode: 'cliente', rooms_client_count: '', rooms_simmetria_count: '', rooms_total_count: '', room_rate_client: '', room_cost_simmetria: '', commissione_attiva: false, commissione_percentuale: '', commissione_base: '', commissione_importo: '', commissione_note: '', rooftop: false, outdoor: false, indoor: true, sala_riservata: false, costo_area_speciale: '', venduto_area_speciale: '', note_area_speciale: '' })
     } else if (category === 'transfer') {
       Object.assign(base, { titolo: '', data: '', ora_inizio: '', ora_fine: '', partenza: '', destinazione: '', quantita: '1', luogo: '', note: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else if (category === 'ristorante') {
-      Object.assign(base, { tipologia_servizio: '', data: '', ora_inizio: '', ora_fine: '', pax_previsti: '', pax_confermati: '', menu_portate: '', menu_descrizione: '', beverage_incluso: false, area_riservata: false, sala_privata: false, esclusiva_parziale: false, esclusiva_totale: false, nome_sala: '', note_location: '', num_vegetariani: '', num_vegani: '', allergie: '', intolleranze: '', richieste_alimentari: '', note_operative: '', budget_per_persona: '', budget_totale: '', costo_per_persona: '', costo_totale_reale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10' })
+      Object.assign(base, { tipologia_servizio: '', data: '', ora_inizio: '', ora_fine: '', pax_previsti: '', pax_confermati: '', menu_portate: '', menu_descrizione: '', beverage_incluso: false, area_riservata: false, sala_privata: false, esclusiva_parziale: false, esclusiva_totale: false, nome_sala: '', note_location: '', num_vegetariani: '', num_vegani: '', allergie: '', intolleranze: '', richieste_alimentari: '', note_operative: '', budget_per_persona: '', budget_totale: '', costo_per_persona: '', costo_totale_reale: '', aliquota_iva_venduto: '10', aliquota_iva_costo: '10', rooftop: false, outdoor: false, indoor: true, sala_riservata_area: false, costo_area_speciale: '', venduto_area_speciale: '', note_area_speciale: '' })
     } else if (category === 'experience') {
       Object.assign(base, { nome_attivita: '', tipologia: '', data: '', ora_inizio: '', ora_fine: '', location: '', pax: '', durata_minuti: '', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', ...(isDmc ? { dmc_categoria: '' } : {}) })
     } else if (category === 'catering') {
@@ -193,7 +193,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
     } else if (category === 'agenzia_viaggi') {
       Object.assign(base, { tipo_servizio: '', numero_pratica: '', destinazione: '', data_partenza: '', data_rientro: '', num_passeggeri: '', quantita: '1', note_operative: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
     } else {
-      Object.assign(base, { descrizione: '', quantita: '1', data: '', ora_inizio: '', note: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '' })
+      Object.assign(base, { descrizione: '', quantita: '1', data: '', ora_inizio: '', note: '', venduto_unitario: '', venduto_totale: '', costo_unitario: '', costo_totale: '', tipologia: '', rooftop: false, outdoor: false, indoor: true, sala_riservata: false, area_riservata: false, esclusiva_parziale: false, esclusiva_totale: false, costo_area_speciale: '', venduto_area_speciale: '', note_area_speciale: '' })
     }
     setForm(base)
   }
@@ -301,6 +301,13 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
         commissione_importo: sotto === 'pernottamento' ? commissioneImporto : null,
         commissione_note: sotto === 'pernottamento' ? (strOrNull('commissione_note') || null) : null,
         commissione_pct: sotto === 'pernottamento' && commissioneAttiva ? commissionePerc : null,
+        rooftop: !!form.rooftop,
+        outdoor: !!form.outdoor,
+        indoor: !!form.indoor,
+        sala_riservata: !!form.sala_riservata,
+        costo_area_speciale: numOrNull('costo_area_speciale'),
+        venduto_area_speciale: numOrNull('venduto_area_speciale'),
+        note_area_speciale: strOrEmpty('note_area_speciale') || null,
       })
     } else if (category === 'transfer') {
       const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
@@ -308,7 +315,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
     } else if (category === 'ristorante') {
       const paxP = numOrNull('pax_previsti'); const paxC = numOrNull('pax_confermati'); const pax = paxC ?? paxP ?? 1
       const bpp = numOrNull('budget_per_persona'); const cpp = numOrNull('costo_per_persona')
-      Object.assign(record, { tipologia_servizio: strOrEmpty('tipologia_servizio'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), pax_previsti: paxP, pax_confermati: paxC, menu_portate: strOrEmpty('menu_portate'), menu_descrizione: strOrEmpty('menu_descrizione'), beverage_incluso: !!form.beverage_incluso, area_riservata: !!form.area_riservata, sala_privata: !!form.sala_privata, esclusiva_parziale: !!form.esclusiva_parziale, esclusiva_totale: !!form.esclusiva_totale, nome_sala: strOrEmpty('nome_sala'), note_location: strOrEmpty('note_location'), num_vegetariani: numOrNull('num_vegetariani'), num_vegani: numOrNull('num_vegani'), allergie: strOrEmpty('allergie'), intolleranze: strOrEmpty('intolleranze'), richieste_alimentari: strOrEmpty('richieste_alimentari'), note_operative: strOrEmpty('note_operative'), budget_per_persona: bpp, budget_totale: numOrNull('budget_totale') ?? (bpp ? bpp * pax : null), costo_per_persona: cpp, costo_totale_reale: numOrNull('costo_totale_reale') ?? (cpp ? cpp * pax : null) })
+      Object.assign(record, { tipologia_servizio: strOrEmpty('tipologia_servizio'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), pax_previsti: paxP, pax_confermati: paxC, menu_portate: strOrEmpty('menu_portate'), menu_descrizione: strOrEmpty('menu_descrizione'), beverage_incluso: !!form.beverage_incluso, area_riservata: !!form.area_riservata, sala_privata: !!form.sala_privata, esclusiva_parziale: !!form.esclusiva_parziale, esclusiva_totale: !!form.esclusiva_totale, nome_sala: strOrEmpty('nome_sala'), note_location: strOrEmpty('note_location'), num_vegetariani: numOrNull('num_vegetariani'), num_vegani: numOrNull('num_vegani'), allergie: strOrEmpty('allergie'), intolleranze: strOrEmpty('intolleranze'), richieste_alimentari: strOrEmpty('richieste_alimentari'), note_operative: strOrEmpty('note_operative'), budget_per_persona: bpp, budget_totale: numOrNull('budget_totale') ?? (bpp ? bpp * pax : null), costo_per_persona: cpp, costo_totale_reale: numOrNull('costo_totale_reale') ?? (cpp ? cpp * pax : null), rooftop: !!form.rooftop, outdoor: !!form.outdoor, indoor: !!form.indoor, sala_riservata: !!form.sala_riservata_area || !!form.sala_riservata, costo_area_speciale: numOrNull('costo_area_speciale'), venduto_area_speciale: numOrNull('venduto_area_speciale'), note_area_speciale: strOrEmpty('note_area_speciale') || null })
     } else if (category === 'experience') {
       const pax = numOrNull('pax') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
       Object.assign(record, { nome_attivita: strOrEmpty('nome_attivita'), tipologia: strOrEmpty('tipologia'), data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), ora_fine: strOrNull('ora_fine'), location: strOrEmpty('location'), pax, durata_minuti: numOrNull('durata_minuti'), note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * pax : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * pax : null), ...(isDmc ? { dmc_categoria: strOrEmpty('dmc_categoria') || null } : {}) })
@@ -338,7 +345,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
       Object.assign(record, { tipo_servizio: strOrEmpty('tipo_servizio'), numero_pratica: strOrEmpty('numero_pratica'), destinazione: strOrEmpty('destinazione'), data_partenza: strOrNull('data_partenza'), data_rientro: strOrNull('data_rientro'), num_passeggeri: numOrNull('num_passeggeri'), quantita: qty, note_operative: strOrEmpty('note_operative'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
     } else {
       const qty = numOrNull('quantita') ?? 1; const vu = numOrNull('venduto_unitario'); const cu = numOrNull('costo_unitario')
-      Object.assign(record, { tipologia: strOrEmpty('tipologia') || null, descrizione: strOrEmpty('descrizione'), quantita: qty, data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), note: strOrEmpty('note'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null) })
+      Object.assign(record, { tipologia: strOrEmpty('tipologia') || null, descrizione: strOrEmpty('descrizione'), quantita: qty, data: strOrNull('data'), ora_inizio: strOrNull('ora_inizio'), note: strOrEmpty('note'), venduto_unitario: vu, venduto_totale: numOrNull('venduto_totale') ?? (vu ? vu * qty : null), costo_unitario: cu, costo_totale: numOrNull('costo_totale') ?? (cu ? cu * qty : null), rooftop: !!form.rooftop, outdoor: !!form.outdoor, indoor: !!form.indoor, sala_riservata: !!form.sala_riservata, area_riservata: !!form.area_riservata, esclusiva_parziale: !!form.esclusiva_parziale, esclusiva_totale: !!form.esclusiva_totale, costo_area_speciale: numOrNull('costo_area_speciale'), venduto_area_speciale: numOrNull('venduto_area_speciale'), note_area_speciale: strOrEmpty('note_area_speciale') || null })
     }
 
     let error: { message: string } | null = null
@@ -492,6 +499,30 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
       {chk('iva_inclusa_venduto', 'IVA inclusa nel venduto')}
       {sel('aliquota_iva_costo', 'IVA Costo %', IVA_OPTIONS)}
       {chk('iva_inclusa_costo', 'IVA inclusa nel costo')}
+    </div>
+  )
+
+  const hasSpecialArea = !!form.rooftop || !!form.outdoor || !!form.sala_riservata || !!form.esclusiva_parziale || !!form.esclusiva_totale || !!form.area_riservata
+
+  const areeFields = (includeLocation = false) => (
+    <div className="sm:col-span-3 pt-3 mt-3 space-y-3" style={{ borderTop: '1px solid var(--line)' }}>
+      <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Aree e Spazi</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {chk('indoor', 'Indoor')}
+        {chk('outdoor', 'Outdoor')}
+        {chk('rooftop', 'Rooftop')}
+        {chk('sala_riservata', 'Sala riservata')}
+        {includeLocation && chk('area_riservata', 'Area riservata')}
+        {includeLocation && chk('esclusiva_parziale', 'Esclusiva parziale')}
+        {includeLocation && chk('esclusiva_totale', 'Esclusiva totale')}
+      </div>
+      {hasSpecialArea && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+          {inp('costo_area_speciale', 'Costo area speciale', 'number')}
+          {inp('venduto_area_speciale', 'Venduto area speciale', 'number')}
+          {inp('note_area_speciale', 'Note area speciale')}
+        </div>
+      )}
     </div>
   )
 
@@ -649,6 +680,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
             </div>
             {ivaFields()}
           </div>
+          {areeFields()}
         </div>
       )
     }
@@ -677,6 +709,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
         <div className="sm:col-span-3">{inp('menu_descrizione', 'Descrizione menu')}</div>
         <div className="sm:col-span-3">{inp('note_operative', 'Note operative')}</div>
         {ivaFields()}
+        {areeFields()}
       </div>
     )
     if (category === 'experience') return (
@@ -807,6 +840,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
         {inp('costo_unitario', 'Costo/unit.', 'number')}{inp('costo_totale', 'Costo totale', 'number')}
         <div className="sm:col-span-3">{inp('note', 'Note')}</div>
         {ivaFields()}
+        {areeFields(true)}
       </div>
     )
   }
@@ -870,6 +904,16 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
                     {(item.ora_inizio as string) && <span>{(item.ora_inizio as string).slice(0, 5)}</span>}
                     {(item.partenza as string) && (item.destinazione as string) && <span>{item.partenza as string} → {item.destinazione as string}</span>}
                   </div>
+                  {!!(item.outdoor || item.rooftop || item.sala_riservata || item.area_riservata || item.esclusiva_parziale || item.esclusiva_totale) && (
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      {!!item.outdoor && <span className="px-1.5 py-0.5 rounded text-[9px]" style={{ fontFamily: 'var(--font-mono)', background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>Outdoor</span>}
+                      {!!item.rooftop && <span className="px-1.5 py-0.5 rounded text-[9px]" style={{ fontFamily: 'var(--font-mono)', background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>Rooftop</span>}
+                      {!!item.sala_riservata && <span className="px-1.5 py-0.5 rounded text-[9px]" style={{ fontFamily: 'var(--font-mono)', background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>Sala riservata</span>}
+                      {!!item.area_riservata && <span className="px-1.5 py-0.5 rounded text-[9px]" style={{ fontFamily: 'var(--font-mono)', background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>Area riservata</span>}
+                      {!!item.esclusiva_parziale && <span className="px-1.5 py-0.5 rounded text-[9px]" style={{ fontFamily: 'var(--font-mono)', background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>Esclusiva parziale</span>}
+                      {!!item.esclusiva_totale && <span className="px-1.5 py-0.5 rounded text-[9px]" style={{ fontFamily: 'var(--font-mono)', background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--line)' }}>Esclusiva totale</span>}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button onClick={() => startEdit(item)} className="p-1.5 rounded hover:bg-white/10">
