@@ -17,6 +17,7 @@ import {
   Download,
   Paperclip,
   Eye,
+  ExternalLink,
 } from 'lucide-react'
 import { type Pratica, type CategoriaPratica, type StatoPratica, type PrioritaPratica } from '@/data/pratiche'
 import type { Event } from '@/data/events'
@@ -428,7 +429,10 @@ function UnassignedDocumentsSection() {
 
 function DocRow({ doc, onRemove }: { doc: DossierDocument; onRemove?: () => void }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [previewType, setPreviewType] = useState<'image' | 'pdf' | 'office' | null>(null)
+  const [previewType, setPreviewType] = useState<'image' | 'pdf' | null>(null)
+
+  const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']
+  const OFFICE_EXTS = ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt']
 
   async function handleDownload() {
     const { data, error } = await supabase.storage.from('documents').download(doc.file_path)
@@ -441,26 +445,35 @@ function DocRow({ doc, onRemove }: { doc: DossierDocument; onRemove?: () => void
     URL.revokeObjectURL(url)
   }
 
-  function handlePreview() {
+  async function handlePreview() {
     const ext = doc.file_name.split('.').pop()?.toLowerCase() ?? ''
-    const previewable = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt']
-    if (!previewable.includes(ext)) { handleDownload(); return }
 
-    const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path)
-    if (!data?.publicUrl) return
-
-    const publicUrl = data.publicUrl
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-      setPreviewUrl(publicUrl)
+    if (IMAGE_EXTS.includes(ext)) {
+      const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path)
+      if (!data?.publicUrl) return
+      setPreviewUrl(data.publicUrl)
       setPreviewType('image')
     } else if (ext === 'pdf') {
-      setPreviewUrl(publicUrl)
+      const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path)
+      if (!data?.publicUrl) return
+      setPreviewUrl(data.publicUrl)
       setPreviewType('pdf')
+    } else if (OFFICE_EXTS.includes(ext)) {
+      const { data } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(doc.file_path, 300)
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+      } else {
+        handleDownload()
+      }
     } else {
-      setPreviewUrl(`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(publicUrl)}`)
-      setPreviewType('office')
+      handleDownload()
     }
   }
+
+  const ext = doc.file_name.split('.').pop()?.toLowerCase() ?? ''
+  const isOffice = OFFICE_EXTS.includes(ext)
 
   return (
     <>
@@ -477,8 +490,13 @@ function DocRow({ doc, onRemove }: { doc: DossierDocument; onRemove?: () => void
           </p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={handlePreview} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Anteprima">
-            <Eye className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />
+          <button onClick={handlePreview} className="p-1.5 rounded-lg transition-all hover:bg-white/10"
+            title={isOffice ? 'Apri' : 'Anteprima'}>
+            {isOffice ? (
+              <ExternalLink className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />
+            ) : (
+              <Eye className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />
+            )}
           </button>
           <button onClick={handleDownload} className="p-1.5 rounded-lg transition-all hover:bg-white/10" title="Scarica">
             <Download className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
@@ -505,14 +523,6 @@ function DocRow({ doc, onRemove }: { doc: DossierDocument; onRemove?: () => void
             )}
             {previewType === 'pdf' && (
               <iframe src={previewUrl} style={{ width: '100%', height: '85vh', border: 'none', borderRadius: 12, maxWidth: 900 }} title={doc.nome} />
-            )}
-            {previewType === 'office' && (
-              <div style={{ width: '100%', maxWidth: 960 }}>
-                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginBottom: 8, textAlign: 'center' }}>
-                  Anteprima via Microsoft Office Online
-                </p>
-                <iframe src={previewUrl} style={{ width: '100%', height: '80vh', border: 'none', borderRadius: 12 }} title={doc.nome} />
-              </div>
             )}
           </div>
         </div>

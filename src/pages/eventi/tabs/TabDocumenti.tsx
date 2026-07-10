@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, Upload, Download, Eye, Trash2, X } from 'lucide-react'
+import { FileText, Upload, Download, Eye, Trash2, X, ExternalLink } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
@@ -114,30 +114,45 @@ export function TabDocumenti({ event }: { event: Event }) {
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewName, setPreviewName] = useState('')
-  const [previewType, setPreviewType] = useState<'image' | 'pdf' | 'office' | null>(null)
+  const [previewType, setPreviewType] = useState<'image' | 'pdf' | null>(null)
 
-  function handlePreview(doc: EventDocument) {
+  const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']
+  const OFFICE_EXTS = ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt']
+
+  async function handlePreview(doc: EventDocument) {
     const ext = doc.file_name.split('.').pop()?.toLowerCase() ?? ''
-    const previewable = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt']
-    if (!previewable.includes(ext)) { handleDownload(doc); return }
 
-    const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path)
-    if (!data?.publicUrl) return
-
-    const publicUrl = data.publicUrl
-
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-      setPreviewUrl(publicUrl)
+    if (IMAGE_EXTS.includes(ext)) {
+      const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path)
+      if (!data?.publicUrl) return
+      setPreviewUrl(data.publicUrl)
       setPreviewType('image')
+      setPreviewName(doc.nome || doc.file_name)
     } else if (ext === 'pdf') {
-      setPreviewUrl(publicUrl)
+      const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path)
+      if (!data?.publicUrl) return
+      setPreviewUrl(data.publicUrl)
       setPreviewType('pdf')
+      setPreviewName(doc.nome || doc.file_name)
+    } else if (OFFICE_EXTS.includes(ext)) {
+      const { data } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(doc.file_path, 300)
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+      } else {
+        handleDownload(doc)
+      }
     } else {
-      const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(publicUrl)}`
-      setPreviewUrl(viewerUrl)
-      setPreviewType('office')
+      handleDownload(doc)
     }
-    setPreviewName(doc.nome || doc.file_name)
+  }
+
+  function getActionLabel(doc: EventDocument): string {
+    const ext = doc.file_name.split('.').pop()?.toLowerCase() ?? ''
+    if (IMAGE_EXTS.includes(ext) || ext === 'pdf') return 'Anteprima'
+    if (OFFICE_EXTS.includes(ext)) return 'Apri'
+    return 'Scarica'
   }
 
   async function handleDelete(id: string) {
@@ -198,9 +213,15 @@ export function TabDocumenti({ event }: { event: Event }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <button onClick={() => handlePreview(doc)} title="Apri"
-                    className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
-                    <Eye className="w-4 h-4" style={{ color: 'var(--green)' }} />
+                  <button onClick={() => handlePreview(doc)} title={getActionLabel(doc)}
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-[var(--line)]"
+                    style={{ color: 'var(--green)' }}>
+                    {OFFICE_EXTS.includes(doc.file_name.split('.').pop()?.toLowerCase() ?? '') ? (
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    ) : (
+                      <Eye className="w-3.5 h-3.5" />
+                    )}
+                    <span>{getActionLabel(doc)}</span>
                   </button>
                   <button onClick={() => handleDownload(doc)} title="Scarica"
                     className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
@@ -245,14 +266,6 @@ export function TabDocumenti({ event }: { event: Event }) {
             )}
             {previewType === 'pdf' && (
               <iframe src={previewUrl} style={{ width: '100%', height: '85vh', border: 'none', borderRadius: 12, maxWidth: 900 }} title={previewName} />
-            )}
-            {previewType === 'office' && (
-              <div style={{ width: '100%', maxWidth: 960 }}>
-                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginBottom: 8, textAlign: 'center' }}>
-                  Anteprima via Microsoft Office Online
-                </p>
-                <iframe src={previewUrl} style={{ width: '100%', height: '80vh', border: 'none', borderRadius: 12 }} title={previewName} />
-              </div>
             )}
           </div>
         </div>
