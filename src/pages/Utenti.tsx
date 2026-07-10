@@ -30,17 +30,10 @@ function roleColor(role: string) {
     case 'Super Admin': return 'var(--red2)'
     case 'Admin': return '#e67e22'
     case 'Senior PM': return '#8e44ad'
-    case 'Partner': return 'var(--red2)'
     case 'Project Manager': return 'var(--blue)'
+    case 'Regista': return '#9b59b6'
     case 'Commerciale': return '#27ae60'
-    case 'Finance': return '#16a085'
-    case 'Event Coordinator': return '#38d27d'
-    case 'Event Assistant': return 'var(--yellow)'
-    case 'Junior Event Assistant': return 'var(--muted)'
-    case 'Amministrazione': return '#38d27d'
-    case 'Production Manager': return 'var(--blue)'
-    case 'Digital Strategist': return 'var(--yellow)'
-    case 'User': return 'var(--muted)'
+    case 'Amministrazione': return '#16a085'
     default: return 'var(--muted)'
   }
 }
@@ -77,7 +70,7 @@ const emptyCreateForm: CreateFormData = {
   last_name: '',
   email: '',
   password: '',
-  role: 'Junior Event Assistant',
+  role: 'Project Manager',
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
@@ -95,7 +88,7 @@ export default function Utenti() {
   const [editingUser, setEditingUser] = useState<Profile | null>(null)
   const [resetUser, setResetUser] = useState<Profile | null>(null)
   const [createForm, setCreateForm] = useState<CreateFormData>(emptyCreateForm)
-  const [editForm, setEditForm] = useState<EditFormData>({ first_name: '', last_name: '', email: '', role: 'Junior Event Assistant', is_active: true, avatar_url: '' })
+  const [editForm, setEditForm] = useState<EditFormData>({ first_name: '', last_name: '', email: '', role: 'Project Manager', is_active: true, avatar_url: '' })
   const [newPassword, setNewPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null)
@@ -861,13 +854,13 @@ function FormField({ label, value, onChange, type = 'text', placeholder, icon }:
 }
 
 const ROLE_DESCRIPTIONS: Partial<Record<AppRole, string>> = {
-  'Super Admin': 'Accesso totale al sistema',
-  'Admin': 'Direzione, approva tutto',
-  'Senior PM': 'Autonomia pagamenti fino a soglia €5.000',
-  'Project Manager': 'Gestione propri eventi, autonomia €2.000',
-  'Commerciale': 'Accesso CRM, clienti e creative',
-  'Finance': 'Accesso amministrazione e cash flow',
-  'User': 'Accesso base',
+  'Super Admin': 'Accesso totale',
+  'Admin': 'Direzione aziendale',
+  'Senior PM': 'PM con autonomia estesa',
+  'Project Manager': 'Gestione eventi',
+  'Regista': 'Regia tecnica eventi',
+  'Commerciale': 'Vendite e clienti',
+  'Amministrazione': 'Contabilita e pagamenti',
 }
 
 function RoleSelect({ value, onChange }: { value: AppRole; onChange: (v: AppRole) => void }) {

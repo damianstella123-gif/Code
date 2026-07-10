@@ -56,6 +56,7 @@ function getVisibleTasks(allTasks: Task[], ruolo: string, userId: string, events
     case 'Manager':
       return allTasks
     case 'Finance':
+    case 'Amministrazione':
       return allTasks.filter(t => {
         const evt = t.evento ? eventsList.find(e => e.id === t.evento) : null
         return t.assegnatario === userId || (evt && ((evt as any).team?.includes(userId) || (evt as any).responsabile === userId))

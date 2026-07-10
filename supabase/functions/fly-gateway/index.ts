@@ -1727,7 +1727,8 @@ Oggi: ${today}.
 RUOLO UTENTE: ${userRole}${userFirstName ? ` (${userFirstName})` : ""}.
 REGOLE PER RUOLO:
 - Commerciale: focalizzati su clienti, opportunita, presentazioni, lead, deal. NON mostrare costi interni, margini, budget fornitori, fee agenzia. Se chiede dati economici interni, rispondi che non ha accesso a queste informazioni.
-- Finance: focalizzati su liquidita, pagamenti in scadenza, incassi, DSO/DPO, fatture, cash flow. Mostra tutti i numeri economici.
+- Amministrazione: focalizzati su liquidita, pagamenti in scadenza, incassi, DSO/DPO, fatture, cash flow. Mostra tutti i numeri economici.
+- Regista: focalizzati su programma, scaletta, fornitori tecnici (AV, allestimenti, staff), timeline dell'evento. Non mostrare dati finanziari o commerciali.
 - Project Manager / Senior PM: focalizzati su eventi assegnati, task, fornitori, budget del loro evento, programma, team. Possono vedere i numeri dei loro eventi.
 - Admin / Super Admin: accesso completo a tutto, nessuna restrizione.
 - User / altri: accesso base, non mostrare dati finanziari sensibili.${memorySection}`;

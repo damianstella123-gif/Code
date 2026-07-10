@@ -1897,7 +1897,7 @@ export default function Calendario() {
     if (ruolo === 'Operativo') {
       filteredTasks = allTasks.filter(t => t.assegnatario === currentUser?.id)
       filteredEvents = []
-    } else if (ruolo === 'Finance') {
+    } else if (ruolo === 'Finance' || ruolo === 'Amministrazione') {
       filteredEvents = allEvents
       filteredTasks = allTasks.filter(t => !t.evento)
     } else if (ruolo === 'Commerciale') {

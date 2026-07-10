@@ -411,8 +411,8 @@ type TabId = 'dashboard' | 'entrate' | 'uscite' | 'fatture' | 'invoices' | 'docu
 export default function Amministrazione() {
   const currentUser = loadUser()
 
-  // Permission gate - only Admin, Super Admin, Finance can access fiscal area
-  const FISCAL_ROLES = ['Admin', 'Super Admin', 'Finance']
+  // Permission gate - only Admin, Super Admin, Amministrazione can access fiscal area
+  const FISCAL_ROLES = ['Admin', 'Super Admin', 'Amministrazione']
   if (!currentUser || !FISCAL_ROLES.includes(currentUser.ruolo || currentUser.role || '')) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">

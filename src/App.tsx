@@ -34,7 +34,7 @@ function PageLoader() {
 }
 
 /* 2FA — temporaneamente disattivato */
-export const ROLES_REQUIRING_2FA = ['Super Admin', 'Admin', 'Finance']
+export const ROLES_REQUIRING_2FA = ['Super Admin', 'Admin', 'Amministrazione']
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true)

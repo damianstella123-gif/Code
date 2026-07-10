@@ -119,7 +119,7 @@ function score(fields: string[], query: string): number {
 
 function getVisibleEvents(ruolo: string, userId: string) {
   const events = loadEventsFromStorage()
-  if (ruolo === 'Admin' || ruolo === 'Finance') return events
+  if (ruolo === 'Admin' || ruolo === 'Amministrazione') return events
   if (ruolo === 'Manager' || ruolo === 'Commerciale')
     return events.filter(e => e.responsabile === userId || e.team.includes(userId))
   if (ruolo === 'Operativo')
@@ -129,7 +129,7 @@ function getVisibleEvents(ruolo: string, userId: string) {
 function getVisibleTasks(ruolo: string, userId: string) {
   const tasks = loadTasksFromStorage()
   if (ruolo === 'Admin' || ruolo === 'Manager') return tasks
-  if (ruolo === 'Finance') return tasks.filter(t => !t.evento)
+  if (ruolo === 'Amministrazione') return tasks.filter(t => !t.evento)
   return tasks.filter(t => t.assegnatario === userId)
 }
 function getVisibleUsers(ruolo: string) {
@@ -141,7 +141,7 @@ function getVisibleClients(ruolo: string) {
   return []
 }
 function getVisibleSuppliers(ruolo: string) {
-  if (ruolo === 'Admin' || ruolo === 'Manager' || ruolo === 'Finance') return suppliers
+  if (ruolo === 'Admin' || ruolo === 'Manager' || ruolo === 'Amministrazione') return suppliers
   return []
 }
 function getVisibleMessages(ruolo: string, userId: string) {
@@ -150,7 +150,7 @@ function getVisibleMessages(ruolo: string, userId: string) {
 }
 function getVisibleWorkflows(ruolo: string, userId: string) {
   const wfs = loadWorkflowsFromStorage()
-  if (ruolo === 'Admin' || ruolo === 'Finance') return wfs
+  if (ruolo === 'Admin' || ruolo === 'Amministrazione') return wfs
   const myEvtIds = getVisibleEvents(ruolo, userId).map(e => e.id)
   return wfs.filter(w => myEvtIds.includes(w.eventoId))
 }

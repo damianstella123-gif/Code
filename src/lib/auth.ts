@@ -52,7 +52,7 @@ export function isAdmin(user: AuthUser | null): boolean {
 }
 
 export function isManager(user: AuthUser | null): boolean {
-  return user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Senior PM' || user?.role === 'Project Manager'
+  return ['Super Admin', 'Admin', 'Senior PM', 'Project Manager', 'Regista'].includes(user?.role || '')
 }
 
 export function canManageUsers(user: AuthUser | null): boolean {
@@ -76,16 +76,19 @@ export function isSeniorPM(user: AuthUser | null): boolean {
 }
 
 export function isFinance(user: AuthUser | null): boolean {
-  return user?.role === 'Finance'
+  return user?.role === 'Amministrazione'
+}
+
+export function isRegista(user: AuthUser | null): boolean {
+  return user?.role === 'Regista'
 }
 
 export function isCommerciale(user: AuthUser | null): boolean {
   return user?.role === 'Commerciale'
 }
 
-// Legacy compat - used by Amministrazione page
 export function isPartnerUser(user: AuthUser | null): boolean {
-  return isManager(user) || user?.role === 'Finance'
+  return isManager(user) || user?.role === 'Amministrazione'
 }
 
 export type NavItem = {
@@ -121,19 +124,25 @@ export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
     )
   }
 
+  if (role === 'Regista') {
+    return ALL_NAV.filter(item =>
+      ['/dashboard', '/eventi', '/task', '/calendario', '/fornitori', '/comunicazioni', '/dossier', '/impostazioni', '/feedback-beta'].includes(item.href)
+    )
+  }
+
   if (role === 'Commerciale') {
     return ALL_NAV.filter(item =>
       ['/dashboard', '/crm', '/presentazioni', '/comunicazioni', '/calendario', '/dossier', '/creative-studio', '/impostazioni', '/feedback-beta'].includes(item.href)
     )
   }
 
-  if (role === 'Finance') {
+  if (role === 'Amministrazione' || role === 'Finance') {
     return ALL_NAV.filter(item =>
       ['/dashboard', '/amministrazione', '/eventi', '/calendario', '/impostazioni', '/feedback-beta'].includes(item.href)
     )
   }
 
-  // User / any other role: basic access
+  // Any other role: basic access
   return ALL_NAV.filter(item =>
     !['/amministrazione', '/utenti', '/performance'].includes(item.href)
   )

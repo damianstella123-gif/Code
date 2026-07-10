@@ -2,7 +2,7 @@ export interface User {
   id: string
   nome: string
   email: string
-  ruolo: 'Admin' | 'Manager' | 'Operativo' | 'Finance' | 'Commerciale' | 'Fornitore'
+  ruolo: 'Admin' | 'Manager' | 'Operativo' | 'Amministrazione' | 'Commerciale' | 'Fornitore' | 'Regista'
   reparto: string
   avatar: string
   stato: 'attivo' | 'ferie' | 'malattia'
@@ -40,7 +40,7 @@ export const users: User[] = [
     id: 'usr_004',
     nome: 'Anna Martini',
     email: 'a.martini@simmetria.it',
-    ruolo: 'Finance',
+    ruolo: 'Amministrazione',
     reparto: 'Amministrazione',
     avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
     stato: 'attivo',
@@ -76,7 +76,7 @@ export const users: User[] = [
     id: 'usr_008',
     nome: 'Chiara Galli',
     email: 'c.galli@simmetria.it',
-    ruolo: 'Finance',
+    ruolo: 'Amministrazione',
     reparto: 'Amministrazione',
     avatar: 'https://images.unsplash.com/photo-1534528741773-5394a9f0a8ef?w=150&h=150&fit=crop&crop=face',
     stato: 'attivo',
