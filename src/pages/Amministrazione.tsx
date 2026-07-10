@@ -631,6 +631,24 @@ export default function Amministrazione() {
   const margine = totEntrate - totUscite
   const marginePerc = totEntrate > 0 ? Math.round((margine / totEntrate) * 100) : 0
 
+  // ─── DSO / DPO ─────────────────────────────────────────────────────────────
+  const { dso, dpo } = useMemo(() => {
+    function avgDays(payments: EventPayment[]) {
+      const valid = payments.filter(p => p.data_pagamento && p.created_at)
+      if (valid.length === 0) return 0
+      const totalDays = valid.reduce((sum, p) => {
+        const created = new Date(p.created_at).getTime()
+        const paid = new Date(p.data_pagamento!).getTime()
+        return sum + Math.max(0, (paid - created) / 86400000)
+      }, 0)
+      return Math.round(totalDays / valid.length)
+    }
+    return {
+      dso: avgDays(eventIncassiForFilter),
+      dpo: avgDays(eventPaymentsForFilter),
+    }
+  }, [eventIncassiForFilter, eventPaymentsForFilter])
+
   // ─── Double-counting detection ───────────────────────────────────────────────
   const doppioConteggioAlerts = useMemo(() => {
     const alerts: { eventId: string; eventName: string; manuali: number; servizi: number; tipo: 'uscite' | 'entrate' }[] = []
@@ -1253,6 +1271,30 @@ export default function Amministrazione() {
               </div>
             </div>
           </div>
+
+          {/* DSO / DPO */}
+          {(dso > 0 || dpo > 0) && (
+            <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+              <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 16 }}>Tempi di Incasso e Pagamento</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div style={{ background: 'var(--panel2)', borderRadius: 10, padding: 16 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase', color: 'var(--muted)', letterSpacing: '0.04em', marginBottom: 8 }}>DSO (Days Sales Outstanding)</p>
+                  <p style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 600, color: 'var(--text)', lineHeight: 1.1 }}>{dso}<span style={{ fontSize: 14, color: 'var(--muted)', marginLeft: 4 }}>gg</span></p>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>I clienti ci pagano mediamente in {dso}gg</p>
+                </div>
+                <div style={{ background: 'var(--panel2)', borderRadius: 10, padding: 16 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase', color: 'var(--muted)', letterSpacing: '0.04em', marginBottom: 8 }}>DPO (Days Payable Outstanding)</p>
+                  <p style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 600, color: 'var(--text)', lineHeight: 1.1 }}>{dpo}<span style={{ fontSize: 14, color: 'var(--muted)', marginLeft: 4 }}>gg</span></p>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>Paghiamo i fornitori mediamente in {dpo}gg</p>
+                </div>
+                <div style={{ background: 'var(--panel2)', borderRadius: 10, padding: 16 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase', color: 'var(--muted)', letterSpacing: '0.04em', marginBottom: 8 }}>Gap Strutturale</p>
+                  <p style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 600, color: (dso - dpo) >= 0 ? 'var(--red2)' : 'var(--green)', lineHeight: 1.1 }}>{dso - dpo}<span style={{ fontSize: 14, color: 'var(--muted)', marginLeft: 4 }}>gg</span></p>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{(dso - dpo) > 0 ? 'Anticipiamo i fornitori rispetto agli incassi' : 'Incassiamo prima di pagare i fornitori'}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Budget per evento */}
           <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
