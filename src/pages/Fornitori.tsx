@@ -15,6 +15,7 @@ import { useRealtimeTable } from '@/lib/use-realtime'
 import { supabase } from '@/lib/supabase'
 import type { Supplier, SupplierDetails, SalaMeeting, StatoContratto } from '@/data/suppliers'
 import { SUPPLIER_CATEGORIES } from '@/data/suppliers'
+import { SupplierPhotoGallery, useSupplierCoverPhoto } from '@/components/SupplierPhotoGallery'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -719,56 +720,91 @@ function SupplierCard({ supplier, onClick }: { supplier: Supplier; onClick: () =
   const capacity = getCapacity(supplier)
   const rooms = getRooms(supplier)
   const meetingRooms = getMeetingRooms(supplier)
+  const coverUrl = useSupplierCoverPhoto(supplier.id)
 
   return (
     <div onClick={onClick}
-      className="cursor-pointer transition-all"
-      style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '16px 18px' }}
+      className="cursor-pointer transition-all overflow-hidden"
+      style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px' }}
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}>
-      <div className="flex items-start gap-3 mb-3">
-        <SupplierLogo supplier={supplier} size={40} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate" style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)' }}>{supplier.nome}</p>
-          <p className="truncate" style={{ fontSize: '11.5px', color: 'var(--muted)', marginTop: '2px' }}>
-            {geoLine || normalizeCategory(supplier.categoria)}
-          </p>
-        </div>
-        {supplier.stato === 'inattivo' && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)' }}>Inattivo</span>
-        )}
-      </div>
-      <div className="flex items-center gap-2 mb-2 flex-wrap">
-        {(() => {
-          const cats = supplier.categorie?.length ? supplier.categorie : [supplier.categoria]
-          const shown = cats.slice(0, 2)
-          const rest = cats.length - 2
-          return (
-            <>
-              {shown.map(c => (
-                <span key={c} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>
+      {coverUrl && (
+        <div style={{
+          height: 100, borderRadius: '12px 12px 0 0',
+          background: `linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.6)), url(${coverUrl}) center/cover`,
+          position: 'relative',
+        }}>
+          <div className="absolute top-2 left-2 flex items-center gap-1.5">
+            {(() => {
+              const cats = supplier.categorie?.length ? supplier.categorie : [supplier.categoria]
+              return cats.slice(0, 1).map(c => (
+                <span key={c} style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', padding: '2px 5px', borderRadius: '3px', background: 'rgba(0,0,0,0.5)', color: 'white' }}>
                   {normalizeCategory(c)}
                 </span>
-              ))}
-              {rest > 0 && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)' }}>+{rest} altre</span>}
-            </>
-          )
-        })()}
-        <div className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
-          {rooms > 0 && <span>{rooms} camere</span>}
-          {capacity > 0 && <span>cap. {capacity}</span>}
-          {meetingRooms > 0 && <span>{meetingRooms} sale</span>}
-        </div>
-      </div>
-      <InteractiveStars rating={supplier.rating} size="sm" />
-      {supplier.servizi.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2">
-          {supplier.servizi.slice(0, 3).map(s => (
-            <span key={s} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>{s}</span>
-          ))}
-          {supplier.servizi.length > 3 && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>+{supplier.servizi.length - 3}</span>}
+              ))
+            })()}
+          </div>
+          {supplier.rating > 0 && (
+            <div className="absolute top-2 right-2 flex items-center gap-0.5" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'white', background: 'rgba(0,0,0,0.5)', padding: '2px 5px', borderRadius: 3 }}>
+              <Star className="w-2.5 h-2.5" style={{ fill: '#ffc24b', color: '#ffc24b' }} /> {supplier.rating}
+            </div>
+          )}
         </div>
       )}
+      <div style={{ padding: '16px 18px' }}>
+        <div className="flex items-start gap-3 mb-3">
+          <SupplierLogo supplier={supplier} size={40} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate" style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)' }}>{supplier.nome}</p>
+            <p className="truncate" style={{ fontSize: '11.5px', color: 'var(--muted)', marginTop: '2px' }}>
+              {geoLine || normalizeCategory(supplier.categoria)}
+            </p>
+          </div>
+          {supplier.stato === 'inattivo' && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)' }}>Inattivo</span>
+          )}
+        </div>
+        {!coverUrl && (
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            {(() => {
+              const cats = supplier.categorie?.length ? supplier.categorie : [supplier.categoria]
+              const shown = cats.slice(0, 2)
+              const rest = cats.length - 2
+              return (
+                <>
+                  {shown.map(c => (
+                    <span key={c} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>
+                      {normalizeCategory(c)}
+                    </span>
+                  ))}
+                  {rest > 0 && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)' }}>+{rest} altre</span>}
+                </>
+              )
+            })()}
+            <div className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
+              {rooms > 0 && <span>{rooms} camere</span>}
+              {capacity > 0 && <span>cap. {capacity}</span>}
+              {meetingRooms > 0 && <span>{meetingRooms} sale</span>}
+            </div>
+          </div>
+        )}
+        {!coverUrl && <InteractiveStars rating={supplier.rating} size="sm" />}
+        {coverUrl && (
+          <div className="flex items-center gap-2 mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
+            {rooms > 0 && <span>{rooms} camere</span>}
+            {capacity > 0 && <span>cap. {capacity}</span>}
+            {meetingRooms > 0 && <span>{meetingRooms} sale</span>}
+          </div>
+        )}
+        {supplier.servizi.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {supplier.servizi.slice(0, 3).map(s => (
+              <span key={s} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>{s}</span>
+            ))}
+            {supplier.servizi.length > 3 && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: 'var(--panel2)', color: 'var(--muted)' }}>+{supplier.servizi.length - 3}</span>}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -1119,6 +1155,7 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
 
       {d && Object.keys(d).length > 0 && (
         <DetailSection title={`SCHEDA ${cat.toUpperCase()}`}>
+          <SupplierPhotoGallery supplierId={supplier.id} supplierCategory={cat} />
           {cat === 'Hotel' ? <HotelCard d={d} /> :
            cat === 'Ristorante' ? <RistoranteCard d={d} /> :
            cat === 'Location' ? <LocationCard d={d} /> :
@@ -1131,6 +1168,12 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
            cat === 'Allestimenti' ? <AllestimentiCard d={d} /> :
            (cat === 'Esperienze' || cat === 'Entertainment') ? <ExperienceCard d={d} /> :
            <GenericDetailCard d={d} />}
+        </DetailSection>
+      )}
+
+      {(!d || Object.keys(d).length === 0) && (
+        <DetailSection title="FOTO">
+          <SupplierPhotoGallery supplierId={supplier.id} supplierCategory={cat} />
         </DetailSection>
       )}
 
