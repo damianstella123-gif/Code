@@ -168,6 +168,102 @@ export interface SupplierDetails {
   tipologia_attivita?: string
   durata?: string
   dehor?: boolean
+
+  // Location (new)
+  loc_tipo?: string
+  loc_capienza_teatro?: number
+  loc_capienza_cocktail?: number
+  loc_capienza_banquetto?: number
+  loc_capienza_cabaret?: number
+  loc_mq?: number
+  loc_outdoor?: boolean
+  loc_indoor?: boolean
+  loc_rooftop?: boolean
+  loc_parcheggio?: boolean
+  loc_esclusiva?: boolean
+  loc_catering_interno?: boolean
+  loc_note_tecniche?: string
+
+  // Audio Video (new)
+  av_tipologie?: string[]
+  av_marchi?: string
+  av_led_wall?: boolean
+  av_led_wall_mq?: number
+  av_streaming?: boolean
+  av_regia?: boolean
+  av_montaggio_incluso?: boolean
+  av_note?: string
+
+  // Catering (new)
+  cat_stile?: string
+  cat_min_pax?: number
+  cat_max_pax?: number
+  cat_servizio_tavolo?: boolean
+  cat_buffet?: boolean
+  cat_finger_food?: boolean
+  cat_bio?: boolean
+  cat_km0?: boolean
+  cat_allergie_gestite?: boolean
+  cat_beverage?: boolean
+  cat_personale_incluso?: boolean
+
+  // DMC
+  dmc_paesi?: string[]
+  dmc_lingue?: string[]
+  dmc_specialita?: string[]
+  dmc_anni_esperienza?: number
+  dmc_iata?: boolean
+  dmc_incentive?: boolean
+  dmc_congressi?: boolean
+  dmc_team_building?: boolean
+
+  // Transfer
+  tr_flotta_auto?: number
+  tr_flotta_minivan?: number
+  tr_flotta_bus?: number
+  tr_flotta_pullman?: number
+  tr_lingue_autisti?: string[]
+  tr_ncc?: boolean
+  tr_vip?: boolean
+  tr_h24?: boolean
+
+  // Staff
+  stf_ruoli?: string[]
+  stf_lingue?: string[]
+  stf_min_ordine?: number
+  stf_hostess?: boolean
+  stf_steward?: boolean
+  stf_promoter?: boolean
+  stf_interpreti?: boolean
+  stf_divisa?: boolean
+
+  // Agenzia Viaggi
+  ag_iata?: boolean
+  ag_vettori?: string[]
+  ag_destinazioni?: string[]
+  ag_biglietteria_aerea?: boolean
+  ag_biglietteria_treno?: boolean
+  ag_pacchetti?: boolean
+  ag_mice?: boolean
+
+  // Allestimenti
+  all_tipologie?: string[]
+  all_montaggio_incluso?: boolean
+  all_noleggio?: boolean
+  all_vendita?: boolean
+  all_grafica_inclusa?: boolean
+  all_min_budget?: number
+
+  // Experience
+  exp_tipologia?: string
+  exp_min_pax?: number
+  exp_max_pax?: number
+  exp_durata_minuti?: number
+  exp_outdoor?: boolean
+  exp_indoor?: boolean
+  exp_stagionalita?: string[]
+  exp_lingue?: string[]
+
   [key: string]: unknown
 }
 

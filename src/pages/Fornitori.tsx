@@ -330,6 +330,370 @@ function RistoranteCard({ d }: { d: SupplierDetails }) {
   )
 }
 
+function LocationCard({ d }: { d: SupplierDetails }) {
+  const hasCapienza = d.loc_capienza_teatro || d.loc_capienza_cocktail || d.loc_capienza_banquetto || d.loc_capienza_cabaret
+  return (
+    <div className="space-y-4">
+      {hasCapienza && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '10px' }}>CAPIENZA</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Teatro', value: d.loc_capienza_teatro },
+              { label: 'Cocktail', value: d.loc_capienza_cocktail },
+              { label: 'Banquetto', value: d.loc_capienza_banquetto },
+              { label: 'Cabaret', value: d.loc_capienza_cabaret },
+            ].filter(c => c.value).map(c => (
+              <div key={c.label} className="rounded-lg p-3 text-center" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', color: 'var(--muted)' }}>{c.label}</p>
+                <p style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', fontWeight: 600, color: 'var(--text)', marginTop: '2px' }}>{c.value}</p>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)' }}>pax</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {d.loc_mq && (
+        <p style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', fontWeight: 600, color: 'var(--text)' }}>{d.loc_mq} m&sup2;</p>
+      )}
+      <InfoGrid items={[
+        { label: 'Tipo', value: d.loc_tipo || d.tipo_location },
+        { label: 'Capienza massima', value: d.capienza_massima },
+      ]} />
+      <BoolGrid items={[
+        { label: 'Outdoor', value: d.loc_outdoor || d.spazi_esterni },
+        { label: 'Indoor', value: d.loc_indoor || d.spazi_interni },
+        { label: 'Rooftop', value: d.loc_rooftop },
+        { label: 'Parcheggio', value: d.loc_parcheggio },
+        { label: 'Esclusiva', value: d.loc_esclusiva || d.esclusiva },
+        { label: 'Catering interno', value: d.loc_catering_interno || d.catering_interno },
+      ]} />
+      {d.loc_note_tecniche && (
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', marginTop: '8px' }}>{d.loc_note_tecniche}</p>
+      )}
+    </div>
+  )
+}
+
+function AudioVideoCard({ d }: { d: SupplierDetails }) {
+  const tipologie = d.av_tipologie ?? []
+  return (
+    <div className="space-y-4">
+      {tipologie.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>SERVIZI</p>
+          <div className="flex flex-wrap gap-2">
+            {tipologie.map(t => (
+              <span key={t} className="px-3 py-1.5 rounded-lg" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>{t}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {d.av_led_wall && (
+        <div className="rounded-lg p-3" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', color: 'var(--muted)' }}>LED WALL</p>
+          {d.av_led_wall_mq && <p style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', fontWeight: 600, color: 'var(--text)' }}>{d.av_led_wall_mq} m&sup2;</p>}
+        </div>
+      )}
+      {d.av_marchi && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '4px' }}>MARCHI</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }}>{d.av_marchi}</p>
+        </div>
+      )}
+      <BoolGrid items={[
+        { label: 'Audio', value: d.audio },
+        { label: 'Video', value: d.video },
+        { label: 'Luci', value: d.luci },
+        { label: 'LED Wall', value: d.av_led_wall || d.ledwall },
+        { label: 'Streaming', value: d.av_streaming || d.streaming },
+        { label: 'Regia', value: d.av_regia || d.regia },
+        { label: 'Montaggio incluso', value: d.av_montaggio_incluso },
+        { label: 'Tecnici inclusi', value: d.tecnici_inclusi },
+        { label: 'Traduzione simultanea', value: d.traduzione_simultanea },
+        { label: 'Palco', value: d.palco },
+        { label: 'Sopralluogo', value: d.sopralluogo },
+      ]} />
+      {d.av_note && (
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', marginTop: '8px' }}>{d.av_note}</p>
+      )}
+    </div>
+  )
+}
+
+function CateringCard({ d }: { d: SupplierDetails }) {
+  return (
+    <div className="space-y-4">
+      {d.cat_stile && (
+        <span className="inline-block px-4 py-2 rounded-lg" style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>{d.cat_stile}</span>
+      )}
+      {(d.cat_min_pax || d.cat_max_pax) && (
+        <p style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)' }}>
+          Da {d.cat_min_pax ?? '?'} a {d.cat_max_pax ?? '?'} pax
+        </p>
+      )}
+      <InfoGrid items={[
+        { label: 'Tipo cucina', value: d.tipo_cucina },
+        { label: 'Tipologia servizi', value: d.tipologia_servizi },
+        { label: 'Max ospiti', value: d.numero_massimo_ospiti },
+      ]} />
+      <BoolGrid items={[
+        { label: 'Servizio al tavolo', value: d.cat_servizio_tavolo || d.cena_servita },
+        { label: 'Buffet', value: d.cat_buffet || d.buffet },
+        { label: 'Finger food', value: d.cat_finger_food },
+        { label: 'Bio / Naturale', value: d.cat_bio },
+        { label: 'Km0', value: d.cat_km0 },
+        { label: 'Allergie gestite', value: d.cat_allergie_gestite || d.intolleranze },
+        { label: 'Beverage incluso', value: d.cat_beverage },
+        { label: 'Personale incluso', value: d.cat_personale_incluso || d.personale_incluso },
+        { label: 'Coffee break', value: d.coffee_break },
+        { label: 'Light lunch', value: d.light_lunch },
+        { label: 'Banqueting', value: d.banqueting },
+        { label: 'Vegano', value: d.vegano },
+        { label: 'Vegetariano', value: d.vegetariano },
+        { label: 'Kosher', value: d.kosher },
+        { label: 'Halal', value: d.halal },
+      ]} />
+    </div>
+  )
+}
+
+function DMCCard({ d }: { d: SupplierDetails }) {
+  const paesi = d.dmc_paesi ?? []
+  const lingue = d.dmc_lingue ?? []
+  const spec = d.dmc_specialita ?? []
+  return (
+    <div className="space-y-4">
+      {paesi.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>DESTINAZIONI</p>
+          <div className="flex flex-wrap gap-2">
+            {paesi.slice(0, 6).map(p => (
+              <span key={p} className="px-3 py-1.5 rounded-lg" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>{p}</span>
+            ))}
+            {paesi.length > 6 && <span className="px-3 py-1.5 rounded-lg" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--muted)' }}>+{paesi.length - 6} altri</span>}
+          </div>
+        </div>
+      )}
+      {lingue.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>LINGUE</p>
+          <div className="flex flex-wrap gap-2">
+            {lingue.map(l => (
+              <span key={l} className="px-2.5 py-1 rounded-full" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'color-mix(in srgb, var(--blue) 10%, transparent)', color: 'var(--blue)' }}>{l}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {spec.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>SPECIALITA</p>
+          <div className="flex flex-wrap gap-2">
+            {spec.map(s => (
+              <span key={s} className="px-3 py-1.5 rounded-lg" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>{s}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      <InfoGrid items={[
+        { label: 'Anni esperienza', value: d.dmc_anni_esperienza },
+        { label: 'IATA', value: d.dmc_iata ? 'Si' : undefined },
+      ]} />
+      <BoolGrid items={[
+        { label: 'Incentive', value: d.dmc_incentive },
+        { label: 'Congressi', value: d.dmc_congressi },
+        { label: 'Team Building', value: d.dmc_team_building },
+      ]} />
+    </div>
+  )
+}
+
+function TransferCard({ d }: { d: SupplierDetails }) {
+  const fleet = [
+    { label: 'Auto', value: d.tr_flotta_auto },
+    { label: 'Minivan', value: d.tr_flotta_minivan },
+    { label: 'Bus', value: d.tr_flotta_bus },
+    { label: 'Pullman', value: d.tr_flotta_pullman },
+  ].filter(f => f.value)
+  const lingue = d.tr_lingue_autisti ?? []
+  return (
+    <div className="space-y-4">
+      {fleet.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '10px' }}>FLOTTA</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {fleet.map(f => (
+              <div key={f.label} className="rounded-lg p-3 text-center" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', color: 'var(--muted)' }}>{f.label}</p>
+                <p style={{ fontFamily: 'var(--font-serif)', fontSize: '22px', fontWeight: 700, color: 'var(--text)', marginTop: '2px' }}>{f.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {lingue.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>LINGUE AUTISTI</p>
+          <div className="flex flex-wrap gap-2">
+            {lingue.map(l => (
+              <span key={l} className="px-2.5 py-1 rounded-full" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'color-mix(in srgb, var(--blue) 10%, transparent)', color: 'var(--blue)' }}>{l}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      <BoolGrid items={[
+        { label: 'NCC', value: d.tr_ncc },
+        { label: 'VIP', value: d.tr_vip },
+        { label: 'H24 / 7gg', value: d.tr_h24 },
+      ]} />
+    </div>
+  )
+}
+
+function StaffCard({ d }: { d: SupplierDetails }) {
+  const ruoli = d.stf_ruoli ?? []
+  const lingue = d.stf_lingue ?? []
+  return (
+    <div className="space-y-4">
+      {ruoli.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>FIGURE DISPONIBILI</p>
+          <div className="flex flex-wrap gap-2">
+            {ruoli.map(r => (
+              <span key={r} className="px-3 py-1.5 rounded-lg" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>{r}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {lingue.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>LINGUE</p>
+          <div className="flex flex-wrap gap-2">
+            {lingue.map(l => (
+              <span key={l} className="px-2.5 py-1 rounded-full" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'color-mix(in srgb, var(--blue) 10%, transparent)', color: 'var(--blue)' }}>{l}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {d.stf_min_ordine && (
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>Minimo {d.stf_min_ordine} unita</p>
+      )}
+      <BoolGrid items={[
+        { label: 'Hostess', value: d.stf_hostess },
+        { label: 'Steward', value: d.stf_steward },
+        { label: 'Promoter', value: d.stf_promoter },
+        { label: 'Interpreti', value: d.stf_interpreti },
+        { label: 'Divisa / Dress code', value: d.stf_divisa },
+      ]} />
+    </div>
+  )
+}
+
+function AgenziaViaggCard({ d }: { d: SupplierDetails }) {
+  const vettori = d.ag_vettori ?? []
+  const dest = d.ag_destinazioni ?? []
+  return (
+    <div className="space-y-4">
+      <BoolGrid items={[
+        { label: 'IATA', value: d.ag_iata },
+        { label: 'Biglietteria aerea', value: d.ag_biglietteria_aerea },
+        { label: 'Biglietteria treno', value: d.ag_biglietteria_treno },
+        { label: 'Pacchetti', value: d.ag_pacchetti },
+        { label: 'MICE specializzato', value: d.ag_mice },
+      ]} />
+      {vettori.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>VETTORI PRINCIPALI</p>
+          <div className="flex flex-wrap gap-2">
+            {vettori.map(v => (
+              <span key={v} className="px-2.5 py-1 rounded-full" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>{v}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {dest.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>DESTINAZIONI TOP</p>
+          <div className="flex flex-wrap gap-2">
+            {dest.slice(0, 8).map(dd => (
+              <span key={dd} className="px-2.5 py-1 rounded-full" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>{dd}</span>
+            ))}
+            {dest.length > 8 && <span className="px-2.5 py-1 rounded-full" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'var(--panel2)', color: 'var(--muted)' }}>+{dest.length - 8}</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AllestimentiCard({ d }: { d: SupplierDetails }) {
+  const tipologie = d.all_tipologie ?? []
+  return (
+    <div className="space-y-4">
+      {tipologie.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>TIPOLOGIE</p>
+          <div className="flex flex-wrap gap-2">
+            {tipologie.map(t => (
+              <span key={t} className="px-3 py-1.5 rounded-lg" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>{t}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {d.all_min_budget && (
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }}>Budget minimo: &euro;{d.all_min_budget.toLocaleString('it-IT')}</p>
+      )}
+      <BoolGrid items={[
+        { label: 'Montaggio incluso', value: d.all_montaggio_incluso },
+        { label: 'Noleggio', value: d.all_noleggio },
+        { label: 'Vendita', value: d.all_vendita },
+        { label: 'Grafica inclusa', value: d.all_grafica_inclusa },
+      ]} />
+    </div>
+  )
+}
+
+function ExperienceCard({ d }: { d: SupplierDetails }) {
+  const lingue = d.exp_lingue ?? []
+  const stagioni = d.exp_stagionalita ?? []
+  return (
+    <div className="space-y-4">
+      {d.exp_tipologia && (
+        <span className="inline-block px-4 py-2 rounded-lg" style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600, background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>{d.exp_tipologia}</span>
+      )}
+      <InfoGrid items={[
+        { label: 'Min pax', value: d.exp_min_pax },
+        { label: 'Max pax', value: d.exp_max_pax },
+        { label: 'Durata', value: d.exp_durata_minuti ? `${d.exp_durata_minuti} min` : undefined },
+      ]} />
+      {lingue.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>LINGUE</p>
+          <div className="flex flex-wrap gap-2">
+            {lingue.map(l => (
+              <span key={l} className="px-2.5 py-1 rounded-full" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'color-mix(in srgb, var(--blue) 10%, transparent)', color: 'var(--blue)' }}>{l}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      <BoolGrid items={[
+        { label: 'Outdoor', value: d.exp_outdoor },
+        { label: 'Indoor', value: d.exp_indoor },
+      ]} />
+      {stagioni.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '8px' }}>STAGIONALITA</p>
+          <div className="flex flex-wrap gap-2">
+            {stagioni.map(s => (
+              <span key={s} className="px-2.5 py-1 rounded-full" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'color-mix(in srgb, var(--green) 10%, transparent)', color: 'var(--green)' }}>{s}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function GenericDetailCard({ d }: { d: SupplierDetails }) {
   const entries = Object.entries(d).filter(([k, v]) =>
     v !== undefined && v !== '' && v !== null && v !== false &&
@@ -757,6 +1121,15 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
         <DetailSection title={`SCHEDA ${cat.toUpperCase()}`}>
           {cat === 'Hotel' ? <HotelCard d={d} /> :
            cat === 'Ristorante' ? <RistoranteCard d={d} /> :
+           cat === 'Location' ? <LocationCard d={d} /> :
+           cat === 'Audio Video' ? <AudioVideoCard d={d} /> :
+           cat === 'Catering' ? <CateringCard d={d} /> :
+           cat === 'DMC' ? <DMCCard d={d} /> :
+           (cat === 'Transfer' || cat === 'Trasporti') ? <TransferCard d={d} /> :
+           cat === 'Staff' ? <StaffCard d={d} /> :
+           cat === 'Agenzia di Viaggi' ? <AgenziaViaggCard d={d} /> :
+           cat === 'Allestimenti' ? <AllestimentiCard d={d} /> :
+           (cat === 'Esperienze' || cat === 'Entertainment') ? <ExperienceCard d={d} /> :
            <GenericDetailCard d={d} />}
         </DetailSection>
       )}
@@ -846,18 +1219,37 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
   const [hotelCapienzaTotaleMeeting, setHotelCapienzaTotaleMeeting] = useState<number | ''>(det?.capienza_totale_meeting ?? '')
 
   const isHotel = categorie.some(c => matchesCategory(c, 'Hotel'))
+  const isLocation = categorie.some(c => matchesCategory(c, 'Location'))
+  const isAV = categorie.some(c => matchesCategory(c, 'Audio Video'))
+  const isCatering = categorie.some(c => matchesCategory(c, 'Catering'))
+  const isDMC = categorie.some(c => matchesCategory(c, 'DMC'))
+  const isTransfer = categorie.some(c => matchesCategory(c, 'Transfer') || matchesCategory(c, 'Trasporti'))
+  const isStaff = categorie.some(c => matchesCategory(c, 'Staff'))
+  const isAgenzia = categorie.some(c => matchesCategory(c, 'Agenzia di Viaggi'))
+  const isAllestimenti = categorie.some(c => matchesCategory(c, 'Allestimenti'))
+  const isExperience = categorie.some(c => matchesCategory(c, 'Esperienze') || matchesCategory(c, 'Entertainment'))
+  const hasCategoryForm = isLocation || isAV || isCatering || isDMC || isTransfer || isStaff || isAgenzia || isAllestimenti || isExperience
+
+  const [catFields, setCatFields] = useState<Record<string, unknown>>(() => {
+    const d = supplier?.details ?? {}
+    return { ...d }
+  })
+  function setCF(key: string, value: unknown) {
+    setCatFields(prev => ({ ...prev, [key]: value }))
+  }
+  function setCFArray(key: string, value: string) {
+    setCatFields(prev => ({ ...prev, [key]: value.split(',').map(s => s.trim()).filter(Boolean) }))
+  }
+  function getCFStr(key: string): string { return (catFields[key] as string) ?? '' }
+  function getCFNum(key: string): number | '' { const v = catFields[key]; return typeof v === 'number' ? v : '' }
+  function getCFBool(key: string): boolean { return !!(catFields[key]) }
+  function getCFArr(key: string): string { return ((catFields[key] as string[]) ?? []).join(', ') }
 
   function buildDetails(): SupplierDetails | undefined {
     if (isHotel) {
-      let base: Record<string, unknown> = {}
+      let base: Record<string, unknown> = { ...catFields }
       if (detailsJson.trim()) {
-        try {
-          base = JSON.parse(detailsJson)
-        } catch {
-          base = supplier?.details ? { ...supplier.details } : {}
-        }
-      } else if (supplier?.details) {
-        base = { ...supplier.details }
+        try { base = { ...base, ...JSON.parse(detailsJson) } } catch { /* keep base */ }
       }
       base.citta = hotelCitta || undefined
       base.catena = hotelCatena || undefined
@@ -868,10 +1260,16 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
       base.stelle = hotelStelle !== '' ? Number(hotelStelle) : undefined
       base.capienza_sala_massima = hotelCapienzaSalaMassima !== '' ? Number(hotelCapienzaSalaMassima) : undefined
       base.capienza_totale_meeting = hotelCapienzaTotaleMeeting !== '' ? Number(hotelCapienzaTotaleMeeting) : undefined
-      for (const k of Object.keys(base)) {
-        if (base[k] === undefined) delete base[k]
-      }
+      for (const k of Object.keys(base)) { if (base[k] === undefined) delete base[k] }
       return base as SupplierDetails
+    }
+    if (hasCategoryForm) {
+      let base: Record<string, unknown> = { ...catFields }
+      if (detailsJson.trim()) {
+        try { base = { ...base, ...JSON.parse(detailsJson) } } catch { /* keep base */ }
+      }
+      for (const k of Object.keys(base)) { if (base[k] === undefined || base[k] === '' || (Array.isArray(base[k]) && (base[k] as unknown[]).length === 0)) delete base[k] }
+      return Object.keys(base).length > 0 ? (base as SupplierDetails) : supplier?.details
     }
     if (detailsJson.trim()) {
       try {
@@ -1160,6 +1558,188 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
                   </label>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>Ristorante interno</span>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {isLocation && !isHotel && (
+            <div className="rounded-xl p-4 space-y-4" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>DATI LOCATION</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div><label style={labelStyle}>Tipo</label><input type="text" value={getCFStr('loc_tipo')} onChange={e => setCF('loc_tipo', e.target.value)} className={inputCls} style={inputStyle} placeholder="Villa, Palazzo..." /></div>
+                <div><label style={labelStyle}>Cap. Teatro</label><input type="number" min={0} value={getCFNum('loc_capienza_teatro')} onChange={e => setCF('loc_capienza_teatro', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Cap. Cocktail</label><input type="number" min={0} value={getCFNum('loc_capienza_cocktail')} onChange={e => setCF('loc_capienza_cocktail', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Cap. Banquetto</label><input type="number" min={0} value={getCFNum('loc_capienza_banquetto')} onChange={e => setCF('loc_capienza_banquetto', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Cap. Cabaret</label><input type="number" min={0} value={getCFNum('loc_capienza_cabaret')} onChange={e => setCF('loc_capienza_cabaret', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Superficie (m2)</label><input type="number" min={0} value={getCFNum('loc_mq')} onChange={e => setCF('loc_mq', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+              </div>
+              <div className="flex flex-wrap gap-4 pt-2">
+                {(['loc_outdoor', 'loc_indoor', 'loc_rooftop', 'loc_parcheggio', 'loc_esclusiva', 'loc_catering_interno'] as const).map(k => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={getCFBool(k)} onChange={e => setCF(k, e.target.checked)} className="w-4 h-4 rounded" />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>{k.replace('loc_', '').replace(/_/g, ' ')}</span>
+                  </label>
+                ))}
+              </div>
+              <div><label style={labelStyle}>Note tecniche</label><textarea value={getCFStr('loc_note_tecniche')} onChange={e => setCF('loc_note_tecniche', e.target.value)} rows={2} className={inputCls + ' resize-none'} style={inputStyle} /></div>
+            </div>
+          )}
+
+          {isAV && (
+            <div className="rounded-xl p-4 space-y-4" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>DATI AUDIO VIDEO</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div><label style={labelStyle}>Tipologie (virgola)</label><input type="text" value={getCFArr('av_tipologie')} onChange={e => setCFArray('av_tipologie', e.target.value)} className={inputCls} style={inputStyle} placeholder="Luci, Audio, Video, Regia" /></div>
+                <div><label style={labelStyle}>Marchi</label><input type="text" value={getCFStr('av_marchi')} onChange={e => setCF('av_marchi', e.target.value)} className={inputCls} style={inputStyle} placeholder="Shure, d&b..." /></div>
+                <div><label style={labelStyle}>LED Wall m2</label><input type="number" min={0} step={0.1} value={getCFNum('av_led_wall_mq')} onChange={e => setCF('av_led_wall_mq', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+              </div>
+              <div className="flex flex-wrap gap-4 pt-2">
+                {(['av_led_wall', 'av_streaming', 'av_regia', 'av_montaggio_incluso'] as const).map(k => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={getCFBool(k)} onChange={e => setCF(k, e.target.checked)} className="w-4 h-4 rounded" />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>{k.replace('av_', '').replace(/_/g, ' ')}</span>
+                  </label>
+                ))}
+              </div>
+              <div><label style={labelStyle}>Note</label><textarea value={getCFStr('av_note')} onChange={e => setCF('av_note', e.target.value)} rows={2} className={inputCls + ' resize-none'} style={inputStyle} /></div>
+            </div>
+          )}
+
+          {isCatering && (
+            <div className="rounded-xl p-4 space-y-4" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>DATI CATERING</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div><label style={labelStyle}>Stile cucina</label><input type="text" value={getCFStr('cat_stile')} onChange={e => setCF('cat_stile', e.target.value)} className={inputCls} style={inputStyle} placeholder="Mediterranea, Fusion..." /></div>
+                <div><label style={labelStyle}>Min pax</label><input type="number" min={0} value={getCFNum('cat_min_pax')} onChange={e => setCF('cat_min_pax', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Max pax</label><input type="number" min={0} value={getCFNum('cat_max_pax')} onChange={e => setCF('cat_max_pax', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+              </div>
+              <div className="flex flex-wrap gap-4 pt-2">
+                {(['cat_servizio_tavolo', 'cat_buffet', 'cat_finger_food', 'cat_bio', 'cat_km0', 'cat_allergie_gestite', 'cat_beverage', 'cat_personale_incluso'] as const).map(k => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={getCFBool(k)} onChange={e => setCF(k, e.target.checked)} className="w-4 h-4 rounded" />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>{k.replace('cat_', '').replace(/_/g, ' ')}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isDMC && (
+            <div className="rounded-xl p-4 space-y-4" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>DATI DMC</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div><label style={labelStyle}>Paesi (virgola)</label><input type="text" value={getCFArr('dmc_paesi')} onChange={e => setCFArray('dmc_paesi', e.target.value)} className={inputCls} style={inputStyle} placeholder="Italia, Francia, Spagna" /></div>
+                <div><label style={labelStyle}>Lingue (virgola)</label><input type="text" value={getCFArr('dmc_lingue')} onChange={e => setCFArray('dmc_lingue', e.target.value)} className={inputCls} style={inputStyle} placeholder="IT, EN, FR" /></div>
+                <div><label style={labelStyle}>Specialita (virgola)</label><input type="text" value={getCFArr('dmc_specialita')} onChange={e => setCFArray('dmc_specialita', e.target.value)} className={inputCls} style={inputStyle} placeholder="Incentive, Congressi" /></div>
+                <div><label style={labelStyle}>Anni esperienza</label><input type="number" min={0} value={getCFNum('dmc_anni_esperienza')} onChange={e => setCF('dmc_anni_esperienza', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+              </div>
+              <div className="flex flex-wrap gap-4 pt-2">
+                {(['dmc_iata', 'dmc_incentive', 'dmc_congressi', 'dmc_team_building'] as const).map(k => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={getCFBool(k)} onChange={e => setCF(k, e.target.checked)} className="w-4 h-4 rounded" />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>{k.replace('dmc_', '').replace(/_/g, ' ')}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isTransfer && (
+            <div className="rounded-xl p-4 space-y-4" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>DATI TRANSFER</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div><label style={labelStyle}>Auto</label><input type="number" min={0} value={getCFNum('tr_flotta_auto')} onChange={e => setCF('tr_flotta_auto', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Minivan</label><input type="number" min={0} value={getCFNum('tr_flotta_minivan')} onChange={e => setCF('tr_flotta_minivan', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Bus</label><input type="number" min={0} value={getCFNum('tr_flotta_bus')} onChange={e => setCF('tr_flotta_bus', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Pullman</label><input type="number" min={0} value={getCFNum('tr_flotta_pullman')} onChange={e => setCF('tr_flotta_pullman', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+              </div>
+              <div><label style={labelStyle}>Lingue autisti (virgola)</label><input type="text" value={getCFArr('tr_lingue_autisti')} onChange={e => setCFArray('tr_lingue_autisti', e.target.value)} className={inputCls} style={inputStyle} placeholder="IT, EN, FR" /></div>
+              <div className="flex flex-wrap gap-4 pt-2">
+                {(['tr_ncc', 'tr_vip', 'tr_h24'] as const).map(k => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={getCFBool(k)} onChange={e => setCF(k, e.target.checked)} className="w-4 h-4 rounded" />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>{k.replace('tr_', '').replace(/_/g, ' ').toUpperCase()}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isStaff && (
+            <div className="rounded-xl p-4 space-y-4" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>DATI STAFF</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div><label style={labelStyle}>Ruoli (virgola)</label><input type="text" value={getCFArr('stf_ruoli')} onChange={e => setCFArray('stf_ruoli', e.target.value)} className={inputCls} style={inputStyle} placeholder="Hostess, Steward, Promoter" /></div>
+                <div><label style={labelStyle}>Lingue (virgola)</label><input type="text" value={getCFArr('stf_lingue')} onChange={e => setCFArray('stf_lingue', e.target.value)} className={inputCls} style={inputStyle} placeholder="IT, EN, FR" /></div>
+                <div><label style={labelStyle}>Minimo ordine</label><input type="number" min={0} value={getCFNum('stf_min_ordine')} onChange={e => setCF('stf_min_ordine', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+              </div>
+              <div className="flex flex-wrap gap-4 pt-2">
+                {(['stf_hostess', 'stf_steward', 'stf_promoter', 'stf_interpreti', 'stf_divisa'] as const).map(k => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={getCFBool(k)} onChange={e => setCF(k, e.target.checked)} className="w-4 h-4 rounded" />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>{k.replace('stf_', '').replace(/_/g, ' ')}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isAgenzia && (
+            <div className="rounded-xl p-4 space-y-4" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>DATI AGENZIA VIAGGI</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div><label style={labelStyle}>Vettori (virgola)</label><input type="text" value={getCFArr('ag_vettori')} onChange={e => setCFArray('ag_vettori', e.target.value)} className={inputCls} style={inputStyle} placeholder="Alitalia, Lufthansa" /></div>
+                <div><label style={labelStyle}>Destinazioni (virgola)</label><input type="text" value={getCFArr('ag_destinazioni')} onChange={e => setCFArray('ag_destinazioni', e.target.value)} className={inputCls} style={inputStyle} placeholder="Europa, USA, Asia" /></div>
+              </div>
+              <div className="flex flex-wrap gap-4 pt-2">
+                {(['ag_iata', 'ag_biglietteria_aerea', 'ag_biglietteria_treno', 'ag_pacchetti', 'ag_mice'] as const).map(k => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={getCFBool(k)} onChange={e => setCF(k, e.target.checked)} className="w-4 h-4 rounded" />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>{k.replace('ag_', '').replace(/_/g, ' ')}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isAllestimenti && (
+            <div className="rounded-xl p-4 space-y-4" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>DATI ALLESTIMENTI</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div><label style={labelStyle}>Tipologie (virgola)</label><input type="text" value={getCFArr('all_tipologie')} onChange={e => setCFArray('all_tipologie', e.target.value)} className={inputCls} style={inputStyle} placeholder="Stand, Strutture, Arredi, Floreale" /></div>
+                <div><label style={labelStyle}>Budget minimo</label><input type="number" min={0} value={getCFNum('all_min_budget')} onChange={e => setCF('all_min_budget', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+              </div>
+              <div className="flex flex-wrap gap-4 pt-2">
+                {(['all_montaggio_incluso', 'all_noleggio', 'all_vendita', 'all_grafica_inclusa'] as const).map(k => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={getCFBool(k)} onChange={e => setCF(k, e.target.checked)} className="w-4 h-4 rounded" />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>{k.replace('all_', '').replace(/_/g, ' ')}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isExperience && (
+            <div className="rounded-xl p-4 space-y-4" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>DATI ESPERIENZA</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div><label style={labelStyle}>Tipologia</label><input type="text" value={getCFStr('exp_tipologia')} onChange={e => setCF('exp_tipologia', e.target.value)} className={inputCls} style={inputStyle} placeholder="Team Building, Cooking..." /></div>
+                <div><label style={labelStyle}>Min pax</label><input type="number" min={0} value={getCFNum('exp_min_pax')} onChange={e => setCF('exp_min_pax', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Max pax</label><input type="number" min={0} value={getCFNum('exp_max_pax')} onChange={e => setCF('exp_max_pax', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Durata (min)</label><input type="number" min={0} value={getCFNum('exp_durata_minuti')} onChange={e => setCF('exp_durata_minuti', e.target.value ? Number(e.target.value) : '')} className={inputCls} style={inputStyle} /></div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div><label style={labelStyle}>Lingue (virgola)</label><input type="text" value={getCFArr('exp_lingue')} onChange={e => setCFArray('exp_lingue', e.target.value)} className={inputCls} style={inputStyle} placeholder="IT, EN" /></div>
+                <div><label style={labelStyle}>Stagionalita (virgola)</label><input type="text" value={getCFArr('exp_stagionalita')} onChange={e => setCFArray('exp_stagionalita', e.target.value)} className={inputCls} style={inputStyle} placeholder="Primavera, Estate" /></div>
+              </div>
+              <div className="flex flex-wrap gap-4 pt-2">
+                {(['exp_outdoor', 'exp_indoor'] as const).map(k => (
+                  <label key={k} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={getCFBool(k)} onChange={e => setCF(k, e.target.checked)} className="w-4 h-4 rounded" />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>{k.replace('exp_', '').replace(/_/g, ' ')}</span>
+                  </label>
+                ))}
               </div>
             </div>
           )}
