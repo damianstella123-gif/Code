@@ -155,7 +155,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
     const { data } = await query.order('created_at', { ascending: true })
     setItems(data ?? [])
     if (showExtras) {
-      const { data: extData } = await supabase.from('event_varie_details').select('*').eq('event_id', event.id).eq('supplier_id', supplierId).order('created_at', { ascending: true })
+      const { data: extData } = await supabase.from('event_supplier_services').select('*').eq('event_id', event.id).eq('supplier_id', supplierId).order('created_at', { ascending: true })
       setExtras(extData ?? [])
     }
     setLoading(false)
@@ -412,11 +412,11 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
     }
     let error: { message: string } | null = null
     if (editingExtraId) {
-      const res = await supabase.from('event_varie_details').update(record).eq('id', editingExtraId)
+      const res = await supabase.from('event_supplier_services').update(record).eq('id', editingExtraId)
       error = res.error
     } else {
       record.id = crypto.randomUUID()
-      const res = await supabase.from('event_varie_details').insert(record)
+      const res = await supabase.from('event_supplier_services').insert(record)
       error = res.error
     }
     setSaving(false)
@@ -427,7 +427,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
 
   async function handleDeleteExtra() {
     if (!deletingExtraId) return
-    await supabase.from('event_varie_details').delete().eq('id', deletingExtraId)
+    await supabase.from('event_supplier_services').delete().eq('id', deletingExtraId)
     setDeletingExtraId(null)
     await loadItems()
   }
