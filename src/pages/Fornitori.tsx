@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Phone, Mail, MapPin, Globe, Star, FileText, Euro,
-  Search, X, Plus, Trash2, Save, Upload, Building2, Edit3, Link2,
+  Search, X, Plus, Trash2, Save, Upload, Building2, Edit3,
   Hotel, UtensilsCrossed, MapPinned, CookingPot,
   Speaker, PaintBucket, Users, MoreHorizontal, Camera, Video, Shield,
   Music, ChevronRight, Navigation, Plane, Car, Printer, Umbrella,
@@ -66,28 +66,6 @@ function normalizeCategory(cat: string): string {
     if (matchesCategory(cat, c)) return c
   }
   return 'Altro'
-}
-
-function getSupplierCity(s: Supplier): string {
-  return s.city || s.location || ''
-}
-
-function getSupplierRegion(s: Supplier): string {
-  return inferRegion(s.city || s.province || '', s.region || '')
-}
-
-function getSupplierCountry(s: Supplier): string {
-  if (s.country) return s.country
-  if (s.region || s.city || s.province) return 'Italia'
-  if (s.location) return 'Italia'
-  return 'Altro'
-}
-
-function getCountryGroup(country: string): string {
-  const c = country.toLowerCase().trim()
-  if (!c || c === 'altro') return 'Altro'
-  if (c === 'italia' || c === 'it' || c === 'italy') return 'Italia'
-  return 'Estero'
 }
 
 function getCapacity(s: Supplier): number {
@@ -1219,52 +1197,30 @@ export function SupplierFormModal({ supplier, onSave, onCancel, initialName }: {
   )
 }
 
-// ─── Breadcrumb ─────────────────────────────────────────────────────────────
+// ─── Category Chip ──────────────────────────────────────────────────────────
 
-interface BreadcrumbItem {
-  label: string
-  onClick: () => void
-}
-
-function Breadcrumb({ items }: { items: BreadcrumbItem[] }) {
-  return (
-    <div className="flex items-center gap-1 flex-wrap" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
-      {items.map((item, i) => (
-        <div key={i} className="flex items-center gap-1">
-          {i > 0 && <span style={{ color: 'var(--line)' }}>/</span>}
-          <button
-            onClick={item.onClick}
-            className="transition-all hover:opacity-100"
-            style={{ color: i === items.length - 1 ? 'var(--text)' : 'var(--muted)', opacity: i === items.length - 1 ? 1 : 0.8, background: 'none', border: 'none', cursor: 'pointer' }}>
-            {item.label}
-          </button>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Navigation Tile ────────────────────────────────────────────────────────
-
-function NavTile({ label, count, icon: Icon, onClick }: {
-  label: string; count: number; icon?: React.ElementType; onClick: () => void
+function CategoryChip({ label, active, count, icon: Icon, onClick }: {
+  label: string; active: boolean; count: number; icon?: React.ElementType; onClick: () => void
 }) {
-  const TileIcon = Icon ?? MapPin
+  const ChipIcon = Icon ?? MoreHorizontal
   return (
     <button onClick={onClick}
-      className="text-left w-full transition-all"
-      style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '18px 20px' }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}>
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--panel2)' }}>
-          <TileIcon className="w-4 h-4" style={{ color: 'var(--muted)' }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)' }}>{label}</p>
-          <p style={{ fontFamily: 'var(--font-serif)', fontSize: '22px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.2, marginTop: '2px' }}>{count}</p>
-        </div>
-      </div>
+      className="flex items-center gap-1.5 flex-shrink-0 transition-all"
+      style={{
+        padding: '6px 14px',
+        borderRadius: '99px',
+        background: active ? 'var(--red2)' : 'var(--panel2)',
+        color: active ? 'white' : 'var(--text)',
+        border: 'none',
+        cursor: 'pointer',
+        fontFamily: 'var(--font-mono)',
+        fontSize: '11px',
+        fontWeight: 500,
+        whiteSpace: 'nowrap',
+      }}>
+      <ChipIcon className="w-3 h-3" />
+      <span>{label}</span>
+      <span style={{ opacity: 0.7, fontSize: '10px' }}>{count}</span>
     </button>
   )
 }
@@ -1282,15 +1238,26 @@ export default function Fornitori() {
   const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const [mode, setMode] = useState<'navigate' | 'search'>('search')
-
-  const [navCategory, setNavCategory] = useState<string | null>(null)
-  const [navCountryGroup, setNavCountryGroup] = useState<string | null>(null)
-  const [navRegion, setNavRegion] = useState<string | null>(null)
-  const [navCity, setNavCity] = useState<string | null>(null)
-  const [navChain, setNavChain] = useState<string | null>(null)
-
   const [searchQuery, setSearchQuery] = useState('')
+  const chipsRef = useRef<HTMLDivElement>(null)
+
+  // URL-driven filters
+  const activeCat = searchParams.get('cat') || ''
+  const luogoSearch = searchParams.get('luogo') || ''
+
+  const setActiveCat = useCallback((cat: string) => {
+    const next = new URLSearchParams(searchParams)
+    if (cat) next.set('cat', cat)
+    else next.delete('cat')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  const setLuogoSearch = useCallback((val: string) => {
+    const next = new URLSearchParams(searchParams)
+    if (val) next.set('luogo', val)
+    else next.delete('luogo')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const loadData = useCallback(async () => {
     try {
@@ -1309,7 +1276,9 @@ export default function Fornitori() {
     if (id && supplierList.length > 0) {
       const found = supplierList.find(s => s.id === id)
       if (found) setSelected(found)
-      setSearchParams({}, { replace: true })
+      const next = new URLSearchParams(searchParams)
+      next.delete('id')
+      setSearchParams(next, { replace: true })
     }
   }, [searchParams, supplierList, setSearchParams])
 
@@ -1346,60 +1315,7 @@ export default function Fornitori() {
     setDeletingSupplier(null)
   }
 
-  // ─── Navigation data derivation ────────────────────────────────────────────
-
-  const categorySuppliers = useMemo(() => {
-    if (!navCategory) return supplierList
-    return supplierList.filter(s => {
-      const cats = s.categorie?.length ? s.categorie : [s.categoria]
-      return cats.some(c => matchesCategory(c, navCategory))
-    })
-  }, [supplierList, navCategory])
-
-  const countryGroups = useMemo(() => {
-    const map: Record<string, Supplier[]> = {}
-    for (const s of categorySuppliers) {
-      const g = getCountryGroup(getSupplierCountry(s))
-      if (!map[g]) map[g] = []
-      map[g].push(s)
-    }
-    return map
-  }, [categorySuppliers])
-
-  const regionSuppliers = useMemo(() => {
-    if (!navCountryGroup) return categorySuppliers
-    return categorySuppliers.filter(s => getCountryGroup(getSupplierCountry(s)) === navCountryGroup)
-  }, [categorySuppliers, navCountryGroup])
-
-  const regions = useMemo(() => {
-    const map: Record<string, Supplier[]> = {}
-    for (const s of regionSuppliers) {
-      const r = getSupplierRegion(s) || getSupplierCity(s) || 'Altro'
-      if (!map[r]) map[r] = []
-      map[r].push(s)
-    }
-    return map
-  }, [regionSuppliers])
-
-  const citySuppliers = useMemo(() => {
-    if (!navRegion) return regionSuppliers
-    return regionSuppliers.filter(s => (getSupplierRegion(s) || getSupplierCity(s) || 'Altro') === navRegion)
-  }, [regionSuppliers, navRegion])
-
-  const cities = useMemo(() => {
-    const map: Record<string, Supplier[]> = {}
-    for (const s of citySuppliers) {
-      const c = getSupplierCity(s) || 'Altro'
-      if (!map[c]) map[c] = []
-      map[c].push(s)
-    }
-    return map
-  }, [citySuppliers])
-
-  const finalNavList = useMemo(() => {
-    if (!navCity) return citySuppliers
-    return citySuppliers.filter(s => (getSupplierCity(s) || 'Altro') === navCity)
-  }, [citySuppliers, navCity])
+  // ─── Category counts ────────────────────────────────────────────────────────
 
   const categoryCounts = useMemo(() => {
     const map: Record<string, number> = {}
@@ -1413,61 +1329,42 @@ export default function Fornitori() {
     return map
   }, [supplierList])
 
-  const hotelChains = useMemo(() => {
-    if (navCategory !== 'Hotel') return {}
-    const map: Record<string, Supplier[]> = {}
-    for (const s of categorySuppliers) {
-      const chain = s.details?.catena || 'Indipendenti'
-      if (!map[chain]) map[chain] = []
-      map[chain].push(s)
-    }
-    return map
-  }, [categorySuppliers, navCategory])
+  // ─── Filtered & sorted list ─────────────────────────────────────────────────
 
-  const chainSuppliers = useMemo(() => {
-    if (!navChain) return []
-    const chainKey = navChain === 'Indipendenti' ? '' : navChain
-    return categorySuppliers.filter(s => {
-      const sc = s.details?.catena || ''
-      if (navChain === 'Indipendenti') return !sc
-      return sc === chainKey
+  const filteredSuppliers = useMemo(() => {
+    let list = supplierList
+
+    // Category filter
+    if (activeCat) {
+      list = list.filter(s => {
+        const cats = s.categorie?.length ? s.categorie : [s.categoria]
+        return cats.some(c => matchesCategory(c, activeCat))
+      })
+    }
+
+    // Location filter
+    if (luogoSearch.trim()) {
+      const luogoLower = luogoSearch.toLowerCase().trim()
+      list = list.filter(s => {
+        const fields = [s.city, s.region, s.province, s.location, s.country].filter(Boolean).join(' ').toLowerCase()
+        return fields.includes(luogoLower)
+      })
+    }
+
+    // Text search
+    if (searchQuery.trim()) {
+      const parsed = parseSearchQuery(searchQuery)
+      list = list.filter(s => supplierMatchesSearch(s, parsed))
+    }
+
+    // Sort: rating desc, name asc
+    list = [...list].sort((a, b) => {
+      if (b.rating !== a.rating) return b.rating - a.rating
+      return a.nome.localeCompare(b.nome)
     })
-  }, [categorySuppliers, navChain])
 
-  // ─── Search results ─────────────────────────────────────────────────────────
-
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return []
-    const parsed = parseSearchQuery(searchQuery)
-    const results = supplierList.filter(s => supplierMatchesSearch(s, parsed))
-    return results
-  }, [supplierList, searchQuery])
-
-  // ─── Breadcrumb construction ────────────────────────────────────────────────
-
-  const breadcrumbItems = useMemo(() => {
-    const items: BreadcrumbItem[] = [
-      { label: 'Fornitori', onClick: () => { setNavCategory(null); setNavCountryGroup(null); setNavRegion(null); setNavCity(null); setNavChain(null) } }
-    ]
-    if (navCategory) {
-      items.push({ label: navCategory, onClick: () => { setNavCountryGroup(null); setNavRegion(null); setNavCity(null); setNavChain(null) } })
-    }
-    if (navChain) {
-      items.push({ label: 'Catene', onClick: () => { setNavChain(null) } })
-      items.push({ label: navChain, onClick: () => {} })
-    } else {
-      if (navCountryGroup) {
-        items.push({ label: navCountryGroup, onClick: () => { setNavRegion(null); setNavCity(null) } })
-      }
-      if (navRegion) {
-        items.push({ label: navRegion, onClick: () => { setNavCity(null) } })
-      }
-      if (navCity) {
-        items.push({ label: navCity, onClick: () => {} })
-      }
-    }
-    return items
-  }, [navCategory, navCountryGroup, navRegion, navCity, navChain])
+    return list
+  }, [supplierList, activeCat, luogoSearch, searchQuery])
 
   // Average rating
   const avgRating = useMemo(() => {
@@ -1576,251 +1473,101 @@ export default function Fornitori() {
         )}
       </div>
 
-      {/* Wire tabs: mode selector */}
-      <div className="wire-tabs">
-        <button onClick={() => setMode('navigate')}
-          className={`wire-tab ${mode === 'navigate' ? 'wire-tab--active' : ''}`}>
-          <Navigation className="w-3 h-3 inline mr-1 -mt-0.5" />NAVIGA
-        </button>
-        <button onClick={() => setMode('search')}
-          className={`wire-tab ${mode === 'search' ? 'wire-tab--active' : ''}`}>
-          <Search className="w-3 h-3 inline mr-1 -mt-0.5" />CERCA
-        </button>
-      </div>
+      {/* ─── INLINE FILTERS ──────────────────────────────────────────────────────── */}
+      <div className="space-y-3" style={{ marginTop: '20px' }}>
 
-      {/* ─── SEARCH MODE ───────────────────────────────────────────────────────── */}
-      {mode === 'search' && (
-        <div className="space-y-4 animate-fade-in" style={{ marginTop: '20px' }}>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--muted)' }} />
+        {/* Category chips - scrollable */}
+        <div ref={chipsRef} className="flex items-center gap-2"
+          style={{ overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none', paddingBottom: '4px' }}>
+          <CategoryChip
+            label="Tutti"
+            active={!activeCat}
+            count={supplierList.length}
+            icon={Building2}
+            onClick={() => setActiveCat('')}
+          />
+          {SUPPLIER_CATEGORIES.map(cat => {
+            const count = categoryCounts[cat] ?? 0
+            if (count === 0) return null
+            return (
+              <CategoryChip
+                key={cat}
+                label={cat}
+                active={activeCat === cat}
+                count={count}
+                icon={CATEGORY_ICONS[cat]}
+                onClick={() => setActiveCat(activeCat === cat ? '' : cat)}
+              />
+            )
+          })}
+        </div>
+
+        {/* Location search + text search row */}
+        <div className="flex gap-2 flex-col sm:flex-row">
+          {/* Location input */}
+          <div className="relative flex-1">
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+            <input
+              type="text"
+              value={luogoSearch}
+              onChange={e => setLuogoSearch(e.target.value)}
+              placeholder="Cerca per città, regione..."
+              className="w-full pl-9 pr-8 py-2.5 rounded-lg text-sm focus:outline-none"
+              style={{ background: 'transparent', border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
+            />
+            {luogoSearch && (
+              <button onClick={() => setLuogoSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+              </button>
+            )}
+          </div>
+
+          {/* Text search input */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder='Cerca: "Milano 200 persone", "hotel Lombardia", "audio video Torino"...'
-              className="w-full pl-10 pr-9 py-3 rounded-lg text-sm focus:outline-none"
+              placeholder="Cerca nome, servizio, dettaglio..."
+              className="w-full pl-9 pr-8 py-2.5 rounded-lg text-sm focus:outline-none"
               style={{ background: 'transparent', border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
-              autoFocus
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+              <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
                 <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
               </button>
             )}
-            {!searchQuery && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>Usa Fly ↑ per domande complesse</span>
+          </div>
+        </div>
+
+        {/* Result counter */}
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+          {filteredSuppliers.length} fornitor{filteredSuppliers.length !== 1 ? 'i' : 'e'}
+          {(activeCat || luogoSearch || searchQuery) && ' filtrat' + (filteredSuppliers.length !== 1 ? 'i' : 'o')}
+        </p>
+
+        {/* Supplier grid */}
+        {filteredSuppliers.length === 0 ? (
+          <div className="p-10 text-center" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', color: 'var(--muted)' }}>
+            <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessun fornitore trovato</p>
+            {(activeCat || luogoSearch || searchQuery) && (
+              <button onClick={() => { setActiveCat(''); setLuogoSearch(''); setSearchQuery('') }}
+                className="mt-3 px-4 py-1.5 rounded-lg transition-all"
+                style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)', cursor: 'pointer' }}>
+                RESETTA FILTRI
+              </button>
             )}
           </div>
-
-          {searchQuery.trim() && (
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-              {searchResults.length} fornitor{searchResults.length !== 1 ? 'i' : 'e'} trovat{searchResults.length !== 1 ? 'i' : 'o'}
-            </p>
-          )}
-
-          {searchQuery.trim() && searchResults.length === 0 && (
-            <div className="p-10 text-center" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', color: 'var(--muted)' }}>
-              <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessun fornitore trovato</p>
-            </div>
-          )}
-
-          {searchResults.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {searchResults.map(sup => (
-                <SupplierCard key={sup.id} supplier={sup} onClick={() => setSelected(sup)} />
-              ))}
-            </div>
-          )}
-
-          {!searchQuery.trim() && (
-            <div className="p-10 text-center" style={{ background: 'var(--panel-solid)', border: '1px dashed var(--line)', borderRadius: '14px' }}>
-              <Search className="w-8 h-8 mx-auto mb-2 opacity-20" style={{ color: 'var(--muted)' }} />
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>Scrivi una ricerca per trovare fornitori</p>
-              <div className="flex flex-wrap justify-center gap-2 mt-4">
-                {['Milano 200 persone', 'hotel Lombardia', 'audio video Torino', 'ristorante Roma 100 persone', 'catering Bari'].map(ex => (
-                  <button key={ex} onClick={() => setSearchQuery(ex)}
-                    style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', padding: '4px 10px', borderRadius: '6px', background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)', cursor: 'pointer' }}>
-                    {ex}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ─── NAVIGATE MODE ─────────────────────────────────────────────────────── */}
-      {mode === 'navigate' && (
-        <div className="space-y-4 animate-fade-in" style={{ marginTop: '20px' }}>
-          {/* Breadcrumb */}
-          {navCategory && navCountryGroup !== '__chains__' && <Breadcrumb items={breadcrumbItems} />}
-
-          {/* Level: Categories */}
-          {!navCategory && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {SUPPLIER_CATEGORIES.map(cat => {
-                const Icon = CATEGORY_ICONS[cat] ?? MoreHorizontal
-                const count = categoryCounts[cat] ?? 0
-                return (
-                  <NavTile key={cat} label={cat} count={count} icon={Icon} onClick={() => setNavCategory(cat)} />
-                )
-              })}
-            </div>
-          )}
-
-          {/* Level: Country groups */}
-          {navCategory && !navCountryGroup && !navChain && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {navCategory === 'Hotel' && (
-                <NavTile
-                  label="Catene"
-                  count={Object.keys(hotelChains).length}
-                  icon={Link2}
-                  onClick={() => setNavCountryGroup('__chains__')}
-                />
-              )}
-              {Object.entries(countryGroups)
-                .sort(([a], [b]) => {
-                  const order = ['Italia', 'Estero', 'Altro']
-                  return order.indexOf(a) - order.indexOf(b)
-                })
-                .map(([group, sups]) => (
-                  <NavTile key={group} label={group} count={sups.length} icon={MapPin}
-                    onClick={() => setNavCountryGroup(group)} />
-                ))}
-            </div>
-          )}
-
-          {/* Level: Hotel Chains list */}
-          {navCategory === 'Hotel' && navCountryGroup === '__chains__' && !navChain && (
-            <div className="space-y-3">
-              <Breadcrumb items={[
-                { label: 'Fornitori', onClick: () => { setNavCategory(null); setNavCountryGroup(null); setNavChain(null) } },
-                { label: 'Hotel', onClick: () => { setNavCountryGroup(null); setNavChain(null) } },
-                { label: 'Catene', onClick: () => {} },
-              ]} />
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {Object.entries(hotelChains)
-                  .sort(([a, sa], [b, sb]) => {
-                    if (a === 'Indipendenti') return 1
-                    if (b === 'Indipendenti') return -1
-                    return sb.length - sa.length
-                  })
-                  .map(([chain, sups]) => (
-                    <NavTile key={chain} label={chain} count={sups.length} icon={Hotel}
-                      onClick={() => setNavChain(chain)} />
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {/* Level: Hotel Chain supplier list */}
-          {navCategory === 'Hotel' && navCountryGroup === '__chains__' && navChain && (
-            <div className="space-y-3">
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-                {chainSuppliers.length} hotel {navChain}
-              </p>
-              {chainSuppliers.length === 0 ? (
-                <div className="p-10 text-center" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', color: 'var(--muted)' }}>
-                  <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessun hotel in questa catena</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {chainSuppliers.map(sup => (
-                    <SupplierCard key={sup.id} supplier={sup} onClick={() => setSelected(sup)} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Level: Regions */}
-          {navCategory && navCountryGroup && navCountryGroup !== '__chains__' && !navRegion && (
-            <>
-              {Object.keys(regions).length === 1 ? (
-                (() => {
-                  const onlyRegion = Object.keys(regions)[0]
-                  return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {Object.entries(
-                        (() => {
-                          const sups = regions[onlyRegion]
-                          const map: Record<string, Supplier[]> = {}
-                          for (const s of sups) {
-                            const c = getSupplierCity(s) || 'Altro'
-                            if (!map[c]) map[c] = []
-                            map[c].push(s)
-                          }
-                          return map
-                        })()
-                      )
-                        .sort(([, a], [, b]) => b.length - a.length)
-                        .map(([city, sups]) => (
-                          <NavTile key={city} label={city} count={sups.length} icon={MapPin}
-                            onClick={() => { setNavRegion(onlyRegion); setNavCity(city) }} />
-                        ))}
-                    </div>
-                  )
-                })()
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Object.entries(regions)
-                    .sort(([, a], [, b]) => b.length - a.length)
-                    .map(([region, sups]) => (
-                      <NavTile key={region} label={region} count={sups.length} icon={MapPin}
-                        onClick={() => setNavRegion(region)} />
-                    ))}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Level: Cities */}
-          {navCategory && navCountryGroup && navCountryGroup !== '__chains__' && navRegion && !navCity && (
-            <>
-              {Object.keys(cities).length === 1 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {citySuppliers.map(sup => (
-                    <SupplierCard key={sup.id} supplier={sup} onClick={() => setSelected(sup)} />
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Object.entries(cities)
-                    .sort(([, a], [, b]) => b.length - a.length)
-                    .map(([city, sups]) => (
-                      <NavTile key={city} label={city} count={sups.length} icon={MapPin}
-                        onClick={() => setNavCity(city)} />
-                    ))}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Level: Supplier list (final) */}
-          {navCategory && navCountryGroup && navCountryGroup !== '__chains__' && (navCity || (navRegion && Object.keys(cities).length === 1)) && (
-            <div className="space-y-3">
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-                {finalNavList.length} risultat{finalNavList.length !== 1 ? 'i' : 'o'}
-              </p>
-              {finalNavList.length === 0 ? (
-                <div className="p-10 text-center" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', color: 'var(--muted)' }}>
-                  <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessun fornitore in questa posizione</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {finalNavList.map(sup => (
-                    <SupplierCard key={sup.id} supplier={sup} onClick={() => setSelected(sup)} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filteredSuppliers.map(sup => (
+              <SupplierCard key={sup.id} supplier={sup} onClick={() => setSelected(sup)} />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Modals */}
       {showForm && <SupplierFormModal supplier={editingSupplier} onSave={handleSave} onCancel={() => { setShowForm(false); setEditingSupplier(undefined) }} />}
