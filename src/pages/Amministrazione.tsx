@@ -22,6 +22,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
 import { todayISO, addDaysISO, fmtLong, fmtDateShort, fmtDate } from '@/lib/format'
 import type {
   Entrata,
@@ -451,6 +452,7 @@ export default function Amministrazione() {
   const [editingDoc, setEditingDoc] = useState<AdminDocument | null>(null)
   const [eventEconomics, setEventEconomics] = useState<EventEconomicsSummary[]>([])
   const [eventPaymentsForFilter, setEventPaymentsForFilter] = useState<EventPayment[]>([])
+  const [eventIncassiForFilter, setEventIncassiForFilter] = useState<EventPayment[]>([])
   const [migrationMsg, setMigrationMsg] = useState<string | null>(null)
   const migrationRan = useRef(false)
 
@@ -545,11 +547,27 @@ export default function Amministrazione() {
   // Load event payments when filtering by specific event
   useEffect(() => {
     if (filterEvento !== 'tutti') {
-      fetchEventPayments(filterEvento).then(data =>
+      fetchEventPayments(filterEvento).then(data => {
         setEventPaymentsForFilter(data.filter(p => p.tipo === 'pagamento_fornitore'))
-      )
+        setEventIncassiForFilter(data.filter(p => p.tipo === 'incasso_cliente'))
+      })
     } else {
-      setEventPaymentsForFilter([])
+      supabase
+        .from('event_payments')
+        .select('*')
+        .eq('tipo', 'pagamento_fornitore')
+        .not('data_pagamento', 'is', null)
+        .then((res) => {
+          setEventPaymentsForFilter((res.data ?? []) as EventPayment[])
+        })
+      supabase
+        .from('event_payments')
+        .select('*')
+        .eq('tipo', 'incasso_cliente')
+        .not('data_pagamento', 'is', null)
+        .then((res) => {
+          setEventIncassiForFilter((res.data ?? []) as EventPayment[])
+        })
     }
   }, [filterEvento])
 
@@ -692,6 +710,26 @@ export default function Amministrazione() {
     const unique = epAsUscite.filter(ep => !existingIds.has(ep.fornitoreId + ep.importo + ep.scadenza))
     return [...filteredUscite, ...unique]
   }, [filteredUscite, eventPaymentsForFilter])
+
+  const mergedEntrate = useMemo(() => {
+    if (eventIncassiForFilter.length === 0) return filteredEntrate
+    const epAsEntrate: Entrata[] = eventIncassiForFilter.map(p => ({
+      id: `ep_${p.id}`,
+      clienteId: '',
+      eventoId: p.event_id,
+      importo: p.importo,
+      stato: (p.data_pagamento ? 'pagato' : p.data_scadenza < todayISO() ? 'scaduto' : 'in_attesa') as StatoPagamento,
+      dataPrevista: p.data_scadenza,
+      dataPagamento: p.data_pagamento,
+      metodoPagamento: 'bonifico' as const,
+      note: p.descrizione + (p.note ? ` - ${p.note}` : ''),
+      fatturaId: null,
+    }))
+    const existingIds = new Set(filteredEntrate.map(e => e.clienteId + e.importo + e.dataPrevista))
+    const unique = epAsEntrate.filter(ep => !existingIds.has(ep.clienteId + ep.importo + ep.dataPrevista))
+    return [...filteredEntrate, ...unique]
+  }, [filteredEntrate, eventIncassiForFilter])
+
   const filteredFatture = visibleFatture.filter(f => {
     const matchEvento = filterEvento === 'tutti' || f.eventoId === filterEvento
     const matchMese = filterMese === 'tutti' || f.dataEmissione.startsWith(filterMese)
@@ -873,7 +911,7 @@ export default function Amministrazione() {
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'dashboard', label: 'Dashboard' },
-    { id: 'entrate', label: `Entrate (${filteredEntrate.length})` },
+    { id: 'entrate', label: `Entrate (${mergedEntrate.length})` },
     { id: 'uscite', label: `Uscite (${mergedUscite.length})` },
     { id: 'fatture', label: `Fatture (${filteredFatture.length})` },
     { id: 'invoices', label: `Fatture DB (${invoices.length})` },
@@ -1293,10 +1331,10 @@ export default function Amministrazione() {
         <div className="animate-fade-in" style={{ paddingTop: 14 }}>
           <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              {filteredEntrate.length} voci
+              {mergedEntrate.length} voci
             </span>
             <span style={{ fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 600, color: 'var(--green)' }}>
-              {formatEur(filteredEntrate.reduce((s, e) => s + e.importo, 0))}
+              {formatEur(mergedEntrate.reduce((s, e) => s + e.importo, 0))}
             </span>
           </div>
           <div style={{ overflowX: 'auto' }}>
@@ -1314,14 +1352,23 @@ export default function Amministrazione() {
                 </tr>
               </thead>
               <tbody>
-                {filteredEntrate.length === 0 ? (
+                {mergedEntrate.length === 0 ? (
                   <tr>
                     <td colSpan={8} style={{ ...tdMuted, textAlign: 'center', padding: '32px 14px' }}>Nessun movimento trovato</td>
                   </tr>
-                ) : filteredEntrate.map(e => (
+                ) : mergedEntrate.map(e => {
+                  const isFromEvent = e.id.startsWith('ep_')
+                  return (
                   <tr key={e.id} style={{ borderBottom: '1px solid var(--line)' }}
                     className="hover:bg-[var(--panel2)] transition-colors">
-                    <td style={tdStyle}>{clientName(e.clienteId)}</td>
+                    <td style={tdStyle}>
+                      {clientName(e.clienteId)}
+                      {isFromEvent && (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, background: 'color-mix(in srgb, var(--blue) 12%, transparent)', color: 'var(--blue)', padding: '2px 6px', borderRadius: 4, marginLeft: 6 }}>
+                          EMS {e.eventoId ? `\u00B7 ${eventName(e.eventoId)}` : ''}
+                        </span>
+                      )}
+                    </td>
                     <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(e.eventoId)}</td>
                     <td style={{ ...tdAmount, color: 'var(--green)' }}>{formatEur(e.importo)}</td>
                     <td style={{ padding: '10px 14px' }}><StatoBadge stato={e.stato} /></td>
@@ -1353,7 +1400,8 @@ export default function Amministrazione() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -1394,10 +1442,18 @@ export default function Amministrazione() {
                   </tr>
                 ) : mergedUscite.map(u => {
                   const isScad = u.scadenza < todayISO() && u.stato !== 'pagato'
+                  const isFromEvent = u.id.startsWith('ep_')
                   return (
                     <tr key={u.id} style={{ borderBottom: '1px solid var(--line)' }}
                       className="hover:bg-[var(--panel2)] transition-colors">
-                      <td style={tdStyle}>{supplierName(u.fornitoreId)}</td>
+                      <td style={tdStyle}>
+                        {supplierName(u.fornitoreId)}
+                        {isFromEvent && (
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, background: 'color-mix(in srgb, var(--blue) 12%, transparent)', color: 'var(--blue)', padding: '2px 6px', borderRadius: 4, marginLeft: 6 }}>
+                            EMS {u.eventoId ? `\u00B7 ${eventName(u.eventoId)}` : ''}
+                          </span>
+                        )}
+                      </td>
                       <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(u.eventoId)}</td>
                       <td className="mobile-hide" style={tdMuted}>{u.categoria}</td>
                       <td className="mobile-hide" style={tdStyle}>{u.quantity ?? 1}</td>

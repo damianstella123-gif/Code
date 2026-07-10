@@ -258,6 +258,33 @@ function PaymentForm({ eventId, suppliers, onDone, onCancel }: {
   const [saving, setSaving] = useState(false)
   const { showToast } = useToast()
 
+  const [supplierSearch, setSupplierSearch] = useState('')
+  const [supplierOpen, setSupplierOpen] = useState(false)
+  const [supplierLabel, setSupplierLabel] = useState('')
+
+  const filteredSuppliers = supplierSearch.length > 0
+    ? suppliers.filter(s =>
+        s.nome.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+        (s.categorie || [s.categoria]).some((c: string | null) => c?.toLowerCase().includes(supplierSearch.toLowerCase()))
+      ).slice(0, 8)
+    : []
+
+  useEffect(() => {
+    if (!supplierOpen) return
+    const close = () => setSupplierOpen(false)
+    const timer = setTimeout(() => document.addEventListener('mousedown', close), 0)
+    return () => { clearTimeout(timer); document.removeEventListener('mousedown', close) }
+  }, [supplierOpen])
+
+  useEffect(() => {
+    if (tipo !== 'pagamento_fornitore') {
+      setSupplierId('')
+      setSupplierLabel('')
+      setSupplierSearch('')
+      setSupplierOpen(false)
+    }
+  }, [tipo])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!descrizione.trim() || !importo) return
@@ -318,10 +345,62 @@ function PaymentForm({ eventId, suppliers, onDone, onCancel }: {
         {tipo === 'pagamento_fornitore' && (
           <div>
             <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Fornitore</label>
-            <select value={supplierId} onChange={e => setSupplierId(e.target.value)} style={inputStyle}>
-              <option value="">-- Seleziona --</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-            </select>
+            <div style={{ position: 'relative' }} onMouseDown={e => e.stopPropagation()}>
+              <input
+                type="text"
+                value={supplierLabel}
+                onChange={e => {
+                  setSupplierLabel(e.target.value)
+                  setSupplierSearch(e.target.value)
+                  setSupplierId('')
+                  setSupplierOpen(true)
+                }}
+                onFocus={() => setSupplierOpen(true)}
+                placeholder="Cerca fornitore..."
+                style={inputStyle}
+                autoComplete="off"
+              />
+              {supplierOpen && filteredSuppliers.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0, right: 0,
+                  zIndex: 50,
+                  background: 'var(--panel-solid, var(--bg2))',
+                  border: '1px solid var(--line)',
+                  borderRadius: 12,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  maxHeight: 220,
+                  overflowY: 'auto',
+                }} onMouseDown={e => e.stopPropagation()}>
+                  {filteredSuppliers.map(s => (
+                    <div
+                      key={s.id}
+                      onClick={() => {
+                        setSupplierId(s.id)
+                        setSupplierLabel(s.nome)
+                        setSupplierSearch('')
+                        setSupplierOpen(false)
+                      }}
+                      style={{
+                        padding: '10px 14px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid var(--line)',
+                        fontSize: 13,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--panel2, var(--bg3))')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <div style={{ fontWeight: 500, color: 'var(--text)' }}>{s.nome}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                        {(s.categorie?.[0] || s.categoria || '')}
+                        {s.city ? ` \u00B7 ${s.city}` : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
         <div className={tipo === 'pagamento_fornitore' ? 'md:col-span-2' : ''}>

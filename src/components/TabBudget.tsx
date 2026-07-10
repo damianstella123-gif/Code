@@ -1142,6 +1142,9 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
           </div>
         </div>
       )}
+
+      {/* ══════ PAGAMENTI SUMMARY ══════ */}
+      <PaymentsSummary eventId={event.id} />
     </div>
   )
 }
@@ -1160,6 +1163,73 @@ function Detail({ label, value }: { label: string; value: string }) {
     <div>
       <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>{label}</p>
       <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text)' }}>{value}</p>
+    </div>
+  )
+}
+
+function PaymentsSummary({ eventId }: { eventId: string }) {
+  const [payments, setPayments] = useState<{ tipo: string; importo: number; data_pagamento: string | null }[]>([])
+
+  useEffect(() => {
+    supabase.from('event_payments')
+      .select('tipo, importo, data_pagamento')
+      .eq('event_id', eventId)
+      .order('data_scadenza', { ascending: true })
+      .then(({ data }) => { if (data) setPayments(data) })
+  }, [eventId])
+
+  if (payments.length === 0) return null
+
+  let incassato = 0, daIncassare = 0, pagato = 0, daPagare = 0
+  for (const p of payments) {
+    if (p.tipo === 'incasso_cliente') {
+      if (p.data_pagamento) incassato += p.importo
+      else daIncassare += p.importo
+    } else {
+      if (p.data_pagamento) pagato += p.importo
+      else daPagare += p.importo
+    }
+  }
+  const liquidita = incassato - pagato
+  const fmt = (n: number) => '\u20AC' + n.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+
+  return (
+    <div className="panel p-5 space-y-4">
+      <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: 12 }}>
+          PAGAMENTI
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(56,210,125,0.06)', border: '1px solid rgba(56,210,125,0.15)' }}>
+          <p className="text-[10px] uppercase" style={{ color: 'var(--muted)' }}>Incassato</p>
+          <p className="text-sm font-bold mt-1" style={{ color: 'var(--green)' }}>{fmt(incassato)}</p>
+        </div>
+        <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(255,194,75,0.06)', border: '1px solid rgba(255,194,75,0.15)' }}>
+          <p className="text-[10px] uppercase" style={{ color: 'var(--muted)' }}>Da incassare</p>
+          <p className="text-sm font-bold mt-1" style={{ color: 'var(--yellow)' }}>{fmt(daIncassare)}</p>
+        </div>
+        <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(208,0,58,0.06)', border: '1px solid rgba(208,0,58,0.15)' }}>
+          <p className="text-[10px] uppercase" style={{ color: 'var(--muted)' }}>Pagato</p>
+          <p className="text-sm font-bold mt-1" style={{ color: 'var(--red2)' }}>{fmt(pagato)}</p>
+        </div>
+        <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+          <p className="text-[10px] uppercase" style={{ color: 'var(--muted)' }}>Da pagare</p>
+          <p className="text-sm font-bold mt-1" style={{ color: '#f59e0b' }}>{fmt(daPagare)}</p>
+        </div>
+      </div>
+
+      <div className="rounded-xl p-4 text-center" style={{ background: 'var(--panel2)' }}>
+        <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Liquidita disponibile</p>
+        <p className="text-2xl font-bold mt-1" style={{ color: liquidita >= 0 ? 'var(--green)' : 'var(--red2)' }}>
+          {fmt(liquidita)}
+        </p>
+      </div>
+
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textAlign: 'right' }}>
+        Dettagli nella tab Pagamenti
+      </p>
     </div>
   )
 }
