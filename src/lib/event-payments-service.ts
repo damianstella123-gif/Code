@@ -27,6 +27,7 @@ export interface PaymentInsert {
   stato?: 'atteso' | 'pagato' | 'in_ritardo'
   note?: string | null
   created_by?: string | null
+  stato_approvazione?: 'autonomo' | 'in_attesa' | 'approvato' | 'bloccato'
 }
 
 function num(x: number | string | null | undefined): number {

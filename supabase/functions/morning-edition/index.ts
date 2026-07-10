@@ -60,21 +60,21 @@ Deno.serve(async (req: Request) => {
     // Leaves starting in 7 days
     const { data: leaves7 } = await sb
       .from("leave_requests")
-      .select("tipo, data_inizio, data_fine, profiles(first_name, last_name)")
+      .select("id, tipo, data_inizio, data_fine, profiles(first_name, last_name)")
       .eq("stato", "approvata")
       .eq("data_inizio", in7days);
 
     // Leaves starting tomorrow
     const { data: leaves1 } = await sb
       .from("leave_requests")
-      .select("tipo, data_inizio, data_fine, profiles(first_name, last_name)")
+      .select("id, tipo, data_inizio, data_fine, profiles(first_name, last_name)")
       .eq("stato", "approvata")
       .eq("data_inizio", tomorrow);
 
     // Leaves active today
     const { data: leavesToday } = await sb
       .from("leave_requests")
-      .select("tipo, data_inizio, data_fine, profiles(first_name, last_name)")
+      .select("id, tipo, data_inizio, data_fine, profiles(first_name, last_name)")
       .eq("stato", "approvata")
       .lte("data_inizio", today)
       .gte("data_fine", today);
@@ -85,8 +85,12 @@ Deno.serve(async (req: Request) => {
       const prof = l.profiles as unknown as { first_name: string; last_name: string };
       const nome = `${prof.first_name} ${prof.last_name}`;
       const nots = adminIds.map((aid: string) => ({
-        user_id: aid, is_read: false, link: "/amministrazione",
-        message: `📅 ${nome} ha ${l.tipo} tra 7 giorni (${l.data_inizio} → ${l.data_fine}). Verifica la copertura.`,
+        user_id: aid, is_read: false,
+        title: "\u{1F4C5} Ferie in arrivo",
+        message: `${nome} ha ${l.tipo} tra 7 giorni (${l.data_inizio} \u2192 ${l.data_fine}). Verifica la copertura.`,
+        type: "leave_reminder",
+        related_entity_type: "leave_request",
+        related_entity_id: l.id,
       }));
       if (nots.length > 0) await sb.from("notifications").insert(nots);
     }
@@ -95,8 +99,12 @@ Deno.serve(async (req: Request) => {
       const prof = l.profiles as unknown as { first_name: string; last_name: string };
       const nome = `${prof.first_name} ${prof.last_name}`;
       const nots = adminIds.map((aid: string) => ({
-        user_id: aid, is_read: false, link: "/calendario",
-        message: `⚠️ Domani ${nome} è in ${l.tipo} (fino al ${l.data_fine}). Verifica la copertura.`,
+        user_id: aid, is_read: false,
+        title: "\u26A0\uFE0F Ferie domani",
+        message: `Domani ${nome} \u00E8 in ${l.tipo} (fino al ${l.data_fine}). Verifica la copertura.`,
+        type: "leave_reminder",
+        related_entity_type: "leave_request",
+        related_entity_id: l.id,
       }));
       if (nots.length > 0) await sb.from("notifications").insert(nots);
     }
@@ -104,10 +112,14 @@ Deno.serve(async (req: Request) => {
     for (const l of leavesToday ?? []) {
       const prof = l.profiles as unknown as { first_name: string; last_name: string };
       const nome = `${prof.first_name} ${prof.last_name}`;
-      const em = EMOJI[l.tipo] || "📅";
+      const em = EMOJI[l.tipo] || "\u{1F4C5}";
       const nots = adminIds.map((aid: string) => ({
-        user_id: aid, is_read: false, link: "/calendario",
-        message: `${em} Oggi ${nome} è in ${l.tipo} (rientra il ${l.data_fine})`,
+        user_id: aid, is_read: false,
+        title: "\u{1F3D6}\uFE0F In ferie oggi",
+        message: `${em} Oggi ${nome} \u00E8 in ${l.tipo} (rientra il ${l.data_fine})`,
+        type: "leave_reminder",
+        related_entity_type: "leave_request",
+        related_entity_id: l.id,
       }));
       if (nots.length > 0) await sb.from("notifications").insert(nots);
     }

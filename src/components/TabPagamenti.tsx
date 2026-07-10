@@ -156,6 +156,7 @@ export default function TabPagamenti({ event, suppliers }: Props) {
       {showForm && (
         <PaymentForm
           eventId={event.id}
+          eventName={event.nome}
           suppliers={suppliers}
           onDone={() => { setShowForm(false); load() }}
           onCancel={() => setShowForm(false)}
@@ -243,8 +244,9 @@ function StatoBadge({ stato }: { stato: string }) {
   )
 }
 
-function PaymentForm({ eventId, suppliers, onDone, onCancel }: {
+function PaymentForm({ eventId, eventName, suppliers, onDone, onCancel }: {
   eventId: string
+  eventName: string
   suppliers: Supplier[]
   onDone: () => void
   onCancel: () => void
@@ -256,11 +258,19 @@ function PaymentForm({ eventId, suppliers, onDone, onCancel }: {
   const [supplierId, setSupplierId] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  const [soglia, setSoglia] = useState(2000)
   const { showToast } = useToast()
 
   const [supplierSearch, setSupplierSearch] = useState('')
   const [supplierOpen, setSupplierOpen] = useState(false)
   const [supplierLabel, setSupplierLabel] = useState('')
+
+  useEffect(() => {
+    supabase.from('cashflow_config').select('soglia_autonomia_pm_eur').limit(1).maybeSingle()
+      .then(({ data }) => { if (data?.soglia_autonomia_pm_eur) setSoglia(Number(data.soglia_autonomia_pm_eur)) })
+  }, [])
+
+  const needsApproval = tipo === 'pagamento_fornitore' && Number(importo) > soglia
 
   const filteredSuppliers = supplierSearch.length > 0
     ? suppliers.filter(s =>
@@ -290,6 +300,7 @@ function PaymentForm({ eventId, suppliers, onDone, onCancel }: {
     if (!descrizione.trim() || !importo) return
     setSaving(true)
     const user = await loadUser()
+    const statoApprovazione = needsApproval ? 'in_attesa' : 'autonomo'
     const result = await insertPayment({
       event_id: eventId,
       tipo,
@@ -299,10 +310,30 @@ function PaymentForm({ eventId, suppliers, onDone, onCancel }: {
       supplier_id: tipo === 'pagamento_fornitore' && supplierId ? supplierId : null,
       note: note.trim() || null,
       created_by: user?.id ?? null,
+      stato_approvazione: statoApprovazione as any,
     })
+    if (result && needsApproval) {
+      const { data: admins } = await supabase.from('profiles').select('id').in('role', ['Admin', 'Super Admin', 'Amministrazione'])
+      const fornitoreNome = suppliers.find(s => s.id === supplierId)?.nome || 'Fornitore'
+      for (const a of admins ?? []) {
+        await supabase.from('notifications').insert({
+          user_id: a.id,
+          title: 'Approvazione pagamento richiesta',
+          message: `Richiesta di \u20AC${Number(importo).toLocaleString('it-IT')} a ${fornitoreNome} per evento "${eventName}" attende la tua approvazione.`,
+          type: 'payment_approval',
+          related_entity_type: 'event_payment',
+          related_entity_id: result.id,
+          is_read: false,
+        })
+      }
+    }
     setSaving(false)
-    if (result) { showToast('Pagamento aggiunto', 'success'); onDone() }
-    else showToast('Errore salvataggio', 'error')
+    if (result) {
+      showToast(needsApproval ? 'Pagamento inviato in approvazione' : 'Pagamento registrato', 'success')
+      onDone()
+    } else {
+      showToast('Errore salvataggio', 'error')
+    }
   }
 
   const inputStyle: React.CSSProperties = {
@@ -409,10 +440,24 @@ function PaymentForm({ eventId, suppliers, onDone, onCancel }: {
         </div>
       </div>
 
+      {needsApproval && (
+        <div style={{
+          background: 'color-mix(in srgb, var(--yellow) 12%, transparent)',
+          border: '1px solid var(--yellow)',
+          borderRadius: 10,
+          padding: '10px 14px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 12,
+          color: 'var(--yellow)',
+        }}>
+          Questo pagamento ({fmtEuro(Number(importo))}) supera la soglia di autonomia ({fmtEuro(soglia)}). Sara inviato in approvazione all'Amministrazione.
+        </div>
+      )}
+
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--muted)' }}>Annulla</button>
         <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--accent)', color: '#fff', opacity: saving ? 0.6 : 1 }}>
-          {saving ? 'Salvando...' : 'Salva'}
+          {saving ? (needsApproval ? 'Invio approvazione...' : 'Salvando...') : (needsApproval ? 'Invia per approvazione' : 'Salva')}
         </button>
       </div>
     </form>
