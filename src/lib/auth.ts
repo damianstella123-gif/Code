@@ -107,6 +107,7 @@ const ALL_NAV: NavItem[] = [
   { name: 'Comunicazioni', href: '/comunicazioni' },
   { name: 'Workflow', href: '/workflow' },
   { name: 'Utenti', href: '/utenti' },
+  { name: 'Performance', href: '/performance' },
   { name: 'Impostazioni', href: '/impostazioni' },
   { name: 'Feedback Beta', href: '/feedback-beta' },
 ]
@@ -116,7 +117,7 @@ export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
 
   if (role === 'Senior PM' || role === 'Project Manager') {
     return ALL_NAV.filter(item =>
-      !['/amministrazione', '/utenti'].includes(item.href)
+      !['/amministrazione', '/utenti', '/performance'].includes(item.href)
     )
   }
 
@@ -134,7 +135,7 @@ export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
 
   // User / any other role: basic access
   return ALL_NAV.filter(item =>
-    !['/amministrazione', '/utenti'].includes(item.href)
+    !['/amministrazione', '/utenti', '/performance'].includes(item.href)
   )
 }
 

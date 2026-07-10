@@ -60,7 +60,7 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
   { label: 'Operativo', paths: ['/eventi', '/task', '/calendario', '/fornitori'] },
   { label: 'Business', paths: ['/crm', '/amministrazione'] },
   { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
-  { label: 'Sistema', paths: ['/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta'] },
+  { label: 'Sistema', paths: ['/workflow', '/dossier', '/utenti', '/performance', '/impostazioni', '/feedback-beta'] },
 ]
 
 interface SidebarProps {
