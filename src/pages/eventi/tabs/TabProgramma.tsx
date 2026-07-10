@@ -50,7 +50,7 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
   async function loadAll() {
     const [autoRes, manualRes] = await Promise.all([
       loadAutoEntries(event),
-      supabase.from('event_program').select('*').eq('event_id', event.id),
+      supabase.from('event_program').select('*').eq('event_id', event.id).order('sort_order', { ascending: true }),
     ])
 
     setAutoEntries(autoRes)
@@ -168,6 +168,19 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
     await loadAll()
   }
 
+  async function handleReorder(draggedId: string, droppedOnId: string) {
+    const list = [...manualEntries]
+    const dragIdx = list.findIndex(e => e.id === draggedId)
+    const dropIdx = list.findIndex(e => e.id === droppedOnId)
+    if (dragIdx < 0 || dropIdx < 0) return
+    const [item] = list.splice(dragIdx, 1)
+    list.splice(dropIdx, 0, item)
+    setManualEntries(list)
+    await Promise.all(list.map((e, i) =>
+      supabase.from('event_program').update({ sort_order: i }).eq('id', e.id)
+    ))
+  }
+
   if (loading) {
     return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento programma...</div></div>
   }
@@ -210,6 +223,7 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
         openDuplicate={openDuplicate}
         openEdit={openEdit}
         handleDelete={handleDelete}
+        onReorder={handleReorder}
       />
     </div>
   )

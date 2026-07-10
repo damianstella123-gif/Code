@@ -1,4 +1,5 @@
-import { Clock, Edit3, Trash2, Users, Truck, MapPin, Link2, Copy } from 'lucide-react'
+import { useRef } from 'react'
+import { Clock, Edit3, Trash2, Users, Truck, MapPin, Link2, Copy, GripVertical } from 'lucide-react'
 import { fmtFullLong } from '@/lib/format'
 import type { Supplier } from '@/data/suppliers'
 import type { ProgramEntry } from './types'
@@ -11,9 +12,12 @@ interface ProgrammaTimelineProps {
   openDuplicate: (entry: ProgramEntry) => void
   openEdit: (entry: ProgramEntry) => void
   handleDelete: (id: string) => void
+  onReorder: (dragId: string, dropId: string) => void
 }
 
-export function ProgrammaTimeline({ allEntries, showForm, grouped, suppliers, openDuplicate, openEdit, handleDelete }: ProgrammaTimelineProps) {
+export function ProgrammaTimeline({ allEntries, showForm, grouped, suppliers, openDuplicate, openEdit, handleDelete, onReorder }: ProgrammaTimelineProps) {
+  const dragId = useRef<string | null>(null)
+
   if (allEntries.length === 0 && !showForm) {
     return (
       <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
@@ -38,10 +42,34 @@ export function ProgrammaTimeline({ allEntries, showForm, grouped, suppliers, op
               {dayItems.map(entry => {
                 const sup = suppliers.find(s => s.id === entry.supplier_id)
                 return (
-                  <div key={entry.id} className="relative flex items-start gap-3">
+                  <div key={entry.id} className="relative flex items-start gap-3"
+                    onDragOver={e => {
+                      if (!entry.manual) return
+                      e.preventDefault()
+                      e.currentTarget.style.borderTop = '2px solid var(--blue)'
+                    }}
+                    onDragLeave={e => {
+                      e.currentTarget.style.borderTop = ''
+                    }}
+                    onDrop={e => {
+                      e.preventDefault()
+                      e.currentTarget.style.borderTop = ''
+                      if (dragId.current && dragId.current !== entry.id) {
+                        onReorder(dragId.current, entry.id)
+                        dragId.current = null
+                      }
+                    }}>
                     <div className="absolute left-[-18px] top-2.5 w-2.5 h-2.5 rounded-full border-2"
                       style={{ borderColor: entry.manual ? 'var(--blue)' : 'var(--red2)', background: 'var(--bg)' }} />
-                    <div className="flex-1 panel p-4" style={{ border: entry.manual ? '1px solid var(--blue)' : undefined }}>
+                    <div className="flex-1 panel p-4"
+                      onClick={() => entry.manual && openEdit(entry)}
+                      style={{
+                        border: entry.manual ? '1px solid var(--line)' : undefined,
+                        cursor: entry.manual ? 'pointer' : 'default',
+                        transition: 'border-color 0.15s',
+                      }}
+                      onMouseEnter={e => { if (entry.manual) e.currentTarget.style.borderColor = 'var(--blue)' }}
+                      onMouseLeave={e => { if (entry.manual) e.currentTarget.style.borderColor = 'var(--line)' }}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -86,13 +114,21 @@ export function ProgrammaTimeline({ allEntries, showForm, grouped, suppliers, op
                         </div>
                         {entry.manual && (
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <button onClick={() => openDuplicate(entry)} className="p-1.5 rounded-lg hover:bg-[var(--line)] transition-colors" title="Duplica (es. per un'altra notte)">
+                            <div
+                              draggable={true}
+                              onDragStart={() => { dragId.current = entry.id }}
+                              style={{ cursor: 'grab', color: 'var(--muted)', padding: '6px 4px', display: 'flex', alignItems: 'center' }}
+                              title="Trascina per riordinare"
+                              onClick={e => e.stopPropagation()}>
+                              <GripVertical className="w-3.5 h-3.5" />
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); openDuplicate(entry) }} className="p-1.5 rounded-lg hover:bg-[var(--line)] transition-colors" title="Duplica (es. per un'altra notte)">
                               <Copy className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
                             </button>
-                            <button onClick={() => openEdit(entry)} className="p-1.5 rounded-lg hover:bg-[var(--line)] transition-colors">
+                            <button onClick={(e) => { e.stopPropagation(); openEdit(entry) }} className="p-1.5 rounded-lg hover:bg-[var(--line)] transition-colors">
                               <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
                             </button>
-                            <button onClick={() => handleDelete(entry.id)} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                            <button onClick={(e) => { e.stopPropagation(); handleDelete(entry.id) }} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors">
                               <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
                             </button>
                           </div>

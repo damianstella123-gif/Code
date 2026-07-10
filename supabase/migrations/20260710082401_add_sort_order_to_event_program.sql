@@ -1,0 +1,1 @@
+ALTER TABLE event_program ADD COLUMN IF NOT EXISTS sort_order int DEFAULT 0;
