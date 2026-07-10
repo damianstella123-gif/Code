@@ -1,5 +1,6 @@
 import { ReactNode, useState, useEffect, useCallback } from 'react'
 import GlobalSearch from '@/components/GlobalSearch'
+import { OfflineBanner } from '@/components/OfflineBanner'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -711,6 +712,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
         <div className="shell-main">
           <Topbar setOpen={setSidebarOpen} />
+          <OfflineBanner />
           <main className="shell-content pb-mobile-nav" style={{ alignSelf: 'center', width: '100%', maxWidth: '1280px', marginLeft: 'auto', marginRight: 'auto' }}>
             {children}
           </main>

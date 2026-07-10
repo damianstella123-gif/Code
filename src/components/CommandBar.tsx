@@ -254,6 +254,10 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
 
   const askFly = useCallback(async (text: string) => {
     if (!text.trim() || flyLoading) return
+    if (!navigator.onLine) {
+      setFlyError('Fly non \u00E8 disponibile offline. Riconnettiti per usarla.')
+      return
+    }
 
     const userMsg: FlyMessage = { role: 'user', content: text.trim() }
     const newHistory = [...flyHistory, userMsg]
