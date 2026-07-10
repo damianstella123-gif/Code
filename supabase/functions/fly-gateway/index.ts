@@ -1771,20 +1771,22 @@ async function executeProposal(
 
       case "create_event_draft": {
         const nome = sanitizeString(params.nome);
-        const location = params.location ? sanitizeString(params.location) : null;
-        const pax = typeof params.pax === "number" ? params.pax : null;
-        const budget = typeof params.budget === "number" ? params.budget : null;
+        const location = params.location ? sanitizeString(params.location) : "";
+        const pax = typeof params.pax === "number" ? params.pax : 0;
+        const budget = typeof params.budget === "number" ? params.budget : 0;
 
         const { data: evData, error: evErr } = await supabaseClient
           .from("events")
           .insert({
-            title: nome,
+            id: crypto.randomUUID(),
+            title: nome || "Nuovo evento",
             location: location,
             attendees: pax,
-            budget: budget || 0,
+            budget: budget,
             status: "bozza",
-            start_date: null,
-            created_by: userId,
+            start_date: new Date().toISOString().split("T")[0],
+            end_date: new Date().toISOString().split("T")[0],
+            project_manager_id: userId,
           })
           .select("id, title")
           .maybeSingle();

@@ -51,7 +51,7 @@ export function DistanceLogistics({ linkedSuppliers, eventLocation }: { linkedSu
           </thead>
           <tbody>
             {pairs.map((p, i) => {
-              const driveMin = Math.round((p.km / 60) * 60)
+              const driveMin = Math.round((p.km / 80) * 60)
               return (
                 <tr key={i} style={{ borderTop: '1px solid var(--line)' }}>
                   <td className="px-3 py-2 font-medium" style={{ color: 'var(--text)' }}>

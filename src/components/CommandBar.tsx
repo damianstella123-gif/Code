@@ -421,6 +421,10 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
       const linkedCount = data.data?.fornitori_collegati || 0
       final.push({ role: 'assistant', content: `Bozza creata con ${linkedCount} fornitori precollegati. Aprila in EMS per completarla.` })
       setFlyHistory(final)
+      trackAction('fly_propose_event')
+      if (data.data?.event_id) {
+        setTimeout(() => navigate(`/eventi/${data.data.event_id}`), 600)
+      }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Errore'
       const final = [...updated]
