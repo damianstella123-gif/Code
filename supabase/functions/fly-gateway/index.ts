@@ -1079,13 +1079,13 @@ async function executeTool(
 
       // Load event documents - search for guest list
       const { data: docs } = await supabase
-        .from("event_documents")
-        .select("id, file_name, storage_path, file_type")
+        .from("documents")
+        .select("id, file_name, file_path")
         .eq("event_id", eventId);
 
       const guestListDoc = docs?.find((d: any) =>
         d.file_name.toLowerCase().match(
-          /ospiti|guests|partecipanti|attendees|lista|list|registr/
+          /ospiti|guests|partecipanti|participant|attendees|lista|list|registr|delegate|delegati|invitati|pd.disease|pd_disease/
         )
       );
 
@@ -1096,8 +1096,8 @@ async function executeTool(
         try {
           const { data: fileData } = await supabase
             .storage
-            .from("event-documents")
-            .download(guestListDoc.storage_path);
+            .from("documents")
+            .download(guestListDoc.file_path);
           if (fileData) {
             const ext = guestListDoc.file_name.split(".").pop()?.toLowerCase();
             if (ext === "csv" || ext === "txt") {
