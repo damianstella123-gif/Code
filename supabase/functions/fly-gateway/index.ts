@@ -228,6 +228,18 @@ const TOOLS = [
       required: ["task_id", "nuovo_stato"] as string[],
     },
   },
+  {
+    name: "generate_green_report",
+    description:
+      "Genera un report ambientale per un evento, includendo CO2 trasporti, fornitori e contributo digitale Synergy. Restituisce dati strutturati per la visualizzazione del Green Report.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        event_id: { type: "string", description: "UUID/ID dell'evento." },
+      },
+      required: ["event_id"] as string[],
+    },
+  },
 ];
 
 // ─── TOOL EXECUTION ────────────────────────────────────────────────────
@@ -1013,6 +1025,75 @@ async function executeTool(
         },
       };
       return `__PROPOSAL__${JSON.stringify(proposal)}`;
+    }
+
+    case "generate_green_report": {
+      const eventId = input.event_id;
+
+      // Load green data for the event
+      const { data: greenRow } = await supabase
+        .from("event_green_data")
+        .select("*")
+        .eq("event_id", eventId)
+        .maybeSingle();
+
+      // Load Synergy CO2 savings for this event
+      const { data: synergyCO2 } = await supabase
+        .from("impact_co2_log")
+        .select("kg_co2_risparmiati, fonte, descrizione")
+        .eq("event_id", eventId);
+
+      const totalSynergyCO2 = synergyCO2?.reduce(
+        (sum: number, r: any) => sum + Number(r.kg_co2_risparmiati), 0
+      ) || 0;
+
+      const byFonte = synergyCO2?.reduce(
+        (acc: Record<string, number>, r: any) => {
+          acc[r.fonte] = (acc[r.fonte] || 0) + Number(r.kg_co2_risparmiati);
+          return acc;
+        }, {} as Record<string, number>
+      ) || {};
+
+      // Load event basic info
+      const { data: evt } = await supabase
+        .from("events")
+        .select("id, nome, start_date, end_date, location")
+        .eq("id", eventId)
+        .maybeSingle();
+
+      const pax = greenRow?.pax || 0;
+      const distanza = greenRow?.distanza_km || 0;
+      const mezzo = greenRow?.mezzo_prevalente || "misto";
+      const factors: Record<string, number> = { auto: 0.170, treno: 0.041, aereo: 0.255, misto: 0.105 };
+      const co2Trasporti = pax * distanza * 2 * (factors[mezzo] || 0.105);
+      const co2Fornitori = greenRow?.co2_fornitori || 0;
+      const co2Totale = co2Trasporti + co2Fornitori;
+      const impattoNetto = Math.max(0, co2Totale - totalSynergyCO2);
+
+      return JSON.stringify({
+        evento: evt?.nome || eventId,
+        location: evt?.location || "",
+        pax,
+        co2_trasporti_kg: Math.round(co2Trasporti),
+        co2_fornitori_kg: Math.round(co2Fornitori),
+        totale_co2_kg: Math.round(co2Totale),
+        synergy_impact: {
+          co2_risparmiata_kg: Math.round(totalSynergyCO2),
+          breakdown: {
+            documenti_digitali_kg: Math.round(byFonte.documento_digitale || 0),
+            comunicazioni_interne_kg: Math.round(byFonte.comunicazione_interna || 0),
+            riunioni_evitate_kg: Math.round(byFonte.riunione_evitata || 0),
+          },
+          equivalente_fogli_carta: Math.round(totalSynergyCO2 * 120),
+          descrizione_it: `Gestendo questo evento con Synergy, il team ha evitato ${Math.round((byFonte.documento_digitale || 0) * 120)} stampe e ${synergyCO2?.filter((r: any) => r.fonte === 'riunione_evitata').length || 0} riunioni fisiche, risparmiando ${Math.round(totalSynergyCO2)} kg CO2.`,
+        },
+        impatto_netto_kg: Math.round(impattoNetto),
+        equivalenti: {
+          alberi_salvati: Math.ceil(impattoNetto / 21),
+          km_auto: Math.round(impattoNetto * 6),
+          voli_roma_milano: Number((impattoNetto / 45).toFixed(1)),
+        },
+      });
     }
 
     default:

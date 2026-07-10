@@ -43,6 +43,13 @@ interface GreenData {
   note: string
 }
 
+interface SynergyData {
+  totalKg: number
+  byFonte: Record<string, number>
+  count: number
+  riunioniEvitate: number
+}
+
 export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const user = loadUser()
   const [data, setData] = useState<GreenData>({
@@ -56,6 +63,7 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [synergy, setSynergy] = useState<SynergyData>({ totalKg: 0, byFonte: {}, count: 0, riunioniEvitate: 0 })
 
   const eventSuppliers = useMemo(() => {
     return suppliers.filter(s => s.eventiId?.includes(event.id))
@@ -63,6 +71,7 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
 
   useEffect(() => {
     loadGreenData()
+    loadSynergyData()
   }, [event.id])
 
   async function loadGreenData() {
@@ -85,6 +94,25 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
       })
     }
     setLoading(false)
+  }
+
+  async function loadSynergyData() {
+    const { data: rows } = await supabase
+      .from('impact_co2_log')
+      .select('kg_co2_risparmiati, fonte, descrizione')
+      .eq('event_id', event.id)
+
+    if (rows && rows.length > 0) {
+      const totalKg = rows.reduce((sum, r) => sum + Number(r.kg_co2_risparmiati), 0)
+      const byFonte = rows.reduce((acc, r) => {
+        acc[r.fonte] = (acc[r.fonte] || 0) + Number(r.kg_co2_risparmiati)
+        return acc
+      }, {} as Record<string, number>)
+      const riunioniEvitate = rows.filter(r => r.fonte === 'riunione_evitata').length
+      setSynergy({ totalKg, byFonte, count: rows.length, riunioniEvitate })
+    } else {
+      setSynergy({ totalKg: 0, byFonte: {}, count: 0, riunioniEvitate: 0 })
+    }
   }
 
   const saveData = useCallback(async (updated: GreenData) => {
@@ -135,6 +163,7 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
   }, [eventSuppliers, data.supplier_scores, data.pax])
 
   const co2Totale = co2Trasporti + co2Fornitori
+  const impattoNetto = Math.max(0, co2Totale - synergy.totalKg)
 
   const avgScore = useMemo(() => {
     if (eventSuppliers.length === 0) return 0
@@ -174,23 +203,54 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
     doc.setFontSize(12)
     doc.text(`TOTALE EVENTO: ${co2Totale.toFixed(0)} kg CO2`, 20, 100)
 
+    // Synergy contribution section
+    let yPos = 112
+    doc.setFontSize(11)
+    doc.setTextColor(34, 139, 34)
+    doc.text('CONTRIBUTO DIGITALE SYNERGY', 20, yPos)
+    doc.setDrawColor(34, 139, 34)
+    doc.line(20, yPos + 2, 190, yPos + 2)
+    yPos += 12
+
+    doc.setFontSize(10)
+    doc.setTextColor(34, 139, 34)
+    doc.text(`CO2 risparmiata: -${synergy.totalKg.toFixed(0)} kg`, 20, yPos)
+    yPos += 7
+    doc.setTextColor(80)
+    doc.text(`Documenti digitali: ${(synergy.byFonte.documento_digitale || 0).toFixed(0)} kg`, 24, yPos)
+    yPos += 6
+    doc.text(`Comunicazioni interne: ${(synergy.byFonte.comunicazione_interna || 0).toFixed(0)} kg`, 24, yPos)
+    yPos += 6
+    doc.text(`Riunioni evitate: ${(synergy.byFonte.riunione_evitata || 0).toFixed(0)} kg`, 24, yPos)
+    yPos += 6
+    doc.text(`Fogli carta risparmiati: ~${Math.round(synergy.totalKg * 120)}`, 24, yPos)
+    yPos += 12
+
+    // Net impact
+    doc.setFontSize(12)
+    doc.setTextColor(0)
+    doc.text(`IMPATTO NETTO: ${impattoNetto.toFixed(0)} kg CO2`, 20, yPos)
+    yPos += 12
+
     doc.setFontSize(9)
     doc.setTextColor(100)
-    doc.text(`= ${Math.ceil(co2Totale / 21)} alberi da piantare per compensare`, 20, 112)
-    doc.text(`= ${Math.round(co2Totale * 6)} km in auto`, 20, 118)
-    doc.text(`= ${(co2Totale / 45).toFixed(1)} voli Roma-Milano`, 20, 124)
+    doc.text(`= ${Math.ceil(impattoNetto / 21)} alberi salvati`, 20, yPos)
+    yPos += 6
+    doc.text(`= ${Math.round(impattoNetto * 6)} km in auto non percorsi`, 20, yPos)
+    yPos += 6
+    doc.text(`= ${(impattoNetto / 45).toFixed(1)} voli Roma-Milano equivalenti`, 20, yPos)
+    yPos += 12
 
-    if (avgScore > 3) {
+    if (avgScore > 3 && eventSuppliers.length > 0) {
       doc.setTextColor(34, 139, 34)
-      doc.text('EVENTO SOSTENIBILE +', 20, 136)
-    } else if (avgScore < 2) {
-      doc.setTextColor(200, 150, 0)
-      doc.text('Considera fornitori piu sostenibili', 20, 136)
+      doc.text('EVENTO SOSTENIBILE +', 20, yPos)
+      yPos += 10
     }
 
     doc.setFontSize(7)
     doc.setTextColor(150)
-    doc.text('Calcolato con metodologia DEFRA 2024', 20, 280)
+    doc.text('Questo report e stato generato con Fly AI di Simmetria Synergy', 20, 270)
+    doc.text('Metodologia DEFRA 2024 | I dati Synergy sono calcolati tramite tracciamento automatico delle attivita digitali', 20, 275)
 
     doc.save(`green-report-${event.nome.replace(/\s+/g, '-').toLowerCase()}.pdf`)
   }
@@ -223,7 +283,7 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
         {saving && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>Salvataggio...</span>}
       </div>
 
-      {/* ━━━ TRASPORTI ━━━ */}
+      {/* TRASPORTI */}
       <div>
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '12px' }}>
           TRASPORTI PARTECIPANTI
@@ -289,7 +349,7 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
         </div>
       </div>
 
-      {/* ━━━ FORNITORI ━━━ */}
+      {/* FORNITORI */}
       <div>
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '12px' }}>
           FORNITORI & SCELTE GREEN
@@ -349,7 +409,58 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
         </div>
       </div>
 
-      {/* ━━━ RIEPILOGO FINALE ━━━ */}
+      {/* CONTRIBUTO SYNERGY */}
+      <div style={{
+        background: 'color-mix(in srgb, var(--green) 8%, transparent)',
+        border: '1px solid var(--green)',
+        borderRadius: 14,
+        padding: '16px 20px',
+      }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          letterSpacing: '.12em',
+          color: 'var(--green)',
+          marginBottom: 8,
+          textTransform: 'uppercase',
+        }}>
+          CONTRIBUTO SYNERGY
+        </div>
+        <div style={{
+          fontSize: 22,
+          fontWeight: 700,
+          color: 'var(--green)',
+          fontFamily: 'var(--font-serif)',
+        }}>
+          -{synergy.totalKg.toFixed(0)} kg CO2
+        </div>
+        <p style={{
+          fontSize: 13,
+          color: 'var(--text)',
+          marginTop: 8,
+          lineHeight: 1.6,
+        }}>
+          {synergy.totalKg > 0
+            ? `Gestendo questo evento con Synergy, il team ha evitato ${Math.round((synergy.byFonte.documento_digitale || 0) * 120)} stampe e ${synergy.riunioniEvitate} riunioni fisiche, risparmiando ${synergy.totalKg.toFixed(0)} kg CO2.`
+            : 'Nessun contributo Synergy registrato per questo evento. I risparmi CO2 verranno tracciati automaticamente.'
+          }
+        </p>
+        <div style={{
+          display: 'flex',
+          gap: 16,
+          marginTop: 12,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          color: 'var(--muted)',
+          flexWrap: 'wrap',
+        }}>
+          <span>{Math.round(synergy.totalKg * 120)} fogli risparmiati</span>
+          <span>{(synergy.byFonte.comunicazione_interna || 0).toFixed(0)} kg da comunicazioni digitali</span>
+          <span>{(synergy.byFonte.riunione_evitata || 0).toFixed(0)} kg da riunioni evitate</span>
+        </div>
+      </div>
+
+      {/* RIEPILOGO FINALE */}
       <div style={{ border: '1px solid var(--line)', borderRadius: '14px', padding: '24px', background: 'color-mix(in srgb, var(--green) 4%, transparent)' }}>
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '16px' }}>
           RIEPILOGO FINALE
@@ -370,11 +481,38 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
           </div>
         </div>
 
-        <div style={{ borderTop: '1px solid var(--line)', paddingTop: '12px', marginBottom: '16px' }}>
+        {/* Impatto netto */}
+        <div style={{
+          marginTop: 12,
+          padding: '10px 16px',
+          borderRadius: 10,
+          background: 'var(--panel2)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            color: 'var(--muted)',
+          }}>
+            IMPATTO NETTO (incluso Synergy)
+          </span>
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 15,
+            fontWeight: 700,
+            color: impattoNetto < co2Totale ? 'var(--green)' : 'var(--text)',
+          }}>
+            {impattoNetto.toFixed(0)} kg CO2
+          </span>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--line)', paddingTop: '12px', marginTop: '16px', marginBottom: '16px' }}>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', lineHeight: 1.8 }}>
-            = {Math.ceil(co2Totale / 21)} alberi da piantare per compensare<br />
-            = {Math.round(co2Totale * 6)} km in auto<br />
-            = {(co2Totale / 45).toFixed(1)} voli Roma-Milano
+            = {Math.ceil(impattoNetto / 21)} alberi salvati<br />
+            = {Math.round(impattoNetto * 6)} km in auto non percorsi<br />
+            = {(impattoNetto / 45).toFixed(1)} voli Roma-Milano equivalenti
           </p>
         </div>
 
@@ -390,7 +528,7 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
         )}
       </div>
 
-      {/* ─── PDF Download ──────────────────────────────────────────────────────── */}
+      {/* PDF Download */}
       <div style={{ textAlign: 'center' }}>
         <button
           onClick={handleDownloadPdf}
