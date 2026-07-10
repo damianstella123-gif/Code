@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Star, Download, Leaf } from 'lucide-react'
+import { Star, Download, Leaf, Sparkles, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { loadUser } from '@/lib/auth'
 import { fmtShort } from '@/lib/format'
@@ -14,7 +14,6 @@ const FACTORS: Record<string, number> = {
   misto: (0.170 + 0.041) / 2,
 }
 
-// Supplier category CO2 factors by score (kg CO2 per pax)
 function supplierCO2(categoria: string, score: number, pax: number): number {
   const cat = categoria.toLowerCase()
   if (cat.includes('hotel')) {
@@ -50,6 +49,49 @@ interface SynergyData {
   riunioniEvitate: number
 }
 
+interface FlyRoute {
+  citta_origine: string
+  n_partecipanti: number
+  distanza_km: number
+  mezzo: string
+  co2_kg: number
+  fonte_distanza: string
+}
+
+interface FlySupplier {
+  nome: string
+  categoria: string
+  carbon_score: number
+  certificazioni_trovate: string[]
+  fonte_certificazione: string | null
+  co2_kg: number
+  alternativa_green: string | null
+}
+
+interface FlyGreenReport {
+  trasporti: {
+    fonte_dati: string
+    documento_usato: string | null
+    rotte: FlyRoute[]
+    totale_co2_kg: number
+    nota: string
+  }
+  fornitori: FlySupplier[]
+  synergy_impact: {
+    co2_risparmiata_kg: number
+    breakdown: { documenti_digitali_kg: number; comunicazioni_interne_kg: number; riunioni_evitate_kg: number }
+    equivalente_fogli_carta: number
+    descrizione_it: string
+    descrizione_en: string
+  }
+  totale_co2_kg: number
+  impatto_netto_kg: number
+  equivalenti: { alberi_salvati: number; km_auto: number; voli_roma_milano: number }
+  narrativa_it: string
+  narrativa_en: string
+  fonti: string[]
+}
+
 export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const user = loadUser()
   const [data, setData] = useState<GreenData>({
@@ -64,6 +106,8 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [synergy, setSynergy] = useState<SynergyData>({ totalKg: 0, byFonte: {}, count: 0, riunioniEvitate: 0 })
+  const [flyReport, setFlyReport] = useState<FlyGreenReport | null>(null)
+  const [generating, setGenerating] = useState(false)
 
   const eventSuppliers = useMemo(() => {
     return suppliers.filter(s => s.eventiId?.includes(event.id))
@@ -146,13 +190,55 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
     saveData(updated)
   }
 
+  // ─── Generate with Fly AI ──────────────────────────────────────────────────
+  async function handleGenerateWithFly() {
+    setGenerating(true)
+    try {
+      const { data: session } = await supabase.auth.getSession()
+      const token = session?.session?.access_token
+      if (!token) throw new Error('Non autenticato')
+
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fly-gateway`
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: `Genera il green report per l'evento ${event.id}` }),
+      })
+
+      if (!res.ok) throw new Error(`Errore ${res.status}`)
+      const result = await res.json()
+
+      // The fly-gateway returns { reply } - try to extract JSON from it
+      const replyText = result.reply || ''
+      let parsed: FlyGreenReport | null = null
+
+      // Try to find JSON in the reply
+      const jsonMatch = replyText.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[0])
+        } catch (_e) { /* ignore */ }
+      }
+
+      if (parsed && parsed.trasporti) {
+        setFlyReport(parsed)
+      }
+    } catch (err) {
+      console.error('Green report generation failed:', err)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   // ─── Transport CO2 calculation ─────────────────────────────────────────────
   const co2Trasporti = useMemo(() => {
     const factor = FACTORS[data.mezzo_prevalente] || FACTORS.misto
     return data.pax * data.distanza_km * 2 * factor
   }, [data.pax, data.distanza_km, data.mezzo_prevalente])
 
-  // ─── Supplier CO2 calculation ──────────────────────────────────────────────
   const co2Fornitori = useMemo(() => {
     let total = 0
     for (const s of eventSuppliers) {
@@ -162,8 +248,8 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
     return total
   }, [eventSuppliers, data.supplier_scores, data.pax])
 
-  const co2Totale = co2Trasporti + co2Fornitori
-  const impattoNetto = Math.max(0, co2Totale - synergy.totalKg)
+  const co2Totale = flyReport?.totale_co2_kg ?? (co2Trasporti + co2Fornitori)
+  const impattoNetto = flyReport?.impatto_netto_kg ?? Math.max(0, co2Totale - synergy.totalKg)
 
   const avgScore = useMemo(() => {
     if (eventSuppliers.length === 0) return 0
@@ -197,14 +283,32 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
     doc.setDrawColor(200)
     doc.line(20, 74, 190, 74)
 
+    let yPos = 82
     doc.setFontSize(10)
-    doc.text(`CO2 Trasporti: ${co2Trasporti.toFixed(0)} kg`, 20, 82)
-    doc.text(`CO2 Fornitori: ${co2Fornitori.toFixed(0)} kg`, 20, 89)
-    doc.setFontSize(12)
-    doc.text(`TOTALE EVENTO: ${co2Totale.toFixed(0)} kg CO2`, 20, 100)
 
-    // Synergy contribution section
-    let yPos = 112
+    // If we have fly report with routes
+    if (flyReport?.trasporti?.rotte?.length) {
+      doc.text('TRASPORTI (per rotta):', 20, yPos)
+      yPos += 7
+      const sortedRoutes = [...flyReport.trasporti.rotte].sort((a, b) => b.co2_kg - a.co2_kg)
+      for (const r of sortedRoutes.slice(0, 8)) {
+        doc.text(`  ${r.citta_origine}: ${r.n_partecipanti} pax, ${r.distanza_km} km (${r.mezzo}) = ${r.co2_kg} kg CO2`, 20, yPos)
+        yPos += 6
+      }
+      doc.text(`  TOTALE TRASPORTI: ${flyReport.trasporti.totale_co2_kg} kg`, 20, yPos)
+      yPos += 8
+    } else {
+      doc.text(`CO2 Trasporti: ${co2Trasporti.toFixed(0)} kg`, 20, yPos)
+      yPos += 7
+      doc.text(`CO2 Fornitori: ${co2Fornitori.toFixed(0)} kg`, 20, yPos)
+      yPos += 10
+    }
+
+    doc.setFontSize(12)
+    doc.text(`TOTALE EVENTO: ${co2Totale.toFixed(0)} kg CO2`, 20, yPos)
+    yPos += 12
+
+    // Synergy contribution
     doc.setFontSize(11)
     doc.setTextColor(34, 139, 34)
     doc.text('CONTRIBUTO DIGITALE SYNERGY', 20, yPos)
@@ -213,7 +317,6 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
     yPos += 12
 
     doc.setFontSize(10)
-    doc.setTextColor(34, 139, 34)
     doc.text(`CO2 risparmiata: -${synergy.totalKg.toFixed(0)} kg`, 20, yPos)
     yPos += 7
     doc.setTextColor(80)
@@ -222,34 +325,46 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
     doc.text(`Comunicazioni interne: ${(synergy.byFonte.comunicazione_interna || 0).toFixed(0)} kg`, 24, yPos)
     yPos += 6
     doc.text(`Riunioni evitate: ${(synergy.byFonte.riunione_evitata || 0).toFixed(0)} kg`, 24, yPos)
-    yPos += 6
-    doc.text(`Fogli carta risparmiati: ~${Math.round(synergy.totalKg * 120)}`, 24, yPos)
-    yPos += 12
+    yPos += 10
 
     // Net impact
     doc.setFontSize(12)
     doc.setTextColor(0)
     doc.text(`IMPATTO NETTO: ${impattoNetto.toFixed(0)} kg CO2`, 20, yPos)
-    yPos += 12
+    yPos += 10
 
     doc.setFontSize(9)
     doc.setTextColor(100)
-    doc.text(`= ${Math.ceil(impattoNetto / 21)} alberi salvati`, 20, yPos)
+    const equiv = flyReport?.equivalenti || { alberi_salvati: Math.ceil(impattoNetto / 21), km_auto: Math.round(impattoNetto * 6), voli_roma_milano: Number((impattoNetto / 45).toFixed(1)) }
+    doc.text(`= ${equiv.alberi_salvati} alberi salvati`, 20, yPos)
     yPos += 6
-    doc.text(`= ${Math.round(impattoNetto * 6)} km in auto non percorsi`, 20, yPos)
+    doc.text(`= ${equiv.km_auto} km in auto non percorsi`, 20, yPos)
     yPos += 6
-    doc.text(`= ${(impattoNetto / 45).toFixed(1)} voli Roma-Milano equivalenti`, 20, yPos)
-    yPos += 12
+    doc.text(`= ${equiv.voli_roma_milano} voli Roma-Milano equivalenti`, 20, yPos)
+    yPos += 14
 
-    if (avgScore > 3 && eventSuppliers.length > 0) {
-      doc.setTextColor(34, 139, 34)
-      doc.text('EVENTO SOSTENIBILE +', 20, yPos)
+    // Fonti section
+    if (flyReport?.fonti?.length) {
+      doc.setFontSize(10)
+      doc.setTextColor(0)
+      doc.text('METODOLOGIA E FONTI', 20, yPos)
+      doc.setDrawColor(200)
+      doc.line(20, yPos + 2, 190, yPos + 2)
       yPos += 10
+      doc.setFontSize(8)
+      doc.setTextColor(80)
+      for (const fonte of flyReport.fonti.slice(0, 10)) {
+        const truncated = fonte.length > 90 ? fonte.slice(0, 87) + '...' : fonte
+        doc.text(`- ${truncated}`, 22, yPos)
+        yPos += 5
+        if (yPos > 260) break
+      }
+      yPos += 6
     }
 
     doc.setFontSize(7)
     doc.setTextColor(150)
-    doc.text('Questo report e stato generato con Fly AI di Simmetria Synergy', 20, 270)
+    doc.text('Dati verificati tramite ricerca web | Fly AI | Simmetria Synergy', 20, 270)
     doc.text('Metodologia DEFRA 2024 | I dati Synergy sono calcolati tramite tracciamento automatico delle attivita digitali', 20, 275)
 
     doc.save(`green-report-${event.nome.replace(/\s+/g, '-').toLowerCase()}.pdf`)
@@ -280,7 +395,25 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
             </p>
           </div>
         </div>
-        {saving && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>Salvataggio...</span>}
+        <div className="flex items-center gap-3">
+          {saving && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>Salvataggio...</span>}
+          <button
+            onClick={handleGenerateWithFly}
+            disabled={generating}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all hover:scale-105"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              background: generating ? 'var(--panel2)' : 'color-mix(in srgb, var(--green) 12%, transparent)',
+              color: 'var(--green)',
+              border: '1px solid var(--green)',
+              cursor: generating ? 'wait' : 'pointer',
+              opacity: generating ? 0.7 : 1,
+            }}
+          >
+            {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            {generating ? 'Generazione...' : 'Genera con Fly'}
+          </button>
+        </div>
       </div>
 
       {/* TRASPORTI */}
@@ -288,6 +421,17 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '12px' }}>
           TRASPORTI PARTECIPANTI
         </p>
+
+        {/* Guest doc banner */}
+        {flyReport?.trasporti?.documento_usato && (
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--green)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>Dati da: {flyReport.trasporti.documento_usato}</span>
+            <span style={{ color: 'var(--muted)' }}>
+              {flyReport.trasporti.rotte.reduce((s, r) => s + r.n_partecipanti, 0)} ospiti analizzati
+            </span>
+          </div>
+        )}
+
         <div style={{ border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
@@ -337,15 +481,52 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
             </div>
           </div>
 
-          {/* Result */}
-          <div style={{ marginTop: '20px', textAlign: 'center', padding: '16px', borderTop: '1px solid var(--line)' }}>
-            <p style={{ fontFamily: 'var(--font-serif)', fontSize: '28px', fontWeight: 700, color: 'var(--text)' }}>
-              {co2Trasporti.toFixed(0)} <span style={{ fontSize: '14px', fontWeight: 400 }}>kg CO2</span>
-            </p>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginTop: '4px' }}>
-              = {Math.round(co2Trasporti * 6)} km in auto
-            </p>
-          </div>
+          {/* Fly routes table */}
+          {flyReport?.trasporti?.rotte?.length ? (
+            <div style={{ marginTop: 20, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: 10 }}>
+                ROTTE PER CITTA (ordinate per impatto)
+              </p>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                    {['Citta', 'Ospiti', 'Distanza', 'Mezzo', 'CO2 kg', 'Fonte'].map(h => (
+                      <th key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', padding: '6px 8px', textAlign: 'left', fontWeight: 500 }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...flyReport.trasporti.rotte].sort((a, b) => b.co2_kg - a.co2_kg).map((r, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid var(--line)' }}>
+                      <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>{r.citta_origine}</td>
+                      <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>{r.n_partecipanti}</td>
+                      <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>{r.distanza_km} km</td>
+                      <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>{r.mezzo}</td>
+                      <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>{r.co2_kg}</td>
+                      <td style={{ padding: '6px 8px' }}>
+                        <SourceBadge fonte={r.fonte_distanza} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ marginTop: 12, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 700, color: 'var(--text)' }}>
+                TOTALE: {flyReport.trasporti.totale_co2_kg} kg CO2
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginTop: '20px', textAlign: 'center', padding: '16px', borderTop: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-serif)', fontSize: '28px', fontWeight: 700, color: 'var(--text)' }}>
+                {co2Trasporti.toFixed(0)} <span style={{ fontSize: '14px', fontWeight: 400 }}>kg CO2</span>
+              </p>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginTop: '4px' }}>
+                = {Math.round(co2Trasporti * 6)} km in auto
+              </p>
+              <SourceBadge fonte="DEFRA 2024 standard" />
+            </div>
+          )}
         </div>
       </div>
 
@@ -355,7 +536,47 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
           FORNITORI & SCELTE GREEN
         </p>
         <div style={{ border: '1px solid var(--line)', borderRadius: '14px', overflow: 'hidden' }}>
-          {eventSuppliers.length === 0 ? (
+          {/* Fly-generated supplier data */}
+          {flyReport?.fornitori?.length ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                  {['Fornitore', 'Categoria', 'Score', 'Certificazioni', 'CO2 kg'].map(h => (
+                    <th key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', padding: '10px 10px', textAlign: 'left', fontWeight: 500 }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {flyReport.fornitori.map((s, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--line)' }}>
+                    <td style={{ padding: '10px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>{s.nome}</td>
+                    <td style={{ padding: '10px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>{s.categoria}</td>
+                    <td style={{ padding: '10px' }}>
+                      <StarRating value={s.carbon_score} onChange={() => {}} />
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      {s.certificazioni_trovate.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {s.certificazioni_trovate.map((c, ci) => (
+                            <span key={ci} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--green)', background: 'color-mix(in srgb, var(--green) 10%, transparent)', padding: '1px 6px', borderRadius: 4 }}>
+                              {c}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)' }}>Nessuna cert. trovata</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>
+                      {s.co2_kg}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : eventSuppliers.length === 0 ? (
             <div style={{ padding: '24px', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)' }}>
               Nessun fornitore collegato all'evento
             </div>
@@ -432,7 +653,7 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
           color: 'var(--green)',
           fontFamily: 'var(--font-serif)',
         }}>
-          -{synergy.totalKg.toFixed(0)} kg CO2
+          -{(flyReport?.synergy_impact?.co2_risparmiata_kg ?? synergy.totalKg).toFixed(0)} kg CO2
         </div>
         <p style={{
           fontSize: 13,
@@ -440,9 +661,11 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
           marginTop: 8,
           lineHeight: 1.6,
         }}>
-          {synergy.totalKg > 0
-            ? `Gestendo questo evento con Synergy, il team ha evitato ${Math.round((synergy.byFonte.documento_digitale || 0) * 120)} stampe e ${synergy.riunioniEvitate} riunioni fisiche, risparmiando ${synergy.totalKg.toFixed(0)} kg CO2.`
-            : 'Nessun contributo Synergy registrato per questo evento. I risparmi CO2 verranno tracciati automaticamente.'
+          {flyReport?.synergy_impact?.descrizione_it
+            || (synergy.totalKg > 0
+              ? `Gestendo questo evento con Synergy, il team ha evitato ${Math.round((synergy.byFonte.documento_digitale || 0) * 120)} stampe e ${synergy.riunioniEvitate} riunioni fisiche, risparmiando ${synergy.totalKg.toFixed(0)} kg CO2.`
+              : 'Nessun contributo Synergy registrato per questo evento. I risparmi CO2 verranno tracciati automaticamente.'
+            )
           }
         </p>
         <div style={{
@@ -454,7 +677,7 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
           color: 'var(--muted)',
           flexWrap: 'wrap',
         }}>
-          <span>{Math.round(synergy.totalKg * 120)} fogli risparmiati</span>
+          <span>{flyReport?.synergy_impact?.equivalente_fogli_carta ?? Math.round(synergy.totalKg * 120)} fogli risparmiati</span>
           <span>{(synergy.byFonte.comunicazione_interna || 0).toFixed(0)} kg da comunicazioni digitali</span>
           <span>{(synergy.byFonte.riunione_evitata || 0).toFixed(0)} kg da riunioni evitate</span>
         </div>
@@ -469,11 +692,15 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" style={{ marginBottom: '16px' }}>
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>CO2 TRASPORTI</p>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: 700, color: 'var(--text)' }}>{co2Trasporti.toFixed(0)} <span style={{ fontSize: '11px', fontWeight: 400 }}>kg</span></p>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: 700, color: 'var(--text)' }}>
+              {(flyReport?.trasporti?.totale_co2_kg ?? co2Trasporti).toFixed(0)} <span style={{ fontSize: '11px', fontWeight: 400 }}>kg</span>
+            </p>
           </div>
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>CO2 FORNITORI</p>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: 700, color: 'var(--text)' }}>{co2Fornitori.toFixed(0)} <span style={{ fontSize: '11px', fontWeight: 400 }}>kg</span></p>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: 700, color: 'var(--text)' }}>
+              {(flyReport?.fornitori?.reduce((s, f) => s + f.co2_kg, 0) ?? co2Fornitori).toFixed(0)} <span style={{ fontSize: '11px', fontWeight: 400 }}>kg</span>
+            </p>
           </div>
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>TOTALE EVENTO</p>
@@ -491,11 +718,7 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
           justifyContent: 'space-between',
           alignItems: 'center',
         }}>
-          <span style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--muted)',
-          }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>
             IMPATTO NETTO (incluso Synergy)
           </span>
           <span style={{
@@ -510,9 +733,9 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
 
         <div style={{ borderTop: '1px solid var(--line)', paddingTop: '12px', marginTop: '16px', marginBottom: '16px' }}>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', lineHeight: 1.8 }}>
-            = {Math.ceil(impattoNetto / 21)} alberi salvati<br />
-            = {Math.round(impattoNetto * 6)} km in auto non percorsi<br />
-            = {(impattoNetto / 45).toFixed(1)} voli Roma-Milano equivalenti
+            = {flyReport?.equivalenti?.alberi_salvati ?? Math.ceil(impattoNetto / 21)} alberi salvati<br />
+            = {flyReport?.equivalenti?.km_auto ?? Math.round(impattoNetto * 6)} km in auto non percorsi<br />
+            = {flyReport?.equivalenti?.voli_roma_milano ?? (impattoNetto / 45).toFixed(1)} voli Roma-Milano equivalenti
           </p>
         </div>
 
@@ -528,6 +751,34 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
         )}
       </div>
 
+      {/* NARRATIVA (from Fly) */}
+      {flyReport?.narrativa_it && (
+        <div style={{ border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '12px' }}>
+            NARRATIVA PER IL CLIENTE
+          </p>
+          <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+            {flyReport.narrativa_it}
+          </p>
+        </div>
+      )}
+
+      {/* FONTI */}
+      {flyReport?.fonti?.length ? (
+        <div style={{ border: '1px solid var(--line)', borderRadius: '14px', padding: '16px 20px' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '10px' }}>
+            METODOLOGIA E FONTI
+          </p>
+          <div className="space-y-1">
+            {flyReport.fonti.map((f, i) => (
+              <p key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', lineHeight: 1.5 }}>
+                {f}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {/* PDF Download */}
       <div style={{ textAlign: 'center' }}>
         <button
@@ -540,6 +791,37 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
         </button>
       </div>
     </div>
+  )
+}
+
+// ─── Source Badge ─────────────────────────────────────────────────────────────
+
+function SourceBadge({ fonte }: { fonte: string }) {
+  const isVerified = fonte && !fonte.toLowerCase().includes('defra') && !fonte.toLowerCase().includes('standard')
+
+  if (isVerified) {
+    return (
+      <span style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 9,
+        color: 'var(--green)',
+        background: 'color-mix(in srgb, var(--green) 10%, transparent)',
+        padding: '1px 6px',
+        borderRadius: 4,
+      }}>
+        Dato verificato online
+      </span>
+    )
+  }
+
+  return (
+    <span style={{
+      fontFamily: 'var(--font-mono)',
+      fontSize: 9,
+      color: 'var(--muted)',
+    }}>
+      ~ Stima DEFRA 2024
+    </span>
   )
 }
 

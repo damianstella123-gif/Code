@@ -1061,39 +1061,315 @@ async function executeTool(
         .eq("id", eventId)
         .maybeSingle();
 
+      // Load event suppliers with details
+      const { data: evtSuppliers } = await supabase
+        .from("event_suppliers")
+        .select("supplier_id, service_category")
+        .eq("event_id", eventId);
+
+      let supplierNames: { id: string; nome: string; categoria: string }[] = [];
+      if (evtSuppliers && evtSuppliers.length > 0) {
+        const ids = evtSuppliers.map((es: any) => es.supplier_id);
+        const { data: sups } = await supabase
+          .from("suppliers")
+          .select("id, nome, categoria")
+          .in("id", ids);
+        supplierNames = sups || [];
+      }
+
+      // Load event documents - search for guest list
+      const { data: docs } = await supabase
+        .from("event_documents")
+        .select("id, file_name, storage_path, file_type")
+        .eq("event_id", eventId);
+
+      const guestListDoc = docs?.find((d: any) =>
+        d.file_name.toLowerCase().match(
+          /ospiti|guests|partecipanti|attendees|lista|list|registr/
+        )
+      );
+
+      let guestText = "";
+      let guestDocName: string | null = null;
+      if (guestListDoc) {
+        guestDocName = guestListDoc.file_name;
+        try {
+          const { data: fileData } = await supabase
+            .storage
+            .from("event-documents")
+            .download(guestListDoc.storage_path);
+          if (fileData) {
+            const ext = guestListDoc.file_name.split(".").pop()?.toLowerCase();
+            if (ext === "csv" || ext === "txt") {
+              guestText = await fileData.text();
+            } else {
+              guestText = await fileData.text();
+            }
+            if (guestText.length > 3000) guestText = guestText.slice(0, 3000);
+          }
+        } catch (_e) {
+          guestText = "";
+        }
+      }
+
+      // Build context for Claude with web_search
       const pax = greenRow?.pax || 0;
       const distanza = greenRow?.distanza_km || 0;
       const mezzo = greenRow?.mezzo_prevalente || "misto";
-      const factors: Record<string, number> = { auto: 0.170, treno: 0.041, aereo: 0.255, misto: 0.105 };
-      const co2Trasporti = pax * distanza * 2 * (factors[mezzo] || 0.105);
-      const co2Fornitori = greenRow?.co2_fornitori || 0;
-      const co2Totale = co2Trasporti + co2Fornitori;
-      const impattoNetto = Math.max(0, co2Totale - totalSynergyCO2);
+      const citta = greenRow?.citta_provenienza || "";
+      const location = evt?.location || "";
+      const supplierScores = (greenRow?.supplier_scores as Record<string, number>) || {};
 
-      return JSON.stringify({
-        evento: evt?.nome || eventId,
-        location: evt?.location || "",
-        pax,
-        co2_trasporti_kg: Math.round(co2Trasporti),
-        co2_fornitori_kg: Math.round(co2Fornitori),
-        totale_co2_kg: Math.round(co2Totale),
-        synergy_impact: {
-          co2_risparmiata_kg: Math.round(totalSynergyCO2),
-          breakdown: {
-            documenti_digitali_kg: Math.round(byFonte.documento_digitale || 0),
-            comunicazioni_interne_kg: Math.round(byFonte.comunicazione_interna || 0),
-            riunioni_evitate_kg: Math.round(byFonte.riunione_evitata || 0),
+      const suppliersList = supplierNames.map((s: any) => {
+        const score = supplierScores[s.id] ?? 3;
+        return `- ${s.nome} (${s.categoria}), carbon score: ${score}/5`;
+      }).join("\n");
+
+      const synergyContext = `
+CO2 RISPARMIATA DA SYNERGY: ${totalSynergyCO2.toFixed(0)} kg totali
+- Documenti digitali: ${(byFonte.documento_digitale || 0).toFixed(0)} kg
+- Comunicazioni interne: ${(byFonte.comunicazione_interna || 0).toFixed(0)} kg
+- Riunioni evitate: ${(byFonte.riunione_evitata || 0).toFixed(0)} kg`;
+
+      const guestContext = guestText
+        ? `\nLISTA OSPITI (da documento "${guestDocName}"):\n${guestText}\n\nAnalizza questo documento per estrarre:\n- Numero ospiti per citta di provenienza\n- Mezzo di trasporto se indicato\n- Qualsiasi info utile per il calcolo CO2\n\nSe il documento non contiene info di provenienza, ignoralo.`
+        : "\nNessun documento ospiti trovato. Usa i dati manuali inseriti.";
+
+      const greenPrompt = `Sei un consulente ambientale. Genera un Green Report JSON per questo evento.
+
+DATI EVENTO:
+- Nome: ${evt?.nome || eventId}
+- Location: ${location}
+- Pax: ${pax}
+- Citta provenienza (manuale): ${citta}
+- Distanza media (manuale): ${distanza} km
+- Mezzo prevalente: ${mezzo}
+
+FORNITORI EVENTO:
+${suppliersList || "Nessun fornitore collegato"}
+
+${synergyContext}
+${guestContext}
+
+ISTRUZIONI:
+1. Usa web_search per:
+   - Verificare certificazioni ambientali reali dei fornitori (cerca nome + "green certification" o "ISO 14001" o "certificazione ambientale")
+   - Trovare fattori CO2 aggiornati per le rotte di trasporto specifiche
+   - Distanze reali tra citta di provenienza degli ospiti e la location "${location}"
+
+2. Per ogni dato cercato online, includi un campo "fonte" con l'URL o la fonte trovata.
+   Se non trovi dati reali, usa i fattori DEFRA 2024 standard e segnala "fonte: DEFRA 2024 standard".
+   Non inventare mai certificazioni o dati.
+
+3. Se hai la lista ospiti, calcola le rotte per citta. Altrimenti usa i dati manuali.
+
+4. Includi nella narrativa un paragrafo dedicato al contributo digitale di Synergy nella riduzione dell'impatto, presentandolo come valore aggiunto dell'approccio tecnologico di Simmetria.
+
+RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa struttura esatta:
+{
+  "trasporti": {
+    "fonte_dati": "lista_ospiti" oppure "stima_manuale",
+    "documento_usato": "nome file" oppure null,
+    "rotte": [
+      {
+        "citta_origine": "string",
+        "n_partecipanti": number,
+        "distanza_km": number,
+        "mezzo": "auto|treno|aereo",
+        "co2_kg": number,
+        "fonte_distanza": "string (URL o 'DEFRA 2024 standard')"
+      }
+    ],
+    "totale_co2_kg": number,
+    "nota": "string"
+  },
+  "fornitori": [
+    {
+      "nome": "string",
+      "categoria": "string",
+      "carbon_score": number,
+      "certificazioni_trovate": ["string"] oppure [],
+      "fonte_certificazione": "string URL" oppure null,
+      "co2_kg": number,
+      "alternativa_green": "string suggerimento" oppure null
+    }
+  ],
+  "synergy_impact": {
+    "co2_risparmiata_kg": ${Math.round(totalSynergyCO2)},
+    "breakdown": {
+      "documenti_digitali_kg": ${Math.round(byFonte.documento_digitale || 0)},
+      "comunicazioni_interne_kg": ${Math.round(byFonte.comunicazione_interna || 0)},
+      "riunioni_evitate_kg": ${Math.round(byFonte.riunione_evitata || 0)}
+    },
+    "equivalente_fogli_carta": ${Math.round(totalSynergyCO2 * 120)},
+    "descrizione_it": "string (2 righe, tono positivo)",
+    "descrizione_en": "string"
+  },
+  "totale_co2_kg": number,
+  "impatto_netto_kg": number (= totale_co2_kg - synergy_impact.co2_risparmiata_kg),
+  "equivalenti": {
+    "alberi_salvati": number (impatto_netto_kg / 21),
+    "km_auto": number (impatto_netto_kg * 6),
+    "voli_roma_milano": number (impatto_netto_kg / 45)
+  },
+  "narrativa_it": "string (3-4 paragrafi con sezione Synergy)",
+  "narrativa_en": "string",
+  "fonti": ["string - tutte le URL e fonti consultate"]
+}`;
+
+      // Make dedicated Claude call with web_search
+      const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!apiKey) return JSON.stringify({ error: "ANTHROPIC_API_KEY non configurata" });
+
+      try {
+        const greenRes = await fetch(ANTHROPIC_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
           },
-          equivalente_fogli_carta: Math.round(totalSynergyCO2 * 120),
-          descrizione_it: `Gestendo questo evento con Synergy, il team ha evitato ${Math.round((byFonte.documento_digitale || 0) * 120)} stampe e ${synergyCO2?.filter((r: any) => r.fonte === 'riunione_evitata').length || 0} riunioni fisiche, risparmiando ${Math.round(totalSynergyCO2)} kg CO2.`,
-        },
-        impatto_netto_kg: Math.round(impattoNetto),
-        equivalenti: {
-          alberi_salvati: Math.ceil(impattoNetto / 21),
-          km_auto: Math.round(impattoNetto * 6),
-          voli_roma_milano: Number((impattoNetto / 45).toFixed(1)),
-        },
-      });
+          body: JSON.stringify({
+            model: MODEL_SONNET,
+            max_tokens: 4096,
+            system: "Sei un consulente ambientale esperto. Rispondi SOLO con JSON valido, senza markdown o backtick.",
+            tools: [
+              { type: "web_search_20250305", name: "web_search" }
+            ],
+            messages: [{ role: "user", content: greenPrompt }],
+          }),
+        });
+
+        if (!greenRes.ok) {
+          const errText = await greenRes.text();
+          throw new Error(`Anthropic ${greenRes.status}: ${errText}`);
+        }
+
+        let result = await greenRes.json();
+        let iterations = 0;
+        const maxIterations = 6;
+        let currentMsgs: any[] = [{ role: "user", content: greenPrompt }];
+
+        while (result.stop_reason !== "end_turn" && iterations < maxIterations) {
+          iterations++;
+          if (result.stop_reason === "tool_use") {
+            currentMsgs.push({ role: "assistant", content: result.content });
+            const toolResults = [];
+            for (const block of (result.content || [])) {
+              if (block.type === "tool_use") {
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: "Search completed - integrate results into response.",
+                });
+              }
+            }
+            currentMsgs.push({ role: "user", content: toolResults });
+
+            const nextRes = await fetch(ANTHROPIC_URL, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": apiKey,
+                "anthropic-version": "2023-06-01",
+              },
+              body: JSON.stringify({
+                model: MODEL_SONNET,
+                max_tokens: 4096,
+                system: "Sei un consulente ambientale esperto. Rispondi SOLO con JSON valido, senza markdown o backtick.",
+                tools: [
+                  { type: "web_search_20250305", name: "web_search" }
+                ],
+                messages: currentMsgs,
+              }),
+            });
+            if (!nextRes.ok) break;
+            result = await nextRes.json();
+          } else {
+            break;
+          }
+        }
+
+        // Extract text from final result
+        const textBlocks = (result.content || []).filter((b: any) => b.type === "text");
+        const rawText = textBlocks.map((b: any) => b.text).join("\n").trim();
+
+        // Try to parse as JSON, handling possible markdown wrapping
+        let jsonStr = rawText;
+        if (jsonStr.startsWith("```")) {
+          jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+        }
+
+        try {
+          JSON.parse(jsonStr);
+          return jsonStr;
+        } catch (_e) {
+          // Return a fallback structured response
+          const factors: Record<string, number> = { auto: 0.170, treno: 0.041, aereo: 0.255, misto: 0.105 };
+          const co2Trasporti = pax * distanza * 2 * (factors[mezzo] || 0.105);
+          const co2Fornitori = supplierNames.length * pax * 2;
+          const co2Totale = co2Trasporti + co2Fornitori;
+          const impattoNetto = Math.max(0, co2Totale - totalSynergyCO2);
+
+          return JSON.stringify({
+            trasporti: {
+              fonte_dati: "stima_manuale",
+              documento_usato: null,
+              rotte: citta ? [{ citta_origine: citta, n_partecipanti: pax, distanza_km: distanza, mezzo, co2_kg: Math.round(co2Trasporti), fonte_distanza: "DEFRA 2024 standard" }] : [],
+              totale_co2_kg: Math.round(co2Trasporti),
+              nota: "Stima basata su dati inseriti manualmente",
+            },
+            fornitori: supplierNames.map((s: any) => ({
+              nome: s.nome,
+              categoria: s.categoria,
+              carbon_score: supplierScores[s.id] ?? 3,
+              certificazioni_trovate: [],
+              fonte_certificazione: null,
+              co2_kg: Math.round(pax * 2),
+              alternativa_green: null,
+            })),
+            synergy_impact: {
+              co2_risparmiata_kg: Math.round(totalSynergyCO2),
+              breakdown: {
+                documenti_digitali_kg: Math.round(byFonte.documento_digitale || 0),
+                comunicazioni_interne_kg: Math.round(byFonte.comunicazione_interna || 0),
+                riunioni_evitate_kg: Math.round(byFonte.riunione_evitata || 0),
+              },
+              equivalente_fogli_carta: Math.round(totalSynergyCO2 * 120),
+              descrizione_it: `Gestendo questo evento con Synergy, il team ha risparmiato ${Math.round(totalSynergyCO2)} kg CO2.`,
+              descrizione_en: `By managing this event with Synergy, the team saved ${Math.round(totalSynergyCO2)} kg CO2.`,
+            },
+            totale_co2_kg: Math.round(co2Totale),
+            impatto_netto_kg: Math.round(impattoNetto),
+            equivalenti: {
+              alberi_salvati: Math.ceil(impattoNetto / 21),
+              km_auto: Math.round(impattoNetto * 6),
+              voli_roma_milano: Number((impattoNetto / 45).toFixed(1)),
+            },
+            narrativa_it: rawText || "Report non generato correttamente.",
+            narrativa_en: "",
+            fonti: ["DEFRA 2024 standard"],
+          });
+        }
+      } catch (err: any) {
+        // Fallback if Claude call fails entirely
+        const factors: Record<string, number> = { auto: 0.170, treno: 0.041, aereo: 0.255, misto: 0.105 };
+        const co2Trasporti = pax * distanza * 2 * (factors[mezzo] || 0.105);
+        const co2Totale = co2Trasporti;
+        const impattoNetto = Math.max(0, co2Totale - totalSynergyCO2);
+
+        return JSON.stringify({
+          trasporti: { fonte_dati: "stima_manuale", documento_usato: null, rotte: [], totale_co2_kg: Math.round(co2Trasporti), nota: "Errore nella generazione AI: " + err.message },
+          fornitori: [],
+          synergy_impact: { co2_risparmiata_kg: Math.round(totalSynergyCO2), breakdown: { documenti_digitali_kg: Math.round(byFonte.documento_digitale || 0), comunicazioni_interne_kg: Math.round(byFonte.comunicazione_interna || 0), riunioni_evitate_kg: Math.round(byFonte.riunione_evitata || 0) }, equivalente_fogli_carta: Math.round(totalSynergyCO2 * 120), descrizione_it: "", descrizione_en: "" },
+          totale_co2_kg: Math.round(co2Totale),
+          impatto_netto_kg: Math.round(impattoNetto),
+          equivalenti: { alberi_salvati: Math.ceil(impattoNetto / 21), km_auto: Math.round(impattoNetto * 6), voli_roma_milano: Number((impattoNetto / 45).toFixed(1)) },
+          narrativa_it: "",
+          narrativa_en: "",
+          fonti: ["DEFRA 2024 standard"],
+        });
+      }
     }
 
     default:
