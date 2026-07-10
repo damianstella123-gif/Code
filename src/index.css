@@ -123,3 +123,9 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 [data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
+
+@media print {
+  .shell-header, .shell-sidebar, .mobile-bottom-nav, .no-print, .wire-masthead, .wire-tabs, .wire-ticker { display: none !important; }
+  .calendario-print { font-family: 'Montserrat', sans-serif; color: #1a1a1a; }
+  .panel { border: 1px solid #ddd !important; box-shadow: none !important; }
+}

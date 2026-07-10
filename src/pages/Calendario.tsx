@@ -20,6 +20,11 @@ import {
   Trash2,
   Edit3,
   Layers,
+  Download,
+  Printer,
+  Filter,
+  HelpCircle,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
@@ -172,7 +177,8 @@ function prioritaLabel(p: string) {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ViewMode = 'month' | 'week' | 'day' | 'agenda'
+type ViewMode = 'month' | 'week' | 'day' | 'agenda' | 'team'
+type LayerKey = 'eventi' | 'task' | 'memo' | 'ferie' | 'creative' | 'social' | 'pratiche'
 type CalItem =
   | { type: 'event'; data: Event }
   | { type: 'task'; data: Task }
@@ -180,6 +186,61 @@ type CalItem =
   | { type: 'creative'; data: CreativeProject }
   | { type: 'social'; data: SocialContent }
   | { type: 'memo'; data: CalendarItem }
+  | { type: 'leave'; data: LeaveRequest }
+
+interface LeaveRequest {
+  id: string
+  user_id: string
+  tipo: string
+  data_inizio: string
+  data_fine: string
+  stato: string
+  profiles?: { first_name: string; last_name: string; avatar_url?: string }
+}
+
+interface ProfileInfo {
+  id: string
+  first_name: string
+  last_name: string
+  avatar_url?: string | null
+}
+
+const LAYER_DEFAULTS: Record<LayerKey, boolean> = { eventi: true, task: true, memo: true, ferie: true, creative: true, social: true, pratiche: true }
+
+function loadLayers(): Record<LayerKey, boolean> {
+  try { return JSON.parse(localStorage.getItem('cal_layers') || 'null') ?? LAYER_DEFAULTS } catch { return LAYER_DEFAULTS }
+}
+function saveLayers(l: Record<LayerKey, boolean>) { localStorage.setItem('cal_layers', JSON.stringify(l)) }
+
+function loadFilterPeople(): string[] {
+  try { return JSON.parse(localStorage.getItem('cal_filter_people') || '[]') } catch { return [] }
+}
+function saveFilterPeople(p: string[]) { localStorage.setItem('cal_filter_people', JSON.stringify(p)) }
+
+function getDayLoad(n: number): 'light' | 'medium' | 'heavy' | 'critical' {
+  if (n === 0) return 'light'
+  if (n <= 2) return 'medium'
+  if (n <= 5) return 'heavy'
+  return 'critical'
+}
+
+function generateICS(items: CalItem[]): string {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Simmetria Synergy//IT', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH']
+  for (const item of items) {
+    if (item.type === 'event') {
+      const ev = item.data as Event
+      lines.push('BEGIN:VEVENT', `UID:synergy-event-${ev.id}`, `DTSTART;VALUE=DATE:${ev.dataInizio.replace(/-/g, '')}`, `DTEND;VALUE=DATE:${ev.dataFine.replace(/-/g, '')}`, `SUMMARY:${ev.nome}`, `DESCRIPTION:${ev.location || ''} ${ev.partecipanti || ''} pax`, 'STATUS:CONFIRMED', 'END:VEVENT')
+    } else if (item.type === 'task') {
+      const t = item.data as Task
+      lines.push('BEGIN:VTODO', `UID:synergy-task-${t.id}`, `DUE;VALUE=DATE:${t.scadenza.replace(/-/g, '')}`, `SUMMARY:${t.titolo}`, `DESCRIPTION:${t.descrizione || ''}`, 'END:VTODO')
+    } else if (item.type === 'memo') {
+      const m = item.data as CalendarItem
+      lines.push('BEGIN:VEVENT', `UID:synergy-memo-${m.id}`, `DTSTART;VALUE=DATE:${m.start_date.replace(/-/g, '')}`, `DTEND;VALUE=DATE:${(m.end_date || m.start_date).replace(/-/g, '')}`, `SUMMARY:${m.title}`, `DESCRIPTION:${m.description || ''}`, 'END:VEVENT')
+    }
+  }
+  lines.push('END:VCALENDAR')
+  return lines.join('\r\n')
+}
 
 // ─── Detail popup ─────────────────────────────────────────────────────────────
 
@@ -822,6 +883,13 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem,
                 setDragging(null)
               }}
               onClick={() => onDayClick(day)}>
+              {(() => {
+                const load = getDayLoad(dayItems.length)
+                if (load === 'light') return null
+                const w = load === 'medium' ? '20%' : load === 'heavy' ? '60%' : '100%'
+                const c = load === 'medium' ? 'var(--green)' : load === 'heavy' ? 'var(--yellow)' : 'var(--red2)'
+                return <div className="mx-1 mt-0.5 h-[3px] rounded-full" style={{ width: w, background: c }} title={load === 'critical' ? 'Giornata intensa' : undefined} />
+              })()}
               <div className="mx-1 mt-1"
                 style={{
                   fontFamily: 'var(--font-mono)',
@@ -1843,6 +1911,252 @@ function MemoEditModal({ item, onClose, onSave }: {
   )
 }
 
+// ─── Team View ───────────────────────────────────────────────────────────────
+
+function TeamView({ weekStart, items, profiles, onItemClick }: {
+  weekStart: Date; items: CalItem[]; profiles: ProfileInfo[]; onItemClick: (item: CalItem) => void
+}) {
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+
+  function getForDayUser(day: Date, userId: string): CalItem[] {
+    return items.filter(item => {
+      const owner = getItemOwner(item)
+      if (owner !== userId) return false
+      if (item.type === 'event') {
+        const ev = item.data as Event
+        return day >= isoToLocalMidnight(ev.dataInizio) && day <= isoToLocalMidnight(ev.dataFine)
+      }
+      if (item.type === 'task') return sameDay(day, isoToLocalMidnight((item.data as Task).scadenza))
+      if (item.type === 'leave') {
+        const l = item.data as LeaveRequest
+        return day >= isoToLocalMidnight(l.data_inizio) && day <= isoToLocalMidnight(l.data_fine)
+      }
+      if (item.type === 'memo') {
+        const m = item.data as CalendarItem
+        if (m.end_date) return day >= isoToLocalMidnight(m.start_date) && day <= isoToLocalMidnight(m.end_date)
+        return sameDay(day, isoToLocalMidnight(m.start_date))
+      }
+      return false
+    })
+  }
+
+  function getItemOwner(item: CalItem): string {
+    if (item.type === 'event') return (item.data as Event).responsabile || ''
+    if (item.type === 'task') return (item.data as Task).assegnatario || ''
+    if (item.type === 'leave') return (item.data as LeaveRequest).user_id || ''
+    if (item.type === 'memo') return (item.data as CalendarItem).user_id || ''
+    return ''
+  }
+
+  const LEAVE_COLORS: Record<string, string> = {
+    ferie: 'rgba(59,130,246,0.15)',
+    permesso: 'rgba(234,179,8,0.12)',
+    malattia: 'rgba(107,114,128,0.12)',
+    recupero: 'rgba(34,197,94,0.12)',
+  }
+
+  if (profiles.length === 0) return <div className="panel p-8 text-center" style={{ color: 'var(--muted)' }}>Caricamento team...</div>
+
+  return (
+    <div className="panel overflow-hidden">
+      <div className="overflow-x-auto">
+        <div style={{ minWidth: Math.max(700, profiles.length * 160 + 80) }}>
+          {/* Header row */}
+          <div className="grid border-b" style={{ gridTemplateColumns: `60px repeat(${profiles.length}, 1fr)`, borderColor: 'var(--line)' }}>
+            <div className="p-2" style={{ borderRight: '1px solid var(--line)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)' }}>
+                {fmtShort(toISO(weekStart))}
+              </span>
+            </div>
+            {profiles.map(p => (
+              <div key={p.id} className="p-2 text-center" style={{ borderRight: '1px solid var(--line)' }}>
+                <div className="w-6 h-6 rounded-full mx-auto mb-1 flex items-center justify-center text-[10px] font-bold" style={{ background: 'var(--red)', color: '#fff' }}>
+                  {(p.first_name?.[0] || '').toUpperCase()}{(p.last_name?.[0] || '').toUpperCase()}
+                </div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text)' }}>
+                  {p.first_name}
+                </span>
+              </div>
+            ))}
+          </div>
+          {/* Day rows */}
+          {days.map((day, di) => {
+            const isToday = sameDay(day, new Date())
+            return (
+              <div key={di} className="grid border-b" style={{ gridTemplateColumns: `60px repeat(${profiles.length}, 1fr)`, borderColor: 'var(--line)', background: isToday ? 'color-mix(in srgb, var(--red2) 3%, transparent)' : undefined }}>
+                <div className="p-2 flex flex-col justify-center" style={{ borderRight: '1px solid var(--line)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: isToday ? 700 : 400, color: isToday ? 'var(--red2)' : 'var(--text)' }}>{day.getDate()}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--muted)' }}>{DAYS_IT[day.getDay()]}</span>
+                </div>
+                {profiles.map(p => {
+                  const userItems = getForDayUser(day, p.id)
+                  const leave = userItems.find(i => i.type === 'leave')
+                  const leaveBg = leave ? LEAVE_COLORS[(leave.data as LeaveRequest).tipo] || LEAVE_COLORS.ferie : undefined
+                  return (
+                    <div key={p.id} className="p-1 min-h-[44px] space-y-0.5" style={{ borderRight: '1px solid var(--line)', background: leaveBg }}>
+                      {leave && (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--blue)' }}>
+                          {(leave.data as LeaveRequest).tipo}
+                        </span>
+                      )}
+                      {userItems.filter(i => i.type !== 'leave').slice(0, 2).map(item => (
+                        <CalPill key={item.type === 'event' ? (item.data as Event).id : (item.data as Task).id} item={item} onClick={() => onItemClick(item)} />
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Mini Calendar ───────────────────────────────────────────────────────────
+
+function MiniCalendar({ cursor, items, onDayClick }: {
+  cursor: Date; items: CalItem[]; onDayClick: (d: Date) => void
+}) {
+  const [month, setMonth] = useState(new Date(cursor.getFullYear(), cursor.getMonth(), 1))
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+
+  const calStart = startOfWeek(month)
+  const cells: Date[] = []
+  for (let d = new Date(calStart); cells.length < 42; d = addDays(d, 1)) cells.push(new Date(d))
+
+  function dayHasItems(day: Date): boolean {
+    return items.some(item => {
+      if (item.type === 'event') {
+        const ev = item.data as Event
+        return day >= isoToLocalMidnight(ev.dataInizio) && day <= isoToLocalMidnight(ev.dataFine)
+      }
+      if (item.type === 'task') return sameDay(day, isoToLocalMidnight((item.data as Task).scadenza))
+      if (item.type === 'memo') {
+        const m = item.data as CalendarItem
+        if (m.end_date) return day >= isoToLocalMidnight(m.start_date) && day <= isoToLocalMidnight(m.end_date)
+        return sameDay(day, isoToLocalMidnight(m.start_date))
+      }
+      return false
+    })
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <button onClick={() => setMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))} className="p-1 rounded hover:bg-white/10"><ChevronLeft className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} /></button>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text)' }}>{MONTHS_IT[month.getMonth()].slice(0, 3).toUpperCase()} {month.getFullYear()}</span>
+        <button onClick={() => setMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))} className="p-1 rounded hover:bg-white/10"><ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} /></button>
+      </div>
+      <div className="grid grid-cols-7 gap-0">
+        {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, i) => (
+          <div key={i} className="text-center py-0.5" style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--muted)' }}>{d}</div>
+        ))}
+        {cells.map((day, i) => {
+          const isCurrentMonth = day.getMonth() === month.getMonth()
+          const isToday = sameDay(day, today)
+          const hasItems = dayHasItems(day)
+          return (
+            <button key={i} onClick={() => onDayClick(day)}
+              className="w-7 h-7 flex flex-col items-center justify-center rounded-full relative transition-colors"
+              style={{ background: isToday ? 'var(--red2)' : 'transparent', color: isToday ? '#fff' : isCurrentMonth ? 'var(--text)' : 'var(--muted)', opacity: isCurrentMonth ? 1 : 0.3, fontSize: 10, fontFamily: 'var(--font-mono)' }}>
+              {day.getDate()}
+              {hasItems && !isToday && <span className="absolute bottom-0.5 w-1 h-1 rounded-full" style={{ background: 'var(--red2)' }} />}
+            </button>
+          )
+        })}
+      </div>
+      <div className="space-y-1 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
+        {[{ label: 'Evento', color: '#ff315f' }, { label: 'Task', color: '#38d27d' }, { label: 'Memo', color: '#a78bfa' }, { label: 'Ferie', color: '#3b82f6' }].map(l => (
+          <div key={l.label} className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ background: l.color }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>{l.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Filter Bar ──────────────────────────────────────────────────────────────
+
+function FilterBar({ layers, onToggleLayer, people, selectedPeople, onTogglePerson, profiles }: {
+  layers: Record<LayerKey, boolean>
+  onToggleLayer: (k: LayerKey) => void
+  people: string[]
+  selectedPeople: string[]
+  onTogglePerson: (id: string) => void
+  profiles: ProfileInfo[]
+}) {
+  const allSelected = selectedPeople.length === 0
+
+  return (
+    <div className="panel p-3 space-y-3">
+      <div>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Layer</p>
+        <div className="flex flex-wrap gap-1.5">
+          {(Object.keys(LAYER_DEFAULTS) as LayerKey[]).map(k => (
+            <button key={k} onClick={() => onToggleLayer(k)}
+              className="px-2 py-1 rounded text-[10px] font-medium transition-colors"
+              style={{ fontFamily: 'var(--font-mono)', background: layers[k] ? 'color-mix(in srgb, var(--red2) 12%, transparent)' : 'var(--panel2)', color: layers[k] ? 'var(--red2)' : 'var(--muted)', border: `1px solid ${layers[k] ? 'color-mix(in srgb, var(--red2) 30%, transparent)' : 'var(--line)'}` }}>
+              {k.charAt(0).toUpperCase() + k.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+      {profiles.length > 0 && (
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Persone</p>
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => { people.forEach(id => { if (selectedPeople.includes(id)) onTogglePerson(id) }) }}
+              className="px-2 py-1 rounded text-[10px] font-medium transition-colors"
+              style={{ fontFamily: 'var(--font-mono)', background: allSelected ? 'color-mix(in srgb, var(--blue) 12%, transparent)' : 'var(--panel2)', color: allSelected ? 'var(--blue)' : 'var(--muted)', border: `1px solid ${allSelected ? 'color-mix(in srgb, var(--blue) 30%, transparent)' : 'var(--line)'}` }}>
+              Tutti
+            </button>
+            {profiles.map(p => {
+              const selected = selectedPeople.includes(p.id) || allSelected
+              return (
+                <button key={p.id} onClick={() => onTogglePerson(p.id)}
+                  className="px-2 py-1 rounded text-[10px] font-medium transition-colors"
+                  style={{ fontFamily: 'var(--font-mono)', background: selected ? 'color-mix(in srgb, var(--blue) 12%, transparent)' : 'var(--panel2)', color: selected ? 'var(--text)' : 'var(--muted)', border: `1px solid ${selected ? 'color-mix(in srgb, var(--blue) 30%, transparent)' : 'var(--line)'}` }}>
+                  {p.first_name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Shortcuts Help ──────────────────────────────────────────────────────────
+
+function ShortcutsHelp({ onClose }: { onClose: () => void }) {
+  const shortcuts = [
+    ['T', 'Oggi'], ['M', 'Mese'], ['W', 'Settimana'], ['D', 'Giorno'],
+    ['E', 'Team'], ['A', 'Agenda'], ['N', 'Nuovo'], ['F', 'Filtri'],
+    ['\u2190\u2192', 'Naviga'], ['Esc', 'Chiudi'],
+  ]
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
+      <div className="relative rounded-xl p-5 max-w-xs w-full" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }} onClick={e => e.stopPropagation()}>
+        <h4 className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>Scorciatoie tastiera</h4>
+        <div className="grid grid-cols-2 gap-2">
+          {shortcuts.map(([key, label]) => (
+            <div key={key} className="flex items-center gap-2">
+              <kbd className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ fontFamily: 'var(--font-mono)', background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)' }}>{key}</kbd>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Calendario() {
@@ -1855,6 +2169,8 @@ export default function Calendario() {
   const [allCreative, setAllCreative] = useState<CreativeProject[]>([])
   const [allSocial, setAllSocial] = useState<SocialContent[]>([])
   const [allMemos, setAllMemos] = useState<CalendarItem[]>([])
+  const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([])
+  const [teamProfiles, setTeamProfiles] = useState<ProfileInfo[]>([])
   const [view, setView] = useState<ViewMode>('month')
   const [cursor, setCursor] = useState(() => {
     const t = new Date(); t.setHours(0, 0, 0, 0); return t
@@ -1864,6 +2180,13 @@ export default function Calendario() {
   const [editingMemo, setEditingMemo] = useState<CalendarItem | null>(null)
   const [editingEventDates, setEditingEventDates] = useState<Event | null>(null)
   const [shiftToast, setShiftToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
+  const [layers, setLayers] = useState<Record<LayerKey, boolean>>(loadLayers)
+  const [selectedPeople, setSelectedPeople] = useState<string[]>(loadFilterPeople)
+  const [showSidebar, setShowSidebar] = useState(() => localStorage.getItem('cal_sidebar') !== 'false')
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [lastRefresh, setLastRefresh] = useState(new Date())
   const today = useMemo(() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t }, [])
 
   const currentUser = loadUser()
@@ -1879,6 +2202,13 @@ export default function Calendario() {
       setAllCreative(cr)
       setAllSocial(so)
       setAllMemos(memos)
+      // Fetch leaves
+      const { data: leaves } = await supabase.from('leave_requests').select('id, user_id, tipo, data_inizio, data_fine, stato, profiles(first_name, last_name, avatar_url)').eq('stato', 'approvata')
+      setAllLeaves((leaves ?? []) as unknown as LeaveRequest[])
+      // Fetch active profiles for team view
+      const { data: profs } = await supabase.from('profiles').select('id, first_name, last_name, avatar_url').eq('stato', 'attivo').order('first_name')
+      setTeamProfiles((profs ?? []) as ProfileInfo[])
+      setLastRefresh(new Date())
     } catch (err) {
       showToast('Errore caricamento calendario')
     }
@@ -1887,6 +2217,48 @@ export default function Calendario() {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  // Auto-refresh every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => { refresh() }, 300000)
+    return () => clearInterval(interval)
+  }, [refresh])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as Element).tagName)) return
+      switch (e.key) {
+        case 't': case 'T': { const t = new Date(); t.setHours(0, 0, 0, 0); setCursor(t) } break
+        case 'm': case 'M': setView('month'); break
+        case 'w': case 'W': setView('week'); break
+        case 'd': case 'D': setView('day'); break
+        case 'a': case 'A': setView('agenda'); break
+        case 'e': case 'E': setView('team'); break
+        case 'n': case 'N': setShowCreate(true); break
+        case 'f': case 'F': setShowFilters(f => !f); break
+        case 'ArrowLeft': if (!e.shiftKey) navigateCal(-1); break
+        case 'ArrowRight': if (!e.shiftKey) navigateCal(1); break
+        case 'Escape': setSelectedItem(null); setShowCreate(false); setShowShortcuts(false); break
+      }
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [view])
+
+  // Layer/filter persistence
+  function handleToggleLayer(k: LayerKey) {
+    setLayers(prev => { const next = { ...prev, [k]: !prev[k] }; saveLayers(next); return next })
+  }
+  function handleTogglePerson(id: string) {
+    setSelectedPeople(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+      saveFilterPeople(next); return next
+    })
+  }
+  function handleSidebarToggle() {
+    setShowSidebar(v => { localStorage.setItem('cal_sidebar', String(!v)); return !v })
+  }
 
   // Permission-filtered visible items
   const visibleItems = useMemo((): CalItem[] => {
@@ -1921,14 +2293,24 @@ export default function Calendario() {
     const visibleSocial = allSocial.filter(s => s.publish_date && s.status !== 'pubblicato')
 
     return [
-      ...filteredEvents.map(e => ({ type: 'event' as const, data: e })),
-      ...filteredTasks.map(t => ({ type: 'task' as const, data: t })),
-      ...visiblePratiche.map(p => ({ type: 'pratica' as const, data: p })),
-      ...visibleCreative.map(c => ({ type: 'creative' as const, data: c })),
-      ...visibleSocial.map(s => ({ type: 'social' as const, data: s })),
-      ...allMemos.map(m => ({ type: 'memo' as const, data: m })),
-    ]
-  }, [allTasks, allEvents, allPratiche, allCreative, allSocial, allMemos, ruolo, currentUser])
+      ...(layers.eventi ? filteredEvents.map(e => ({ type: 'event' as const, data: e })) : []),
+      ...(layers.task ? filteredTasks.map(t => ({ type: 'task' as const, data: t })) : []),
+      ...(layers.pratiche ? visiblePratiche.map(p => ({ type: 'pratica' as const, data: p })) : []),
+      ...(layers.creative ? visibleCreative.map(c => ({ type: 'creative' as const, data: c })) : []),
+      ...(layers.social ? visibleSocial.map(s => ({ type: 'social' as const, data: s })) : []),
+      ...(layers.memo ? allMemos.map(m => ({ type: 'memo' as const, data: m })) : []),
+      ...(layers.ferie ? allLeaves.map(l => ({ type: 'leave' as const, data: l })) : []),
+    ].filter(item => {
+      if (selectedPeople.length === 0) return true
+      const owner = item.type === 'event' ? (item.data as Event).responsabile
+        : item.type === 'task' ? (item.data as Task).assegnatario
+        : item.type === 'leave' ? (item.data as LeaveRequest).user_id
+        : item.type === 'memo' ? (item.data as CalendarItem).user_id
+        : null
+      if (!owner) return true
+      return selectedPeople.includes(owner)
+    })
+  }, [allTasks, allEvents, allPratiche, allCreative, allSocial, allMemos, allLeaves, ruolo, currentUser, layers, selectedPeople])
 
   async function handleTaskStateChange(id: string, stato: Task['stato']) {
     setAllTasks(prev => prev.map(t => t.id === id ? { ...t, stato } : t))
@@ -2014,12 +2396,12 @@ export default function Calendario() {
 
   const navLabel = useMemo(() => {
     if (view === 'month') return `${MONTHS_IT[cursor.getMonth()]} ${cursor.getFullYear()}`
-    if (view === 'week') return `${fmtShort(toISO(weekStart))} - ${fmtShort(toISO(weekEnd))}`
+    if (view === 'week' || view === 'team') return `${fmtShort(toISO(weekStart))} - ${fmtShort(toISO(weekEnd))}`
     if (view === 'day') return `${DAYS_FULL[cursor.getDay()]} ${cursor.getDate()} ${MONTHS_IT[cursor.getMonth()]}`
     return 'Prossime scadenze'
   }, [view, cursor, weekStart, weekEnd])
 
-  function navigate(dir: -1 | 1) {
+  function navigateCal(dir: -1 | 1) {
     if (view === 'month') setCursor(d => { const x = new Date(d); x.setMonth(x.getMonth() + dir); return x })
     else if (view === 'week') setCursor(d => addDays(d, dir * 7))
     else if (view === 'day') setCursor(d => addDays(d, dir))
@@ -2067,12 +2449,45 @@ export default function Calendario() {
             )}
           </span>
         </div>
-        <div className="wire-masthead-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="wire-masthead-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)' }}>
+            {lastRefresh.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+          <button onClick={handleSidebarToggle} title="Mini calendario"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: showSidebar ? 'var(--text)' : 'var(--muted)' }}>
+            <PanelLeftOpen className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => setShowFilters(f => !f)} title="Filtri [F]"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: showFilters ? 'var(--red2)' : 'var(--muted)' }}>
+            <Filter className="w-3.5 h-3.5" />
+          </button>
+          <div className="relative">
+            <button onClick={() => setShowExportMenu(v => !v)} title="Esporta"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+              <Download className="w-3.5 h-3.5" />
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 rounded-lg py-1 z-30 min-w-[180px]" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-sm)' }}>
+                <button onClick={() => { const ics = generateICS(visibleItems.filter(i => { if (i.type !== 'event') return false; const ev = i.data as Event; const m = cursor.getMonth(); return new Date(ev.dataInizio).getMonth() === m })); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `synergy-${MONTHS_IT[cursor.getMonth()].toLowerCase()}.ics`; a.click(); URL.revokeObjectURL(url); setShowExportMenu(false) }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/5" style={{ color: 'var(--text)' }}>Esporta mese (.ics)</button>
+                <button onClick={() => { const ics = generateICS(visibleItems); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'synergy-tutti.ics'; a.click(); URL.revokeObjectURL(url); setShowExportMenu(false) }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/5" style={{ color: 'var(--text)' }}>Esporta tutti (.ics)</button>
+              </div>
+            )}
+          </div>
+          <button onClick={() => window.print()} title="Stampa"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+            <Printer className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => setShowShortcuts(true)} title="Scorciatoie [?]"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+            <HelpCircle className="w-3.5 h-3.5" />
+          </button>
           <button onClick={() => setShowCreate(true)}
             style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
-            + PROMEMORIA
+            + NUOVO
           </button>
         </div>
       </div>
@@ -2083,6 +2498,7 @@ export default function Calendario() {
           { id: 'month' as ViewMode, label: 'MESE' },
           { id: 'week' as ViewMode, label: 'SETTIMANA' },
           { id: 'day' as ViewMode, label: 'GIORNO' },
+          { id: 'team' as ViewMode, label: 'TEAM' },
           { id: 'agenda' as ViewMode, label: 'AGENDA' },
         ]).map(v => (
           <button key={v.id} onClick={() => setView(v.id)}
@@ -2113,10 +2529,22 @@ export default function Calendario() {
         )}
       </div>
 
+      {/* Filter bar */}
+      {showFilters && (
+        <FilterBar
+          layers={layers}
+          onToggleLayer={handleToggleLayer}
+          people={teamProfiles.map(p => p.id)}
+          selectedPeople={selectedPeople}
+          onTogglePerson={handleTogglePerson}
+          profiles={teamProfiles}
+        />
+      )}
+
       {/* Navigation */}
       {view !== 'agenda' && (
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)}
+          <button onClick={() => navigateCal(-1)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', transition: 'color 0.12s' }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
@@ -2129,7 +2557,7 @@ export default function Calendario() {
             OGGI
           </button>
           <span className="flex-1 text-center" style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{navLabel}</span>
-          <button onClick={() => navigate(1)}
+          <button onClick={() => navigateCal(1)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', transition: 'color 0.12s' }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
@@ -2139,29 +2567,46 @@ export default function Calendario() {
       )}
 
       {/* Views */}
-      {view === 'month' && (
-        <MonthView
-          current={cursor} items={visibleItems} today={today}
-          onItemClick={setSelectedItem}
-          onDayClick={d => { setCursor(d); setView('day') }}
-          onMoveItem={handleMoveItem}
-          onResizeEvent={handleResizeEvent}
-        />
-      )}
-      {view === 'week' && (
-        <WeekView
-          weekStart={weekStart} items={visibleItems} today={today}
-          onItemClick={setSelectedItem}
-          onMoveItem={handleMoveItem}
-          onResizeEvent={handleResizeEvent}
-        />
-      )}
-      {view === 'day' && (
-        <DayView day={cursor} items={visibleItems} onItemClick={setSelectedItem} />
-      )}
-      {view === 'agenda' && (
-        <AgendaView items={visibleItems} onItemClick={setSelectedItem} />
-      )}
+      <div className="flex gap-4 calendario-print">
+        {showSidebar && (
+          <div className="hidden sm:block flex-shrink-0 no-print" style={{ width: 200 }}>
+            <MiniCalendar cursor={cursor} items={visibleItems} onDayClick={d => { setCursor(d); setView('day') }} />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          {view === 'month' && (
+            <MonthView
+              current={cursor} items={visibleItems} today={today}
+              onItemClick={setSelectedItem}
+              onDayClick={d => { setCursor(d); setView('day') }}
+              onMoveItem={handleMoveItem}
+              onResizeEvent={handleResizeEvent}
+            />
+          )}
+          {view === 'week' && (
+            <WeekView
+              weekStart={weekStart} items={visibleItems} today={today}
+              onItemClick={setSelectedItem}
+              onMoveItem={handleMoveItem}
+              onResizeEvent={handleResizeEvent}
+            />
+          )}
+          {view === 'day' && (
+            <DayView day={cursor} items={visibleItems} onItemClick={setSelectedItem} />
+          )}
+          {view === 'team' && (
+            <TeamView
+              weekStart={weekStart}
+              items={visibleItems}
+              profiles={teamProfiles}
+              onItemClick={setSelectedItem}
+            />
+          )}
+          {view === 'agenda' && (
+            <AgendaView items={visibleItems} onItemClick={setSelectedItem} />
+          )}
+        </div>
+      </div>
 
       {/* Detail popup */}
       {selectedItem && (
@@ -2205,6 +2650,9 @@ export default function Calendario() {
           onCreate={handleCreate}
         />
       )}
+
+      {/* Shortcuts help */}
+      {showShortcuts && <ShortcutsHelp onClose={() => setShowShortcuts(false)} />}
 
       {/* Shift toast */}
       {shiftToast && (
