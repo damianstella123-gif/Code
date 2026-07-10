@@ -92,6 +92,7 @@ export default function Utenti() {
   const [newPassword, setNewPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null)
+  const [expandedUser, setExpandedUser] = useState<string | null>(null)
 
   const isPartner = canManageUsers(currentUser)
   const canEditRoles = canChangeRoles(currentUser)
@@ -112,6 +113,19 @@ export default function Utenti() {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const cards = document.querySelectorAll('[data-user-card]')
+      let inside = false
+      cards.forEach(c => {
+        if (c.contains(e.target as Node)) inside = true
+      })
+      if (!inside) setExpandedUser(null)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   useEffect(() => {
     if (!error && !success) return
@@ -420,6 +434,8 @@ export default function Utenti() {
                 canResetPw={canResetPasswords}
                 isSelf={u.id === currentUser?.id}
                 delay={i * 40}
+                expanded={expandedUser === u.id}
+                onToggle={() => setExpandedUser(expandedUser === u.id ? null : u.id)}
                 onEdit={() => openEdit(u)}
                 onToggleActive={() => handleToggleActive(u)}
                 onResetPassword={() => { setResetUser(u); setNewPassword('') }}
@@ -596,12 +612,14 @@ export default function Utenti() {
 
 // ─── USER CARD COMPONENT ──────────────────────────────────────────────────────
 
-function UserCard({ user, isPartner, canResetPw, isSelf, delay, onEdit, onToggleActive, onResetPassword }: {
+function UserCard({ user, isPartner, canResetPw, isSelf, delay, expanded, onToggle, onEdit, onToggleActive, onResetPassword }: {
   user: Profile
   isPartner: boolean
   canResetPw: boolean
   isSelf: boolean
   delay: number
+  expanded: boolean
+  onToggle: () => void
   onEdit: () => void
   onToggleActive: () => void
   onResetPassword: () => void
@@ -610,19 +628,24 @@ function UserCard({ user, isPartner, canResetPw, isSelf, delay, onEdit, onToggle
 
   return (
     <div
+      data-user-card
+      onClick={onToggle}
       style={{
         background: 'var(--panel-solid)',
-        border: '1px solid var(--line)',
+        border: `1px solid ${expanded ? 'var(--red2)' : 'var(--line)'}`,
         borderRadius: 14,
         padding: 16,
         opacity: user.is_active ? 1 : 0.7,
         position: 'relative',
-        cursor: 'default',
+        cursor: 'pointer',
         animation: `fadeIn 0.3s ease-out ${delay}ms forwards`,
         animationFillMode: 'both',
+        transition: 'border-color 0.2s ease, background 0.15s ease',
       }}
+      onMouseEnter={e => { if (!expanded) (e.currentTarget as HTMLElement).style.background = 'var(--panel2)' }}
+      onMouseLeave={e => { if (!expanded) (e.currentTarget as HTMLElement).style.background = 'var(--panel-solid)' }}
     >
-      {/* Status indicator - small dot, no glow */}
+      {/* Status indicator */}
       <div style={{ position: 'absolute', top: 16, right: 16 }}>
         <span
           style={{
@@ -702,45 +725,28 @@ function UserCard({ user, isPartner, canResetPw, isSelf, delay, onEdit, onToggle
         </span>
       </div>
 
-      {/* Admin actions - text-only, font-mono 10px uppercase */}
+      {/* Admin actions - hidden until expanded */}
       {isPartner && (
         <div
           style={{
-            display: 'flex',
-            gap: 8,
-            marginTop: 12,
-            paddingTop: 12,
-            borderTop: '1px solid var(--line)',
-            justifyContent: 'flex-start',
+            overflow: 'hidden',
+            maxHeight: expanded ? 60 : 0,
+            opacity: expanded ? 1 : 0,
+            transition: 'max-height 0.2s ease, opacity 0.2s ease',
           }}
         >
-          <button
-            onClick={onEdit}
+          <div
             style={{
               display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              fontWeight: 500,
-              color: 'var(--blue)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              transition: 'opacity 0.15s',
+              gap: 8,
+              marginTop: 12,
+              paddingTop: 12,
+              borderTop: '1px solid var(--line)',
+              justifyContent: 'flex-start',
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
           >
-            <Edit3 className="w-3 h-3" />
-            MODIFICA
-          </button>
-          {canResetPw && !isSelf && (
             <button
-              onClick={onResetPassword}
+              onClick={e => { e.stopPropagation(); onEdit() }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -750,7 +756,7 @@ function UserCard({ user, isPartner, canResetPw, isSelf, delay, onEdit, onToggle
                 textTransform: 'uppercase',
                 letterSpacing: '0.04em',
                 fontWeight: 500,
-                color: 'var(--yellow)',
+                color: 'var(--blue)',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
@@ -760,37 +766,63 @@ function UserCard({ user, isPartner, canResetPw, isSelf, delay, onEdit, onToggle
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7' }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
             >
-              <Key className="w-3 h-3" />
-              PASSWORD
+              <Edit3 className="w-3 h-3" />
+              MODIFICA
             </button>
-          )}
-          {!isSelf && (
-            <button
-              onClick={onToggleActive}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                fontWeight: 500,
-                color: user.is_active ? 'var(--red2)' : 'var(--green)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: 0,
-                marginLeft: 'auto',
-                transition: 'opacity 0.15s',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
-            >
-              {user.is_active ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-              {user.is_active ? 'DISATTIVA' : 'RIATTIVA'}
-            </button>
-          )}
+            {canResetPw && !isSelf && (
+              <button
+                onClick={e => { e.stopPropagation(); onResetPassword() }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  fontWeight: 500,
+                  color: 'var(--yellow)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
+              >
+                <Key className="w-3 h-3" />
+                PASSWORD
+              </button>
+            )}
+            {!isSelf && (
+              <button
+                onClick={e => { e.stopPropagation(); onToggleActive() }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  fontWeight: 500,
+                  color: user.is_active ? 'var(--red2)' : 'var(--green)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  marginLeft: 'auto',
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
+              >
+                {user.is_active ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                {user.is_active ? 'DISATTIVA' : 'RIATTIVA'}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
