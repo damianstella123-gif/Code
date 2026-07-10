@@ -34,6 +34,7 @@ import type { Task } from '@/data/tasks'
 import type { Pratica } from '@/data/pratiche'
 import type { Uscita } from '@/data/amministrazione'
 import { fetchEvents, upsertEvent, moveEventWithTimelineShift, resizeEventOnly } from '@/lib/events-service'
+import { trackAction } from '@/lib/impact-tracker'
 import { fetchTasks, upsertTask, changeTaskStatus } from '@/lib/tasks-service'
 import { fetchDossiers as fetchPractices, upsertDossier as upsertPractice } from '@/lib/dossier-service'
 import { fetchBudgets } from '@/lib/budgets-service'
@@ -2463,6 +2464,7 @@ export default function Calendario() {
       const newEnd = addDaysISO(target.dataFine, deltaDays)
       setAllEvents(prev => prev.map(e => e.id === id ? { ...e, dataInizio: newDate, dataFine: newEnd } : e))
       const { shift: result } = await moveEventWithTimelineShift(id, newDate)
+      trackAction('calendar_cascade', { eventId: id })
       if (result.skipped.length > 0) {
         setShiftToast({ message: 'Evento spostato. Alcune scadenze non sono state aggiornate automaticamente.', type: 'warning' })
       } else {

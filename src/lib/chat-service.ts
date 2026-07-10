@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { logError } from './error-log'
+import { trackAction } from './impact-tracker'
 
 export interface ChatConversation {
   id: string
@@ -69,6 +70,8 @@ export async function sendMessage(conversationId: string, _senderId: string, con
       updated_at: new Date().toISOString(),
     })
     .eq('id', conversationId)
+
+  trackAction('chat_message_sent')
 
   return data as ChatMessage | null
 }

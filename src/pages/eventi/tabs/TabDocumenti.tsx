@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { FileText, Upload, Download, Eye, Trash2, X, ExternalLink } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { trackAction } from '@/lib/impact-tracker'
 import { fmtLong } from '@/lib/format'
 import type { Event } from '@/data/events'
 
@@ -89,6 +90,7 @@ export function TabDocumenti({ event }: { event: Event }) {
         file_type: file.type || 'application/octet-stream',
         uploaded_by: '',
       })
+      trackAction('document_uploaded', { eventId: event.id })
     }
 
     await loadDocs()

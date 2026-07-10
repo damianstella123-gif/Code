@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Send, X, Calendar, Users, Briefcase, CheckSquare, PawPrint, Check, XCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { trackAction } from '@/lib/impact-tracker'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Client } from '@/data/clients'
@@ -342,6 +343,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
         }
         return updated
       })
+      trackAction('fly_query')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Errore imprevisto'
       setFlyError(msg)
