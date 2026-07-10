@@ -2105,17 +2105,22 @@ function LeaveRequestForm({ userId, userName, onClose, onSubmit }: {
     if (!dataInizio || !dataFine || !userId) return
     setSaving(true)
     try {
-      const { error } = await supabase.from('leave_requests').insert({
+      const { data: inserted, error } = await supabase.from('leave_requests').insert({
         user_id: userId, tipo, data_inizio: dataInizio, data_fine: dataFine,
         ora_inizio: tipo === 'permesso' && oraInizio ? oraInizio : null,
         ora_fine: tipo === 'permesso' && oraFine ? oraFine : null,
         motivo: motivo || null,
-      })
+      }).select('id').single()
       if (error) throw error
+      const leaveId = inserted?.id ?? ''
       const { data: admins } = await supabase.from('profiles').select('id').in('role', ['Admin', 'Super Admin', 'Amministrazione'])
       const notifications = (admins ?? []).map(a => ({
-        user_id: a.id, is_read: false, link: '/amministrazione',
+        user_id: a.id, is_read: false,
+        title: 'Nuova richiesta ferie',
         message: `${userName} ha richiesto ${tipo} dal ${dataInizio} al ${dataFine} (${durata} giorni)`,
+        type: 'leave_request',
+        related_entity_type: 'leave_request',
+        related_entity_id: leaveId,
       }))
       if (notifications.length > 0) await supabase.from('notifications').insert(notifications)
       onSubmit()

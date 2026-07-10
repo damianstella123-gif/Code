@@ -2113,14 +2113,14 @@ function FeriePermessiTab({ currentUserId }: { currentUserId: string }) {
 
   const approve = async (id: string, row: LeaveRow) => {
     await supabase.from('leave_requests').update({ stato: 'approvata', approvato_da: currentUserId, approvato_at: new Date().toISOString() }).eq('id', id)
-    await supabase.from('notifications').insert({ user_id: row.user_id, is_read: false, link: '/impostazioni', message: `La tua richiesta di ${row.tipo} dal ${row.data_inizio} al ${row.data_fine} e stata approvata!` })
+    await supabase.from('notifications').insert({ user_id: row.user_id, is_read: false, title: 'Ferie approvate \u2713', message: `La tua richiesta di ${row.tipo} dal ${row.data_inizio} al ${row.data_fine} e stata approvata!`, type: 'leave_approved', related_entity_type: 'leave_request', related_entity_id: id })
     loadLeaves()
   }
 
   const deny = async (id: string, row: LeaveRow) => {
     if (denyNote.length < 10) return
     await supabase.from('leave_requests').update({ stato: 'negata', note_admin: denyNote, approvato_da: currentUserId, approvato_at: new Date().toISOString() }).eq('id', id)
-    await supabase.from('notifications').insert({ user_id: row.user_id, is_read: false, link: '/impostazioni', message: `La tua richiesta di ${row.tipo} e stata negata. Motivazione: ${denyNote}` })
+    await supabase.from('notifications').insert({ user_id: row.user_id, is_read: false, title: 'Richiesta ferie negata', message: `La tua richiesta di ${row.tipo} e stata negata. Motivazione: ${denyNote}`, type: 'leave_denied', related_entity_type: 'leave_request', related_entity_id: id })
     setDenyingId(null); setDenyNote('')
     loadLeaves()
   }
