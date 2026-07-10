@@ -1545,6 +1545,15 @@ Deno.serve(async (req: Request) => {
     logUserId = user.id;
     const userClient = getUserClient(token);
 
+    // ─── FETCH USER ROLE ────────────────────────────────────────────────
+    const { data: userProfile } = await adminClient
+      .from("profiles")
+      .select("role, first_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    const userRole = userProfile?.role || "User";
+    const userFirstName = userProfile?.first_name || "";
+
     // ─── RATE LIMITING (20 req/min per user) ────────────────────────────
     const windowStart = new Date();
     windowStart.setSeconds(0, 0);
@@ -1713,7 +1722,15 @@ ENTITIES_JSON: chiudi la risposta con ENTITIES_JSON: [...] se citi entita specif
 PROPOSAL_JSON: dopo propose_event, chiudi con PROPOSAL_JSON:{...} (nome, location, pax, budget, giorni, fornitori).
 
 Dossier = processi burocratici (tabella "dossiers"), non confondere con eventi.
-Oggi: ${today}.${memorySection}`;
+Oggi: ${today}.
+
+RUOLO UTENTE: ${userRole}${userFirstName ? ` (${userFirstName})` : ""}.
+REGOLE PER RUOLO:
+- Commerciale: focalizzati su clienti, opportunita, presentazioni, lead, deal. NON mostrare costi interni, margini, budget fornitori, fee agenzia. Se chiede dati economici interni, rispondi che non ha accesso a queste informazioni.
+- Finance: focalizzati su liquidita, pagamenti in scadenza, incassi, DSO/DPO, fatture, cash flow. Mostra tutti i numeri economici.
+- Project Manager / Senior PM: focalizzati su eventi assegnati, task, fornitori, budget del loro evento, programma, team. Possono vedere i numeri dei loro eventi.
+- Admin / Super Admin: accesso completo a tutto, nessuna restrizione.
+- User / altri: accesso base, non mostrare dati finanziari sensibili.${memorySection}`;
 
     // ─── BUILD MESSAGES WITH CONTEXT MANAGEMENT ─────────────────────────
     const messages: AnthropicMessage[] = [];

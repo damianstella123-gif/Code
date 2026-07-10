@@ -52,7 +52,7 @@ export function isAdmin(user: AuthUser | null): boolean {
 }
 
 export function isManager(user: AuthUser | null): boolean {
-  return user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Project Manager'
+  return user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Senior PM' || user?.role === 'Project Manager'
 }
 
 export function canManageUsers(user: AuthUser | null): boolean {
@@ -69,6 +69,18 @@ export function canChangeRoles(user: AuthUser | null): boolean {
 
 export function canAccessSystemSettings(user: AuthUser | null): boolean {
   return user?.role === 'Super Admin'
+}
+
+export function isSeniorPM(user: AuthUser | null): boolean {
+  return user?.role === 'Senior PM'
+}
+
+export function isFinance(user: AuthUser | null): boolean {
+  return user?.role === 'Finance'
+}
+
+export function isCommerciale(user: AuthUser | null): boolean {
+  return user?.role === 'Commerciale'
 }
 
 // Legacy compat - used by Amministrazione page
@@ -90,6 +102,7 @@ const ALL_NAV: NavItem[] = [
   { name: 'Fornitori', href: '/fornitori' },
   { name: 'Amministrazione', href: '/amministrazione' },
   { name: 'Creative Studio', href: '/creative-studio' },
+  { name: 'Presentazioni', href: '/presentazioni' },
   { name: 'Dossier', href: '/dossier' },
   { name: 'Comunicazioni', href: '/comunicazioni' },
   { name: 'Workflow', href: '/workflow' },
@@ -98,26 +111,31 @@ const ALL_NAV: NavItem[] = [
   { name: 'Feedback Beta', href: '/feedback-beta' },
 ]
 
-const ADMIN_ONLY_PATHS = ['/utenti']
-const FINANCE_PATHS = ['/amministrazione']
-
 export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
   if (role === 'Super Admin' || role === 'Admin') return ALL_NAV
 
+  if (role === 'Senior PM' || role === 'Project Manager') {
+    return ALL_NAV.filter(item =>
+      !['/amministrazione', '/utenti'].includes(item.href)
+    )
+  }
+
+  if (role === 'Commerciale') {
+    return ALL_NAV.filter(item =>
+      ['/dashboard', '/crm', '/presentazioni', '/comunicazioni', '/calendario', '/dossier', '/creative-studio', '/impostazioni', '/feedback-beta'].includes(item.href)
+    )
+  }
+
   if (role === 'Finance') {
-    return ALL_NAV.filter(item => !ADMIN_ONLY_PATHS.includes(item.href))
+    return ALL_NAV.filter(item =>
+      ['/dashboard', '/amministrazione', '/eventi', '/calendario', '/impostazioni', '/feedback-beta'].includes(item.href)
+    )
   }
 
-  if (role === 'Project Manager') {
-    return ALL_NAV.filter(item => !ADMIN_ONLY_PATHS.includes(item.href) && !FINANCE_PATHS.includes(item.href))
-  }
-
-  // User / any other role: basic access (no admin, no finance, no user mgmt)
-  return ALL_NAV.filter(item => {
-    if (ADMIN_ONLY_PATHS.includes(item.href)) return false
-    if (FINANCE_PATHS.includes(item.href)) return false
-    return true
-  })
+  // User / any other role: basic access
+  return ALL_NAV.filter(item =>
+    !['/amministrazione', '/utenti'].includes(item.href)
+  )
 }
 
 export function getAllowedNav(ruolo: string): NavItem[] {

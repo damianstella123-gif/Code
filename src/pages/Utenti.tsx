@@ -29,8 +29,11 @@ function roleColor(role: string) {
   switch (role) {
     case 'Super Admin': return 'var(--red2)'
     case 'Admin': return '#e67e22'
+    case 'Senior PM': return '#8e44ad'
     case 'Partner': return 'var(--red2)'
     case 'Project Manager': return 'var(--blue)'
+    case 'Commerciale': return '#27ae60'
+    case 'Finance': return '#16a085'
     case 'Event Coordinator': return '#38d27d'
     case 'Event Assistant': return 'var(--yellow)'
     case 'Junior Event Assistant': return 'var(--muted)'
@@ -857,6 +860,16 @@ function FormField({ label, value, onChange, type = 'text', placeholder, icon }:
   )
 }
 
+const ROLE_DESCRIPTIONS: Partial<Record<AppRole, string>> = {
+  'Super Admin': 'Accesso totale al sistema',
+  'Admin': 'Direzione, approva tutto',
+  'Senior PM': 'Autonomia pagamenti fino a soglia €5.000',
+  'Project Manager': 'Gestione propri eventi, autonomia €2.000',
+  'Commerciale': 'Accesso CRM, clienti e creative',
+  'Finance': 'Accesso amministrazione e cash flow',
+  'User': 'Accesso base',
+}
+
 function RoleSelect({ value, onChange }: { value: AppRole; onChange: (v: AppRole) => void }) {
   return (
     <div>
@@ -880,7 +893,11 @@ function RoleSelect({ value, onChange }: { value: AppRole; onChange: (v: AppRole
         onFocus={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--text)' }}
         onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--line)' }}
       >
-        {APP_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+        {APP_ROLES.map(r => (
+          <option key={r} value={r}>
+            {r}{ROLE_DESCRIPTIONS[r] ? ` — ${ROLE_DESCRIPTIONS[r]}` : ''}
+          </option>
+        ))}
       </select>
     </div>
   )
