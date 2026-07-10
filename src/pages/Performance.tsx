@@ -372,6 +372,9 @@ export default function Performance() {
             I benchmark pre-Synergy sono stime. Aggiornali con i dati reali per calcoli piu accurati.
           </p>
         </div>
+
+        {/* ─── FLY INSIGHTS — TEAM ─────────────────────────────────────────────────── */}
+        <FlyInsightsSection userRows={userRows} />
       </div>
     </div>
   )
@@ -488,5 +491,187 @@ function BenchmarkRow({ row, saving, onChange, onSave }: {
         </button>
       </td>
     </tr>
+  )
+}
+
+// ─── FLY INSIGHTS ────────────────────────────────────────────────────────────
+
+interface InsightCard {
+  userId: string
+  nome: string
+  role: string
+  avatar_url: string | null
+  insight: string
+}
+
+function FlyInsightsSection({ userRows }: {
+  userRows: { id: string; nome: string; role: string; avatar_url: string | null; oreThisMonth: number; valoreThisMonth: number; topAction: string; trend: 'up' | 'down' | 'flat' }[]
+}) {
+  const [insights, setInsights] = useState<InsightCard[]>([])
+  const [generating, setGenerating] = useState(false)
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null)
+
+  async function handleAnalyze() {
+    setGenerating(true)
+    setInsights([])
+
+    const teamData = userRows.map(u => ({
+      nome: u.nome,
+      ruolo: u.role,
+      ore_mese: parseFloat(u.oreThisMonth.toFixed(1)),
+      valore_eur: parseFloat(u.valoreThisMonth.toFixed(0)),
+      top_action: u.topAction || 'nessuna',
+      trend_vs_mese_prec: u.trend,
+      azioni_count: u.oreThisMonth > 0 ? Math.ceil(u.oreThisMonth * 2) : 0,
+    }))
+
+    try {
+      const { data: session } = await supabase.auth.getSession()
+      const token = session?.session?.access_token
+      if (!token) { setGenerating(false); return }
+
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fly-gateway`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          message: `Analizza le performance del team Simmetria questo mese e dai consigli specifici per ogni utente.\n\nDati team:\n${JSON.stringify(teamData, null, 2)}\n\nRispondi con un insight per ogni utente, una riga ciascuno nel formato:\nNOME: consiglio specifico\n\nMax 2 righe per utente. Tono costruttivo, mai giudicante. Se un utente ha 0 ore/azioni scrivi che i dati sono insufficienti per analizzarlo.`,
+          history: [],
+        }),
+      })
+
+      const json = await res.json()
+      const reply: string = json?.reply || json?.message || ''
+
+      const parsed: InsightCard[] = []
+      const lines = reply.split('\n').filter((l: string) => l.trim().length > 0)
+
+      for (const line of lines) {
+        const colonIdx = line.indexOf(':')
+        if (colonIdx < 1) continue
+        const nameStr = line.slice(0, colonIdx).replace(/^\*\*|\*\*$/g, '').replace(/^-\s*/, '').trim()
+        const insightText = line.slice(colonIdx + 1).trim()
+        if (!insightText) continue
+
+        const matchedUser = userRows.find(u =>
+          u.nome.toLowerCase().includes(nameStr.toLowerCase()) ||
+          nameStr.toLowerCase().includes(u.nome.split(' ')[0].toLowerCase())
+        )
+
+        if (matchedUser) {
+          parsed.push({
+            userId: matchedUser.id,
+            nome: matchedUser.nome,
+            role: matchedUser.role,
+            avatar_url: matchedUser.avatar_url,
+            insight: insightText,
+          })
+        } else {
+          parsed.push({
+            userId: nameStr,
+            nome: nameStr,
+            role: '',
+            avatar_url: null,
+            insight: insightText,
+          })
+        }
+      }
+
+      setInsights(parsed)
+      setGeneratedAt(new Date().toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }))
+    } catch (err) {
+      console.error('Fly insights error:', err)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ borderTop: '1px solid var(--line)', paddingTop: '24px', marginTop: '8px' }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '6px' }}>
+          FLY INSIGHTS — TEAM
+        </p>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '16px' }}>
+          Analisi comportamentale del team generata da Fly — aggiornata su richiesta
+        </p>
+      </div>
+
+      <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <button
+          onClick={handleAnalyze}
+          disabled={generating}
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '12px',
+            padding: '8px 16px',
+            borderRadius: '10px',
+            border: '1px solid var(--red2)',
+            background: generating ? 'transparent' : 'color-mix(in srgb, var(--red2) 10%, transparent)',
+            color: 'var(--red2)',
+            cursor: generating ? 'wait' : 'pointer',
+            transition: 'all 0.15s',
+          }}
+        >
+          {generating ? 'Analizzando...' : 'Analizza il team con Fly'}
+        </button>
+        {generatedAt && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
+            Aggiornato {generatedAt}
+          </span>
+        )}
+      </div>
+
+      {generating && (
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} style={{ border: '1px solid var(--line)', borderRadius: '12px', padding: '16px', overflow: 'hidden', position: 'relative' }}>
+              <div className="animate-pulse flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full" style={{ background: 'var(--line)' }} />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 rounded" style={{ background: 'var(--line)', width: '30%' }} />
+                  <div className="h-3 rounded" style={{ background: 'var(--line)', width: '80%' }} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!generating && insights.length > 0 && (
+        <div className="space-y-3">
+          {insights.map((card, idx) => {
+            const initials = card.nome.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase()
+            return (
+              <div key={idx} style={{ border: '1px solid var(--line)', borderRadius: '12px', padding: '16px', position: 'relative' }}>
+                <span style={{ position: 'absolute', top: '10px', right: '12px', fontSize: '14px', opacity: 0.4 }}>
+                  FLY
+                </span>
+                <div className="flex items-start gap-3">
+                  {card.avatar_url ? (
+                    <img src={card.avatar_url} className="w-8 h-8 rounded-full object-cover flex-shrink-0" alt="" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0"
+                      style={{ background: 'var(--red2)', fontSize: '9px', fontWeight: 600 }}>{initials}</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>
+                      {card.nome}
+                      {card.role && <span style={{ fontWeight: 400, color: 'var(--muted)', marginLeft: '8px' }}>{card.role}</span>}
+                    </p>
+                    <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.5 }}>
+                      {card.insight}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
