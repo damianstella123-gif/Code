@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sun, Moon } from 'lucide-react'
+import { Sun, Moon, Calendar, ListTodo, AlertCircle, MessageSquare, ChevronRight } from 'lucide-react'
 import { loadUser, isAdmin } from '@/lib/auth'
 import { useTheme } from '@/lib/theme'
 import { daysLeft } from '@/lib/format'
@@ -351,6 +351,13 @@ export default function Dashboard() {
         <span><strong>{kpi.clientiAttivi}</strong> clienti attivi</span>
       </div>
 
+      <DashboardWidgets
+        events={liveEvents}
+        tasks={liveTasks}
+        setTasks={setLiveTasks}
+        navigate={navigate}
+      />
+
       <div className="wire-tabs">
         {(['tutto', 'eventi', 'task', 'clienti'] as const).map(t => (
           <button
@@ -475,6 +482,219 @@ function MorningEditionCard({ edition }: { edition: { id: string; message: strin
           {new Date(edition.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} · fly
         </p>
       </span>
+    </div>
+  )
+}
+
+function DashboardWidgets({ events, tasks, setTasks, navigate }: {
+  events: Event[]
+  tasks: Task[]
+  setTasks: React.Dispatch<React.SetStateAction<Task[]>>
+  navigate: (path: string) => void
+}) {
+  const { unread } = useChatNotifications()
+
+  const activeEvents = useMemo(() =>
+    events.filter(e => e.stato === 'in_corso' || e.stato === 'pianificazione'),
+    [events]
+  )
+
+  const openTasks = useMemo(() =>
+    tasks
+      .filter(t => t.stato !== 'completato')
+      .sort((a, b) => new Date(a.scadenza).getTime() - new Date(b.scadenza).getTime()),
+    [tasks]
+  )
+
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+
+  const deadlines = useMemo(() => {
+    return openTasks.filter(t => {
+      const d = t.scadenza?.slice(0, 10)
+      return d === todayStr || d === tomorrowStr
+    })
+  }, [openTasks, todayStr, tomorrowStr])
+
+  async function toggleTask(taskId: string) {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, stato: 'completato' } : t))
+    await supabase.from('tasks').update({ stato: 'completato' }).eq('id', taskId)
+  }
+
+  const unreadConvs = useMemo(() => {
+    if (!unread?.byConversation) return []
+    return Array.from(unread.byConversation.entries()).slice(0, 3).map(([id, count]) => {
+      const conv = unread.conversations?.find(c => c.id === id)
+      const title = conv?.title || 'Conversazione'
+      return { id, title, count }
+    })
+  }, [unread])
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-4 py-3" style={{ maxWidth: 900, margin: '0 auto' }}>
+      {/* EVENTI */}
+      <div
+        className="rounded-[14px] p-4 transition-all cursor-pointer group"
+        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+        onClick={() => navigate('/eventi')}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--red2) 40%, transparent)')}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line)')}
+      >
+        <div className="flex items-center justify-between mb-2 pb-2" style={{ borderBottom: '1px solid var(--line)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Eventi</span>
+          <Calendar className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+        </div>
+        <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--text)', lineHeight: 1.1 }}>
+          {activeEvents.length}
+        </p>
+        <p className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>attivi</p>
+        <div className="space-y-1.5">
+          {activeEvents.slice(0, 3).map(e => {
+            const dl = daysLeft(e.dataInizio)
+            return (
+              <div key={e.id} className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>
+                <span className="truncate flex-1">{e.nome}</span>
+                <span style={{ color: dl <= 7 ? 'var(--red2)' : 'var(--muted)', fontSize: 10 }}>
+                  T{dl >= 0 ? `-${dl}` : `+${Math.abs(dl)}`}
+                </span>
+              </div>
+            )
+          })}
+          {activeEvents.length === 0 && (
+            <p className="text-xs" style={{ color: 'var(--green)' }}>Nessun evento in corso</p>
+          )}
+        </div>
+        <div className="flex items-center gap-1 mt-3 text-[10px] font-medium" style={{ color: 'var(--red2)' }}>
+          Vedi tutti <ChevronRight className="w-3 h-3" />
+        </div>
+      </div>
+
+      {/* TASK */}
+      <div
+        className="rounded-[14px] p-4 transition-all cursor-pointer"
+        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+        onClick={() => navigate('/task')}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--red2) 40%, transparent)')}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line)')}
+      >
+        <div className="flex items-center justify-between mb-2 pb-2" style={{ borderBottom: '1px solid var(--line)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Task</span>
+          <ListTodo className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+        </div>
+        <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--text)', lineHeight: 1.1 }}>
+          {openTasks.length}
+        </p>
+        <p className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>aperti</p>
+        <div className="space-y-1.5">
+          {openTasks.slice(0, 3).map(t => {
+            const dl = daysLeft(t.scadenza)
+            return (
+              <div key={t.id} className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>
+                <input
+                  type="checkbox"
+                  className="w-3.5 h-3.5 rounded flex-shrink-0 cursor-pointer"
+                  style={{ accentColor: 'var(--green)' }}
+                  checked={false}
+                  onClick={e => { e.stopPropagation(); toggleTask(t.id) }}
+                  onChange={() => {}}
+                />
+                <span className="truncate flex-1">{t.titolo}</span>
+                <span style={{ color: dl <= 0 ? 'var(--red2)' : dl <= 2 ? 'var(--yellow)' : 'var(--muted)', fontSize: 10 }}>
+                  {dl === 0 ? 'oggi' : dl < 0 ? `${Math.abs(dl)}g fa` : `${dl}g`}
+                </span>
+              </div>
+            )
+          })}
+          {openTasks.length === 0 && (
+            <p className="text-xs" style={{ color: 'var(--green)' }}>Tutti i task completati</p>
+          )}
+        </div>
+        <div className="flex items-center gap-1 mt-3 text-[10px] font-medium" style={{ color: 'var(--red2)' }}>
+          Vedi tutti <ChevronRight className="w-3 h-3" />
+        </div>
+      </div>
+
+      {/* SCADENZE */}
+      <div
+        className="rounded-[14px] p-4 transition-all cursor-pointer"
+        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+        onClick={() => navigate('/calendario')}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--red2) 40%, transparent)')}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line)')}
+      >
+        <div className="flex items-center justify-between mb-2 pb-2" style={{ borderBottom: '1px solid var(--line)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Scadenze</span>
+          <AlertCircle className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+        </div>
+        {deadlines.length > 0 ? (
+          <>
+            <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--red2)', lineHeight: 1.1 }}>
+              {deadlines.length}
+            </p>
+            <div className="flex items-center gap-1.5 mb-3">
+              {deadlines.some(t => t.scadenza?.slice(0, 10) === todayStr) && (
+                <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-bold" style={{ background: 'color-mix(in srgb, var(--red2) 15%, transparent)', color: 'var(--red2)' }}>Oggi</span>
+              )}
+              {deadlines.some(t => t.scadenza?.slice(0, 10) === tomorrowStr) && (
+                <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-bold" style={{ background: 'color-mix(in srgb, var(--yellow) 15%, transparent)', color: 'var(--yellow)' }}>Domani</span>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              {deadlines.slice(0, 3).map(t => (
+                <div key={t.id} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }} className="truncate">
+                  {t.titolo}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--green)', lineHeight: 1.1 }}>0</p>
+            <p className="text-xs mt-2" style={{ color: 'var(--green)' }}>Nessuna scadenza urgente</p>
+          </>
+        )}
+        <div className="flex items-center gap-1 mt-3 text-[10px] font-medium" style={{ color: 'var(--red2)' }}>
+          Calendario <ChevronRight className="w-3 h-3" />
+        </div>
+      </div>
+
+      {/* MESSAGGI */}
+      <div
+        className="rounded-[14px] p-4 transition-all cursor-pointer"
+        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+        onClick={() => navigate('/comunicazioni')}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--red2) 40%, transparent)')}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line)')}
+      >
+        <div className="flex items-center justify-between mb-2 pb-2" style={{ borderBottom: '1px solid var(--line)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Messaggi</span>
+          <MessageSquare className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+        </div>
+        {unread && unread.total > 0 ? (
+          <>
+            <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--text)', lineHeight: 1.1 }}>
+              {unread.total}
+            </p>
+            <p className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>non letti</p>
+            <div className="space-y-1.5">
+              {unreadConvs.map(c => (
+                <div key={c.id} className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>
+                  <span className="truncate flex-1">{c.title}</span>
+                  <span style={{ color: 'var(--blue)', fontSize: 10 }}>{c.count} nuov{c.count === 1 ? 'o' : 'i'}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--green)', lineHeight: 1.1 }}>0</p>
+            <p className="text-xs mt-2" style={{ color: 'var(--green)' }}>Tutto letto</p>
+          </>
+        )}
+        <div className="flex items-center gap-1 mt-3 text-[10px] font-medium" style={{ color: 'var(--red2)' }}>
+          Chat <ChevronRight className="w-3 h-3" />
+        </div>
+      </div>
     </div>
   )
 }
