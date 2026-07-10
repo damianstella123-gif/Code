@@ -2899,3 +2899,251 @@ textarea::placeholder {
 [style*="font-size: 12.5px"] { font-size: 15px !important; }
 [style*="font-size: 13px"]   { font-size: 15px !important; }
 
+/* ════════════════════════════════════════════════════════════════════════════════
+   SYNERGY MOBILE — iPhone 14 mini+
+   Breakpoint: 640px phone, 1024px tablet
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. BASE GLOBALE ── */
+html, body {
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ── 2. ZOOM SAFARI — input min 16px ── */
+@media (max-width: 640px) {
+  input:not([type="range"]),
+  select,
+  textarea,
+  [contenteditable] {
+    font-size: 16px !important;
+  }
+}
+
+/* ── 3. SAFE AREA NOTCH/DYNAMIC ISLAND ── */
+@media (max-width: 640px) {
+  .mobile-bottom-nav {
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    height: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .pb-mobile-nav,
+  .shell-content {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* ── 4. TOPBAR COMPATTA ── */
+@media (max-width: 640px) {
+  .shell-header {
+    height: 52px !important;
+    padding: 0 !important;
+  }
+  .cmd-bar-trigger,
+  [class*="cmd-bar"],
+  [class*="search-bar"] {
+    max-width: 180px !important;
+    min-width: 120px !important;
+  }
+  .cmd-bar-input::placeholder {
+    font-size: 13px !important;
+  }
+}
+
+/* ── 5. GRIGLIE — 1 colonna su phone ── */
+@media (max-width: 640px) {
+  [style*="minmax(280"],
+  [style*="minmax(300"],
+  [style*="minmax(320"] {
+    grid-template-columns: 1fr !important;
+  }
+  [style*="gap: 12px"],
+  [style*="gap: 16px"],
+  [style*="gap: 18px"] {
+    gap: 10px !important;
+  }
+}
+
+/* ── 6. TABLET — 2 colonne ── */
+@media (min-width: 641px) and (max-width: 1024px) {
+  [style*="minmax(280"],
+  [style*="minmax(300"],
+  [style*="minmax(320"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ── 7. MODALI COME SHEET DAL BASSO ── */
+@media (max-width: 640px) {
+  .fixed.inset-0.flex.items-center.justify-center,
+  [class*="modal-overlay"],
+  [class*="dialog-overlay"] {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .fixed.inset-0.flex.items-center.justify-center > div:not([class*="overlay"]):not([class*="backdrop"]),
+  [class*="modal-content"],
+  [class*="dialog-content"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 90vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    margin: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+  }
+  .max-w-md,
+  .max-w-lg,
+  .max-w-xl,
+  .max-w-2xl,
+  .max-w-3xl {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+}
+
+/* ── 8. WIRE TABS SCROLLABILI ── */
+@media (max-width: 1024px) {
+  .wire-tabs {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    padding-bottom: 2px;
+  }
+  .wire-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+  .wire-tabs > * {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+  .event-detail-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+  .event-detail-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+  .event-detail-tabs > * {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+/* ── 9. TABELLE SCROLLABILI ── */
+@media (max-width: 1024px) {
+  table {
+    display: block !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    white-space: nowrap !important;
+    max-width: 100% !important;
+  }
+  th, td {
+    min-width: 80px;
+    white-space: nowrap;
+  }
+}
+
+/* ── 10. PANNELLO FLY SU MOBILE ── */
+@media (max-width: 640px) {
+  .cmd-dropdown,
+  [class*="fly-panel"],
+  [class*="fly-response"] {
+    position: fixed !important;
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 0 !important;
+    right: 0 !important;
+    max-height: 65vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    z-index: 100 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* ── 11. AREA DI TOCCO MINIMA ── */
+@media (max-width: 640px) {
+  button,
+  [role="button"],
+  a,
+  input[type="checkbox"],
+  input[type="radio"],
+  select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .btn-inline {
+    min-height: unset;
+    min-width: unset;
+  }
+}
+
+/* ── 12. HEADER EDITORIALI ── */
+@media (max-width: 640px) {
+  [class*="supplier-header"],
+  [class*="client-header"],
+  [class*="event-header"] {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  [class*="logo-banner"],
+  [class*="header-logo"] {
+    width: 100% !important;
+    text-align: center !important;
+  }
+}
+
+/* ── 13. WIRE TICKER SCROLLABILE ── */
+@media (max-width: 640px) {
+  .wire-ticker,
+  [class*="wire-ticker"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none !important;
+    white-space: nowrap;
+  }
+  .wire-ticker::-webkit-scrollbar {
+    display: none !important;
+  }
+  .wire-ticker > * {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* ── 14. FORM COMPATTI ── */
+@media (max-width: 640px) {
+  .p-6 { padding: 1rem !important; }
+  .p-8 { padding: 1.25rem !important; }
+  .gap-6 { gap: 1rem !important; }
+  .gap-8 { gap: 1.25rem !important; }
+  .text-xs { font-size: 13px !important; }
+}
+
+/* ── 15. SIDEBAR NASCOSTA SU MOBILE ── */
+@media (max-width: 640px) {
+  .shell-sidebar {
+    transform: translateX(-100%);
+  }
+}
+
+/* ── 16. IMMAGINI E MEDIA ── */
+@media (max-width: 640px) {
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
