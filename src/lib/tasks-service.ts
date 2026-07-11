@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { logError } from './error-log'
+import { getCached, setCache, invalidateCache } from './cache'
 import type { Task } from '@/data/tasks'
 
 interface TaskRow {
@@ -53,6 +54,8 @@ function taskToRow(t: Task): Omit<TaskRow, 'updated_at'> {
 }
 
 export async function fetchTasks(): Promise<Task[]> {
+  const cached = getCached<Task[]>('tasks_list')
+  if (cached) return cached
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
@@ -62,7 +65,9 @@ export async function fetchTasks(): Promise<Task[]> {
     logError('tasks-service', 'fetchTasks', error)
     throw new Error(error.message)
   }
-  return ((data ?? []) as TaskRow[]).map(rowToTask)
+  const result = ((data ?? []) as TaskRow[]).map(rowToTask)
+  setCache('tasks_list', result)
+  return result
 }
 
 export async function fetchTasksByEvent(eventId: string): Promise<Task[]> {
@@ -88,6 +93,7 @@ export async function createTask(task: Task): Promise<Task | null> {
     logError('tasks-service', 'createTask', error)
     throw new Error(error.message)
   }
+  invalidateCache('tasks_list')
   return data ? rowToTask(data as TaskRow) : null
 }
 
@@ -101,6 +107,7 @@ export async function upsertTask(task: Task): Promise<Task | null> {
     logError('tasks-service', 'upsertTask', error)
     throw new Error(error.message)
   }
+  invalidateCache('tasks_list')
   return data ? rowToTask(data as TaskRow) : null
 }
 
@@ -127,6 +134,7 @@ export async function updateTask(id: string, patch: Partial<Task>): Promise<Task
     logError('tasks-service', 'updateTask', error)
     throw new Error(error.message)
   }
+  invalidateCache('tasks_list')
   return data ? rowToTask(data as TaskRow) : null
 }
 
@@ -140,5 +148,6 @@ export async function deleteTask(id: string): Promise<boolean> {
     logError('tasks-service', 'deleteTask', error)
     throw new Error(error.message)
   }
+  invalidateCache('tasks_list')
   return true
 }

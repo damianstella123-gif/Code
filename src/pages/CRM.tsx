@@ -129,6 +129,7 @@ function CompanyLogo({ url, name, size, radius }: { url?: string; name: string; 
       <img
         src={url}
         alt={name}
+        loading="lazy"
         onError={() => setImgError(true)}
         style={{ width: size, height: size, borderRadius: radius, objectFit: 'cover', border: '1px solid var(--line)', flexShrink: 0 }}
       />
@@ -152,6 +153,7 @@ function CardLogoBanner({ url, name, status }: { url?: string; name: string; sta
         <img
           src={url}
           alt={name}
+          loading="lazy"
           onError={() => setImgError(true)}
           style={{ maxHeight: '40px', maxWidth: '60%', objectFit: 'contain' }}
         />

@@ -380,7 +380,9 @@ export default function Dashboard() {
       </div>
 
       {filteredStories.length === 0 ? (
-        <div className="wire-empty">Nessuna notizia in questa sezione, per ora.</div>
+        <div className="wire-empty" style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: 1.7 }}>
+          Il feed e silenzioso. Significa che tutto e sotto controllo<br/>oppure che e ora di mettere in moto qualcosa.
+        </div>
       ) : (
         <>
           <UnreadMessagesCard />

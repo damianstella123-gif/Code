@@ -481,7 +481,7 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
   const showDropdown = focused
 
   return (
-    <div ref={containerRef} className="cmd-bar-wrapper">
+    <div ref={containerRef} className="cmd-bar-wrapper" data-onboarding="commandbar">
       <div className="cmd-bar">
         <PawPrint style={{ width: 14, height: 14, color: 'var(--red2)', flexShrink: 0 }} />
         <input

@@ -13,6 +13,26 @@ export interface Notification {
   created_at: string
 }
 
+const PRIORITY: Record<string, number> = {
+  'leave_request': 1,
+  'payment_approval': 1,
+  'sentinel_critical': 1,
+  'task_scaduto': 2,
+  'leave_approved': 2,
+  'payment_approved': 2,
+  'morning_edition': 3,
+  'leave_reminder': 3,
+  'chat_message': 4,
+}
+
+export function getNotificationPriority(type: string): number {
+  return PRIORITY[type] ?? 5
+}
+
+export function isCriticalNotification(type: string): boolean {
+  return (PRIORITY[type] ?? 5) === 1
+}
+
 export async function fetchNotifications(userId: string): Promise<Notification[]> {
   const { data, error } = await supabase
     .from('notifications')
@@ -26,7 +46,14 @@ export async function fetchNotifications(userId: string): Promise<Notification[]
     logError('notifications-service', 'fetchNotifications', error)
     throw new Error(error.message)
   }
-  return (data ?? []) as Notification[]
+  const notifications = (data ?? []) as Notification[]
+  notifications.sort((a, b) => {
+    const pa = PRIORITY[a.type] ?? 5
+    const pb = PRIORITY[b.type] ?? 5
+    if (pa !== pb) return pa - pb
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+  return notifications
 }
 
 export async function fetchUnreadCount(userId: string): Promise<number> {

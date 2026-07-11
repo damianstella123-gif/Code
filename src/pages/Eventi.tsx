@@ -22,6 +22,7 @@ import { fetchAllProfiles } from '@/lib/profiles'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import TabBudget from '@/components/TabBudget'
 import TabPagamenti from '@/components/TabPagamenti'
+import { useToast } from '@/lib/toast'
 import { setFlyContext } from '@/lib/fly'
 import { daysLeft, fmtShort, toISO } from '@/lib/format'
 import type { Event } from '@/data/events'
@@ -67,6 +68,44 @@ function getVisibleEvents(_ruolo: string, _userId: string, eventList: Event[]): 
   return eventList
 }
 
+// ─── EventStatusBar ─────────────────────────────────────────────────────────
+
+function EventStatusBar({ event, days, isLive, isOver, progressPct, totalTasks, suppliersCount }: {
+  event: Event; days: number; isLive: boolean; isOver: boolean; progressPct: number; totalTasks: number; suppliersCount: number
+}) {
+  const urgency = isOver ? 'over' : isLive ? 'critico' : days <= 7 ? 'critico' : days <= 30 ? 'attenzione' : 'ok'
+  const countdownLabel = isOver ? 'CONCLUSO' : isLive ? 'LIVE' : days === 0 ? 'OGGI' : `T-${days}`
+  const countdownColor = urgency === 'critico' ? 'var(--red2)' : urgency === 'attenzione' ? 'var(--yellow)' : urgency === 'over' ? 'var(--muted)' : 'var(--green)'
+  const countdownBg = urgency === 'critico' ? 'rgba(200,25,46,0.1)' : urgency === 'attenzione' ? 'rgba(234,179,8,0.1)' : urgency === 'over' ? 'rgba(128,128,128,0.08)' : 'rgba(47,168,107,0.1)'
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '10px 0 14px', borderBottom: '1px solid var(--line)', marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: countdownColor, background: countdownBg, padding: '3px 10px', borderRadius: 99 }}>
+        {countdownLabel}
+      </div>
+
+      {totalTasks > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 72, height: 4, background: 'var(--line)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${progressPct}%`, background: progressPct === 100 ? 'var(--green)' : 'var(--red2)', borderRadius: 2, transition: 'width 0.5s ease' }} />
+          </div>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>{progressPct}% task</span>
+        </div>
+      )}
+
+      {(event as any).budget > 0 && (
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>
+          Budget: <strong style={{ color: 'var(--text)' }}>{((event as any).budget || 0).toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}</strong>
+        </span>
+      )}
+
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginLeft: 'auto' }}>
+        {suppliersCount} fornitori{(event as any).pax ? ` \u00B7 ${(event as any).pax} pax` : ''}
+      </span>
+    </div>
+  )
+}
+
 // ─── BudgetTabContainer ──────────────────────────────────────────────────────
 
 function BudgetTabContainer({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
@@ -100,6 +139,12 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
   }
 
   useEffect(() => { fetchTasksByEvent(event.id).then(setEventTasks) }, [event.id])
+
+  useEffect(() => {
+    const handler = (ev: globalThis.Event) => setActiveTab((ev as CustomEvent).detail as TabId)
+    window.addEventListener('set-event-tab', handler)
+    return () => window.removeEventListener('set-event-tab', handler)
+  }, [])
 
   const eventMsg = comunicazioni.filter(m => m.eventoId === event.id)
   const eventSuppliers = suppliers.filter(s => s.eventiId.includes(event.id))
@@ -236,7 +281,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
       </div>
 
       {/* Wire Tabs */}
-      <div ref={tabsContainerRef} className="event-detail-tabs" style={{ display: 'flex', gap: '18px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: '20px', paddingBottom: '8px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div ref={tabsContainerRef} className="event-detail-tabs" style={{ display: 'flex', gap: '18px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: '0', paddingBottom: '8px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {tabs.map(tab => (
           <button key={tab.id} onClick={(e) => {
             setActiveTab(tab.id);
@@ -256,6 +301,9 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
           </button>
         ))}
       </div>
+
+      {/* Event Status Bar */}
+      <EventStatusBar event={event} days={days} isLive={isLive} isOver={isOver} progressPct={progress} totalTasks={totalTasks} suppliersCount={eventSuppliers.length} />
 
       {/* Tab Content */}
       <div key={activeTab} className="animate-fade-in">
@@ -304,6 +352,7 @@ function createWorkflowForEvent(event: Event) {
 
 export default function Eventi() {
   const currentUser = loadUser()
+  const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const [eventList, setEventList] = useState<Event[]>([])
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
@@ -434,12 +483,15 @@ export default function Eventi() {
       setErrorMessage('Aggiornamento stato fallito. Riprova.')
       return
     }
+    if (newStato === 'completato') {
+      showToast(`Evento completato! Ottimo lavoro su ${event.nome}`, 'success')
+    }
     const refreshed = await refreshEvents()
     if (selectedEvent && selectedEvent.id === event.id) {
       const fresh = refreshed.find(e => e.id === event.id) ?? remote
       setSelectedEvent(fresh)
     }
-  }, [refreshEvents, selectedEvent])
+  }, [refreshEvents, selectedEvent, showToast])
 
   const visibleEvents = useMemo(() => {
     if (!currentUser) return []
@@ -523,7 +575,7 @@ export default function Eventi() {
       <div className="wire-masthead">
         <span className="wire-masthead-title">EVENTI — {filtered.length} VISIBILI</span>
         <button onClick={() => { setEditingEvent(undefined); setShowForm(true) }}
-          className="wire-theme-toggle" style={{ borderRadius: '8px' }}>
+          className="wire-theme-toggle" style={{ borderRadius: '8px' }} data-onboarding="new-event">
           <Plus className="w-3.5 h-3.5" style={{ color: 'var(--text)' }} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>Nuovo evento</span>
         </button>

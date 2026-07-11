@@ -1855,6 +1855,7 @@ export default function Fornitori() {
   const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const [supplierList, setSupplierList] = useState<Supplier[]>([])
+  const [initialLoading, setInitialLoading] = useState(true)
   const [selected, setSelected] = useState<Supplier | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<Supplier | undefined>(undefined)
@@ -1888,6 +1889,8 @@ export default function Fornitori() {
       setSupplierList(sups)
     } catch (err) {
       showToast('Errore caricamento fornitori')
+    } finally {
+      setInitialLoading(false)
     }
   }, [showToast])
 
@@ -2171,7 +2174,17 @@ export default function Fornitori() {
         </p>
 
         {/* Supplier grid */}
-        {filteredSuppliers.length === 0 ? (
+        {initialLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} style={{ borderRadius: 14, border: '1px solid var(--line)', padding: 16, background: 'var(--panel)' }}>
+                {[80, 60, 40].map((w, j) => (
+                  <div key={j} style={{ height: 12, width: `${w}%`, background: 'var(--line)', borderRadius: 6, marginBottom: 8, animation: 'shimmer 1.5s infinite' }} />
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : filteredSuppliers.length === 0 ? (
           <div className="p-10 text-center" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', color: 'var(--muted)' }}>
             <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessun fornitore trovato</p>

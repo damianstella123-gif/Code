@@ -230,8 +230,19 @@ export default function Performance() {
   if (!user || !['Admin', 'Super Admin'].includes(user.role)) return null
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento performance...</div>
+      <div style={{ padding: '0 16px' }}>
+        <div className="wire-masthead" style={{ marginBottom: 24 }}>
+          <div style={{ height: 20, width: 180, background: 'var(--line)', borderRadius: 6, animation: 'shimmer 1.5s infinite' }} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} style={{ borderRadius: 14, border: '1px solid var(--line)', padding: 16, background: 'var(--panel)' }}>
+              {[80, 60, 40].map((w, j) => (
+                <div key={j} style={{ height: 12, width: `${w}%`, background: 'var(--line)', borderRadius: 6, marginBottom: 8, animation: 'shimmer 1.5s infinite' }} />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     )
   }

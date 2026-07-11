@@ -1684,6 +1684,39 @@ textarea::placeholder {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes taskComplete {
+  0%   { opacity: 1; transform: scale(1); }
+  50%  { opacity: 0.7; transform: scale(0.98); }
+  100% { opacity: 0; transform: scale(0.95); }
+}
+.task-completing {
+  animation: taskComplete 1.5s ease 0.3s forwards;
+}
+.task-completing .task-title {
+  text-decoration: line-through;
+  text-decoration-color: var(--green);
+  transition: text-decoration 0.3s ease;
+}
+
+@keyframes confirmPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(47,168,107,0.4); }
+  70%  { box-shadow: 0 0 0 8px rgba(47,168,107,0); }
+  100% { box-shadow: 0 0 0 0 rgba(47,168,107,0); }
+}
+.badge-confirmed {
+  animation: confirmPulse 0.6s ease-out;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200,25,46,0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(200,25,46,0); }
+}
+
 @keyframes slideInRight {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
@@ -1697,6 +1730,22 @@ textarea::placeholder {
 @keyframes glassShimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+@keyframes shimmer {
+  0% { opacity: .4; }
+  50% { opacity: .8; }
+  100% { opacity: .4; }
+}
+
+.page-enter {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
 .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
@@ -3050,6 +3099,86 @@ html, body {
   th, td {
     min-width: 80px;
     white-space: nowrap;
+  }
+}
+
+/* ── 9B. NOTIFICHE E ACCOUNT COME BOTTOM SHEET SU MOBILE ── */
+.notif-panel-container {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 8px;
+  width: 320px;
+  border-radius: 16px;
+  overflow: hidden;
+  z-index: 50;
+}
+
+.account-panel-container {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 8px;
+  width: 256px;
+  border-radius: 24px;
+  overflow: hidden;
+  z-index: 50;
+}
+
+@media (max-width: 640px) {
+  .notif-panel-container {
+    position: fixed !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-height: 80vh !important;
+    margin-top: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+    border-bottom: none !important;
+    animation: mobileSheetUp 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+    z-index: 50 !important;
+  }
+
+  .account-panel-container {
+    position: fixed !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    margin-top: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+    border-bottom: none !important;
+    animation: mobileSheetUp 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+    z-index: 50 !important;
+    padding-bottom: env(safe-area-inset-bottom, 12px) !important;
+  }
+}
+
+/* ── 9C. BOTTOM NAV ACTIVE STATE ── */
+.mobile-bottom-nav a.bottom-nav-active {
+  position: relative;
+}
+
+.mobile-bottom-nav a.bottom-nav-active::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--red2);
+}
+
+@media (max-width: 640px) {
+  .mobile-bottom-nav a:active,
+  .mobile-bottom-nav button:active {
+    transform: scale(0.9);
+    transition: transform 0.1s ease;
   }
 }
 

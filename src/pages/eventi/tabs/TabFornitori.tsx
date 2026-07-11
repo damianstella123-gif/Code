@@ -177,8 +177,8 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
       {linkedSuppliers.length === 0 && !adding ? (
         <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <Truck className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p>Nessun fornitore collegato a questo evento</p>
-          <p className="text-xs mt-1">Usa il pulsante "Collega fornitore" per aggiungerne uno</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: 1.7 }}>Aggiungi i primi fornitori per vedere<br/>la magia del budget in tempo reale</p>
+          <p className="text-xs mt-1">Usa il pulsante "Collega fornitore" per iniziare</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -215,7 +215,7 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
                           onChange={async (e) => {
                             if (link) await updateLinkStatus(link.id, e.target.value as 'richiesto' | 'confermato' | 'contrattualizzato')
                           }}
-                          className="text-[10px] px-2 py-0.5 rounded-full font-medium cursor-pointer appearance-none"
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-medium cursor-pointer appearance-none${stato === 'confermato' || stato === 'contrattualizzato' ? ' badge-confirmed' : ''}`}
                           style={{ background: statoConf.bg, color: statoConf.color, border: `1px solid ${statoConf.border}` }}>
                           <option value="richiesto">Richiesto</option>
                           <option value="confermato">Confermato</option>

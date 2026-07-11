@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { addDaysISO, diffDaysISO } from './format'
 import { logError } from './error-log'
+import { getCached, setCache, invalidateCache } from './cache'
 import type { Event } from '@/data/events'
 
 interface EventRow {
@@ -67,6 +68,8 @@ function eventToRow(e: Event): Omit<EventRow, 'created_at' | 'updated_at'> {
 }
 
 export async function fetchEvents(): Promise<Event[]> {
+  const cached = getCached<Event[]>('events_list')
+  if (cached) return cached
   const { data, error } = await supabase
     .from('events')
     .select('*')
@@ -76,7 +79,9 @@ export async function fetchEvents(): Promise<Event[]> {
     logError('events-service', 'fetchEvents', error)
     throw new Error(error.message)
   }
-  return ((data ?? []) as EventRow[]).map(rowToEvent)
+  const result = ((data ?? []) as EventRow[]).map(rowToEvent)
+  setCache('events_list', result)
+  return result
 }
 
 export async function createEvent(event: Event): Promise<Event | null> {
@@ -90,6 +95,7 @@ export async function createEvent(event: Event): Promise<Event | null> {
     logError('events-service', 'createEvent', error)
     throw new Error(error.message)
   }
+  invalidateCache('events_list')
   return data ? rowToEvent(data as EventRow) : null
 }
 
@@ -104,6 +110,7 @@ export async function upsertEvent(event: Event): Promise<Event | null> {
     logError('events-service', 'upsertEvent', error)
     throw new Error(error.message)
   }
+  invalidateCache('events_list')
   return data ? rowToEvent(data as EventRow) : null
 }
 
@@ -134,6 +141,7 @@ export async function updateEvent(id: string, patch: Partial<Event>): Promise<Ev
     logError('events-service', 'updateEvent', error)
     throw new Error(error.message)
   }
+  invalidateCache('events_list')
   return data ? rowToEvent(data as EventRow) : null
 }
 
@@ -143,6 +151,7 @@ export async function deleteEvent(id: string): Promise<boolean> {
     logError('events-service', 'deleteEvent', error)
     throw new Error(error.message)
   }
+  invalidateCache('events_list')
   return true
 }
 

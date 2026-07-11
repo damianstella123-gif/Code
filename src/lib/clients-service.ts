@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { logError } from './error-log'
+import { getCached, setCache, invalidateCache } from './cache'
 import type { Client, Contatto } from '@/data/clients'
 
 interface ClientRow {
@@ -64,6 +65,8 @@ function clientToRow(c: Client): Omit<ClientRow, 'created_at' | 'updated_at'> {
 }
 
 export async function fetchClients(): Promise<Client[]> {
+  const cached = getCached<Client[]>('clients_list')
+  if (cached) return cached
   const { data, error } = await supabase
     .from('clients')
     .select('*')
@@ -73,7 +76,9 @@ export async function fetchClients(): Promise<Client[]> {
     logError('clients-service', 'fetchClients', error)
     throw new Error(error.message)
   }
-  return ((data ?? []) as ClientRow[]).map(rowToClient)
+  const result = ((data ?? []) as ClientRow[]).map(rowToClient)
+  setCache('clients_list', result)
+  return result
 }
 
 export async function upsertClient(client: Client): Promise<Client | null> {
@@ -86,6 +91,7 @@ export async function upsertClient(client: Client): Promise<Client | null> {
     logError('clients-service', 'upsertClient', error)
     throw new Error(error.message)
   }
+  invalidateCache('clients_list')
   return data ? rowToClient(data as ClientRow) : null
 }
 
@@ -115,6 +121,7 @@ export async function updateClient(id: string, patch: Partial<Client>): Promise<
     logError('clients-service', 'updateClient', error)
     throw new Error(error.message)
   }
+  invalidateCache('clients_list')
   return data ? rowToClient(data as ClientRow) : null
 }
 
@@ -124,6 +131,8 @@ export async function deleteClient(id: string): Promise<boolean> {
     logError('clients-service', 'deleteClient', error)
     throw new Error(error.message)
   }
+  invalidateCache('clients_list')
+  return true
   return true
 }
 

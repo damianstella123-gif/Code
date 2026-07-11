@@ -53,6 +53,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      for (const reg of registrations) {
+        reg.update()
+      }
+    })
     navigator.serviceWorker.register('/sw.js').catch(console.error)
   })
 }

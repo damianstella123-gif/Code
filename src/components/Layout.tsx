@@ -1,6 +1,8 @@
 import { ReactNode, useState, useEffect, useCallback } from 'react'
 import GlobalSearch from '@/components/GlobalSearch'
 import { OfflineBanner } from '@/components/OfflineBanner'
+import Onboarding from '@/components/Onboarding'
+import QuickActions from '@/components/QuickActions'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -25,21 +27,25 @@ import {
   UserCog,
   Search,
   MoreHorizontal,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
 import PinnedChats from '@/components/PinnedChats'
 import { loadUser, getAllowedNavForRole, signOutEverywhere } from '@/lib/auth'
+import { useTheme } from '@/lib/theme'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchPractices } from '@/lib/dossier-service'
 import { fetchClients } from '@/lib/clients-service'
 import { cacheEventsSnapshot, cacheTasksSnapshot, cachePraticheSnapshot, cacheClientsSnapshot } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
-import { fetchNotifications, fetchUnreadCount, markAsRead, markAllAsRead, archiveOldNotifications } from '@/lib/notifications-service'
+import { fetchNotifications, fetchUnreadCount, markAsRead, markAllAsRead, archiveOldNotifications, isCriticalNotification } from '@/lib/notifications-service'
 import type { Notification } from '@/lib/notifications-service'
 
 const iconMap: Record<string, React.ElementType> = {
+  '/oggi': Sun,
   '/dashboard': LayoutDashboard,
   '/eventi': Calendar,
   '/crm': Users,
@@ -57,7 +63,7 @@ const iconMap: Record<string, React.ElementType> = {
 }
 
 const NAV_GROUPS: { label: string; paths: string[] }[] = [
-  { label: '', paths: ['/dashboard'] },
+  { label: '', paths: ['/oggi', '/dashboard'] },
   { label: 'Operativo', paths: ['/eventi', '/task', '/calendario', '/fornitori'] },
   { label: 'Business', paths: ['/crm', '/amministrazione'] },
   { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
@@ -130,6 +136,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                       to={item.href}
                       onClick={() => setOpen(false)}
                       className={cn('shell-nav-item', isActive && 'shell-nav-item--active')}
+                      {...(item.href === '/calendario' ? { 'data-onboarding': 'calendario' } : {})}
                     >
                       <div className="shell-nav-indicator" />
                       <Icon className="shell-nav-icon" />
@@ -185,6 +192,97 @@ function formatTimeAgo(dateStr: string): string {
   const days = Math.floor(hours / 24)
   if (days === 1) return 'Ieri'
   return `${days} giorni fa`
+}
+
+function NotificationCard({ notification: n, onAction, onClick }: {
+  notification: Notification
+  onAction: (path: string) => void
+  onClick: () => void
+}) {
+  if (n.type === 'payment_approval') {
+    return (
+      <div style={{ background: 'rgba(234,179,8,0.08)', borderLeft: '3px solid var(--yellow)', padding: '10px 14px', borderBottom: '1px solid var(--line)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4, flex: 1 }}>{n.message}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', flexShrink: 0 }}>{formatTimeAgo(n.created_at)}</div>
+        </div>
+        <button onClick={(e) => { e.stopPropagation(); onAction('/amministrazione') }}
+          style={{ marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 10px', borderRadius: 6, background: 'var(--yellow)', color: '#000', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+          Vai ad approvare &rarr;
+        </button>
+      </div>
+    )
+  }
+
+  if (n.type === 'leave_request') {
+    return (
+      <div style={{ background: 'rgba(59,130,246,0.08)', borderLeft: '3px solid var(--blue)', padding: '10px 14px', borderBottom: '1px solid var(--line)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4, flex: 1 }}>{n.message}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', flexShrink: 0 }}>{formatTimeAgo(n.created_at)}</div>
+        </div>
+        <button onClick={(e) => { e.stopPropagation(); onAction('/impostazioni') }}
+          style={{ marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 10px', borderRadius: 6, background: 'var(--blue)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+          Vai a ferie &amp; permessi &rarr;
+        </button>
+      </div>
+    )
+  }
+
+  if (n.type === 'sentinel_critical') {
+    return (
+      <div style={{ background: 'rgba(200,25,46,0.08)', borderLeft: '3px solid var(--red2)', padding: '10px 14px', borderBottom: '1px solid var(--line)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4, flex: 1, fontWeight: 500 }}>{n.message}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', flexShrink: 0 }}>{formatTimeAgo(n.created_at)}</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (n.type === 'morning_edition') {
+    return (
+      <div style={{ background: 'rgba(255,193,7,0.06)', borderLeft: '3px solid var(--yellow)', padding: '10px 14px', borderBottom: '1px solid var(--line)' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--yellow)', letterSpacing: '0.1em', marginBottom: 4, fontWeight: 600 }}>
+          BRIEFING DI OGGI
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>
+          {n.message}
+        </div>
+        <button onClick={(e) => { e.stopPropagation(); onAction('/oggi') }}
+          style={{ marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
+          Leggi tutto &rarr;
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      onClick={onClick}
+      style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid var(--line)', transition: 'background .15s' }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--panel2)' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+    >
+      <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red2)', marginTop: 5, flexShrink: 0, boxShadow: '0 0 5px rgba(200,25,46,.5)' }} />
+      <div style={{ flex: 1, fontSize: 13, color: 'var(--text)', lineHeight: 1.4 }}>{n.message}</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', flexShrink: 0, marginTop: 2 }}>{formatTimeAgo(n.created_at)}</div>
+    </div>
+  )
+}
+
+function ThemeToggleButton() {
+  const { resolved, toggleTheme } = useTheme()
+  return (
+    <button
+      onClick={toggleTheme}
+      title={resolved === 'dark' ? 'Passa al tema chiaro' : 'Passa al tema scuro'}
+      className="p-2 rounded-lg transition-all hover:bg-white/5"
+      style={{ color: 'var(--muted)' }}
+    >
+      {resolved === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+    </button>
+  )
 }
 
 function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
@@ -362,6 +460,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          <ThemeToggleButton />
           <div className="relative">
             <button
               id="notif-btn"
@@ -372,18 +471,23 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
               {unreadCount > 0 && (
                 <span
                   className="absolute top-1 right-1 min-w-[10px] h-[10px] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-0.5"
-                  style={{ background: 'var(--red)' }}
+                  style={{
+                    background: 'var(--red)',
+                    animation: notifications.some(n => isCriticalNotification(n.type)) ? 'pulse-badge 2s infinite' : undefined,
+                  }}
                 >
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </button>
             {notifOpen && (
-              <div
-                id="notif-panel"
-                className="absolute right-0 top-full mt-2 w-[calc(100vw-32px)] sm:w-80 rounded-2xl overflow-hidden animate-fade-in"
-                style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: '0 8px 32px rgba(0,0,0,0.14)' }}
-              >
+              <>
+                <div className="fixed inset-0 z-40 md:hidden" onClick={() => setNotifOpen(false)} />
+                <div
+                  id="notif-panel"
+                  className="notif-panel-container animate-fade-in"
+                  style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: '0 8px 32px rgba(0,0,0,0.14)' }}
+                >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
                     NOTIFICHE
@@ -409,19 +513,13 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                     </div>
                   ) : (
                     notifications.map(n => (
-                      <div
-                        key={n.id}
-                        onClick={() => handleNotificationClick(n)}
-                        style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid var(--line)', transition: 'background .15s' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--panel2)' }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-                      >
-                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red2)', marginTop: 5, flexShrink: 0, boxShadow: '0 0 5px rgba(200,25,46,.5)' }} />
-                        <div style={{ flex: 1, fontSize: '13px', color: 'var(--text)', lineHeight: 1.4 }}>{n.message}</div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', flexShrink: 0, marginTop: 2 }}>
-                          {formatTimeAgo(n.created_at)}
-                        </div>
-                      </div>
+                      <NotificationCard key={n.id} notification={n} onAction={async (path) => {
+                        await markAsRead(n.id)
+                        setNotifications(prev => prev.filter(x => x.id !== n.id))
+                        setUnreadCount(prev => Math.max(0, prev - 1))
+                        setNotifOpen(false)
+                        navigate(path)
+                      }} onClick={() => handleNotificationClick(n)} />
                     ))
                   )}
                 </div>
@@ -429,6 +527,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                   Le notifiche lette spariscono dopo 24 ore
                 </div>
               </div>
+              </>
             )}
           </div>
 
@@ -455,9 +554,11 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
               </button>
 
               {userMenuOpen && (
+                <>
+                <div className="fixed inset-0 z-40 md:hidden" onClick={() => setUserMenuOpen(false)} />
                 <div
                   id="account-panel"
-                  className="absolute right-0 top-full mt-2 w-64 rounded-3xl overflow-hidden animate-fade-in"
+                  className="account-panel-container animate-fade-in"
                   style={{
                     background: 'var(--panel-solid)',
                     backdropFilter: 'none',
@@ -504,6 +605,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                     </button>
                   </div>
                 </div>
+                </>
               )}
             </div>
           )}
@@ -589,10 +691,11 @@ function SentinelBadge() {
   )
 }
 
-const PRIMARY_MOBILE_PATHS = ['/dashboard', '/eventi', '/crm', '/task', '/calendario', '/fornitori', '/amministrazione']
+const PRIMARY_MOBILE_PATHS = ['/oggi', '/dashboard', '/eventi', '/crm', '/task', '/calendario', '/fornitori', '/amministrazione']
 const SECONDARY_MOBILE_PATHS = ['/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio']
 
 const mobileLabels: Record<string, string> = {
+  '/oggi': 'Oggi',
   '/dashboard': 'Home',
   '/eventi': 'Eventi',
   '/crm': 'CRM',
@@ -658,7 +761,7 @@ function BottomNav() {
               <Link
                 key={item.href}
                 to={item.href}
-                className="flex flex-col items-center justify-center gap-0.5 flex-1 py-1"
+                className={cn('flex flex-col items-center justify-center gap-0.5 flex-1 py-1', isActive && 'bottom-nav-active')}
                 style={{ minHeight: 44, minWidth: 44 }}
               >
                 <Icon className="w-[20px] h-[20px]" style={{ color: isActive ? 'var(--red2)' : 'var(--muted)' }} />
@@ -688,6 +791,19 @@ function BottomNav() {
 
 export default function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const user = loadUser()
+
+  useEffect(() => {
+    if (!user) return
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return
+      supabase.from('profiles').select('onboarding_completed').eq('id', session.user.id).maybeSingle()
+        .then(({ data }) => {
+          if (data && data.onboarding_completed === false) setShowOnboarding(true)
+        })
+    })
+  }, [user?.id])
 
   useEffect(() => {
     let cancelled = false
@@ -699,6 +815,15 @@ export default function Layout({ children }: { children: ReactNode }) {
       cacheClientsSnapshot(cl)
     })
     return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      import('../pages/Eventi')
+      import('../pages/Task')
+      import('../pages/Oggi')
+    }, 2000)
+    return () => clearTimeout(timer)
   }, [])
 
   return (
@@ -719,6 +844,13 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
         <BottomNav />
         <PinnedChats />
+        <QuickActions />
+        {showOnboarding && (
+          <Onboarding
+            onComplete={() => setShowOnboarding(false)}
+            userName={user?.first_name || 'amico'}
+          />
+        )}
       </div>
     </ChatNotificationsProvider>
   )

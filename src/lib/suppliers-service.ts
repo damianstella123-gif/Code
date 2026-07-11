@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { logError } from './error-log'
+import { getCached, setCache, invalidateCache } from './cache'
 import type { Supplier, StatoContratto, Documento, Recensione, SupplierDetails } from '@/data/suppliers'
 
 interface SupplierRow {
@@ -122,6 +123,8 @@ function supplierToRow(s: Supplier): Omit<SupplierRow, 'created_at' | 'updated_a
 }
 
 export async function fetchSuppliers(): Promise<Supplier[]> {
+  const cached = getCached<Supplier[]>('suppliers_list')
+  if (cached) return cached
   const { data, error } = await supabase
     .from('suppliers')
     .select('*')
@@ -131,7 +134,9 @@ export async function fetchSuppliers(): Promise<Supplier[]> {
     logError('suppliers-service', 'fetchSuppliers', error)
     throw new Error(error.message)
   }
-  return ((data ?? []) as SupplierRow[]).map(rowToSupplier)
+  const result = ((data ?? []) as SupplierRow[]).map(rowToSupplier)
+  setCache('suppliers_list', result)
+  return result
 }
 
 export async function upsertSupplier(supplier: Supplier): Promise<Supplier | null> {
@@ -144,6 +149,7 @@ export async function upsertSupplier(supplier: Supplier): Promise<Supplier | nul
     logError('suppliers-service', 'upsertSupplier', error)
     throw new Error(error.message)
   }
+  invalidateCache('suppliers_list')
   return data ? rowToSupplier(data as SupplierRow) : null
 }
 
@@ -190,6 +196,7 @@ export async function updateSupplier(id: string, patch: Partial<Supplier>): Prom
     logError('suppliers-service', 'updateSupplier', error)
     throw new Error(error.message)
   }
+  invalidateCache('suppliers_list')
   return data ? rowToSupplier(data as SupplierRow) : null
 }
 
@@ -199,5 +206,6 @@ export async function deleteSupplier(id: string): Promise<boolean> {
     logError('suppliers-service', 'deleteSupplier', error)
     throw new Error(error.message)
   }
+  invalidateCache('suppliers_list')
   return true
 }

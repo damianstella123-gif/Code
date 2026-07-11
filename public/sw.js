@@ -1,12 +1,7 @@
-const CACHE = 'synergy-v1'
-const STATIC = 'synergy-static-v1'
+const CACHE = 'synergy-v2'
+const STATIC = 'synergy-static-v2'
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(STATIC).then(c =>
-      c.addAll(['/', '/index.html', '/logo-synergy.png'])
-    )
-  )
   self.skipWaiting()
 })
 
@@ -25,13 +20,14 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url)
 
+  if (e.request.method !== 'GET') return
+
   if (url.hostname.includes('supabase.co')) {
     e.respondWith(
       fetch(e.request.clone())
         .then(res => {
-          if (e.request.method === 'GET') {
-            caches.open(CACHE).then(c => c.put(e.request, res.clone()))
-          }
+          const copy = res.clone()
+          caches.open(CACHE).then(c => c.put(e.request, copy))
           return res
         })
         .catch(() => caches.match(e.request)
@@ -46,13 +42,23 @@ self.addEventListener('fetch', e => {
     return
   }
 
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request)
+        .catch(() => caches.match('/index.html'))
+    )
+    return
+  }
+
   e.respondWith(
-    caches.match(e.request)
-      .then(cached => cached ||
-        fetch(e.request).then(res => {
-          caches.open(STATIC).then(c => c.put(e.request, res.clone()))
-          return res
-        })
-      ).catch(() => caches.match('/index.html'))
+    fetch(e.request)
+      .then(res => {
+        if (res.ok) {
+          const copy = res.clone()
+          caches.open(STATIC).then(c => c.put(e.request, copy))
+        }
+        return res
+      })
+      .catch(() => caches.match(e.request))
   )
 })

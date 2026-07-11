@@ -16,6 +16,7 @@ import {
   Briefcase,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
+import { useToast } from '@/lib/toast'
 import { cacheTasksSnapshot } from '@/lib/storage'
 import { fetchTasks, upsertTask, deleteTask as deleteTaskRemote, changeTaskStatus } from '@/lib/tasks-service'
 import { fetchEvents } from '@/lib/events-service'
@@ -222,8 +223,10 @@ function TaskFormModal({ task, onSave, onClose, users, events }: {
 export default function TaskPage() {
   const currentUser = loadUser()
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const [taskList, setTaskList] = useState<Task[]>([])
+  const [completingIds, setCompletingIds] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [filterStato, setFilterStato] = useState('Tutti')
   const [filterPriorita, setFilterPriorita] = useState('Tutte')
@@ -302,13 +305,17 @@ export default function TaskPage() {
   }, [filtered])
 
   const moveTask = useCallback(async (taskId: string, to: Task['stato']) => {
+    if (to === 'completato') {
+      setCompletingIds(prev => new Set(prev).add(taskId))
+      showToast('Task completato', 'success')
+    }
     setTaskList(prev => {
       const updated = prev.map(t => t.id === taskId ? { ...t, stato: to } : t)
       cacheTasksSnapshot(updated)
       return updated
     })
     await changeTaskStatus(taskId, to)
-  }, [])
+  }, [showToast])
 
   const saveTask = useCallback(async (task: Task) => {
     const saved = await upsertTask(task)
@@ -440,8 +447,8 @@ export default function TaskPage() {
       {/* Task List */}
       <div style={{ marginTop: '8px' }}>
         {sorted.open.length === 0 && sorted.done.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)', fontSize: '13px' }}>
-            Nessun task trovato.
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: 1.7 }}>
+            Niente da fare &mdash; o e un gran giorno<br/>o e il momento di pianificare il prossimo evento
           </div>
         ) : (
           <>
@@ -456,6 +463,7 @@ export default function TaskPage() {
                 onCycleStatus={() => cycleStatus(task)}
                 onRowClick={() => setSelectedTaskId(task.id)}
                 onNavigateEvent={evtId => navigate(`/eventi?id=${evtId}`)}
+                isCompleting={completingIds.has(task.id)}
               />
             ))}
             {sorted.done.length > 0 && (
@@ -479,6 +487,7 @@ export default function TaskPage() {
                     onCycleStatus={() => cycleStatus(task)}
                     onRowClick={() => setSelectedTaskId(task.id)}
                     onNavigateEvent={evtId => navigate(`/eventi?id=${evtId}`)}
+                    isCompleting={false}
                   />
                 ))}
               </>
@@ -510,7 +519,7 @@ export default function TaskPage() {
 
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus, onRowClick, onNavigateEvent }: {
+function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus, onRowClick, onNavigateEvent, isCompleting }: {
   task: Task
   index: number
   events: { id: string; nome: string }[]
@@ -519,6 +528,7 @@ function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus,
   onCycleStatus: () => void
   onRowClick: () => void
   onNavigateEvent: (evtId: string) => void
+  isCompleting: boolean
 }) {
   const evento = task.evento ? events.find(e => e.id === task.evento) : null
   const dl = deadlineLabel(task.scadenza, task.stato)
@@ -527,7 +537,7 @@ function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus,
 
   return (
     <div
-      className="animate-fade-in"
+      className={`animate-fade-in${isCompleting ? ' task-completing' : ''}`}
       onClick={onRowClick}
       style={{
         display: 'flex', alignItems: 'center', gap: '12px',
@@ -566,7 +576,7 @@ function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus,
       {/* Title + event label */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <p style={{
+          <p className="task-title" style={{
             fontFamily: 'var(--font-serif)', fontSize: '15px', fontWeight: 500,
             color: 'var(--text)', lineHeight: 1.3, margin: 0,
             textDecoration: isCompleted ? 'line-through' : 'none',
