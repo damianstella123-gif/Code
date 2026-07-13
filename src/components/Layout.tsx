@@ -4,6 +4,8 @@ import { OfflineBanner } from '@/components/OfflineBanner'
 import Onboarding from '@/components/Onboarding'
 import QuickActions from '@/components/QuickActions'
 import { RadioPlayer } from '@/components/RadioPlayer'
+import { OnlineUsers } from '@/components/OnlineUsers'
+import { initializePresence, stopPresence } from '@/lib/presence-service'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -464,6 +466,9 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          <div className="hidden sm:block">
+            <OnlineUsers />
+          </div>
           <ThemeToggleButton />
           <div className="relative">
             <button
@@ -807,6 +812,8 @@ export default function Layout({ children }: { children: ReactNode }) {
           if (data && data.onboarding_completed === false) setShowOnboarding(true)
         })
     })
+    initializePresence()
+    return () => { stopPresence() }
   }, [user?.id])
 
   useEffect(() => {
