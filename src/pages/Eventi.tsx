@@ -40,6 +40,7 @@ import { TabOverview } from './eventi/tabs/TabOverview'
 import { TabFornitori } from './eventi/tabs/TabFornitori'
 import { TabProgramma } from './eventi/tabs/TabProgramma'
 import { TabDocumenti } from './eventi/tabs/TabDocumenti'
+import { TabComunicazioni } from './eventi/tabs/TabComunicazioni'
 import { TabGreenReport } from './eventi/tabs/TabGreenReport'
 
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
@@ -167,6 +168,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
     { id: 'programma', label: 'Programma' },
     { id: 'budget', label: 'Budget' },
     { id: 'pagamenti', label: 'Pagamenti' },
+    { id: 'comunicazioni', label: 'Comunicazioni' },
     { id: 'documenti', label: 'Documenti' },
     { id: 'green', label: 'Green Report' },
   ]
@@ -345,6 +347,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
         {activeTab === 'budget' && <BudgetTabContainer event={event} suppliers={suppliers} />}
         {activeTab === 'pagamenti' && <TabPagamenti event={event} suppliers={suppliers} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} />}
+        {activeTab === 'comunicazioni' && <TabComunicazioni event={event} />}
         {activeTab === 'programma' && <TabProgramma event={event} suppliers={suppliers} />}
         {activeTab === 'green' && <TabGreenReport event={event} suppliers={suppliers} />}
       </div>

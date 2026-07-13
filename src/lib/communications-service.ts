@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { logError } from './error-log'
+import { loadUser } from './auth'
 import type { Messaggio, Priorita, TipoCanale } from '@/data/comunicazioni'
 
 interface CommunicationRow {
@@ -141,4 +142,212 @@ export async function deleteCommunication(id: string): Promise<boolean> {
     throw new Error(error.message)
   }
   return true
+}
+
+// ─── Thread System ──────────────────────────────────────────────────────────
+
+export interface ThreadRow {
+  id: string
+  event_id: string
+  titolo: string
+  creato_da: string
+  stato: 'aperto' | 'chiuso' | 'archiviato'
+  priorita: 'bassa' | 'normale' | 'alta' | 'critica'
+  last_message_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ThreadMessageRow {
+  id: string
+  thread_id: string
+  author_id: string
+  testo: string
+  letto_da: string[]
+  edited_at: string | null
+  created_at: string
+}
+
+export interface ThreadParticipant {
+  id: string
+  thread_id: string
+  user_id: string
+  ruolo: 'creator' | 'partecipante' | 'osservatore'
+  notifiche_enabled: boolean
+}
+
+export async function createThread(
+  eventId: string,
+  titolo: string,
+  priorita: string = 'normale',
+  partecipantiIds: string[] = []
+): Promise<ThreadRow | null> {
+  const user = loadUser()
+  if (!user) return null
+
+  const { data: thread, error } = await supabase.from('comunicazioni_thread')
+    .insert({
+      event_id: eventId,
+      titolo,
+      priorita,
+      creato_da: user.id,
+    })
+    .select()
+    .maybeSingle()
+
+  if (error) {
+    logError('communications-service', 'createThread', error)
+    return null
+  }
+  if (!thread) return null
+
+  const participants = [
+    { thread_id: thread.id, user_id: user.id, ruolo: 'creator' },
+    ...partecipantiIds
+      .filter(id => id !== user.id)
+      .map(id => ({ thread_id: thread.id, user_id: id, ruolo: 'partecipante' })),
+  ]
+
+  await supabase.from('comunicazioni_participants').insert(participants)
+  return thread as ThreadRow
+}
+
+export async function addMessageToThread(
+  threadId: string,
+  testo: string
+): Promise<ThreadMessageRow | null> {
+  const user = loadUser()
+  if (!user) return null
+
+  const { data: msg, error } = await supabase.from('comunicazioni_messages')
+    .insert({
+      thread_id: threadId,
+      author_id: user.id,
+      testo,
+      letto_da: [user.id],
+    })
+    .select()
+    .maybeSingle()
+
+  if (error) {
+    logError('communications-service', 'addMessageToThread', error)
+    return null
+  }
+
+  if (msg) {
+    await supabase.from('comunicazioni_thread')
+      .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', threadId)
+  }
+
+  return msg as ThreadMessageRow | null
+}
+
+export async function getThreads(eventId: string): Promise<ThreadRow[]> {
+  const { data, error } = await supabase.from('comunicazioni_thread')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+
+  if (error) {
+    logError('communications-service', 'getThreads', error)
+    return []
+  }
+  return (data || []) as ThreadRow[]
+}
+
+export async function getThreadMessages(threadId: string): Promise<ThreadMessageRow[]> {
+  const { data, error } = await supabase.from('comunicazioni_messages')
+    .select('*')
+    .eq('thread_id', threadId)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    logError('communications-service', 'getThreadMessages', error)
+    return []
+  }
+  return (data || []) as ThreadMessageRow[]
+}
+
+export async function getThreadParticipants(threadId: string): Promise<ThreadParticipant[]> {
+  const { data, error } = await supabase.from('comunicazioni_participants')
+    .select('*')
+    .eq('thread_id', threadId)
+
+  if (error) {
+    logError('communications-service', 'getThreadParticipants', error)
+    return []
+  }
+  return (data || []) as ThreadParticipant[]
+}
+
+export async function addParticipant(threadId: string, userId: string, ruolo: string = 'partecipante'): Promise<void> {
+  await supabase.from('comunicazioni_participants')
+    .upsert({ thread_id: threadId, user_id: userId, ruolo }, { onConflict: 'thread_id,user_id' })
+}
+
+export async function markThreadMessagesRead(threadId: string): Promise<void> {
+  const user = loadUser()
+  if (!user) return
+
+  const { data: msgs } = await supabase.from('comunicazioni_messages')
+    .select('id, letto_da')
+    .eq('thread_id', threadId)
+
+  if (!msgs) return
+
+  for (const msg of msgs) {
+    const existing: string[] = (msg.letto_da || []) as string[]
+    if (!existing.includes(user.id)) {
+      await supabase.from('comunicazioni_messages')
+        .update({ letto_da: [...existing, user.id] })
+        .eq('id', msg.id)
+    }
+  }
+}
+
+export async function closeThread(threadId: string): Promise<void> {
+  await supabase.from('comunicazioni_thread')
+    .update({ stato: 'chiuso', updated_at: new Date().toISOString() })
+    .eq('id', threadId)
+}
+
+export async function reopenThread(threadId: string): Promise<void> {
+  await supabase.from('comunicazioni_thread')
+    .update({ stato: 'aperto', updated_at: new Date().toISOString() })
+    .eq('id', threadId)
+}
+
+export async function getUnreadCountForEvent(eventId: string): Promise<number> {
+  const user = loadUser()
+  if (!user) return 0
+
+  const { data: threads } = await supabase.from('comunicazioni_thread')
+    .select('id')
+    .eq('event_id', eventId)
+
+  if (!threads || threads.length === 0) return 0
+
+  const threadIds = threads.map(t => t.id)
+
+  const { data: msgs } = await supabase.from('comunicazioni_messages')
+    .select('id, letto_da, author_id')
+    .in('thread_id', threadIds)
+
+  if (!msgs) return 0
+
+  return msgs.filter(m =>
+    m.author_id !== user.id &&
+    !(m.letto_da as string[] || []).includes(user.id)
+  ).length
+}
+
+export async function deleteMessage(messageId: string): Promise<void> {
+  await supabase.from('comunicazioni_messages').delete().eq('id', messageId)
+}
+
+export async function editMessage(messageId: string, newText: string): Promise<void> {
+  await supabase.from('comunicazioni_messages')
+    .update({ testo: newText, edited_at: new Date().toISOString() })
+    .eq('id', messageId)
 }
