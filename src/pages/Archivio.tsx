@@ -117,7 +117,7 @@ export default function Archivio() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                     <button
-                      onClick={() => navigate(`/eventi?event=${evt.id}`)}
+                      onClick={() => navigate(`/eventi?id=${evt.id}&archived=1`)}
                       style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer' }}
                     >
                       Apri

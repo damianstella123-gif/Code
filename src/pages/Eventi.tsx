@@ -9,10 +9,11 @@ import {
   Edit3,
   Trash2,
   Archive,
+  RotateCcw,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { loadTasksFromStorage, cacheEventsSnapshot, loadWorkflowsFromStorage } from '@/lib/storage'
-import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote, archiveEvent } from '@/lib/events-service'
+import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote, archiveEvent, restoreEvent, fetchEventById } from '@/lib/events-service'
 import { fetchTasksByEvent } from '@/lib/tasks-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchBudgets } from '@/lib/budgets-service'
@@ -115,6 +116,7 @@ function BudgetTabContainer({ event, suppliers }: { event: Event; suppliers: Sup
 
 interface EventDetailProps {
   event: Event
+  isArchived?: boolean
   onBack: () => void
   onEdit: (event: Event) => void
   onDelete: (event: Event) => void
@@ -128,7 +130,7 @@ interface EventDetailProps {
   onSuppliersChanged: () => void
 }
 
-function EventDetail({ event, onBack, onEdit, onDelete, onArchive, onStatusChange, budgets, suppliers, comunicazioni, internalUsers, clients, onSuppliersChanged }: EventDetailProps) {
+function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, onStatusChange, budgets, suppliers, comunicazioni, internalUsers, clients, onSuppliersChanged }: EventDetailProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [eventTasks, setEventTasks] = useState<Task[]>([])
   const navigateRouter = useNavigate()
@@ -192,6 +194,11 @@ function EventDetail({ event, onBack, onEdit, onDelete, onArchive, onStatusChang
 
   return (
     <div className="animate-fade-in" style={{ maxWidth: '1100px' }}>
+      {isArchived && (
+        <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>
+          Evento archiviato — sola consultazione
+        </div>
+      )}
       {/* Wire Editorial Header */}
       <div style={{ paddingBottom: '20px', marginBottom: '20px', borderBottom: '1.5px solid var(--text)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -216,28 +223,42 @@ function EventDetail({ event, onBack, onEdit, onDelete, onArchive, onStatusChang
             }}>
               {countdownLabel}
             </span>
-            <button onClick={() => onEdit(event)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={() => onDelete(event)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-            {isOver && (
-              <button onClick={() => onArchive(event)}
-                title="Archivia evento"
+            {!isArchived && (
+              <>
+                <button onClick={() => onEdit(event)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => onDelete(event)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                {isOver && (
+                  <button onClick={() => onArchive(event)}
+                    title="Archivia evento"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </>
+            )}
+            {isArchived && (
+              <button onClick={() => { restoreEvent(event.id).then(() => { onBack() }) }}
+                title="Ripristina"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--green)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
               >
-                <Archive className="w-3.5 h-3.5" />
+                <RotateCcw className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -261,6 +282,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onArchive, onStatusChang
         </div>
 
         {/* Status change strip */}
+        {!isArchived && (
         <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto' }}>
           {statiSequenza.map((s, i) => (
             <button key={s} onClick={() => onStatusChange(event, s)}
@@ -276,6 +298,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onArchive, onStatusChang
             </button>
           ))}
         </div>
+        )}
 
         {/* Progress bar */}
         {totalTasks > 0 && (
@@ -362,11 +385,13 @@ export default function Eventi() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [eventList, setEventList] = useState<Event[]>([])
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
+  const [isViewingArchived, setIsViewingArchived] = useState(false)
   const [search, setSearch] = useState('')
   const [filterStato, setFilterStato] = useState('Tutti')
   const [showForm, setShowForm] = useState(false)
   const [editingEvent, setEditingEvent] = useState<Event | undefined>(undefined)
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null)
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState<Event | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [budgets, setBudgets] = useState<Uscita[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -432,11 +457,20 @@ export default function Eventi() {
 
   useEffect(() => {
     const targetId = searchParams.get('id')
-    if (!targetId || eventList.length === 0) return
+    if (!targetId) return
     const found = eventList.find(e => e.id === targetId)
     if (found) {
       setSelectedEvent(found)
+      setIsViewingArchived(false)
       setSearchParams({}, { replace: true })
+    } else if (searchParams.get('archived') === '1') {
+      fetchEventById(targetId).then(evt => {
+        if (evt) {
+          setSelectedEvent(evt)
+          setIsViewingArchived(true)
+        }
+        setSearchParams({}, { replace: true })
+      })
     }
   }, [eventList, searchParams, setSearchParams])
 
@@ -489,15 +523,16 @@ export default function Eventi() {
       setErrorMessage('Aggiornamento stato fallito. Riprova.')
       return
     }
-    if (newStato === 'completato') {
-      showToast(`\ud83c\udf89 Evento completato! Ottimo lavoro su ${event.nome}`, 'success')
-    }
     const refreshed = await refreshEvents()
     if (selectedEvent && selectedEvent.id === event.id) {
       const fresh = refreshed.find(e => e.id === event.id) ?? remote
       setSelectedEvent(fresh)
     }
-  }, [refreshEvents, selectedEvent, showToast])
+    if (newStato === 'completato') {
+      const freshEvt = refreshed.find(e => e.id === event.id) ?? remote
+      setShowArchiveConfirm(freshEvt)
+    }
+  }, [refreshEvents, selectedEvent])
 
   const handleArchive = useCallback(async (event: Event) => {
     const user = loadUser()
@@ -551,6 +586,32 @@ export default function Eventi() {
           {errorMessage}
         </div>
       )}
+      {showArchiveConfirm && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div style={{ background: 'var(--panel-solid)', border: '1.5px solid var(--line)', borderRadius: 14, padding: '28px 24px', maxWidth: 380, width: '90%' }}>
+            <p style={{ fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
+              Evento completato!
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
+              Vuoi archiviare <strong>{showArchiveConfirm.nome}</strong> ora?
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowArchiveConfirm(null)}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '8px 14px', borderRadius: 6, border: '1px solid var(--line)', background: 'none', color: 'var(--muted)', cursor: 'pointer' }}
+              >
+                No, lo archivio dopo
+              </button>
+              <button
+                onClick={() => { handleArchive(showArchiveConfirm); setShowArchiveConfirm(null) }}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '8px 14px', borderRadius: 6, border: 'none', background: 'var(--red2)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Si, archivia
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 
@@ -561,7 +622,8 @@ export default function Eventi() {
         {overlays}
         <EventDetail
           event={liveEvent}
-          onBack={() => setSelectedEvent(null)}
+          isArchived={isViewingArchived}
+          onBack={() => { setSelectedEvent(null); setIsViewingArchived(false) }}
           onEdit={(evt) => { setEditingEvent(evt); setShowForm(true) }}
           onDelete={(evt) => setDeletingEvent(evt)}
           onArchive={handleArchive}

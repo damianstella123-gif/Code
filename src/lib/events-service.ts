@@ -86,6 +86,19 @@ export async function fetchEvents(): Promise<Event[]> {
   return result
 }
 
+export async function fetchEventById(id: string): Promise<Event | null> {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+  if (error) {
+    logError('events-service', 'fetchEventById', error)
+    return null
+  }
+  return data ? rowToEvent(data as EventRow) : null
+}
+
 export async function createEvent(event: Event): Promise<Event | null> {
   const row = eventToRow(event)
   const { data, error } = await supabase
