@@ -2,12 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { Play, Pause, Volume2, VolumeX, ChevronDown } from 'lucide-react'
 
 const STATIONS = [
-  { id: 'capital', name: 'Capital', color: '#FF6B6B', stream: 'https://streamcdnb10-dd67e65685984f298c56ae58aedf3b53.msvdn.net/webradio/Capital' },
-  { id: 'deejay', name: 'DeeJay', color: '#4ECDC4', stream: 'https://streamcdnb10-dd67e65685984f298c56ae58aedf3b53.msvdn.net/webradio/deejay' },
-  { id: 'rtl', name: 'RTL', color: '#FFE66D', stream: 'https://streamcdnb10-dd67e65685984f298c56ae58aedf3b53.msvdn.net/webradio/rtl1025' },
-  { id: 'rds', name: 'RDS', color: '#95E1D3', stream: 'https://stream3.rds.it:8000/rds64k' },
-  { id: 'virgin', name: 'Virgin', color: '#C7CEEA', stream: 'https://streamcdnb10-dd67e65685984f298c56ae58aedf3b53.msvdn.net/webradio/virginradio' },
-  { id: 'radio24', name: 'Radio24', color: '#F38181', stream: 'https://shoutcast.radio24.it:8000/;' },
+  { id: 'capital', name: 'Capital', color: '#FF6B6B', stream: 'https://radiocapital-lh.akamaihd.net/i/RadioCapital_Live_1@196312/master.m3u8' },
+  { id: 'deejay', name: 'DeeJay', color: '#4ECDC4', stream: 'https://radiodeejay-lh.akamaihd.net/i/RadioDeejay_Live_1@189857/master.m3u8' },
+  { id: 'rtl', name: 'RTL', color: '#FFE66D', stream: 'https://streamingv2.shoutcast.com/rtl-1025' },
+  { id: 'rds', name: 'RDS', color: '#95E1D3', stream: 'https://icstream.rds.radio/rds' },
+  { id: 'virgin', name: 'Virgin', color: '#C7CEEA', stream: 'https://icecast.unitedradio.it/Virgin.mp3' },
+  { id: 'radio105', name: 'Radio105', color: '#F38181', stream: 'https://icecast.unitedradio.it/Radio105.mp3' },
 ]
 
 const LS_STATION = 'radio_station'
@@ -43,13 +43,19 @@ export function RadioPlayer() {
   useEffect(() => {
     if (!audioRef.current) return
     audioRef.current.src = currentStation.stream
-    if (playing) audioRef.current.play().catch(() => setPlaying(false))
+    if (playing) audioRef.current.play().catch((err) => {
+      console.warn('[Radio] Play failed on station switch:', currentStation.name, err.message)
+      setPlaying(false)
+    })
   }, [currentStation])
 
   useEffect(() => {
     if (!audioRef.current) return
     if (playing) {
-      audioRef.current.play().catch(() => setPlaying(false))
+      audioRef.current.play().catch((err) => {
+        console.warn('[Radio] Play failed:', currentStation.name, err.message)
+        setPlaying(false)
+      })
     } else {
       audioRef.current.pause()
     }
@@ -60,6 +66,26 @@ export function RadioPlayer() {
       audioRef.current.volume = muted ? 0 : volume
     }
   }, [volume, muted])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    const onError = () => {
+      const code = audio.error?.code
+      const msg = audio.error?.message || 'unknown'
+      console.error('[Radio] Audio error:', currentStation.name, `code=${code}`, msg)
+      setPlaying(false)
+    }
+    const onPlaying = () => {
+      console.log('[Radio] Now playing:', currentStation.name)
+    }
+    audio.addEventListener('error', onError)
+    audio.addEventListener('playing', onPlaying)
+    return () => {
+      audio.removeEventListener('error', onError)
+      audio.removeEventListener('playing', onPlaying)
+    }
+  }, [currentStation])
 
   useEffect(() => {
     if (!expanded) return
@@ -79,7 +105,7 @@ export function RadioPlayer() {
 
   return (
     <div ref={containerRef} className="relative hidden sm:block">
-      <audio ref={audioRef} />
+      <audio ref={audioRef} crossOrigin="anonymous" />
 
       {/* Collapsed pill trigger */}
       <button
