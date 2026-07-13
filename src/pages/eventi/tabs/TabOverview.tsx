@@ -118,18 +118,18 @@ export function TabOverview({ event, progress, completedTasks, totalTasks, budge
 
       {/* Team Section */}
       <div className="md:col-span-2" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
-        <p className="wire-section-title" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--muted)', marginBottom: '10px' }}>Team</p>
+        <p className="wire-section-title" style={{ marginTop: 0 }}>Team</p>
         {event.team.length === 0 ? (
           <p style={{ color: 'var(--muted)', fontSize: 13 }}>Nessun membro nel team</p>
         ) : (
-          <div className="space-y-0">
+          <div className="wire-list-container">
             {event.team.map(memberId => {
               const u = internalUsers.find(x => x.id === memberId)
               if (!u) return null
               const isResp = memberId === event.responsabile
               const roles = teamRolesMap[memberId] || []
               return (
-                <div key={memberId} className="wire-card-sm" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
+                <div key={memberId} className="wire-card-flat" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <img src={u.avatar} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: 13, color: 'var(--text)' }}>{u.nome}</span>
@@ -152,7 +152,7 @@ export function TabOverview({ event, progress, completedTasks, totalTasks, budge
       {/* Task Section */}
       <div className="md:col-span-2" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <p className="wire-section-title" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--muted)' }}>Task</p>
+          <p className="wire-section-title" style={{ marginTop: 0 }}>Task</p>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>{completedTasks}/{totalTasks} completati</span>
         </div>
         {taskList.length === 0 && totalTasks === 0 ? (
@@ -160,9 +160,9 @@ export function TabOverview({ event, progress, completedTasks, totalTasks, budge
         ) : taskList.length === 0 ? (
           <p style={{ color: 'var(--green)', fontSize: 13 }}>Tutti i task completati</p>
         ) : (
-          <div>
+          <div className="wire-list-container">
             {taskList.map(t => (
-              <div key={t.id} className="wire-card-flat" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--line)' }}>
+              <div key={t.id} className="wire-card-flat" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <input type="checkbox" checked={false} onChange={() => handleCheckTask(t.id)} style={{ flexShrink: 0, accentColor: 'var(--red2)' }} />
                 <span style={{ fontSize: 13, flex: 1, color: 'var(--text)' }}>{t.titolo}</span>
                 {t.scadenza && (

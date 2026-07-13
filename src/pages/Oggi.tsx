@@ -178,12 +178,12 @@ export default function Oggi() {
             </span>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div className="wire-list-container">
             {todayTasks.map(task => (
               <TaskCard key={task.id} task={task} isToday navigate={navigate} />
             ))}
             {tomorrowTasks.length > 0 && (
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 8, marginBottom: 4 }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '8px 16px 4px', margin: 0 }}>
                 DOMANI
               </p>
             )}
@@ -265,12 +265,12 @@ export default function Oggi() {
             Tutto il team e presente oggi.
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="wire-list-container">
             {leaves.map(leave => {
               const profile = leave.profiles as any
               const name = profile ? `${profile.first_name} ${profile.last_name}` : 'Collega'
               return (
-                <div key={leave.id} className="wire-card-sm" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
+                <div key={leave.id} className="wire-card-accent-blue" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Palmtree size={14} style={{ color: 'var(--yellow)' }} />
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }}>
                     {name}
@@ -297,14 +297,14 @@ export default function Oggi() {
           Da non perdere
         </h2>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="wire-list-container">
           <button
             onClick={() => navigate('/comunicazioni')}
+            className="wire-card-accent-yellow"
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
-              padding: '12px 16px', borderRadius: 10,
-              background: 'var(--panel-solid)', border: '1px solid var(--line)',
               cursor: 'pointer', width: '100%', textAlign: 'left',
+              background: 'var(--panel)',
             }}
           >
             <Bell size={16} style={{ color: unreadCount > 0 ? 'var(--red2)' : 'var(--muted)' }} />
@@ -328,11 +328,11 @@ export default function Oggi() {
           {isAdmin && (
             <button
               onClick={() => navigate('/amministrazione')}
+              className="wire-card-accent-yellow"
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
-                padding: '12px 16px', borderRadius: 10,
-                background: 'var(--panel-solid)', border: '1px solid var(--line)',
                 cursor: 'pointer', width: '100%', textAlign: 'left',
+                background: 'var(--panel)',
               }}
             >
               <CreditCard size={16} style={{ color: pendingPayments > 0 ? 'var(--yellow)' : 'var(--muted)' }} />
@@ -389,19 +389,14 @@ export default function Oggi() {
 function TaskCard({ task, isToday, navigate }: { task: Task; isToday: boolean; navigate: (p: string) => void }) {
   return (
     <div
-      className="wire-card-accent"
+      className={isToday ? 'wire-card-accent-red' : 'wire-card-accent-yellow'}
       onClick={() => navigate(`/task?id=${task.id}`)}
       style={{
-        padding: '12px 14px',
-        borderRadius: 10,
-        background: 'var(--panel-solid)',
-        border: '1px solid var(--line)',
-        borderLeft: isToday ? '3px solid var(--red2)' : '3px solid var(--yellow)',
         cursor: 'pointer',
         transition: 'background 0.12s',
       }}
       onMouseEnter={e => (e.currentTarget.style.background = 'var(--panel2)')}
-      onMouseLeave={e => (e.currentTarget.style.background = 'var(--panel-solid)')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'var(--panel)')}
     >
       <p style={{
         fontFamily: 'var(--font-serif)',

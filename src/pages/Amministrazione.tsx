@@ -1136,7 +1136,7 @@ export default function Amministrazione() {
                   const prof = p.profiles as any
                   const pmName = prof ? `${prof.first_name ?? ''} ${prof.last_name ?? ''}`.trim() : '—'
                   return (
-                    <div key={p.id} className="wire-card-accent" style={{ background: 'var(--panel2)', borderRadius: 10, padding: '12px 14px' }}>
+                    <div key={p.id} className="wire-card-accent-yellow" style={{ background: 'var(--panel2)' }}>
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>

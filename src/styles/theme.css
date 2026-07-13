@@ -3280,17 +3280,20 @@ html, body {
 
 .wire-card {
   background: var(--panel);
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--line);
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: 8px;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.wire-card:hover { border-color: var(--text); }
+.wire-card:hover {
+  border-color: var(--red2);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
 
 .wire-card-sm {
   background: var(--panel);
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--line);
   border-radius: 10px;
   padding: 10px 14px;
   margin-bottom: 6px;
@@ -3298,17 +3301,54 @@ html, body {
 
 .wire-card-flat {
   background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  padding: 12px 16px;
+  border-bottom: 1.5px solid var(--line);
+  padding: 13px 16px;
+  margin: 0;
 }
+.wire-card-flat:last-child { border-bottom: none; }
 
 .wire-card-accent {
   background: var(--panel);
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--line);
   border-left: 3px solid var(--red2);
   border-radius: 0 10px 10px 0;
   padding: 10px 14px;
   margin-bottom: 6px;
+}
+
+.wire-card-accent-red {
+  background: var(--panel);
+  border: 1.5px solid var(--line);
+  border-left: 3px solid var(--red2);
+  border-radius: 0 10px 10px 0;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+}
+
+.wire-card-accent-yellow {
+  background: var(--panel);
+  border: 1.5px solid var(--line);
+  border-left: 3px solid #E8A020;
+  border-radius: 0 10px 10px 0;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+}
+
+.wire-card-accent-blue {
+  background: var(--panel);
+  border: 1.5px solid var(--line);
+  border-left: 3px solid #378ADD;
+  border-radius: 0 10px 10px 0;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+}
+
+.wire-list-container {
+  background: var(--panel);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 16px;
 }
 
 .wire-section { margin-bottom: 24px; }
@@ -3318,7 +3358,8 @@ html, body {
   letter-spacing: .14em;
   color: var(--muted);
   text-transform: uppercase;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  margin-top: 20px;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--line);
 }

@@ -724,8 +724,8 @@ function SupplierCard({ supplier, onClick }: { supplier: Supplier; onClick: () =
 
   return (
     <div onClick={onClick}
-      className="cursor-pointer transition-all overflow-hidden"
-      style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px' }}
+      className="wire-card cursor-pointer transition-all overflow-hidden"
+      style={{ background: 'var(--panel-solid)' }}
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}>
       {coverUrl && (
@@ -892,9 +892,9 @@ function SupplierContactsSection({ supplierId }: { supplierId: string }) {
       ) : contacts.length === 0 && !showForm ? (
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>Nessun contatto registrato.</p>
       ) : (
-        <div className="space-y-3">
+        <div className="wire-list-container">
           {contacts.map(c => (
-            <div key={c.id} className="flex items-start justify-between gap-3 py-2" style={{ borderBottom: '1px solid var(--line)' }}>
+            <div key={c.id} className="wire-card-flat flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span style={{ fontFamily: 'var(--font-serif)', fontSize: '13px', color: 'var(--text)', fontWeight: 500 }}>{c.nome}</span>

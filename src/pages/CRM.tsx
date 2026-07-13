@@ -410,17 +410,16 @@ function CompanyDetail({ group, onBack, onRefresh, onNavigateToEvent }: CompanyD
           </div>
         </div>
 
-        <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', overflow: 'hidden' }}>
+        <div className="wire-list-container">
           {filteredRefs.length === 0 ? (
             <div className="p-10 text-center" style={{ color: 'var(--muted)' }}>
               <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessun referente trovato</p>
             </div>
           ) : (
-            filteredRefs.map((row, i) => (
+            filteredRefs.map((row) => (
               <div key={row.id}
-                className="flex items-center gap-3 group transition-colors"
-                style={{ padding: '12px 16px', borderBottom: i < filteredRefs.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                className="wire-card-flat flex items-center gap-3 group transition-colors">
                 <div className="flex-shrink-0 flex items-center justify-center"
                   style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--panel2)', fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 600, color: 'var(--muted)' }}>
                   {row.referente ? row.referente.split(' ').map(w => w.charAt(0)).slice(0, 2).join('') : '?'}

@@ -318,7 +318,8 @@ export default function Dossier() {
             <p className="text-sm" style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessun dossier trovato</p>
           </div>
         ) : (
-          filtered.map((p, i) => {
+          <div className="wire-list-container">
+          {filtered.map((p, i) => {
             const dl = daysLeft(p.scadenza)
             const overdue = p.stato !== 'completata' && dl < 0
             const CatIcon = catIcon(p.categoria)
@@ -326,10 +327,8 @@ export default function Dossier() {
             return (
               <button key={p.id}
                 onClick={() => openDetail(p.id)}
-                className="wire-card-sm w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all hover:bg-white/5 group animate-fade-in"
+                className="wire-card-flat w-full flex items-center gap-3 text-left transition-all hover:bg-white/5 group animate-fade-in"
                 style={{
-                  background: 'var(--panel-solid)',
-                  border: `1px solid ${overdue ? 'rgba(255,49,95,0.2)' : 'var(--line)'}`,
                   animationDelay: `${Math.min(i * 30, 300)}ms`,
                 }}>
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -373,6 +372,8 @@ export default function Dossier() {
               </button>
             )
           })
+          }
+          </div>
         )}
       </div>
 

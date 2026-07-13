@@ -374,7 +374,8 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
                 Nessuna conversazione
               </div>
             ) : (
-              filteredConvs.map(conv => {
+              <div className="wire-list-container">
+              {filteredConvs.map(conv => {
                 const isPinned = globalUnread.pinnedIds.includes(conv.id)
                 return (
                   <div key={conv.id} style={{ position: 'relative' }}>
@@ -421,6 +422,8 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
                   </div>
                 )
               })
+              }
+              </div>
             )}
           </div>
         </div>

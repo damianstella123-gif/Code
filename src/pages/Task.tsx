@@ -464,44 +464,46 @@ export default function TaskPage() {
           </div>
         ) : (
           <>
-            {sorted.open.map((task, i) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                index={i}
-                events={allEvents}
-                getInitials={getProfileInitials}
-                getFullName={getProfileName}
-                onCycleStatus={() => cycleStatus(task)}
-                onRowClick={() => setSelectedTaskId(task.id)}
-                onNavigateEvent={evtId => navigate(`/eventi?id=${evtId}`)}
-                isCompleting={completingIds.has(task.id)}
-              />
-            ))}
+            {sorted.open.length > 0 && (
+              <>
+                <div className="wire-section-title">DA FARE ({sorted.open.length})</div>
+                <div className="wire-list-container">
+                  {sorted.open.map((task, i) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      index={i}
+                      events={allEvents}
+                      getInitials={getProfileInitials}
+                      getFullName={getProfileName}
+                      onCycleStatus={() => cycleStatus(task)}
+                      onRowClick={() => setSelectedTaskId(task.id)}
+                      onNavigateEvent={evtId => navigate(`/eventi?id=${evtId}`)}
+                      isCompleting={completingIds.has(task.id)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
             {sorted.done.length > 0 && (
               <>
-                <div style={{
-                  margin: '20px 0 8px', padding: '6px 0',
-                  borderTop: '1px solid var(--line)',
-                  fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 600,
-                  textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)',
-                }}>
-                  COMPLETATI ({sorted.done.length})
+                <div className="wire-section-title">COMPLETATI ({sorted.done.length})</div>
+                <div className="wire-list-container">
+                  {sorted.done.map((task, i) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      index={sorted.open.length + i}
+                      events={allEvents}
+                      getInitials={getProfileInitials}
+                      getFullName={getProfileName}
+                      onCycleStatus={() => cycleStatus(task)}
+                      onRowClick={() => setSelectedTaskId(task.id)}
+                      onNavigateEvent={evtId => navigate(`/eventi?id=${evtId}`)}
+                      isCompleting={false}
+                    />
+                  ))}
                 </div>
-                {sorted.done.map((task, i) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    index={sorted.open.length + i}
-                    events={allEvents}
-                    getInitials={getProfileInitials}
-                    getFullName={getProfileName}
-                    onCycleStatus={() => cycleStatus(task)}
-                    onRowClick={() => setSelectedTaskId(task.id)}
-                    onNavigateEvent={evtId => navigate(`/eventi?id=${evtId}`)}
-                    isCompleting={false}
-                  />
-                ))}
               </>
             )}
           </>
