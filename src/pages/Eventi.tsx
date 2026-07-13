@@ -345,7 +345,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
         )}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} onSuppliersChanged={onSuppliersChanged} />}
         {activeTab === 'budget' && <BudgetTabContainer event={event} suppliers={suppliers} />}
-        {activeTab === 'pagamenti' && <TabPagamenti event={event} suppliers={suppliers} />}
+        {activeTab === 'pagamenti' && <TabPagamenti event={event} suppliers={suppliers} clients={clients} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} />}
         {activeTab === 'programma' && <TabProgramma event={event} suppliers={suppliers} />}

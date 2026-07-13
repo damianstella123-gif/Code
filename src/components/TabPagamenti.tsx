@@ -14,17 +14,19 @@ import {
 } from '@/lib/event-payments-service'
 import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
+import type { Client } from '@/data/clients'
 
 interface Props {
   event: Event
   suppliers: Supplier[]
+  clients?: Client[]
 }
 
 function fmtEuro(n: number): string {
   return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
-export default function TabPagamenti({ event, suppliers }: Props) {
+export default function TabPagamenti({ event, suppliers, clients = [] }: Props) {
   const [payments, setPayments] = useState<EventPayment[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -46,7 +48,6 @@ export default function TabPagamenti({ event, suppliers }: Props) {
     return () => { supabase.removeChannel(channel) }
   }, [event.id, load])
 
-  // Auto-suggest on first load if empty
   useEffect(() => {
     if (!loading && payments.length === 0 && event.budget > 0) {
       autoSuggest()
@@ -158,6 +159,7 @@ export default function TabPagamenti({ event, suppliers }: Props) {
           eventId={event.id}
           eventName={event.nome}
           suppliers={suppliers}
+          clients={clients}
           onDone={() => { setShowForm(false); load() }}
           onCancel={() => setShowForm(false)}
         />
@@ -244,18 +246,20 @@ function StatoBadge({ stato }: { stato: string }) {
   )
 }
 
-function PaymentForm({ eventId, eventName, suppliers, onDone, onCancel }: {
+function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel }: {
   eventId: string
   eventName: string
   suppliers: Supplier[]
+  clients: Client[]
   onDone: () => void
   onCancel: () => void
 }) {
-  const [tipo, setTipo] = useState<'incasso_cliente' | 'pagamento_fornitore'>('incasso_cliente')
+  const [tipo, setTipo] = useState<'incasso_cliente' | 'pagamento_fornitore'>('pagamento_fornitore')
   const [descrizione, setDescrizione] = useState('')
   const [importo, setImporto] = useState('')
   const [dataScadenza, setDataScadenza] = useState(todayISO())
   const [supplierId, setSupplierId] = useState('')
+  const [clientId, setClientId] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [soglia, setSoglia] = useState(2000)
@@ -264,6 +268,10 @@ function PaymentForm({ eventId, eventName, suppliers, onDone, onCancel }: {
   const [supplierSearch, setSupplierSearch] = useState('')
   const [supplierOpen, setSupplierOpen] = useState(false)
   const [supplierLabel, setSupplierLabel] = useState('')
+
+  const [clientSearch, setClientSearch] = useState('')
+  const [clientOpen, setClientOpen] = useState(false)
+  const [clientLabel, setClientLabel] = useState('')
 
   useEffect(() => {
     supabase.from('cashflow_config').select('soglia_autonomia_pm_eur').limit(1).maybeSingle()
@@ -279,6 +287,10 @@ function PaymentForm({ eventId, eventName, suppliers, onDone, onCancel }: {
       ).slice(0, 8)
     : []
 
+  const filteredClients = clientSearch.length > 0
+    ? clients.filter(c => c.nome.toLowerCase().includes(clientSearch.toLowerCase())).slice(0, 8)
+    : []
+
   useEffect(() => {
     if (!supplierOpen) return
     const close = () => setSupplierOpen(false)
@@ -287,20 +299,53 @@ function PaymentForm({ eventId, eventName, suppliers, onDone, onCancel }: {
   }, [supplierOpen])
 
   useEffect(() => {
+    if (!clientOpen) return
+    const close = () => setClientOpen(false)
+    const timer = setTimeout(() => document.addEventListener('mousedown', close), 0)
+    return () => { clearTimeout(timer); document.removeEventListener('mousedown', close) }
+  }, [clientOpen])
+
+  useEffect(() => {
     if (tipo !== 'pagamento_fornitore') {
       setSupplierId('')
       setSupplierLabel('')
       setSupplierSearch('')
       setSupplierOpen(false)
     }
+    if (tipo !== 'incasso_cliente') {
+      setClientId('')
+      setClientLabel('')
+      setClientSearch('')
+      setClientOpen(false)
+    }
   }, [tipo])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!descrizione.trim() || !importo) return
+
+    if (tipo === 'pagamento_fornitore' && !supplierId) {
+      showToast('Seleziona un fornitore per l\'uscita', 'error')
+      return
+    }
+
     setSaving(true)
     const user = await loadUser()
     const statoApprovazione = needsApproval ? 'in_attesa' : 'autonomo'
+
+    const soggetto = tipo === 'pagamento_fornitore'
+      ? suppliers.find(s => s.id === supplierId)?.nome || ''
+      : clients.find(c => c.id === clientId)?.nome || ''
+
+    console.log('%c PAGAMENTO', 'background: #222; color: #0f0; font-size: 14px; padding: 4px 8px;', {
+      tipo,
+      direzione: tipo === 'pagamento_fornitore' ? 'USCITA (soldi escono)' : 'ENTRATA (soldi entrano)',
+      fornitore: tipo === 'pagamento_fornitore' ? soggetto : null,
+      cliente: tipo === 'incasso_cliente' ? soggetto : null,
+      importo: Number(importo),
+      evento: eventName,
+    })
+
     const result = await insertPayment({
       event_id: eventId,
       tipo,
@@ -353,29 +398,62 @@ function PaymentForm({ eventId, eventName, suppliers, onDone, onCancel }: {
         <button type="button" onClick={onCancel} className="p-1 rounded hover:opacity-70"><X className="w-4 h-4" /></button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Tipo</label>
-          <select value={tipo} onChange={e => setTipo(e.target.value as any)} style={inputStyle}>
-            <option value="incasso_cliente">Incasso cliente</option>
-            <option value="pagamento_fornitore">Pagamento fornitore</option>
-          </select>
+      {/* Tipo radio buttons */}
+      <div>
+        <label className="text-xs mb-2 block" style={{ color: 'var(--muted)' }}>Tipo movimento</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setTipo('incasso_cliente')}
+            className="flex items-center justify-center gap-2 p-3 rounded-lg transition-all"
+            style={{
+              border: tipo === 'incasso_cliente' ? '2px solid var(--green)' : '1px solid var(--line)',
+              background: tipo === 'incasso_cliente' ? 'color-mix(in srgb, var(--green) 10%, transparent)' : 'transparent',
+              color: tipo === 'incasso_cliente' ? 'var(--green)' : 'var(--muted)',
+              fontWeight: tipo === 'incasso_cliente' ? 600 : 400,
+            }}
+          >
+            <ArrowDownLeft className="w-4 h-4" />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '.03em' }}>ENTRATA</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTipo('pagamento_fornitore')}
+            className="flex items-center justify-center gap-2 p-3 rounded-lg transition-all"
+            style={{
+              border: tipo === 'pagamento_fornitore' ? '2px solid var(--red2)' : '1px solid var(--line)',
+              background: tipo === 'pagamento_fornitore' ? 'color-mix(in srgb, var(--red2) 10%, transparent)' : 'transparent',
+              color: tipo === 'pagamento_fornitore' ? 'var(--red2)' : 'var(--muted)',
+              fontWeight: tipo === 'pagamento_fornitore' ? 600 : 400,
+            }}
+          >
+            <ArrowUpRight className="w-4 h-4" />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '.03em' }}>USCITA</span>
+          </button>
         </div>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6, fontStyle: 'italic' }}>
+          {tipo === 'incasso_cliente' ? 'Incasso da cliente (soldi entrano)' : 'Pagamento a fornitore (soldi escono)'}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Importo</label>
           <input type="number" min="0" step="0.01" value={importo} onChange={e => setImporto(e.target.value)} placeholder="0.00" style={inputStyle} required />
-        </div>
-        <div className="md:col-span-2">
-          <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Descrizione</label>
-          <input type="text" value={descrizione} onChange={e => setDescrizione(e.target.value)} placeholder="Es. Acconto hotel..." style={inputStyle} required />
         </div>
         <div>
           <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Data scadenza</label>
           <input type="date" value={dataScadenza} onChange={e => setDataScadenza(e.target.value)} style={inputStyle} required />
         </div>
+        <div className="md:col-span-2">
+          <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Descrizione</label>
+          <input type="text" value={descrizione} onChange={e => setDescrizione(e.target.value)} placeholder="Es. Acconto hotel..." style={inputStyle} required />
+        </div>
+
+        {/* Supplier selector for USCITA */}
         {tipo === 'pagamento_fornitore' && (
-          <div>
-            <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Fornitore</label>
+          <div className="md:col-span-2">
+            <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Fornitore *</label>
             <div style={{ position: 'relative' }} onMouseDown={e => e.stopPropagation()}>
               <input
                 type="text"
@@ -434,7 +512,70 @@ function PaymentForm({ eventId, eventName, suppliers, onDone, onCancel }: {
             </div>
           </div>
         )}
-        <div className={tipo === 'pagamento_fornitore' ? 'md:col-span-2' : ''}>
+
+        {/* Client selector for ENTRATA */}
+        {tipo === 'incasso_cliente' && clients.length > 0 && (
+          <div className="md:col-span-2">
+            <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Cliente</label>
+            <div style={{ position: 'relative' }} onMouseDown={e => e.stopPropagation()}>
+              <input
+                type="text"
+                value={clientLabel}
+                onChange={e => {
+                  setClientLabel(e.target.value)
+                  setClientSearch(e.target.value)
+                  setClientId('')
+                  setClientOpen(true)
+                }}
+                onFocus={() => setClientOpen(true)}
+                placeholder="Cerca cliente..."
+                style={inputStyle}
+                autoComplete="off"
+              />
+              {clientOpen && filteredClients.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0, right: 0,
+                  zIndex: 50,
+                  background: 'var(--panel-solid, var(--bg2))',
+                  border: '1px solid var(--line)',
+                  borderRadius: 12,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  maxHeight: 220,
+                  overflowY: 'auto',
+                }} onMouseDown={e => e.stopPropagation()}>
+                  {filteredClients.map(c => (
+                    <div
+                      key={c.id}
+                      onClick={() => {
+                        setClientId(c.id)
+                        setClientLabel(c.nome)
+                        setClientSearch('')
+                        setClientOpen(false)
+                      }}
+                      style={{
+                        padding: '10px 14px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid var(--line)',
+                        fontSize: 13,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--panel2, var(--bg3))')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <div style={{ fontWeight: 500, color: 'var(--text)' }}>{c.nome}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                        {c.settore || ''}{c.citta ? ` \u00B7 ${c.citta}` : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="md:col-span-2">
           <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Note</label>
           <input type="text" value={note} onChange={e => setNote(e.target.value)} placeholder="Opzionale" style={inputStyle} />
         </div>
