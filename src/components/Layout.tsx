@@ -470,6 +470,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
             <OnlineUsers />
           </div>
           <ThemeToggleButton />
+          <RadioPlayer />
           <div className="relative">
             <button
               id="notif-btn"
@@ -854,7 +855,6 @@ export default function Layout({ children }: { children: ReactNode }) {
           </main>
         </div>
         <BottomNav />
-        <RadioPlayer />
         <PinnedChats />
         <QuickActions />
         {showOnboarding && (
