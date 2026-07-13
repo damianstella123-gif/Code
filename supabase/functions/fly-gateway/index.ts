@@ -255,6 +255,20 @@ function futureISO(days: number) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const idCache = new Map<string, string>();
+async function getName(table: string, id: string | null | undefined, sb: ReturnType<typeof createClient>): Promise<string> {
+  if (!id) return "—";
+  const key = `${table}:${id}`;
+  if (idCache.has(key)) return idCache.get(key)!;
+  try {
+    const { data } = await sb.from(table).select("title,name,first_name,last_name").eq("id", id).maybeSingle();
+    if (!data) { idCache.set(key, id); return id; }
+    const n = (data as any).title || (data as any).name || ((data as any).first_name && (data as any).last_name ? `${(data as any).first_name} ${(data as any).last_name}` : (data as any).first_name) || id;
+    idCache.set(key, n);
+    return n;
+  } catch { idCache.set(key, id); return id; }
+}
+
 async function executeTool(
   name: string,
   input: Record<string, unknown>,
@@ -266,7 +280,7 @@ async function executeTool(
     case "get_events": {
       let q = supabase
         .from("events")
-        .select("id, title, start_date, end_date, location, status, budget, attendees, client")
+        .select("id, title, start_date, end_date, location, status, budget, attendees, client, project_manager_id")
         .or("archiviato.is.null,archiviato.eq.false")
         .order("start_date", { ascending: true })
         .limit(30);
@@ -282,8 +296,8 @@ async function executeTool(
       const { data, error } = await q;
       if (error) return JSON.stringify({ error: error.message });
       if (!data || data.length === 0) return "Nessun evento trovato con questi filtri.";
-      return JSON.stringify(
-        data.map((e) => ({
+      const enriched = await Promise.all(
+        data.map(async (e) => ({
           id: e.id,
           nome: e.title,
           data_inizio: e.start_date,
@@ -293,8 +307,11 @@ async function executeTool(
           budget: e.budget,
           partecipanti: e.attendees,
           cliente: e.client,
+          cliente_nome: await getName("clients", e.client, supabase),
+          pm_nome: await getName("profiles", e.project_manager_id, supabase),
         }))
       );
+      return JSON.stringify(enriched);
     }
 
     case "get_tasks": {
@@ -318,18 +335,21 @@ async function executeTool(
       const { data, error } = await q;
       if (error) return JSON.stringify({ error: error.message });
       if (!data || data.length === 0) return "Nessun task trovato con questi filtri.";
-      return JSON.stringify(
-        data.map((t) => ({
+      const enriched = await Promise.all(
+        data.map(async (t) => ({
           id: t.id,
           titolo: t.title,
           scadenza: t.due_date,
           stato: t.status,
           priorita: t.priority,
           assegnatario: t.assigned_to,
+          assegnato_a_nome: await getName("profiles", t.assigned_to, supabase),
           evento_id: t.event_id,
+          evento_nome: await getName("events", t.event_id, supabase),
           fase: t.fase,
         }))
       );
+      return JSON.stringify(enriched);
     }
 
     case "get_clients": {
@@ -479,31 +499,33 @@ async function executeTool(
       const results: unknown[] = [];
 
       if (tasksRes.data?.length) {
-        results.push(
-          ...tasksRes.data.map((t) => ({
+        for (const t of tasksRes.data) {
+          results.push({
             tipo: "task",
             titolo: t.title,
             scadenza: t.due_date,
             stato: t.status,
             priorita: t.priority,
             assegnatario: t.assigned_to,
+            assegnato_a_nome: await getName("profiles", t.assigned_to, supabase),
             scaduto: t.due_date < today,
-          }))
-        );
+          });
+        }
       }
 
       if (practicesRes.data?.length) {
-        results.push(
-          ...practicesRes.data.map((p) => ({
+        for (const p of practicesRes.data) {
+          results.push({
             tipo: "dossier",
             titolo: p.title,
             scadenza: p.due_date,
             stato: p.status,
             priorita: p.priority,
             responsabile: p.responsible,
+            responsabile_nome: await getName("profiles", p.responsible, supabase),
             scaduto: p.due_date < today,
-          }))
-        );
+          });
+        }
       }
 
       if (fattureRes.data?.length) {
@@ -521,17 +543,18 @@ async function executeTool(
       }
 
       if (paymentsRes.data?.length) {
-        results.push(
-          ...paymentsRes.data.map((p) => ({
+        for (const p of paymentsRes.data) {
+          results.push({
             tipo: p.tipo === "incasso_cliente" ? "incasso_evento" : "pagamento_fornitore_evento",
             descrizione: p.descrizione,
             importo: p.importo,
             scadenza: p.data_scadenza,
             stato: p.data_scadenza < today ? "in_ritardo" : p.stato,
             event_id: p.event_id,
+            evento_nome: await getName("events", p.event_id, supabase),
             scaduto: p.data_scadenza < today,
-          }))
-        );
+          });
+        }
       }
 
       if (results.length === 0)
@@ -2128,7 +2151,7 @@ Deno.serve(async (req: Request) => {
 
     const systemPrompt = `Sei Fly, Chief of Staff digitale di Simmetria Synergy (agenzia eventi corporate). Rispondi in italiano, sintetico e preciso. Usa i tool per dati reali, non inventare mai. Segnala criticita. Non decidere: proponi.
 
-STILE: max 5 voci negli elenchi, chiudi con "...e altri N". No tabelle, no markdown pesante. Una frase di risposta, poi solo dettagli utili.
+STILE: max 5 voci negli elenchi, chiudi con "...e altri N". No tabelle, no markdown pesante. Una frase di risposta, poi solo dettagli utili. Usa sempre i campi *_nome (cliente_nome, pm_nome, assegnato_a_nome, evento_nome, responsabile_nome) al posto degli ID nelle risposte all'utente.
 
 AZIONI: usa tool propose_* per proposte. Presenta riepilogo e chiedi conferma. Mai scrivere nel DB senza conferma.
 
