@@ -3,6 +3,7 @@ import GlobalSearch from '@/components/GlobalSearch'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import Onboarding from '@/components/Onboarding'
 import QuickActions from '@/components/QuickActions'
+import { RadioPlayer } from '@/components/RadioPlayer'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -846,6 +847,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           </main>
         </div>
         <BottomNav />
+        <RadioPlayer />
         <PinnedChats />
         <QuickActions />
         {showOnboarding && (
