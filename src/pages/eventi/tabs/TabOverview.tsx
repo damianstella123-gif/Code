@@ -6,10 +6,34 @@ import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Client } from '@/data/clients'
 import type { Uscita } from '@/data/amministrazione'
+import type { Messaggio } from '@/data/comunicazioni'
 import type { InternalUser } from '../shared-types'
 import { EventEconomicSummary } from '../EventEconomicSummary'
 
-export function TabOverview({ event, progress, completedTasks, totalTasks, budgets, clients, onClientClick, internalUsers }: {
+function getTimeline(event: Event) {
+  const start = new Date(event.dataInizio)
+  const end = new Date(event.dataFine)
+  const now = new Date()
+  return [
+    { id: 'plan', label: 'Avvio Pianificazione', data: fmtShort(new Date(start.getTime() - 60 * 86400000).toISOString()), completato: now > new Date(start.getTime() - 60 * 86400000), inRitardo: false },
+    { id: 'fornitori', label: 'Conferma Fornitori', data: fmtShort(new Date(start.getTime() - 30 * 86400000).toISOString()), completato: now > new Date(start.getTime() - 30 * 86400000), inRitardo: !now.valueOf() && now > new Date(start.getTime() - 30 * 86400000) },
+    { id: 'brief', label: 'Briefing Team', data: fmtShort(new Date(start.getTime() - 7 * 86400000).toISOString()), completato: now > new Date(start.getTime() - 7 * 86400000), inRitardo: false },
+    { id: 'start', label: 'Inizio Evento', data: fmtShort(event.dataInizio), completato: now >= start, inRitardo: false },
+    { id: 'end', label: 'Fine Evento', data: fmtShort(event.dataFine), completato: now > end, inRitardo: false },
+    { id: 'report', label: 'Report & Fatturazione', data: fmtShort(new Date(end.getTime() + 7 * 86400000).toISOString()), completato: now > new Date(end.getTime() + 7 * 86400000), inRitardo: now > new Date(end.getTime() + 14 * 86400000) && !(now > new Date(end.getTime() + 7 * 86400000)) },
+  ]
+}
+
+function formatMsgDate(iso: string) {
+  const d = new Date(iso)
+  const now = new Date()
+  const diff = now.getTime() - d.getTime()
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m fa`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h fa`
+  return fmtShort(iso)
+}
+
+export function TabOverview({ event, progress, completedTasks, totalTasks, budgets, clients, onClientClick, internalUsers, comunicazioni }: {
   event: Event
   progress: number
   completedTasks: number
@@ -18,6 +42,7 @@ export function TabOverview({ event, progress, completedTasks, totalTasks, budge
   clients: Client[]
   onClientClick?: (clientName: string) => void
   internalUsers: InternalUser[]
+  comunicazioni?: Messaggio[]
 }) {
   const eventUscite = budgets.filter(u => u.eventoId === event.id)
   const totUscite = eventUscite.reduce((s, u) => s + u.importo, 0)
@@ -178,6 +203,64 @@ export function TabOverview({ event, progress, completedTasks, totalTasks, budge
           </div>
         )}
       </div>
+
+      {/* ══════ TIMELINE ══════ */}
+      <div className="md:col-span-2">
+        <div className="wire-section-title" style={{ marginTop: 24 }}>TIMELINE</div>
+        <div className="wire-list-container">
+          {getTimeline(event).map(m => (
+            <div key={m.id} className="wire-card-flat" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+                background: m.completato ? 'var(--green)' : m.inRitardo ? 'var(--red2)' : 'var(--blue)' }} />
+              <div style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>{m.label}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: m.inRitardo ? 'var(--red2)' : 'var(--muted)' }}>
+                {m.data}
+              </div>
+              {m.completato && (
+                <span style={{ fontSize: 9, color: 'var(--green)', fontFamily: 'var(--font-mono)' }}>done</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ══════ COMUNICAZIONI ══════ */}
+      {comunicazioni && comunicazioni.length > 0 && (
+        <div className="md:col-span-2">
+          <div className="wire-section-title" style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>COMUNICAZIONI</span>
+            {comunicazioni.length > 0 && (
+              <span style={{ background: 'var(--red2)', color: 'white', fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, fontFamily: 'var(--font-mono)' }}>
+                {comunicazioni.length} messaggi
+              </span>
+            )}
+          </div>
+          <div className="wire-list-container">
+            {comunicazioni.slice(0, 3).map(msg => (
+              <div key={msg.id} className="wire-card-flat" style={{ display: 'flex', gap: 10 }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                  background: 'var(--red2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 600, color: 'white' }}>
+                  {msg.mittente?.[0] || '?'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+                      {msg.oggetto || 'Messaggio'}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)' }}>
+                      {formatMsgDate(msg.data)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {msg.corpo}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

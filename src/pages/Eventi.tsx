@@ -38,8 +38,6 @@ import { TabOverview } from './eventi/tabs/TabOverview'
 import { TabFornitori } from './eventi/tabs/TabFornitori'
 import { TabProgramma } from './eventi/tabs/TabProgramma'
 import { TabDocumenti } from './eventi/tabs/TabDocumenti'
-import { TabComunicazioni } from './eventi/tabs/TabComunicazioni'
-import { TabTimeline } from './eventi/tabs/TabTimeline'
 import { TabGreenReport } from './eventi/tabs/TabGreenReport'
 
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
@@ -146,7 +144,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
     return () => window.removeEventListener('set-event-tab', handler)
   }, [])
 
-  const eventMsg = comunicazioni.filter(m => m.eventoId === event.id)
+  const eventComunicazioni = comunicazioni.filter(m => m.eventoId === event.id)
   const eventSuppliers = suppliers.filter(s => s.eventiId.includes(event.id))
 
   const completedTasks = eventTasks.filter(t => t.stato === 'completato').length
@@ -166,9 +164,7 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
     { id: 'budget', label: 'Budget' },
     { id: 'pagamenti', label: 'Pagamenti' },
     { id: 'documenti', label: 'Documenti' },
-    { id: 'comunicazioni', label: `Comunicazioni${eventMsg.length > 0 ? ` (${eventMsg.length})` : ''}` },
     { id: 'green', label: 'Green Report' },
-    { id: 'timeline', label: 'Timeline' },
   ]
 
   const daysEnd = daysLeft(event.dataFine)
@@ -308,16 +304,14 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
       {/* Tab Content */}
       <div key={activeTab} className="animate-fade-in">
         {activeTab === 'overview' && (
-          <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} clients={clients} onClientClick={navigateToCrm} internalUsers={internalUsers} />
+          <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} clients={clients} onClientClick={navigateToCrm} internalUsers={internalUsers} comunicazioni={eventComunicazioni} />
         )}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} onSuppliersChanged={onSuppliersChanged} />}
         {activeTab === 'budget' && <BudgetTabContainer event={event} suppliers={suppliers} />}
         {activeTab === 'pagamenti' && <TabPagamenti event={event} suppliers={suppliers} />}
-        {activeTab === 'comunicazioni' && <TabComunicazioni event={event} comunicazioni={comunicazioni} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} />}
         {activeTab === 'programma' && <TabProgramma event={event} suppliers={suppliers} />}
         {activeTab === 'green' && <TabGreenReport event={event} suppliers={suppliers} />}
-        {activeTab === 'timeline' && <TabTimeline event={event} />}
       </div>
     </div>
   )
