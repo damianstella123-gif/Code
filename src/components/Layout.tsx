@@ -259,6 +259,7 @@ function NotificationCard({ notification: n, onAction, onClick }: {
 
   return (
     <div
+      className="wire-card-sm"
       onClick={onClick}
       style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid var(--line)', transition: 'background .15s' }}
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--panel2)' }}

@@ -549,7 +549,7 @@ function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus,
 
   return (
     <div
-      className={`animate-fade-in${isCompleting ? ' task-completing' : ''}`}
+      className={`wire-card-flat animate-fade-in${isCompleting ? ' task-completing' : ''}`}
       onClick={onRowClick}
       style={{
         display: 'flex', alignItems: 'center', gap: '12px',

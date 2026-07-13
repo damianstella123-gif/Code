@@ -3276,3 +3276,50 @@ html, body {
   }
 }
 
+/* ─── WIRE CARD SYSTEM ────────────────────────────────────────────────────── */
+
+.wire-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  transition: border-color 0.15s;
+}
+.wire-card:hover { border-color: var(--text); }
+
+.wire-card-sm {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+}
+
+.wire-card-flat {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  padding: 12px 16px;
+}
+
+.wire-card-accent {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--red2);
+  border-radius: 0 10px 10px 0;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+}
+
+.wire-section { margin-bottom: 24px; }
+.wire-section-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .14em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+

@@ -326,7 +326,7 @@ export default function Dossier() {
             return (
               <button key={p.id}
                 onClick={() => openDetail(p.id)}
-                className="w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all hover:bg-white/5 group animate-fade-in"
+                className="wire-card-sm w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all hover:bg-white/5 group animate-fade-in"
                 style={{
                   background: 'var(--panel-solid)',
                   border: `1px solid ${overdue ? 'rgba(255,49,95,0.2)' : 'var(--line)'}`,

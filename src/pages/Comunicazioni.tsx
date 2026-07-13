@@ -379,7 +379,7 @@ function ChatView({ currentUserId, onSwitchToArchive }: ChatViewProps) {
                 return (
                   <div key={conv.id} style={{ position: 'relative' }}>
                     <button
-                      className={`chat-conv-item ${activeConvId === conv.id ? 'chat-conv-item--active' : ''}`}
+                      className={`wire-card-flat chat-conv-item ${activeConvId === conv.id ? 'chat-conv-item--active' : ''}`}
                       onClick={() => setActiveConvId(conv.id)}
                     >
                       <div className="chat-conv-avatar" style={{ position: 'relative' }}>

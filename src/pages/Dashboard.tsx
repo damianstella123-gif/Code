@@ -390,7 +390,7 @@ export default function Dashboard() {
           {filteredStories.map((s, i) => (
             <button
               key={s.id}
-              className="wire-story"
+              className="wire-card wire-story"
               style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
               onClick={s.action}
             >

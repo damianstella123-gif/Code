@@ -657,7 +657,7 @@ function FlyInsightsSection({ userRows }: {
           {insights.map((card, idx) => {
             const initials = card.nome.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase()
             return (
-              <div key={idx} style={{ border: '1px solid var(--line)', borderRadius: '12px', padding: '16px', position: 'relative' }}>
+              <div key={idx} className="wire-card-sm" style={{ border: '1px solid var(--line)', borderRadius: '12px', padding: '16px', position: 'relative' }}>
                 <span style={{ position: 'absolute', top: '10px', right: '12px', fontSize: '14px', opacity: 0.4 }}>
                   FLY
                 </span>

@@ -675,7 +675,7 @@ export default function CRM() {
             {filtered.map((group) => (
               <div
                 key={group.companyName}
-                className="cursor-pointer animate-fade-in"
+                className="wire-card cursor-pointer animate-fade-in"
                 style={{
                   background: 'var(--panel-solid)',
                   border: '1px solid var(--line)',

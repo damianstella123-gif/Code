@@ -208,6 +208,7 @@ export default function Oggi() {
 
         {nextEvent ? (
           <div
+            className="wire-card"
             onClick={() => navigate(`/eventi?id=${nextEvent.id}`)}
             style={{
               padding: 20,
@@ -269,7 +270,7 @@ export default function Oggi() {
               const profile = leave.profiles as any
               const name = profile ? `${profile.first_name} ${profile.last_name}` : 'Collega'
               return (
-                <div key={leave.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
+                <div key={leave.id} className="wire-card-sm" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
                   <Palmtree size={14} style={{ color: 'var(--yellow)' }} />
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }}>
                     {name}
@@ -388,6 +389,7 @@ export default function Oggi() {
 function TaskCard({ task, isToday, navigate }: { task: Task; isToday: boolean; navigate: (p: string) => void }) {
   return (
     <div
+      className="wire-card-accent"
       onClick={() => navigate(`/task?id=${task.id}`)}
       style={{
         padding: '12px 14px',
