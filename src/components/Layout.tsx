@@ -29,6 +29,7 @@ import {
   MoreHorizontal,
   Sun,
   Moon,
+  Archive,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
@@ -57,6 +58,7 @@ const iconMap: Record<string, React.ElementType> = {
   '/comunicazioni': MessageSquare,
   '/workflow': GitBranch,
   '/dossier': FileText,
+  '/archivio': Archive,
   '/utenti': UserCog,
   '/impostazioni': SlidersHorizontal,
   '/feedback-beta': MessageCircle,
@@ -67,7 +69,7 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
   { label: 'Operativo', paths: ['/eventi', '/task', '/calendario', '/fornitori'] },
   { label: 'Business', paths: ['/crm', '/amministrazione'] },
   { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
-  { label: 'Sistema', paths: ['/workflow', '/dossier', '/utenti', '/performance', '/impostazioni', '/feedback-beta'] },
+  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/performance', '/impostazioni', '/feedback-beta'] },
 ]
 
 interface SidebarProps {

@@ -108,6 +108,7 @@ const ALL_NAV: NavItem[] = [
   { name: 'Creative Studio', href: '/creative-studio' },
   { name: 'Presentazioni', href: '/presentazioni' },
   { name: 'Dossier', href: '/dossier' },
+  { name: 'Archivio', href: '/archivio' },
   { name: 'Comunicazioni', href: '/comunicazioni' },
   { name: 'Workflow', href: '/workflow' },
   { name: 'Utenti', href: '/utenti' },
@@ -145,7 +146,7 @@ export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
 
   // Any other role: basic access
   return ALL_NAV.filter(item =>
-    !['/amministrazione', '/utenti', '/performance'].includes(item.href)
+    !['/amministrazione', '/utenti', '/performance', '/archivio'].includes(item.href)
   )
 }
 

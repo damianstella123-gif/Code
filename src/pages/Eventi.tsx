@@ -8,10 +8,11 @@ import {
   Plus,
   Edit3,
   Trash2,
+  Archive,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { loadTasksFromStorage, cacheEventsSnapshot, loadWorkflowsFromStorage } from '@/lib/storage'
-import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote } from '@/lib/events-service'
+import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote, archiveEvent } from '@/lib/events-service'
 import { fetchTasksByEvent } from '@/lib/tasks-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchBudgets } from '@/lib/budgets-service'
@@ -117,6 +118,7 @@ interface EventDetailProps {
   onBack: () => void
   onEdit: (event: Event) => void
   onDelete: (event: Event) => void
+  onArchive: (event: Event) => void
   onStatusChange: (event: Event, newStato: StatoEvento) => void
   budgets: Uscita[]
   suppliers: Supplier[]
@@ -126,7 +128,7 @@ interface EventDetailProps {
   onSuppliersChanged: () => void
 }
 
-function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets, suppliers, comunicazioni, internalUsers, clients, onSuppliersChanged }: EventDetailProps) {
+function EventDetail({ event, onBack, onEdit, onDelete, onArchive, onStatusChange, budgets, suppliers, comunicazioni, internalUsers, clients, onSuppliersChanged }: EventDetailProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [eventTasks, setEventTasks] = useState<Task[]>([])
   const navigateRouter = useNavigate()
@@ -228,6 +230,16 @@ function EventDetail({ event, onBack, onEdit, onDelete, onStatusChange, budgets,
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
+            {isOver && (
+              <button onClick={() => onArchive(event)}
+                title="Archivia evento"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
+              >
+                <Archive className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -487,6 +499,17 @@ export default function Eventi() {
     }
   }, [refreshEvents, selectedEvent, showToast])
 
+  const handleArchive = useCallback(async (event: Event) => {
+    const user = loadUser()
+    if (!user) return
+    const allowedRoles = ['Project Manager', 'Senior PM', 'Admin', 'Super Admin']
+    if (!allowedRoles.includes(user.role)) return
+    await archiveEvent(event.id, user.id)
+    showToast('Evento archiviato', 'success')
+    setSelectedEvent(null)
+    refreshEvents()
+  }, [refreshEvents, showToast])
+
   const visibleEvents = useMemo(() => {
     if (!currentUser) return []
     return getVisibleEvents(currentUser.ruolo, currentUser.id, eventList)
@@ -541,6 +564,7 @@ export default function Eventi() {
           onBack={() => setSelectedEvent(null)}
           onEdit={(evt) => { setEditingEvent(evt); setShowForm(true) }}
           onDelete={(evt) => setDeletingEvent(evt)}
+          onArchive={handleArchive}
           onStatusChange={handleStatusChange}
           budgets={budgets}
           suppliers={suppliers}

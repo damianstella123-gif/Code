@@ -19,6 +19,7 @@ const Amministrazione = lazy(() => import('./pages/Amministrazione'))
 const Comunicazioni = lazy(() => import('./pages/Comunicazioni'))
 const Workflow = lazy(() => import('./pages/Workflow'))
 const Dossier = lazy(() => import('./pages/Dossier'))
+const Archivio = lazy(() => import('./pages/Archivio'))
 const CreativeStudio = lazy(() => import('./pages/CreativeStudio'))
 const Utenti = lazy(() => import('./pages/Utenti'))
 const Impostazioni = lazy(() => import('./pages/Impostazioni'))
@@ -251,8 +252,7 @@ export default function App() {
       <Route path="/comunicazioni" element={<AuthGuard><Layout><LazyPage><Comunicazioni /></LazyPage></Layout></AuthGuard>} />
       <Route path="/workflow" element={<AuthGuard><Layout><LazyPage><Workflow /></LazyPage></Layout></AuthGuard>} />
       <Route path="/dossier" element={<AuthGuard><Layout><LazyPage><Dossier /></LazyPage></Layout></AuthGuard>} />
-      <Route path="/pratiche" element={<Navigate to="/dossier" replace />} />
-      <Route path="/archivio" element={<Navigate to="/dossier" replace />} />
+      <Route path="/archivio" element={<AuthGuard><Layout><LazyPage><Archivio /></LazyPage></Layout></AuthGuard>} />
       <Route path="/creative-studio" element={<AuthGuard><Layout><LazyPage><CreativeStudio /></LazyPage></Layout></AuthGuard>} />
       <Route path="/utenti" element={<AuthGuard><Layout><LazyPage><Utenti /></LazyPage></Layout></AuthGuard>} />
       <Route path="/impostazioni" element={<AuthGuard><Layout><LazyPage><Impostazioni /></LazyPage></Layout></AuthGuard>} />

@@ -267,6 +267,7 @@ async function executeTool(
       let q = supabase
         .from("events")
         .select("id, title, start_date, end_date, location, status, budget, attendees, client")
+        .or("archiviato.is.null,archiviato.eq.false")
         .order("start_date", { ascending: true })
         .limit(30);
 

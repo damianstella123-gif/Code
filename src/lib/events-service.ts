@@ -23,6 +23,7 @@ interface EventRow {
   team_member_ids: string[]
   created_at: string
   updated_at: string
+  archiviato_da?: string | null
 }
 
 function rowToEvent(r: EventRow): Event {
@@ -73,6 +74,7 @@ export async function fetchEvents(): Promise<Event[]> {
   const { data, error } = await supabase
     .from('events')
     .select('*')
+    .or('archiviato.is.null,archiviato.eq.false')
     .order('created_at', { ascending: false })
     .limit(500)
   if (error) {
@@ -153,6 +155,46 @@ export async function deleteEvent(id: string): Promise<boolean> {
   }
   invalidateCache('events_list')
   return true
+}
+
+export type ArchivedEvent = Event & { archiviato_da?: string | null }
+
+export async function fetchArchivedEvents(): Promise<ArchivedEvent[]> {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('archiviato', true)
+    .order('end_date', { ascending: false })
+    .limit(500)
+  if (error) {
+    logError('events-service', 'fetchArchivedEvents', error)
+    throw new Error(error.message)
+  }
+  return ((data ?? []) as EventRow[]).map(r => ({ ...rowToEvent(r), archiviato_da: r.archiviato_da ?? null }))
+}
+
+export async function archiveEvent(id: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('events')
+    .update({ archiviato: true, archiviato_at: new Date().toISOString(), archiviato_da: userId })
+    .eq('id', id)
+  if (error) {
+    logError('events-service', 'archiveEvent', error)
+    throw new Error(error.message)
+  }
+  invalidateCache('events_list')
+}
+
+export async function restoreEvent(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('events')
+    .update({ archiviato: false, archiviato_at: null, archiviato_da: null })
+    .eq('id', id)
+  if (error) {
+    logError('events-service', 'restoreEvent', error)
+    throw new Error(error.message)
+  }
+  invalidateCache('events_list')
 }
 
 export async function fetchEventsByClientName(clientName: string): Promise<Event[]> {
