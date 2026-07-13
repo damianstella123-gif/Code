@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, Clock, ShieldCheck, Lock } from 'lucide-react'
+import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, Clock, ShieldCheck, Lock, Plus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { loadUser } from '@/lib/auth'
+import { useToast } from '@/lib/toast'
 import { calcRowEconomics } from '@/lib/event-economics'
 import { fmtDate as fmtDateCentral } from '@/lib/format'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
@@ -82,6 +84,14 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
+  const { showToast } = useToast()
+  const [user, setUser] = useState<any>(null)
+
+  const [versions, setVersions] = useState<any[]>([])
+  const [activeVersion, setActiveVersion] = useState<string | null>(null)
+  const [showNewVersion, setShowNewVersion] = useState(false)
+  const [newVersionName, setNewVersionName] = useState('')
+
   const [feePct, setFeePct] = useState(event.fee_agenzia_pct ?? 6)
   const [editingFee, setEditingFee] = useState(false)
   const [feeInput, setFeeInput] = useState(String(event.fee_agenzia_pct ?? 6))
@@ -105,6 +115,82 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     await supabase.from('events').update({ margine_target: newTarget }).eq('id', event.id)
   }
 
+  // ─── Budget Versions ───────────────────────────────────────
+  useEffect(() => { setUser(loadUser()) }, [])
+
+  useEffect(() => {
+    supabase.from('budget_versions')
+      .select('*')
+      .eq('event_id', event.id)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        setVersions(data || [])
+        if (data?.length) setActiveVersion(data[0].id)
+      })
+  }, [event.id])
+
+  async function approveVersion(id: string) {
+    await supabase.from('budget_versions').update({ stato: 'rifiutato' })
+      .eq('event_id', event.id).eq('tipo', 'preventivo').neq('id', id)
+    await supabase.from('budget_versions')
+      .update({ stato: 'approvato', approvato_at: new Date().toISOString() })
+      .eq('id', id)
+    setVersions(prev => prev.map(v => ({
+      ...v,
+      stato: v.id === id ? 'approvato' : v.tipo === 'preventivo' ? 'rifiutato' : v.stato
+    })))
+    showToast('Preventivo approvato', 'success')
+  }
+
+  async function createConsuntivo(fromId: string) {
+    const { data: newV } = await supabase.from('budget_versions')
+      .insert({ event_id: event.id, nome: 'Consuntivo', tipo: 'consuntivo', stato: 'bozza', created_by: user?.id })
+      .select().single()
+    if (!newV) return
+    const tables = ['event_hotel_details', 'event_restaurant_details', 'event_experience_details',
+      'event_catering_details', 'event_staff_interno_details', 'event_staff_esterno_details',
+      'event_varie_details', 'event_audio_video_details', 'event_allestimenti_details',
+      'event_grafica_stampa_details', 'event_supplier_services']
+    for (const table of tables) {
+      const { data: rows } = await supabase.from(table as any).select('*').eq('budget_version_id', fromId)
+      if (rows?.length) {
+        const copies = rows.map((r: any) => {
+          const { id: _id, created_at: _ca, ...rest } = r
+          return { ...rest, budget_version_id: newV.id }
+        })
+        await supabase.from(table as any).insert(copies)
+      }
+    }
+    setVersions(prev => [...prev, newV])
+    setActiveVersion(newV.id)
+    showToast('Consuntivo creato', 'success')
+  }
+
+  async function duplicateVersion(fromId: string) {
+    const source = versions.find(v => v.id === fromId)
+    const { data: newV } = await supabase.from('budget_versions')
+      .insert({ event_id: event.id, nome: `${source?.nome} (copia)`, tipo: 'preventivo', stato: 'bozza', created_by: user?.id })
+      .select().single()
+    if (!newV) return
+    const tables = ['event_hotel_details', 'event_restaurant_details', 'event_experience_details',
+      'event_catering_details', 'event_staff_interno_details', 'event_staff_esterno_details',
+      'event_varie_details', 'event_audio_video_details', 'event_allestimenti_details',
+      'event_grafica_stampa_details', 'event_supplier_services']
+    for (const table of tables) {
+      const { data: rows } = await supabase.from(table as any).select('*').eq('budget_version_id', fromId)
+      if (rows?.length) {
+        const copies = rows.map((r: any) => {
+          const { id: _id, created_at: _ca, ...rest } = r
+          return { ...rest, budget_version_id: newV.id }
+        })
+        await supabase.from(table as any).insert(copies)
+      }
+    }
+    setVersions(prev => [...prev, newV])
+    setActiveVersion(newV.id)
+    showToast('Versione duplicata', 'success')
+  }
+
   function getSupName(id: string | null | undefined) {
     if (!id) return ''
     return suppliers.find(s => s.id === id)?.nome ?? ''
@@ -116,19 +202,25 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   }
 
   const loadData = useCallback(async () => {
+    const vFilter = activeVersion
+    const bvq = (table: string) => {
+      let q = supabase.from(table as any).select('*').eq('event_id', event.id)
+      if (vFilter) q = q.eq('budget_version_id', vFilter)
+      return q
+    }
     const [linksRes, svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes] = await Promise.all([
       supabase.from('event_suppliers').select('supplier_id, service_category, stato_conferma').eq('event_id', event.id),
-      supabase.from('event_supplier_services').select('*').eq('event_id', event.id),
-      supabase.from('event_hotel_details').select('*').eq('event_id', event.id),
-      supabase.from('event_restaurant_details').select('*').eq('event_id', event.id),
-      supabase.from('event_experience_details').select('*').eq('event_id', event.id),
-      supabase.from('event_catering_details').select('*').eq('event_id', event.id),
-      supabase.from('event_staff_interno_details').select('*').eq('event_id', event.id),
-      supabase.from('event_staff_esterno_details').select('*').eq('event_id', event.id),
-      supabase.from('event_varie_details').select('*').eq('event_id', event.id),
-      supabase.from('event_audio_video_details').select('*').eq('event_id', event.id),
-      supabase.from('event_allestimenti_details').select('*').eq('event_id', event.id),
-      supabase.from('event_grafica_stampa_details').select('*').eq('event_id', event.id),
+      bvq('event_supplier_services'),
+      bvq('event_hotel_details'),
+      bvq('event_restaurant_details'),
+      bvq('event_experience_details'),
+      bvq('event_catering_details'),
+      bvq('event_staff_interno_details'),
+      bvq('event_staff_esterno_details'),
+      bvq('event_varie_details'),
+      bvq('event_audio_video_details'),
+      bvq('event_allestimenti_details'),
+      bvq('event_grafica_stampa_details'),
     ])
 
     const catMap: Record<string, string> = {}
@@ -370,9 +462,9 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
     setLines(all)
     setLoading(false)
-  }, [event.id, suppliers])
+  }, [event.id, suppliers, activeVersion])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { if (activeVersion !== null || versions.length === 0) loadData() }, [loadData, activeVersion, versions.length])
 
   // Aggregated totals
   const totals = useMemo(() => {
@@ -881,6 +973,81 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
   return (
     <div className="space-y-5">
+      {/* ══════ VERSION SELECTOR ══════ */}
+      {versions.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+          {versions.map(v => (
+            <button key={v.id}
+              onClick={() => setActiveVersion(v.id)}
+              style={{
+                padding: '6px 14px', borderRadius: 99, flexShrink: 0,
+                border: activeVersion === v.id
+                  ? v.tipo === 'consuntivo' ? '2px solid var(--green)' : '2px solid var(--red2)'
+                  : '1px solid var(--line)',
+                background: activeVersion === v.id
+                  ? v.tipo === 'consuntivo' ? 'rgba(47,168,107,0.08)' : 'rgba(200,25,46,0.08)'
+                  : 'transparent',
+                fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer',
+                color: activeVersion === v.id
+                  ? v.tipo === 'consuntivo' ? 'var(--green)' : 'var(--red2)'
+                  : 'var(--muted)',
+                display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+              }}>
+              {v.tipo === 'consuntivo' ? '\u2713' : '\uD83D\uDCCB'}
+              {v.nome}
+              {v.stato === 'approvato' && (
+                <span style={{ fontSize: 8, background: 'var(--green)', color: 'white', padding: '1px 5px', borderRadius: 4 }}>
+                  APPROVATO
+                </span>
+              )}
+            </button>
+          ))}
+          <button onClick={() => setShowNewVersion(true)}
+            style={{ padding: '6px 14px', borderRadius: 99, flexShrink: 0, border: '1px dashed var(--line)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Plus className="w-3 h-3" /> Nuova versione
+          </button>
+        </div>
+      )}
+
+      {/* ══════ VERSION TOOLBAR ══════ */}
+      {activeVersion && (() => {
+        const v = versions.find(x => x.id === activeVersion)
+        if (!v) return null
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--panel2)', borderRadius: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, flex: 1, color: 'var(--text)', minWidth: 100 }}>
+              {v.nome}
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 8px', borderRadius: 4,
+              background: v.stato === 'approvato' ? 'rgba(47,168,107,0.1)' : 'var(--panel)',
+              color: v.stato === 'approvato' ? 'var(--green)' : 'var(--muted)',
+              border: '1px solid var(--line)' }}>
+              {v.stato?.toUpperCase()}
+            </span>
+            {v.tipo === 'preventivo' && (
+              <>
+                {v.stato !== 'approvato' && (
+                  <button onClick={() => approveVersion(v.id)}
+                    style={{ padding: '5px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--green)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--green)' }}>
+                    Approva
+                  </button>
+                )}
+                {v.stato === 'approvato' && (
+                  <button onClick={() => createConsuntivo(v.id)}
+                    style={{ padding: '5px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--blue)', background: 'rgba(58,123,213,0.08)', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--blue)' }}>
+                    Crea consuntivo
+                  </button>
+                )}
+                <button onClick={() => duplicateVersion(v.id)}
+                  style={{ padding: '5px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--line)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>
+                  Duplica
+                </button>
+              </>
+            )}
+          </div>
+        )
+      })()}
+
       {/* ══════ LEVEL 1: KPI Dashboard ══════ */}
       <AnimatedLaserBorder loading={savingFee}>
         <div className="panel p-5 space-y-4">
@@ -1164,6 +1331,40 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
       {/* ══════ PAGAMENTI SUMMARY ══════ */}
       <PaymentsSummary eventId={event.id} />
+
+      {/* ══════ NEW VERSION MODAL ══════ */}
+      {showNewVersion && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 14, padding: 24, width: 340 }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginBottom: 12, letterSpacing: '.1em' }}>
+              NUOVA VERSIONE BUDGET
+            </p>
+            <input value={newVersionName} onChange={e => setNewVersionName(e.target.value)}
+              placeholder="es. Hotel Quark - Milano" autoFocus
+              style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 14, marginBottom: 14, boxSizing: 'border-box', fontFamily: 'var(--font-mono)' }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={async () => {
+                const { data } = await supabase.from('budget_versions')
+                  .insert({ event_id: event.id, nome: newVersionName || `Preventivo ${versions.length + 1}`, tipo: 'preventivo', stato: 'bozza', created_by: user?.id })
+                  .select().single()
+                if (data) {
+                  setVersions(prev => [...prev, data])
+                  setActiveVersion(data.id)
+                }
+                setShowNewVersion(false)
+                setNewVersionName('')
+              }} style={{ flex: 1, padding: '9px', borderRadius: 8, cursor: 'pointer', background: 'var(--red2)', color: 'white', border: 'none', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                Crea
+              </button>
+              <button onClick={() => { setShowNewVersion(false); setNewVersionName('') }}
+                style={{ flex: 1, padding: '9px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid var(--line)', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

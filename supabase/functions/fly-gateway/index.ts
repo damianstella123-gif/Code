@@ -649,7 +649,21 @@ async function executeTool(
       if (eventId) {
         const result = await computeForEvent(eventId, supabase);
         if (!result) return "Evento non trovato con questo ID.";
-        return JSON.stringify(result);
+
+        // Attach budget versions summary
+        const { data: bvRows } = await supabase
+          .from("budget_versions")
+          .select("id, nome, tipo, stato, approvato_at, created_at")
+          .eq("event_id", eventId)
+          .order("created_at", { ascending: true });
+
+        const versionsInfo = (bvRows ?? []).map((v: any) => ({
+          id: v.id, nome: v.nome, tipo: v.tipo, stato: v.stato,
+        }));
+        const approved = versionsInfo.find((v: any) => v.stato === "approvato") || null;
+        const consuntivo = versionsInfo.find((v: any) => v.tipo === "consuntivo") || null;
+
+        return JSON.stringify({ ...result, versions: versionsInfo, approved_version: approved, consuntivo });
       }
 
       // Search by name
