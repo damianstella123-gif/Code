@@ -2551,101 +2551,103 @@ export default function Calendario() {
 
   return (
     <div className="space-y-5">
-      {/* Wire masthead */}
-      <div className="wire-masthead">
-        <div>
-          <span className="wire-masthead-title">CALENDARIO</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>
-            {MONTHS_IT[cursor.getMonth()].toUpperCase()} {cursor.getFullYear()}
-            {ruolo !== 'Admin' && ruolo !== 'Partner' && (
-              <span style={{ marginLeft: '8px', color: 'var(--blue)' }}>[ {ruolo.toUpperCase()} ]</span>
-            )}
-          </span>
-        </div>
-        <div className="wire-masthead-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)' }}>
-            {lastRefresh.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-          <button onClick={handleSidebarToggle} title="Mini calendario"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: showSidebar ? 'var(--text)' : 'var(--muted)' }}>
-            <PanelLeftOpen className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={() => setShowFilters(f => !f)} title="Filtri [F]"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: showFilters ? 'var(--red2)' : 'var(--muted)' }}>
-            <Filter className="w-3.5 h-3.5" />
-          </button>
-          <div className="relative">
-            <button onClick={() => setShowExportMenu(v => !v)} title="Esporta"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
-              <Download className="w-3.5 h-3.5" />
-            </button>
-            {showExportMenu && (
-              <div className="absolute right-0 top-full mt-1 rounded-lg py-1 z-30 min-w-[180px]" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-sm)' }}>
-                <button onClick={() => { const ics = generateICS(visibleItems.filter(i => { if (i.type !== 'event') return false; const ev = i.data as Event; const m = cursor.getMonth(); return new Date(ev.dataInizio).getMonth() === m })); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `synergy-${MONTHS_IT[cursor.getMonth()].toLowerCase()}.ics`; a.click(); URL.revokeObjectURL(url); setShowExportMenu(false) }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/5" style={{ color: 'var(--text)' }}>Esporta mese (.ics)</button>
-                <button onClick={() => { const ics = generateICS(visibleItems); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'synergy-tutti.ics'; a.click(); URL.revokeObjectURL(url); setShowExportMenu(false) }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/5" style={{ color: 'var(--text)' }}>Esporta tutti (.ics)</button>
-              </div>
-            )}
+      <div className="wire-card-flat" style={{ padding: '16px', borderRadius: 12, border: '1px solid var(--line)' }}>
+        {/* Wire masthead */}
+        <div className="wire-masthead" style={{ marginBottom: 0 }}>
+          <div>
+            <span className="wire-masthead-title">CALENDARIO</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>
+              {MONTHS_IT[cursor.getMonth()].toUpperCase()} {cursor.getFullYear()}
+              {ruolo !== 'Admin' && ruolo !== 'Partner' && (
+                <span style={{ marginLeft: '8px', color: 'var(--blue)' }}>[ {ruolo.toUpperCase()} ]</span>
+              )}
+            </span>
           </div>
-          <button onClick={() => window.print()} title="Stampa"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
-            <Printer className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={() => setShowShortcuts(true)} title="Scorciatoie [?]"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
-            <HelpCircle className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={() => setShowLeaveForm(true)}
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
-            + FERIE
-          </button>
-          <button onClick={() => setShowCreate(true)}
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
-            + NUOVO
-          </button>
+          <div className="wire-masthead-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)' }}>
+              {lastRefresh.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <button onClick={handleSidebarToggle} title="Mini calendario"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: showSidebar ? 'var(--text)' : 'var(--muted)' }}>
+              <PanelLeftOpen className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => setShowFilters(f => !f)} title="Filtri [F]"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: showFilters ? 'var(--red2)' : 'var(--muted)' }}>
+              <Filter className="w-3.5 h-3.5" />
+            </button>
+            <div className="relative">
+              <button onClick={() => setShowExportMenu(v => !v)} title="Esporta"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+                <Download className="w-3.5 h-3.5" />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-1 rounded-lg py-1 z-30 min-w-[180px]" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-sm)' }}>
+                  <button onClick={() => { const ics = generateICS(visibleItems.filter(i => { if (i.type !== 'event') return false; const ev = i.data as Event; const m = cursor.getMonth(); return new Date(ev.dataInizio).getMonth() === m })); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `synergy-${MONTHS_IT[cursor.getMonth()].toLowerCase()}.ics`; a.click(); URL.revokeObjectURL(url); setShowExportMenu(false) }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-white/5" style={{ color: 'var(--text)' }}>Esporta mese (.ics)</button>
+                  <button onClick={() => { const ics = generateICS(visibleItems); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'synergy-tutti.ics'; a.click(); URL.revokeObjectURL(url); setShowExportMenu(false) }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-white/5" style={{ color: 'var(--text)' }}>Esporta tutti (.ics)</button>
+                </div>
+              )}
+            </div>
+            <button onClick={() => window.print()} title="Stampa"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+              <Printer className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => setShowShortcuts(true)} title="Scorciatoie [?]"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+              <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => setShowLeaveForm(true)}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+              + FERIE
+            </button>
+            <button onClick={() => setShowCreate(true)}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+              + NUOVO
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Wire tabs — view selector */}
-      <div className="wire-tabs">
-        {([
-          { id: 'month' as ViewMode, label: 'MESE' },
-          { id: 'week' as ViewMode, label: 'SETTIMANA' },
-          { id: 'day' as ViewMode, label: 'GIORNO' },
-          { id: 'team' as ViewMode, label: 'TEAM' },
-          { id: 'agenda' as ViewMode, label: 'AGENDA' },
-        ]).map(v => (
-          <button key={v.id} onClick={() => setView(v.id)}
-            className={`wire-tab ${view === v.id ? 'wire-tab--active' : ''}`}>
-            {v.label}
-          </button>
-        ))}
-      </div>
+        {/* Wire tabs — view selector */}
+        <div className="wire-tabs" style={{ marginTop: 12 }}>
+          {([
+            { id: 'month' as ViewMode, label: 'MESE' },
+            { id: 'week' as ViewMode, label: 'SETTIMANA' },
+            { id: 'day' as ViewMode, label: 'GIORNO' },
+            { id: 'team' as ViewMode, label: 'TEAM' },
+            { id: 'agenda' as ViewMode, label: 'AGENDA' },
+          ]).map(v => (
+            <button key={v.id} onClick={() => setView(v.id)}
+              className={`wire-tab ${view === v.id ? 'wire-tab--active' : ''}`}>
+              {v.label}
+            </button>
+          ))}
+        </div>
 
-      {/* Wire ticker — KPIs */}
-      <div className="wire-ticker">
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-          <Bell className="w-3 h-3 inline -mt-0.5 mr-1" />{allMemos.length} promemoria
-        </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: overdueItems.length > 0 ? 'var(--yellow)' : 'var(--muted)' }}>
-          {overdueItems.length} scaduti
-        </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--blue)' }}>
-          {thisWeekItems.length} questa settimana
-        </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-          {visibleItems.length} visibili
-        </span>
-        {(view === 'month' || view === 'week') && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', opacity: 0.6 }}>
-            drag&amp;drop attivo
+        {/* Wire ticker — KPIs */}
+        <div className="wire-ticker" style={{ marginTop: 8 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+            <Bell className="w-3 h-3 inline -mt-0.5 mr-1" />{allMemos.length} promemoria
           </span>
-        )}
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: overdueItems.length > 0 ? 'var(--yellow)' : 'var(--muted)' }}>
+            {overdueItems.length} scaduti
+          </span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--blue)' }}>
+            {thisWeekItems.length} questa settimana
+          </span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+            {visibleItems.length} visibili
+          </span>
+          {(view === 'month' || view === 'week') && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', opacity: 0.6 }}>
+              drag&amp;drop attivo
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Filter bar */}

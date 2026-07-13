@@ -380,58 +380,57 @@ export default function TaskPage() {
 
   return (
     <div style={{ maxWidth: '900px' }}>
-      {/* Masthead */}
-      <div className="wire-masthead">
-        <span className="wire-masthead-title">TASK — {openCount} APERTI</span>
-        <button onClick={() => { setEditingTask(undefined); setShowForm(true) }}
-          className="wire-theme-toggle" style={{ borderRadius: '8px' }}>
-          <Plus className="w-3.5 h-3.5" style={{ color: 'var(--text)' }} />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>Nuovo task</span>
-        </button>
-      </div>
+      {/* Header Card */}
+      <div className="wire-card-flat" style={{ padding: '16px', marginBottom: '20px', borderRadius: 12, border: '1px solid var(--line)' }}>
+        <div className="wire-masthead" style={{ marginBottom: 0 }}>
+          <span className="wire-masthead-title">TASK — {openCount} APERTI</span>
+          <button onClick={() => { setEditingTask(undefined); setShowForm(true) }}
+            className="wire-theme-toggle" style={{ borderRadius: '8px' }}>
+            <Plus className="w-3.5 h-3.5" style={{ color: 'var(--text)' }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>Nuovo task</span>
+          </button>
+        </div>
 
-      {/* Ticker */}
-      <div className="wire-ticker">
-        <span><strong>{openCount}</strong> aperti</span>
-        <span style={{ color: overdueCount > 0 ? 'var(--red2)' : undefined }}>
-          <strong style={{ color: overdueCount > 0 ? 'var(--red2)' : undefined }}>{overdueCount}</strong> in ritardo
-        </span>
-        <span><strong>{completedThisWeek}</strong> completati (7gg)</span>
-        <span><strong>{highPriCount}</strong> alta priorita</span>
-      </div>
+        <div className="wire-ticker" style={{ marginTop: 8 }}>
+          <span><strong>{openCount}</strong> aperti</span>
+          <span style={{ color: overdueCount > 0 ? 'var(--red2)' : undefined }}>
+            <strong style={{ color: overdueCount > 0 ? 'var(--red2)' : undefined }}>{overdueCount}</strong> in ritardo
+          </span>
+          <span><strong>{completedThisWeek}</strong> completati (7gg)</span>
+          <span><strong>{highPriCount}</strong> alta priorita</span>
+        </div>
 
-      {/* Wire tabs: filters */}
-      <div className="wire-tabs" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ display: 'flex', gap: '16px', overflowX: 'auto' }}>
-          {(['Tutti', 'da_fare', 'in_corso', 'completato'] as const).map(s => (
-            <button key={s}
-              className={`wire-tab ${filterStato === s ? 'wire-tab--active' : ''}`}
-              onClick={() => setFilterStato(s)}>
-              {s === 'Tutti' ? 'TUTTI' : s === 'da_fare' ? 'DA FARE' : s === 'in_corso' ? 'IN CORSO' : 'COMPLETATI'}
-            </button>
-          ))}
-          {(['Tutte', 'alta', 'media', 'bassa'] as const).map(p => (
-            <button key={p}
-              className={`wire-tab ${filterPriorita === p ? 'wire-tab--active' : ''}`}
-              onClick={() => setFilterPriorita(p)}
-              style={{ color: filterPriorita === p && p !== 'Tutte' ? prioritaColor(p) : undefined }}>
-              {p === 'Tutte' ? 'TUTTE' : p.toUpperCase()}
-            </button>
-          ))}
-          <select value={filterAssegnatario} onChange={e => setFilterAssegnatario(e.target.value)}
-            style={{
-              fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase',
-              background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer',
-              letterSpacing: '0.04em',
-            }}>
-            <option value="Tutti">ASSEGNATARIO</option>
-            {teamMembers.map(id => <option key={id} value={id}>{getProfileName(id)}</option>)}
-          </select>
-          <select value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}
-            style={{
-              fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase',
-              background: 'none', border: 'none', color: filterCategoria !== 'Tutte' ? categoriaColor(filterCategoria) : 'var(--muted)', cursor: 'pointer',
-              letterSpacing: '0.04em',
+        <div className="wire-tabs" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginTop: 12 }}>
+          <div style={{ display: 'flex', gap: '16px', overflowX: 'auto' }}>
+            {(['Tutti', 'da_fare', 'in_corso', 'completato'] as const).map(s => (
+              <button key={s}
+                className={`wire-tab ${filterStato === s ? 'wire-tab--active' : ''}`}
+                onClick={() => setFilterStato(s)}>
+                {s === 'Tutti' ? 'TUTTI' : s === 'da_fare' ? 'DA FARE' : s === 'in_corso' ? 'IN CORSO' : 'COMPLETATI'}
+              </button>
+            ))}
+            {(['Tutte', 'alta', 'media', 'bassa'] as const).map(p => (
+              <button key={p}
+                className={`wire-tab ${filterPriorita === p ? 'wire-tab--active' : ''}`}
+                onClick={() => setFilterPriorita(p)}
+                style={{ color: filterPriorita === p && p !== 'Tutte' ? prioritaColor(p) : undefined }}>
+                {p === 'Tutte' ? 'TUTTE' : p.toUpperCase()}
+              </button>
+            ))}
+            <select value={filterAssegnatario} onChange={e => setFilterAssegnatario(e.target.value)}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase',
+                background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer',
+                letterSpacing: '0.04em',
+              }}>
+              <option value="Tutti">ASSEGNATARIO</option>
+              {teamMembers.map(id => <option key={id} value={id}>{getProfileName(id)}</option>)}
+            </select>
+            <select value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase',
+                background: 'none', border: 'none', color: filterCategoria !== 'Tutte' ? categoriaColor(filterCategoria) : 'var(--muted)', cursor: 'pointer',
+                letterSpacing: '0.04em',
             }}>
             <option value="Tutte">CATEGORIA</option>
             {CATEGORIE.map(c => <option key={c} value={c}>{c.toUpperCase()}</option>)}
@@ -442,8 +441,9 @@ export default function TaskPage() {
           <input type="text" placeholder="Cerca..." value={search} onChange={e => setSearch(e.target.value)}
             style={{ background: 'none', border: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)', width: '100px' }} />
           {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X className="w-3 h-3" style={{ color: 'var(--muted)' }} /></button>}
-          {!search && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>Usa Fly ↑ per domande complesse</span>}
+          {!search && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', whiteSpace: 'nowrap', fontStyle: 'italic' }}>Usa Fly per domande complesse</span>}
         </div>
+      </div>
       </div>
 
       {/* Task List */}

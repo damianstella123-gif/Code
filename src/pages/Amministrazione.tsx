@@ -992,73 +992,74 @@ export default function Amministrazione() {
           {migrationMsg}
         </div>
       )}
-      {/* Wire Masthead */}
-      <div className="wire-masthead">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span className="wire-masthead-title">AMMINISTRAZIONE</span>
-          {isManagerOnly && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--blue)', opacity: 0.8 }}>SOLO EVENTI ASSEGNATI</span>
-          )}
+      {/* Wire Card Header */}
+      <div className="wire-card-flat" style={{ padding: '16px', marginBottom: '20px', borderRadius: 12, border: '1px solid var(--line)' }}>
+        {/* Wire Masthead */}
+        <div className="wire-masthead" style={{ marginBottom: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className="wire-masthead-title">AMMINISTRAZIONE</span>
+            {isManagerOnly && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--blue)', opacity: 0.8 }}>SOLO EVENTI ASSEGNATI</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <button onClick={() => setShowNuovoMovimento(true)}
+              className="transition-colors"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Plus className="w-3.5 h-3.5" /> Movimento
+            </button>
+            <button onClick={esportaXLSX}
+              className="transition-colors"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Download className="w-3.5 h-3.5" /> XLSX
+            </button>
+            <button onClick={esportaPDF}
+              className="transition-colors"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <FileText className="w-3.5 h-3.5" /> PDF
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <button onClick={() => setShowNuovoMovimento(true)}
-            className="transition-colors"
-            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Plus className="w-3.5 h-3.5" /> Movimento
-          </button>
-          <button onClick={esportaXLSX}
-            className="transition-colors"
-            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Download className="w-3.5 h-3.5" /> XLSX
-          </button>
-          <button onClick={esportaPDF}
-            className="transition-colors"
-            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <FileText className="w-3.5 h-3.5" /> PDF
-          </button>
+
+        {/* Alerts */}
+        {(alertBudget || fattureInScadenza > 0 || totScaduto > 0) && (
+          <div style={{ paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {alertBudget && (
+              <div className="flex items-center gap-3" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--red2)' }}>
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                Uno o piu eventi hanno superato il 90% del budget previsto.
+              </div>
+            )}
+            {fattureInScadenza > 0 && (
+              <div className="flex items-center gap-3" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--yellow)' }}>
+                <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                {fattureInScadenza} fattura{fattureInScadenza !== 1 ? 'e' : ''} in scadenza nei prossimi 7 giorni.
+              </div>
+            )}
+            {totScaduto > 0 && (
+              <div className="flex items-center gap-3" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--red2)' }}>
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                {formatEur(totScaduto)} di pagamenti scaduti da incassare.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Wire Tabs */}
+        <div className="wire-tabs" style={{ marginTop: 12 }}>
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`wire-tab ${activeTab === tab.id ? 'wire-tab--active' : ''}`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
-      </div>
 
-      {/* Alerts */}
-      {(alertBudget || fattureInScadenza > 0 || totScaduto > 0) && (
-        <div style={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {alertBudget && (
-            <div className="flex items-center gap-3" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--red2)' }}>
-              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-              Uno o piu eventi hanno superato il 90% del budget previsto.
-            </div>
-          )}
-          {fattureInScadenza > 0 && (
-            <div className="flex items-center gap-3" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--yellow)' }}>
-              <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-              {fattureInScadenza} fattura{fattureInScadenza !== 1 ? 'e' : ''} in scadenza nei prossimi 7 giorni.
-            </div>
-          )}
-          {totScaduto > 0 && (
-            <div className="flex items-center gap-3" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--red2)' }}>
-              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-              {formatEur(totScaduto)} di pagamenti scaduti da incassare.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Wire Tabs */}
-      <div className="wire-tabs">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`wire-tab ${activeTab === tab.id ? 'wire-tab--active' : ''}`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Filters row */}
-      {(
-        <div className="flex flex-wrap gap-3" style={{ padding: '14px 0' }}>
+        {/* Filters row */}
+        <div className="flex flex-wrap gap-3" style={{ marginTop: 10 }}>
           <div className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
             <Filter className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
             <select value={filterEvento} onChange={e => setFilterEvento(e.target.value)}
@@ -1116,7 +1117,7 @@ export default function Amministrazione() {
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* ─── TAB: DASHBOARD ────────────────────────────────────────────────────── */}
       {activeTab === 'dashboard' && (

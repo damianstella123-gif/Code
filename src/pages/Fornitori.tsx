@@ -2049,62 +2049,60 @@ export default function Fornitori() {
 
   return (
     <div>
-      {/* Wire masthead */}
-      <div className="wire-masthead">
-        <div>
-          <span className="wire-masthead-title">FORNITORI</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>
-            {supplierList.length}
-          </span>
+      <div className="wire-card-flat" style={{ padding: '16px', marginBottom: '20px', borderRadius: 12, border: '1px solid var(--line)' }}>
+        {/* Wire masthead */}
+        <div className="wire-masthead" style={{ marginBottom: 0 }}>
+          <div>
+            <span className="wire-masthead-title">FORNITORI</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>
+              {supplierList.length}
+            </span>
+          </div>
+          <div className="wire-masthead-right">
+            <button onClick={() => { setEditingSupplier(undefined); setShowForm(true) }}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+              <Plus className="w-3 h-3 inline mr-1 -mt-0.5" />NUOVO FORNITORE
+            </button>
+          </div>
         </div>
-        <div className="wire-masthead-right">
-          <button onClick={() => { setEditingSupplier(undefined); setShowForm(true) }}
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
-            <Plus className="w-3 h-3 inline mr-1 -mt-0.5" />NUOVO FORNITORE
-          </button>
+
+        {/* Wire ticker */}
+        <div className="wire-ticker" style={{ marginTop: 8 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+            <strong>{supplierList.length}</strong> totali
+          </span>
+          {(categoryCounts['Hotel'] ?? 0) > 0 && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+              <strong>{categoryCounts['Hotel']}</strong> hotel
+            </span>
+          )}
+          {(categoryCounts['Ristorante'] ?? 0) > 0 && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+              <strong>{categoryCounts['Ristorante']}</strong> ristoranti
+            </span>
+          )}
+          {(categoryCounts['Audio Video'] ?? 0) > 0 && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+              <strong>{categoryCounts['Audio Video']}</strong> audio/video
+            </span>
+          )}
+          {(categoryCounts['Location'] ?? 0) > 0 && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
+              <strong>{categoryCounts['Location']}</strong> location
+            </span>
+          )}
+          {avgRating > 0 && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--yellow)' }}>
+              <Star className="w-3 h-3 inline -mt-0.5 mr-0.5" fill="var(--yellow)" /><strong>{avgRating.toFixed(1)}</strong> rating medio
+            </span>
+          )}
         </div>
-      </div>
 
-      {/* Wire ticker */}
-      <div className="wire-ticker">
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-          <strong>{supplierList.length}</strong> totali
-        </span>
-        {(categoryCounts['Hotel'] ?? 0) > 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-            <strong>{categoryCounts['Hotel']}</strong> hotel
-          </span>
-        )}
-        {(categoryCounts['Ristorante'] ?? 0) > 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-            <strong>{categoryCounts['Ristorante']}</strong> ristoranti
-          </span>
-        )}
-        {(categoryCounts['Audio Video'] ?? 0) > 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-            <strong>{categoryCounts['Audio Video']}</strong> audio/video
-          </span>
-        )}
-        {(categoryCounts['Location'] ?? 0) > 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-            <strong>{categoryCounts['Location']}</strong> location
-          </span>
-        )}
-        {avgRating > 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--yellow)' }}>
-            <Star className="w-3 h-3 inline -mt-0.5 mr-0.5" fill="var(--yellow)" /><strong>{avgRating.toFixed(1)}</strong> rating medio
-          </span>
-        )}
-      </div>
-
-      {/* ─── INLINE FILTERS ──────────────────────────────────────────────────────── */}
-      <div className="space-y-3" style={{ marginTop: '20px' }}>
-
-        {/* Category chips - scrollable */}
+        {/* Category chips */}
         <div ref={chipsRef} className="flex items-center gap-2"
-          style={{ overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none', paddingBottom: '4px' }}>
+          style={{ overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none', paddingBottom: '4px', marginTop: 12 }}>
           <CategoryChip
             label="Tutti"
             active={!activeCat}
@@ -2127,7 +2125,9 @@ export default function Fornitori() {
             )
           })}
         </div>
+      </div>
 
+      <div className="space-y-3">
         {/* Location search + text search row */}
         <div className="flex gap-2 flex-col sm:flex-row">
           {/* Location input */}

@@ -75,30 +75,32 @@ export default function Performance() {
 
   return (
     <div>
-      <div className="wire-masthead">
-        <div>
-          <span className="wire-masthead-title">PERFORMANCE</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>ROI & KPI</span>
+      <div className="wire-card-flat" style={{ padding: '16px', marginBottom: '20px', borderRadius: 12, border: '1px solid var(--line)' }}>
+        <div className="wire-masthead" style={{ marginBottom: 0 }}>
+          <div>
+            <span className="wire-masthead-title">PERFORMANCE</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>ROI & KPI</span>
+          </div>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1" style={{ marginBottom: 24 }}>
-        {([['eventi', 'Eventi ROI'], ['synergy', 'Synergy Impact']] as const).map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            style={{
-              fontFamily: 'var(--font-mono)', fontSize: 11, padding: '7px 16px', borderRadius: 8,
-              border: '1px solid var(--line)', cursor: 'pointer',
-              background: tab === id ? 'var(--text)' : 'transparent',
-              color: tab === id ? 'var(--panel-solid)' : 'var(--muted)',
-              fontWeight: tab === id ? 600 : 400,
-            }}
-          >
-            {label}
-          </button>
-        ))}
+        {/* Tabs */}
+        <div className="flex gap-1" style={{ marginTop: 12 }}>
+          {([['eventi', 'Eventi ROI'], ['synergy', 'Synergy Impact']] as const).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: 11, padding: '7px 16px', borderRadius: 8,
+                border: '1px solid var(--line)', cursor: 'pointer',
+                background: tab === id ? 'var(--text)' : 'transparent',
+                color: tab === id ? 'var(--panel-solid)' : 'var(--muted)',
+                fontWeight: tab === id ? 600 : 400,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === 'eventi' && <EventROISection />}
@@ -206,31 +208,32 @@ function EventROISection() {
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <KpiCard label="REVENUE TOTALE" value={fmtEur(totalRevenue)} color="var(--text)" />
-        <KpiCard label="MARGINE TOTALE" value={fmtEur(totalMargin)} color={totalMargin >= 0 ? 'var(--green)' : 'var(--red2)'} />
-        <KpiCard label="ROI MEDIO" value={`${avgROI.toFixed(0)}%`} color={avgROI >= 0 ? 'var(--green)' : 'var(--red2)'} />
-        <KpiCard label="MARGINE MEDIO" value={`${avgMargin.toFixed(0)}%`} color={avgMargin >= 20 ? 'var(--green)' : 'var(--yellow)'} />
-        <KpiCard label="BUDGET OK" value={`${budgetCompliance.toFixed(0)}%`} color={budgetCompliance >= 70 ? 'var(--green)' : 'var(--yellow)'} />
-      </div>
+      {/* KPI Cards + Filters */}
+      <div className="wire-card-flat" style={{ padding: '16px', borderRadius: 12, border: '1px solid var(--line)' }}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <KpiCard label="REVENUE TOTALE" value={fmtEur(totalRevenue)} color="var(--text)" />
+          <KpiCard label="MARGINE TOTALE" value={fmtEur(totalMargin)} color={totalMargin >= 0 ? 'var(--green)' : 'var(--red2)'} />
+          <KpiCard label="ROI MEDIO" value={`${avgROI.toFixed(0)}%`} color={avgROI >= 0 ? 'var(--green)' : 'var(--red2)'} />
+          <KpiCard label="MARGINE MEDIO" value={`${avgMargin.toFixed(0)}%`} color={avgMargin >= 20 ? 'var(--green)' : 'var(--yellow)'} />
+          <KpiCard label="BUDGET OK" value={`${budgetCompliance.toFixed(0)}%`} color={budgetCompliance >= 70 ? 'var(--green)' : 'var(--yellow)'} />
+        </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3" style={{ marginTop: 8 }}>
-        <input type="date" value={dateRange.from} onChange={e => setDateRange(p => ({ ...p, from: e.target.value }))}
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)' }} />
-        <input type="date" value={dateRange.to} onChange={e => setDateRange(p => ({ ...p, to: e.target.value }))}
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)' }} />
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)' }}>
-          <option value="">Tutti gli stati</option>
-          <option value="confermato">Confermato</option>
-          <option value="in_corso">In corso</option>
-          <option value="completato">Completato</option>
-          <option value="bozza">Bozza</option>
-        </select>
-        <input type="text" placeholder="Filtra cliente..." value={filterClient} onChange={e => setFilterClient(e.target.value)}
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)', width: 140 }} />
+        <div className="flex flex-wrap items-center gap-3" style={{ marginTop: 12 }}>
+          <input type="date" value={dateRange.from} onChange={e => setDateRange(p => ({ ...p, from: e.target.value }))}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)' }} />
+          <input type="date" value={dateRange.to} onChange={e => setDateRange(p => ({ ...p, to: e.target.value }))}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)' }} />
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)' }}>
+            <option value="">Tutti gli stati</option>
+            <option value="confermato">Confermato</option>
+            <option value="in_corso">In corso</option>
+            <option value="completato">Completato</option>
+            <option value="bozza">Bozza</option>
+          </select>
+          <input type="text" placeholder="Filtra cliente..." value={filterClient} onChange={e => setFilterClient(e.target.value)}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)', width: 140 }} />
+        </div>
       </div>
 
       {/* Table */}

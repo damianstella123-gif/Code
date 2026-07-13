@@ -655,43 +655,45 @@ export default function Eventi() {
     <div className="wire-page" style={{ maxWidth: '1100px' }}>
       {overlays}
 
-      <div className="wire-masthead">
-        <span className="wire-masthead-title">EVENTI — {filtered.length} VISIBILI</span>
-        <button onClick={() => { setEditingEvent(undefined); setShowForm(true) }}
-          className="wire-theme-toggle" style={{ borderRadius: '8px' }} data-onboarding="new-event">
-          <Plus className="w-3.5 h-3.5" style={{ color: 'var(--text)' }} />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>Nuovo evento</span>
-        </button>
-      </div>
-
-      <div className="wire-ticker">
-        <span><strong>{visibleEvents.length}</strong> totali</span>
-        <span><strong>{visibleEvents.filter(e => e.stato === 'in_corso').length}</strong> in corso</span>
-        <span><strong>{visibleEvents.filter(e => e.stato === 'pianificazione').length}</strong> in pianificazione</span>
-        <span><strong>{visibleEvents.filter(e => e.stato === 'completato').length}</strong> completati</span>
-      </div>
-
-      <div className="wire-tabs" style={{ flexWrap: 'wrap', alignItems: 'center', gap: '16px' }}>
-        {STATI.map(stato => (
-          <button key={stato} onClick={() => setFilterStato(stato)}
-            className={`wire-tab ${filterStato === stato ? 'wire-tab--active' : ''}`}>
-            {stato === 'Tutti' ? 'Tutti' : statoLabel(stato)}
+      <div className="wire-card-flat" style={{ padding: '16px', marginBottom: '20px', borderRadius: 12, border: '1px solid var(--line)' }}>
+        <div className="wire-masthead" style={{ marginBottom: 0 }}>
+          <span className="wire-masthead-title">EVENTI — {filtered.length} VISIBILI</span>
+          <button onClick={() => { setEditingEvent(undefined); setShowForm(true) }}
+            className="wire-theme-toggle" style={{ borderRadius: '8px' }} data-onboarding="new-event">
+            <Plus className="w-3.5 h-3.5" style={{ color: 'var(--text)' }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>Nuovo evento</span>
           </button>
-        ))}
-        <div style={{ flex: 1, minWidth: '160px', display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
-          <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--muted)' }} />
-          <input type="text" placeholder="Cerca evento o location..." value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="flex-1 bg-transparent focus:outline-none"
-            style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }} />
-          {search && (
-            <button onClick={() => setSearch('')}>
-              <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+        </div>
+
+        <div className="wire-ticker" style={{ marginTop: 8 }}>
+          <span><strong>{visibleEvents.length}</strong> totali</span>
+          <span><strong>{visibleEvents.filter(e => e.stato === 'in_corso').length}</strong> in corso</span>
+          <span><strong>{visibleEvents.filter(e => e.stato === 'pianificazione').length}</strong> in pianificazione</span>
+          <span><strong>{visibleEvents.filter(e => e.stato === 'completato').length}</strong> completati</span>
+        </div>
+
+        <div className="wire-tabs" style={{ flexWrap: 'wrap', alignItems: 'center', gap: '16px', marginTop: 12 }}>
+          {STATI.map(stato => (
+            <button key={stato} onClick={() => setFilterStato(stato)}
+              className={`wire-tab ${filterStato === stato ? 'wire-tab--active' : ''}`}>
+              {stato === 'Tutti' ? 'Tutti' : statoLabel(stato)}
             </button>
-          )}
-          {!search && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>Usa Fly ↑ per domande complesse</span>
-          )}
+          ))}
+          <div style={{ flex: 1, minWidth: '160px', display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+            <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+            <input type="text" placeholder="Cerca evento o location..." value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="flex-1 bg-transparent focus:outline-none"
+              style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }} />
+            {search && (
+              <button onClick={() => setSearch('')}>
+                <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+              </button>
+            )}
+            {!search && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--muted)', whiteSpace: 'nowrap', fontStyle: 'italic' }}>Usa Fly per domande complesse</span>
+            )}
+          </div>
         </div>
       </div>
 
