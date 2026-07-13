@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Star, Download, Leaf, Sparkles, Loader2 } from 'lucide-react'
+import { Star, Download, Leaf, Sparkles, Loader2, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { loadUser } from '@/lib/auth'
 import { fmtShort } from '@/lib/format'
+import { regenerateGreenReport, type GreenReport } from '@/lib/events-service'
 import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
 
@@ -94,6 +95,8 @@ interface FlyGreenReport {
 
 export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const user = loadUser()
+  const [autoReport, setAutoReport] = useState<GreenReport | null>(null)
+  const [recalculating, setRecalculating] = useState(false)
   const [data, setData] = useState<GreenData>({
     event_id: event.id,
     pax: (event as any).pax || 0,
@@ -116,6 +119,7 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
   useEffect(() => {
     loadGreenData()
     loadSynergyData()
+    regenerateGreenReport(event.id).then(r => { if (r) setAutoReport(r) })
   }, [event.id])
 
   async function loadGreenData() {
@@ -233,6 +237,13 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
     }
   }
 
+  async function handleRecalculate() {
+    setRecalculating(true)
+    const r = await regenerateGreenReport(event.id)
+    if (r) setAutoReport(r)
+    setRecalculating(false)
+  }
+
   // ─── Transport CO2 calculation ─────────────────────────────────────────────
   const co2Trasporti = useMemo(() => {
     const factor = FACTORS[data.mezzo_prevalente] || FACTORS.misto
@@ -278,12 +289,18 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
     doc.text(`Data: ${fmtShort(event.dataInizio)} - ${fmtShort(event.dataFine)}`, 20, 52)
     doc.text(`Partecipanti: ${data.pax}`, 20, 58)
 
-    doc.setFontSize(11)
-    doc.text('RIEPILOGO IMPATTO AMBIENTALE', 20, 72)
-    doc.setDrawColor(200)
-    doc.line(20, 74, 190, 74)
+    // Auto-report summary
+    if (autoReport) {
+      doc.setFontSize(10)
+      doc.text(`Score sostenibilita: ${autoReport.score_100.toFixed(0)}/100  |  Rifiuti: ${autoReport.waste_kg.toFixed(1)} kg  |  Acqua: ${autoReport.water_liters.toFixed(0)} L  |  Energia: ${autoReport.energy_kwh.toFixed(1)} kWh`, 20, 64)
+    }
 
-    let yPos = 82
+    doc.setFontSize(11)
+    doc.text('RIEPILOGO IMPATTO AMBIENTALE', 20, autoReport ? 74 : 72)
+    doc.setDrawColor(200)
+    doc.line(20, autoReport ? 76 : 74, 190, autoReport ? 76 : 74)
+
+    let yPos = autoReport ? 84 : 82
     doc.setFontSize(10)
 
     // If we have fly report with routes
@@ -362,6 +379,24 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
       yPos += 6
     }
 
+    // Auto-report recommendations
+    if (autoReport?.recommendations?.length && yPos < 240) {
+      doc.setFontSize(10)
+      doc.setTextColor(0)
+      doc.text('RACCOMANDAZIONI AUTOMATICHE', 20, yPos)
+      doc.setDrawColor(200)
+      doc.line(20, yPos + 2, 190, yPos + 2)
+      yPos += 10
+      doc.setFontSize(9)
+      doc.setTextColor(60)
+      for (const rec of autoReport.recommendations) {
+        doc.text(`-> ${rec}`, 22, yPos)
+        yPos += 6
+        if (yPos > 258) break
+      }
+      yPos += 4
+    }
+
     doc.setFontSize(7)
     doc.setTextColor(150)
     doc.text('Dati verificati tramite ricerca web | Fly AI | Simmetria Synergy', 20, 270)
@@ -415,6 +450,60 @@ export function TabGreenReport({ event, suppliers }: { event: Event; suppliers: 
           </button>
         </div>
       </div>
+
+      {/* AUTO-GENERATED SUMMARY DASHBOARD */}
+      {autoReport && (
+        <div style={{ border: '1px solid var(--green)', borderRadius: 14, padding: 20, background: 'color-mix(in srgb, var(--green) 4%, transparent)' }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--green)', fontWeight: 600 }}>
+              REPORT AUTOGENERATO
+            </p>
+            <button
+              onClick={handleRecalculate}
+              disabled={recalculating}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-all hover:scale-105"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--green)', background: 'transparent', border: '1px solid var(--green)', cursor: recalculating ? 'wait' : 'pointer' }}
+            >
+              <RefreshCw className={`w-3 h-3 ${recalculating ? 'animate-spin' : ''}`} />
+              Ricalcola
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div style={{ textAlign: 'center', padding: 12, borderRadius: 10, background: 'var(--panel2)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>CO2 TOTALE</p>
+              <p style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{autoReport.co2_total_kg.toFixed(1)} <span style={{ fontSize: 10, fontWeight: 400 }}>kg</span></p>
+            </div>
+            <div style={{ textAlign: 'center', padding: 12, borderRadius: 10, background: 'var(--panel2)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>SCORE</p>
+              <p style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 700, color: autoReport.score_100 >= 50 ? 'var(--green)' : 'var(--yellow)' }}>{autoReport.score_100.toFixed(0)}<span style={{ fontSize: 10, fontWeight: 400 }}>/100</span></p>
+            </div>
+            <div style={{ textAlign: 'center', padding: 12, borderRadius: 10, background: 'var(--panel2)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>RIFIUTI</p>
+              <p style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{autoReport.waste_kg.toFixed(1)} <span style={{ fontSize: 10, fontWeight: 400 }}>kg</span></p>
+            </div>
+            <div style={{ textAlign: 'center', padding: 12, borderRadius: 10, background: 'var(--panel2)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>ACQUA</p>
+              <p style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{autoReport.water_liters.toFixed(0)} <span style={{ fontSize: 10, fontWeight: 400 }}>L</span></p>
+            </div>
+          </div>
+          {autoReport.recommendations.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>RACCOMANDAZIONI</p>
+              <div className="space-y-1.5">
+                {autoReport.recommendations.map((r, i) => (
+                  <div key={i} className="flex items-start gap-2" style={{ fontSize: 12, color: 'var(--text)' }}>
+                    <span style={{ color: 'var(--green)', flexShrink: 0, marginTop: 1 }}>&#8594;</span>
+                    <span>{r}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', marginTop: 12, textAlign: 'right' }}>
+            Aggiornato: {new Date(autoReport.updated_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+      )}
 
       {/* TRASPORTI */}
       <div>

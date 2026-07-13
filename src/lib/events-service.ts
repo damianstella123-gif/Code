@@ -316,3 +316,102 @@ export async function moveEventWithTimelineShift(eventId: string, newStartDate: 
 export async function resizeEventOnly(eventId: string, newStartDate: string, newEndDate: string): Promise<Event | null> {
   return await updateEvent(eventId, { dataInizio: newStartDate, dataFine: newEndDate })
 }
+
+// ─── Green Report Auto-Generation ────────────────────────────────────────────
+
+export interface GreenReport {
+  id: string
+  event_id: string
+  co2_total_kg: number
+  waste_kg: number
+  water_liters: number
+  energy_kwh: number
+  renewable_pct: number
+  score_100: number
+  recommendations: string[]
+  generated_at: string
+  updated_at: string
+}
+
+export async function regenerateGreenReport(eventId: string): Promise<GreenReport | null> {
+  const { data: event } = await supabase.from('events')
+    .select('*').eq('id', eventId).maybeSingle()
+  if (!event) return null
+
+  const { data: suppliers } = await supabase.from('event_supplier_services')
+    .select('*').eq('event_id', eventId)
+
+  const { data: greenData } = await supabase.from('event_green_data')
+    .select('distanza_km, pax, mezzo_prevalente').eq('event_id', eventId).maybeSingle()
+
+  const attendees = greenData?.pax || event.attendees || 1
+  const locationKm = greenData?.distanza_km || 0
+
+  // CO2 transport
+  const mezzo = greenData?.mezzo_prevalente || 'misto'
+  const factors: Record<string, number> = { auto: 0.170, treno: 0.041, aereo: 0.255, misto: 0.106 }
+  const factor = factors[mezzo] || factors.misto
+  const co2_transport = attendees * locationKm * 2 * factor
+
+  // CO2 suppliers
+  let co2_suppliers = 0
+  if (suppliers) {
+    for (const s of suppliers) {
+      const cat = ((s as any).categoria || '').toLowerCase()
+      if (cat.includes('hotel')) co2_suppliers += (s.quantity || 1) * 2.5 * attendees
+      else if (cat.includes('catering') || cat.includes('ristor')) co2_suppliers += (s.quantity || 1) * 1.2 * attendees
+      else if (cat.includes('audio') || cat.includes('video')) co2_suppliers += (s.quantity || 1) * 0.3
+      else if (cat.includes('stampa') || cat.includes('grafica')) co2_suppliers += (s.quantity || 1) * 0.02
+      else co2_suppliers += 1 * attendees
+    }
+  }
+
+  const co2_total = co2_transport + co2_suppliers
+  const waste_kg = attendees * 0.5
+  const water_liters = attendees * 2.5
+
+  const startMs = new Date(event.start_date).getTime()
+  const endMs = new Date(event.end_date).getTime()
+  const durationHours = Math.max(1, Math.ceil((endMs - startMs) / (1000 * 60 * 60)))
+  const energy_kwh = (durationHours * 5) + ((suppliers?.length || 0) * 0.2)
+
+  const locationLower = (event.location || '').toLowerCase()
+  const renewable_pct = (locationLower.includes('solar') || locationLower.includes('eco') || locationLower.includes('green')) ? 30 : 0
+
+  // Score 0-100
+  let score = 50
+  score += (100 - attendees * 0.5) / Math.max(attendees, 1)
+  score -= co2_total / 100
+  score += renewable_pct / 2
+  score = Math.max(0, Math.min(100, Math.round(score)))
+
+  // Recommendations
+  const recommendations: string[] = []
+  if (co2_total > 200) recommendations.push('Considerare compensazione carbonio')
+  if (renewable_pct === 0) recommendations.push('Venue ha opzioni energia rinnovabile?')
+  if (waste_kg > attendees * 0.3) recommendations.push('Implementare raccolta differenziata')
+  if (attendees > 100) recommendations.push('Preferire trasporto collettivo')
+  if (locationKm > 50) recommendations.push('Considerare evento ibrido/online')
+  if (co2_suppliers > co2_transport) recommendations.push('Valutare fornitori con certificazioni green')
+
+  const { data: report, error } = await supabase.from('green_reports')
+    .upsert({
+      event_id: eventId,
+      co2_total_kg: co2_total,
+      waste_kg,
+      water_liters,
+      energy_kwh,
+      renewable_pct,
+      score_100: score,
+      recommendations,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'event_id' })
+    .select()
+    .maybeSingle()
+
+  if (error) {
+    logError('events-service', 'regenerateGreenReport', error)
+    return null
+  }
+  return report as GreenReport | null
+}
