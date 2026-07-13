@@ -56,6 +56,29 @@ export function calcRowEconomics(row: RawRow, category: string): RowEconomics {
   return { venduto, costo, hasDate }
 }
 
+export function normalizzaImporto(importo: number, aliquota: string | number | null, inclusa: boolean): number {
+  if (!importo || importo === 0) return 0
+  if (inclusa) {
+    const pct = parseFloat(String(aliquota || 22)) || 22
+    return importo / (1 + pct / 100)
+  }
+  return importo
+}
+
+export function calcRowNetto(row: RawRow, venduto: number, costo: number): { vendutoNetto: number; costoNetto: number } {
+  const vendutoNetto = normalizzaImporto(
+    venduto,
+    (row.aliquota_iva_venduto as string | number | null) ?? 22,
+    (row.iva_inclusa_venduto as boolean) ?? false
+  )
+  const costoNetto = normalizzaImporto(
+    costo,
+    (row.aliquota_iva_costo as string | number | null) ?? 22,
+    (row.iva_inclusa_costo as boolean) ?? false
+  )
+  return { vendutoNetto, costoNetto }
+}
+
 export function calcRowCommission(row: RawRow, costo: number): number {
   const commImporto = (row.commissione_importo as number) || 0
   const commPct = (row.commissione_pct as number) || 0
@@ -77,32 +100,33 @@ export interface EventEconomicsSummary {
 }
 
 export async function fetchAllEventsEconomics(feePctByEvent: Record<string, number>): Promise<EventEconomicsSummary[]> {
+  const IVA_COLS = ', aliquota_iva_venduto, iva_inclusa_venduto, aliquota_iva_costo, iva_inclusa_costo'
   const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes] = await Promise.all([
-    supabase.from('event_supplier_services').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo, dmc_categoria'),
-    supabase.from('event_hotel_details').select('event_id, supplier_id, tipo, payment_mode, rooms_client_count, room_rate_client, rooms_simmetria_count, room_cost_simmetria, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, check_in_date, data, ora_inizio, commissione_pct, commissione_importo, costo_area_speciale, venduto_area_speciale'),
-    supabase.from('event_restaurant_details').select('event_id, supplier_id, budget_totale, budget_per_persona, pax_confermati, pax_previsti, costo_totale_reale, costo_per_persona, data, ora_inizio, commissione_pct, commissione_importo, costo_area_speciale, venduto_area_speciale'),
-    supabase.from('event_experience_details').select('event_id, supplier_id, venduto_totale, venduto_per_persona, costo_totale, costo_per_persona, pax, data, ora_inizio, ora, commissione_pct, commissione_importo, dmc_categoria'),
-    supabase.from('event_catering_details').select('event_id, supplier_id, venduto_totale, venduto_per_persona, costo_totale, costo_per_persona, pax, data, ora_inizio, ora, commissione_pct, commissione_importo'),
-    supabase.from('event_staff_interno_details').select('event_id, profile_id, venduto_totale, costo_totale, costo_giornaliero, data, ora_inizio, commissione_pct, commissione_importo'),
-    supabase.from('event_staff_esterno_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo'),
-    supabase.from('event_varie_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo, costo_area_speciale, venduto_area_speciale'),
-    supabase.from('event_audio_video_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo'),
-    supabase.from('event_allestimenti_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo'),
-    supabase.from('event_grafica_stampa_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo'),
+    supabase.from('event_supplier_services').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo, dmc_categoria' + IVA_COLS),
+    supabase.from('event_hotel_details').select('event_id, supplier_id, tipo, payment_mode, rooms_client_count, room_rate_client, rooms_simmetria_count, room_cost_simmetria, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, check_in_date, data, ora_inizio, commissione_pct, commissione_importo, costo_area_speciale, venduto_area_speciale' + IVA_COLS),
+    supabase.from('event_restaurant_details').select('event_id, supplier_id, budget_totale, budget_per_persona, pax_confermati, pax_previsti, costo_totale_reale, costo_per_persona, data, ora_inizio, commissione_pct, commissione_importo, costo_area_speciale, venduto_area_speciale' + IVA_COLS),
+    supabase.from('event_experience_details').select('event_id, supplier_id, venduto_totale, venduto_per_persona, costo_totale, costo_per_persona, pax, data, ora_inizio, ora, commissione_pct, commissione_importo, dmc_categoria' + IVA_COLS),
+    supabase.from('event_catering_details').select('event_id, supplier_id, venduto_totale, venduto_per_persona, costo_totale, costo_per_persona, pax, data, ora_inizio, ora, commissione_pct, commissione_importo' + IVA_COLS),
+    supabase.from('event_staff_interno_details').select('event_id, profile_id, venduto_totale, costo_totale, costo_giornaliero, data, ora_inizio, commissione_pct, commissione_importo' + IVA_COLS),
+    supabase.from('event_staff_esterno_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo' + IVA_COLS),
+    supabase.from('event_varie_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo, costo_area_speciale, venduto_area_speciale' + IVA_COLS),
+    supabase.from('event_audio_video_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo' + IVA_COLS),
+    supabase.from('event_allestimenti_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo' + IVA_COLS),
+    supabase.from('event_grafica_stampa_details').select('event_id, supplier_id, venduto_totale, venduto_unitario, costo_totale, costo_unitario, quantita, data, ora_inizio, commissione_pct, commissione_importo' + IVA_COLS),
   ])
 
   const catToRows: { category: string; rows: RawRow[] }[] = [
-    { category: 'transfer', rows: (svcRes.data ?? []) as RawRow[] },
-    { category: 'hotel', rows: (hotelRes.data ?? []) as RawRow[] },
-    { category: 'ristorante', rows: (restRes.data ?? []) as RawRow[] },
-    { category: 'experience', rows: (expRes.data ?? []) as RawRow[] },
-    { category: 'catering', rows: (catRes.data ?? []) as RawRow[] },
-    { category: 'staff_interno', rows: (staffIntRes.data ?? []) as RawRow[] },
-    { category: 'staff_esterno', rows: (staffExtRes.data ?? []) as RawRow[] },
-    { category: 'varie', rows: (varieRes.data ?? []) as RawRow[] },
-    { category: 'audio_video', rows: (avRes.data ?? []) as RawRow[] },
-    { category: 'allestimenti', rows: (allestRes.data ?? []) as RawRow[] },
-    { category: 'grafica_stampa', rows: (graficaRes.data ?? []) as RawRow[] },
+    { category: 'transfer', rows: ((svcRes.data ?? []) as unknown) as RawRow[] },
+    { category: 'hotel', rows: ((hotelRes.data ?? []) as unknown) as RawRow[] },
+    { category: 'ristorante', rows: ((restRes.data ?? []) as unknown) as RawRow[] },
+    { category: 'experience', rows: ((expRes.data ?? []) as unknown) as RawRow[] },
+    { category: 'catering', rows: ((catRes.data ?? []) as unknown) as RawRow[] },
+    { category: 'staff_interno', rows: ((staffIntRes.data ?? []) as unknown) as RawRow[] },
+    { category: 'staff_esterno', rows: ((staffExtRes.data ?? []) as unknown) as RawRow[] },
+    { category: 'varie', rows: ((varieRes.data ?? []) as unknown) as RawRow[] },
+    { category: 'audio_video', rows: ((avRes.data ?? []) as unknown) as RawRow[] },
+    { category: 'allestimenti', rows: ((allestRes.data ?? []) as unknown) as RawRow[] },
+    { category: 'grafica_stampa', rows: ((graficaRes.data ?? []) as unknown) as RawRow[] },
   ]
 
   const byEvent: Record<string, { venduto: number; costo: number; commissioni: number; count: number }> = {}
@@ -113,11 +137,12 @@ export async function fetchAllEventsEconomics(feePctByEvent: Record<string, numb
       if (!eid) continue
       const econ = calcRowEconomics(row, category)
       if (!econ.venduto && !econ.costo) continue
+      const { vendutoNetto, costoNetto } = calcRowNetto(row, econ.venduto, econ.costo)
       if (!byEvent[eid]) byEvent[eid] = { venduto: 0, costo: 0, commissioni: 0, count: 0 }
-      byEvent[eid].venduto += econ.venduto
-      byEvent[eid].costo += econ.costo
+      byEvent[eid].venduto += vendutoNetto
+      byEvent[eid].costo += costoNetto
       byEvent[eid].count += 1
-      byEvent[eid].commissioni += calcRowCommission(row, econ.costo)
+      byEvent[eid].commissioni += calcRowCommission(row, costoNetto)
     }
   }
 

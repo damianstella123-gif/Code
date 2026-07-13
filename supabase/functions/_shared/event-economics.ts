@@ -56,6 +56,29 @@ export function calcRowEconomics(row: RawRow, category: string): RowEconomics {
   return { venduto, costo, hasDate }
 }
 
+export function normalizzaImporto(importo: number, aliquota: string | number | null, inclusa: boolean): number {
+  if (!importo || importo === 0) return 0
+  if (inclusa) {
+    const pct = parseFloat(String(aliquota || 22)) || 22
+    return importo / (1 + pct / 100)
+  }
+  return importo
+}
+
+export function calcRowNetto(row: RawRow, venduto: number, costo: number): { vendutoNetto: number; costoNetto: number } {
+  const vendutoNetto = normalizzaImporto(
+    venduto,
+    (row.aliquota_iva_venduto as string | number | null) ?? 22,
+    (row.iva_inclusa_venduto as boolean) ?? false
+  )
+  const costoNetto = normalizzaImporto(
+    costo,
+    (row.aliquota_iva_costo as string | number | null) ?? 22,
+    (row.iva_inclusa_costo as boolean) ?? false
+  )
+  return { vendutoNetto, costoNetto }
+}
+
 export function calcRowCommission(row: RawRow, costo: number): number {
   const commImporto = (row.commissione_importo as number) || 0
   const commPct = (row.commissione_pct as number) || 0

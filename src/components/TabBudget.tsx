@@ -152,6 +152,15 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
     const all: BudgetLine[] = []
 
+    function normalizzaImporto(importo: number, aliquota: string | number | null, inclusa: boolean): number {
+      if (!importo || importo === 0) return 0
+      if (inclusa) {
+        const pct = parseFloat(String(aliquota || 22)) || 22
+        return importo / (1 + pct / 100)
+      }
+      return importo
+    }
+
     function pushLine(row: Record<string, unknown>, categoria: string, table: string, opts: {
       descrizione: string
       qty: number
@@ -162,8 +171,18 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       commissione_importo?: number | null
       dateLabel?: string
     }) {
-      const margine = opts.venduto - opts.costo
-      const marginePct = opts.venduto > 0 ? (margine / opts.venduto) * 100 : 0
+      const costoNetto = normalizzaImporto(
+        opts.costo,
+        (row.aliquota_iva_costo as string | number | null) ?? 22,
+        (row.iva_inclusa_costo as boolean) ?? false
+      )
+      const vendutoNetto = normalizzaImporto(
+        opts.venduto,
+        (row.aliquota_iva_venduto as string | number | null) ?? 22,
+        (row.iva_inclusa_venduto as boolean) ?? false
+      )
+      const margine = vendutoNetto - costoNetto
+      const marginePct = vendutoNetto > 0 ? (margine / vendutoNetto) * 100 : 0
       all.push({
         id: row.id as string,
         categoria,

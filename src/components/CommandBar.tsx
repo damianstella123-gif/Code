@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Send, X, Calendar, Users, Briefcase, CheckSquare, PawPrint, Check, XCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { trackAction } from '@/lib/impact-tracker'
@@ -180,8 +180,9 @@ function EntityCard({ entity, navigate }: { entity: FlyEntity; navigate: (path: 
 
 // ─── Main CommandBar ──────────────────────────────────────────────────────────
 
-export default function CommandBar({ events, tasks, clients, onFilter }: CommandBarProps) {
+export default function CommandBar({ events, tasks, clients }: CommandBarProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const [query, setQuery] = useState('')
   const [focused, setFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -193,6 +194,9 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
   const [flyInput, setFlyInput] = useState('')
   const [flyError, setFlyError] = useState<string | null>(null)
   const flyEndRef = useRef<HTMLDivElement>(null)
+
+  const [smartSuggestions, setSmartSuggestions] = useState<{label:string;query:string}[]>([])
+  const [recentQueries, setRecentQueries] = useState<string[]>([])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -214,6 +218,52 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
   }, [])
+
+  useEffect(() => {
+    const path = location.pathname
+    const hour = new Date().getHours()
+    const sugg: {label:string;query:string}[] = []
+
+    if (hour >= 8 && hour <= 10)
+      sugg.push({ label: 'Briefing mattino', query: 'cosa ho oggi?' })
+    if (hour >= 16 && hour <= 18)
+      sugg.push({ label: 'Riepilogo giornata', query: 'cosa ho completato oggi?' })
+
+    if (path.includes('/eventi/') && path.split('/').length > 2) {
+      sugg.push(
+        { label: 'Margine evento', query: 'qual e\' il margine di questo evento?' },
+        { label: 'Task aperti', query: 'quali task sono aperti su questo evento?' },
+        { label: 'Green Report', query: 'genera il green report di questo evento' }
+      )
+    } else if (path === '/fornitori') {
+      sugg.push(
+        { label: 'Hotel Milano', query: 'fornitori hotel a Milano' },
+        { label: 'DMC estero', query: 'fornitori DMC per eventi internazionali' }
+      )
+    } else if (path === '/calendario') {
+      sugg.push(
+        { label: 'Questa settimana', query: 'cosa ho questa settimana?' },
+        { label: 'Conflitti', query: 'ci sono sovrapposizioni nel calendario?' }
+      )
+    } else if (path === '/amministrazione') {
+      sugg.push(
+        { label: 'In attesa', query: 'quali pagamenti aspettano approvazione?' },
+        { label: 'Liquidita\'', query: 'qual e\' la liquidita\' complessiva?' }
+      )
+    }
+
+    sugg.push(
+      { label: 'Cosa fare adesso', query: 'cosa dovrei fare adesso?' },
+      { label: 'Scadenze oggi', query: 'cosa scade oggi o domani?' }
+    )
+
+    setSmartSuggestions(sugg.slice(0, 5))
+
+    try {
+      const r = JSON.parse(localStorage.getItem('fly_recent') || '[]')
+      setRecentQueries(r.slice(0, 3))
+    } catch { /* ignore */ }
+  }, [location.pathname])
 
   useEffect(() => {
     flyEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -448,15 +498,25 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
     setFlyHistory(updated)
   }, [flyHistory])
 
+  const saveRecent = useCallback((q: string) => {
+    try {
+      const prev = JSON.parse(localStorage.getItem('fly_recent') || '[]')
+      const updated = [q, ...prev.filter((x: string) => x !== q)].slice(0, 5)
+      localStorage.setItem('fly_recent', JSON.stringify(updated))
+      setRecentQueries(updated.slice(0, 3))
+    } catch { /* ignore */ }
+  }, [])
+
   const openFlyWithQuery = useCallback((text: string) => {
     setFlyOpen(true)
     setFocused(false)
     setQuery('')
     if (text.trim()) {
+      saveRecent(text.trim())
       setFlyInput(text.trim())
       askFly(text.trim())
     }
-  }, [askFly])
+  }, [askFly, saveRecent])
 
   const handleFlyKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -471,12 +531,6 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
       openFlyWithQuery(query)
     }
   }
-
-  const suggestions = [
-    { label: 'cosa scade oggi?', filter: 'scade_oggi' },
-    { label: 'eventi in corso', filter: 'eventi_in_corso' },
-    { label: 'clienti attivi', filter: 'clienti_attivi' },
-  ]
 
   const showDropdown = focused
 
@@ -499,19 +553,33 @@ export default function CommandBar({ events, tasks, clients, onFilter }: Command
       {showDropdown && (
         <div className="cmd-dropdown">
           {!query.trim() ? (
-            <div className="cmd-suggestions">
-              {suggestions.map(s => (
-                <button
-                  key={s.filter}
-                  className="cmd-suggestion-pill"
-                  onClick={() => {
-                    onFilter?.(s.filter)
-                    setFocused(false)
-                  }}
-                >
-                  {s.label}
-                </button>
-              ))}
+            <div style={{ padding: '12px 16px' }}>
+              {recentQueries.length > 0 && (
+                <>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.12em', color: 'var(--muted)', marginBottom: 6 }}>RECENTI</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>
+                    {recentQueries.map(r => (
+                      <button key={r} onClick={() => openFlyWithQuery(r)} style={{ padding: '4px 10px', borderRadius: 99, border: '1px solid var(--line)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', cursor: 'pointer' }}>
+                        {r.slice(0, 30)}{r.length > 30 ? '...' : ''}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.12em', color: 'var(--muted)', marginBottom: 6 }}>SUGGERITI PER TE</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {smartSuggestions.map(s => (
+                  <button
+                    key={s.query}
+                    onClick={() => openFlyWithQuery(s.query)}
+                    style={{ padding: '6px 12px', borderRadius: 99, border: '1px solid var(--line)', background: 'var(--panel2)', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)', cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--red2)'; e.currentTarget.style.color = 'var(--red2)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--text)' }}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="cmd-results">

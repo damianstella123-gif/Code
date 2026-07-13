@@ -1748,7 +1748,7 @@ textarea::placeholder {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
-.animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.animate-fade-in { animation: fadeIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 .animate-slide-in-right { animation: slideInRight 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 

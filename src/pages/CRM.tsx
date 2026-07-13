@@ -517,6 +517,7 @@ function CompanyDetail({ group, onBack, onRefresh, onNavigateToEvent }: CompanyD
 
 export default function CRM() {
   const [clientList, setClientList] = useState<Client[]>([])
+  const [initialLoading, setInitialLoading] = useState(true)
   const [selectedName, setSelectedName] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterStato>('Tutti')
   const [search, setSearch] = useState('')
@@ -526,6 +527,7 @@ export default function CRM() {
   const refresh = useCallback(async () => {
     const list = await fetchClients()
     setClientList(list)
+    setInitialLoading(false)
   }, [])
 
   useEffect(() => { refresh() }, [refresh])
@@ -653,7 +655,17 @@ export default function CRM() {
 
       {/* Company cards grid */}
       <div style={{ marginTop: '20px' }}>
-        {filtered.length === 0 ? (
+        {initialLoading ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} style={{ borderRadius: 14, border: '1px solid var(--line)', padding: 16, background: 'var(--panel)' }}>
+                {[80, 60, 40].map((w, j) => (
+                  <div key={j} style={{ height: 12, width: `${w}%`, background: 'var(--line)', borderRadius: 6, marginBottom: 8, animation: 'shimmer 1.5s infinite' }} />
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="p-12 text-center" style={{ color: 'var(--muted)' }}>
             <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Nessuna azienda trovata</p>

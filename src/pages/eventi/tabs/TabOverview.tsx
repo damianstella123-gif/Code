@@ -26,6 +26,8 @@ export function TabOverview({ event, progress, completedTasks, totalTasks, budge
   const cliente = clients.find(c => c.id === event.cliente)
 
   const [taskList, setTaskList] = useState<Task[]>([])
+  const [teamRolesMap, setTeamRolesMap] = useState<Record<string, string[]>>({})
+
   useEffect(() => {
     supabase.from('tasks').select('*')
       .eq('event_id', event.id)
@@ -34,6 +36,15 @@ export function TabOverview({ event, progress, completedTasks, totalTasks, budge
       .limit(5)
       .then(({ data }) => {
         if (data) setTaskList(data as unknown as Task[])
+      })
+    supabase.from('event_team_roles').select('profile_id, ruoli_operativi')
+      .eq('event_id', event.id)
+      .then(({ data }) => {
+        if (data) {
+          const map: Record<string, string[]> = {}
+          for (const row of data) map[row.profile_id] = row.ruoli_operativi || []
+          setTeamRolesMap(map)
+        }
       })
   }, [event.id])
 
@@ -116,12 +127,20 @@ export function TabOverview({ event, progress, completedTasks, totalTasks, budge
               const u = internalUsers.find(x => x.id === memberId)
               if (!u) return null
               const isResp = memberId === event.responsabile
+              const roles = teamRolesMap[memberId] || []
               return (
                 <div key={memberId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
                   <img src={u.avatar} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, color: 'var(--text)' }}>{u.nome}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, color: 'var(--text)' }}>{u.nome}</span>
+                    {roles.length > 0 && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginLeft: 8 }}>
+                        — {roles.join(', ')}
+                      </span>
+                    )}
+                  </div>
                   {isResp && (
-                    <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--red2)', marginLeft: 'auto' }}>RESPONSABILE</span>
+                    <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--red2)', flexShrink: 0 }}>RESPONSABILE</span>
                   )}
                 </div>
               )

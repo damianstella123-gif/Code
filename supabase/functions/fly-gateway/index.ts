@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
-import { calcRowEconomics, calcRowCommission, type RawRow } from "../_shared/event-economics.ts";
+import { calcRowEconomics, calcRowCommission, calcRowNetto, type RawRow } from "../_shared/event-economics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -605,21 +605,22 @@ async function executeTool(
           for (const row of rows) {
             const econ = calcRowEconomics(row, category);
             if (!econ.venduto && !econ.costo) continue;
-            const comm = calcRowCommission(row, econ.costo);
+            const { vendutoNetto, costoNetto } = calcRowNetto(row, econ.venduto, econ.costo);
+            const comm = calcRowCommission(row, costoNetto);
             const suppId = (row.supplier_id as string) || (row.profile_id as string) || "";
-            const margine = econ.venduto - econ.costo;
-            const marginePct = econ.venduto > 0 ? (margine / econ.venduto) * 100 : 0;
+            const margine = vendutoNetto - costoNetto;
+            const marginePct = vendutoNetto > 0 ? (margine / vendutoNetto) * 100 : 0;
             righe.push({
               fornitore: suppMap[suppId] || suppId || "(interno)",
               categoria: category,
               dmc_categoria: (row.dmc_categoria as string) || null,
-              costo: Math.round(econ.costo * 100) / 100,
-              venduto: Math.round(econ.venduto * 100) / 100,
+              costo: Math.round(costoNetto * 100) / 100,
+              venduto: Math.round(vendutoNetto * 100) / 100,
               margine: Math.round(margine * 100) / 100,
               margine_pct: Math.round(marginePct * 10) / 10,
             });
-            totVenduto += econ.venduto;
-            totCosto += econ.costo;
+            totVenduto += vendutoNetto;
+            totCosto += costoNetto;
             totCommissioni += comm;
           }
         }
@@ -723,10 +724,11 @@ async function executeTool(
           if (!eid) continue;
           const econ = calcRowEconomics(row, category);
           if (!econ.venduto && !econ.costo) continue;
+          const { vendutoNetto, costoNetto } = calcRowNetto(row, econ.venduto, econ.costo);
           if (!byEvent[eid]) byEvent[eid] = { venduto: 0, costo: 0, commissioni: 0 };
-          byEvent[eid].venduto += econ.venduto;
-          byEvent[eid].costo += econ.costo;
-          byEvent[eid].commissioni += calcRowCommission(row, econ.costo);
+          byEvent[eid].venduto += vendutoNetto;
+          byEvent[eid].costo += costoNetto;
+          byEvent[eid].commissioni += calcRowCommission(row, costoNetto);
         }
       }
 
@@ -977,11 +979,27 @@ async function executeTool(
 
       if (error) return JSON.stringify({ error: error.message });
       if (!data || data.length === 0) return "Nessun membro del team trovato.";
+
+      const { data: rolesData } = await supabase
+        .from("event_team_roles")
+        .select("profile_id, event_id, ruoli_operativi");
+
+      const rolesMap: Record<string, { event_id: string; ruoli: string[] }[]> = {};
+      if (rolesData) {
+        for (const r of rolesData) {
+          if (!rolesMap[r.profile_id]) rolesMap[r.profile_id] = [];
+          if (r.ruoli_operativi && r.ruoli_operativi.length > 0) {
+            rolesMap[r.profile_id].push({ event_id: r.event_id, ruoli: r.ruoli_operativi });
+          }
+        }
+      }
+
       return JSON.stringify(
         data.map((p) => ({
           id: p.id,
           nome: `${p.first_name || ""} ${p.last_name || ""}`.trim(),
           reparto: p.reparto,
+          ruoli_operativi: rolesMap[p.id] || [],
         }))
       );
     }

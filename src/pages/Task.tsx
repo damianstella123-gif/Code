@@ -226,6 +226,7 @@ export default function TaskPage() {
   const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const [taskList, setTaskList] = useState<Task[]>([])
+  const [initialLoading, setInitialLoading] = useState(true)
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [filterStato, setFilterStato] = useState('Tutti')
@@ -244,6 +245,7 @@ export default function TaskPage() {
       if (cancelled) return
       setTaskList(remote)
       cacheTasksSnapshot(remote)
+      setInitialLoading(false)
     })
     return () => { cancelled = true }
   }, [])
@@ -446,7 +448,17 @@ export default function TaskPage() {
 
       {/* Task List */}
       <div style={{ marginTop: '8px' }}>
-        {sorted.open.length === 0 && sorted.done.length === 0 ? (
+        {initialLoading ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} style={{ borderRadius: 14, border: '1px solid var(--line)', padding: 16, background: 'var(--panel)' }}>
+                {[80, 60, 40].map((w, j) => (
+                  <div key={j} style={{ height: 12, width: `${w}%`, background: 'var(--line)', borderRadius: 6, marginBottom: 8, animation: 'shimmer 1.5s infinite' }} />
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : sorted.open.length === 0 && sorted.done.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: 1.7 }}>
             Niente da fare &mdash; o e un gran giorno<br/>o e il momento di pianificare il prossimo evento
           </div>

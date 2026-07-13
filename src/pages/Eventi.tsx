@@ -484,7 +484,7 @@ export default function Eventi() {
       return
     }
     if (newStato === 'completato') {
-      showToast(`Evento completato! Ottimo lavoro su ${event.nome}`, 'success')
+      showToast(`\ud83c\udf89 Evento completato! Ottimo lavoro su ${event.nome}`, 'success')
     }
     const refreshed = await refreshEvents()
     if (selectedEvent && selectedEvent.id === event.id) {
