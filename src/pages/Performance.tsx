@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieCha
 import { TrendingUp, TrendingDown, Minus, Save, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
-import { getAllEventsROI, type EventROI } from '@/lib/events-service'
+import { getAllEventsROI, getEventROI, type EventROI } from '@/lib/events-service'
 import { fmtShort } from '@/lib/format'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -412,6 +412,24 @@ function EventDetailModal({ event: e, onClose }: { event: EventROI; onClose: () 
             </span>
           </div>
         )}
+
+        <button
+          onClick={async () => {
+            await getEventROI(e.event_id, true)
+            alert('Debug ROI stampato in Console (F12)')
+          }}
+          style={{
+            marginTop: 16, width: '100%', padding: '10px 14px', borderRadius: 8,
+            background: 'var(--panel2)', border: '1px solid var(--line)',
+            cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11,
+            color: 'var(--muted)', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: 6, transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--line)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
+        >
+          Debug Calcoli (Console F12)
+        </button>
       </div>
     </div>
   )

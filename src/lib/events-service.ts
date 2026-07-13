@@ -439,10 +439,12 @@ export interface EventROI {
   status: string
 }
 
-export async function getEventROI(eventId: string): Promise<EventROI | null> {
+export async function getEventROI(eventId: string, debug = false): Promise<EventROI | null> {
   const { data: event } = await supabase.from('events')
     .select('*').eq('id', eventId).maybeSingle()
   if (!event) return null
+
+  if (debug) console.log('%c ROI Debug — ' + event.title, 'font-weight:bold;font-size:13px')
 
   const [hotels, restaurant, catering, staffInt, staffExt, varie, audioVideo, allestimenti, graficaStampa, experience, assicurazioni, agenziaViaggi, tasks] = await Promise.all([
     supabase.from('event_hotel_details').select('costo_totale').eq('event_id', eventId),
@@ -489,6 +491,34 @@ export async function getEventROI(eventId: string): Promise<EventROI | null> {
   const on_time_pct = tasksAll.length > 0 ? (tasksCompleted / tasksAll.length) * 100 : 0
 
   const within_budget = event.margine_target ? margine_pct >= Number(event.margine_target) : costi_totali <= revenue
+
+  if (debug) {
+    console.table({
+      'Revenue (ricavo_cliente)': `\u20AC${revenue.toLocaleString('it-IT')}`,
+      'Hotel': `\u20AC${costi_hotel.toLocaleString('it-IT')}`,
+      'Restaurant': `\u20AC${costi_restaurant.toLocaleString('it-IT')}`,
+      'Catering (incl. restaurant)': `\u20AC${costi_catering.toLocaleString('it-IT')}`,
+      'Audio/Video': `\u20AC${costi_av.toLocaleString('it-IT')}`,
+      'Allestimenti': `\u20AC${costi_allestimenti.toLocaleString('it-IT')}`,
+      'Grafica/Stampa': `\u20AC${costi_grafica.toLocaleString('it-IT')}`,
+      'Experience': `\u20AC${costi_experience.toLocaleString('it-IT')}`,
+      'Assicurazioni': `\u20AC${costi_assicurazioni.toLocaleString('it-IT')}`,
+      'Agenzia Viaggi': `\u20AC${costi_agenzia.toLocaleString('it-IT')}`,
+      'Fornitori (subtotal)': `\u20AC${costi_fornitori.toLocaleString('it-IT')}`,
+      'Staff Interno': `\u20AC${costi_staff_int.toLocaleString('it-IT')}`,
+      'Staff Esterno': `\u20AC${costi_staff_ext.toLocaleString('it-IT')}`,
+      'Staff (subtotal)': `\u20AC${costi_staff.toLocaleString('it-IT')}`,
+      'Varie': `\u20AC${costi_varie.toLocaleString('it-IT')}`,
+      '─────────────': '─────────',
+      'COSTI TOTALI': `\u20AC${costi_totali.toLocaleString('it-IT')}`,
+      'MARGINE \u20AC': `\u20AC${margine_eur.toLocaleString('it-IT')}`,
+      'MARGINE %': `${margine_pct.toFixed(1)}%`,
+      'ROI %': `${roi_pct.toFixed(1)}%`,
+      'Tasks completati': `${tasksCompleted}/${tasksAll.length} (${on_time_pct.toFixed(0)}%)`,
+      'Within budget': within_budget ? 'SI' : 'NO',
+      'Margine target': event.margine_target ? `${event.margine_target}%` : 'N/A',
+    })
+  }
 
   return {
     event_id: eventId,
