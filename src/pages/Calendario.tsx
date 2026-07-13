@@ -41,6 +41,7 @@ import { fetchBudgets } from '@/lib/budgets-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
 import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
 import { supabase } from '@/lib/supabase'
+import { createLeaveRequest } from '@/lib/leave-requests-service'
 
 // ─── Calendar Item type ──────────────────────────────────────────────────────
 
@@ -2084,8 +2085,8 @@ function MiniCalendar({ cursor, items, onDayClick }: {
 
 // ─── Leave Request Form ──────────────────────────────────────────────────────
 
-function LeaveRequestForm({ userId, userName, onClose, onSubmit }: {
-  userId: string; userName: string; onClose: () => void; onSubmit: () => void
+function LeaveRequestForm({ userId, onClose, onSubmit }: {
+  userId: string; onClose: () => void; onSubmit: () => void
 }) {
   const [tipo, setTipo] = useState<'ferie' | 'permesso' | 'malattia' | 'recupero'>('ferie')
   const [dataInizio, setDataInizio] = useState('')
@@ -2105,24 +2106,8 @@ function LeaveRequestForm({ userId, userName, onClose, onSubmit }: {
     if (!dataInizio || !dataFine || !userId) return
     setSaving(true)
     try {
-      const { data: inserted, error } = await supabase.from('leave_requests').insert({
-        user_id: userId, tipo, data_inizio: dataInizio, data_fine: dataFine,
-        ora_inizio: tipo === 'permesso' && oraInizio ? oraInizio : null,
-        ora_fine: tipo === 'permesso' && oraFine ? oraFine : null,
-        motivo: motivo || null,
-      }).select('id').single()
-      if (error) throw error
-      const leaveId = inserted?.id ?? ''
-      const { data: admins } = await supabase.from('profiles').select('id').in('role', ['Admin', 'Super Admin', 'Amministrazione'])
-      const notifications = (admins ?? []).map(a => ({
-        user_id: a.id, is_read: false,
-        title: 'Nuova richiesta ferie',
-        message: `${userName} ha richiesto ${tipo} dal ${dataInizio} al ${dataFine} (${durata} giorni)`,
-        type: 'leave_request',
-        related_entity_type: 'leave_request',
-        related_entity_id: leaveId,
-      }))
-      if (notifications.length > 0) await supabase.from('notifications').insert(notifications)
+      const result = await createLeaveRequest({ tipo, dataInizio, dataFine, oraInizio: oraInizio || undefined, oraFine: oraFine || undefined, motivo: motivo || undefined })
+      if (!result) throw new Error('failed')
       onSubmit()
     } catch { /* handled */ } finally { setSaving(false) }
   }
@@ -2779,7 +2764,6 @@ export default function Calendario() {
       {showLeaveForm && (
         <LeaveRequestForm
           userId={currentUser?.id ?? ''}
-          userName={currentUser?.nome ?? currentUser?.first_name ?? ''}
           onClose={() => setShowLeaveForm(false)}
           onSubmit={async () => { setShowLeaveForm(false); await refresh() }}
         />

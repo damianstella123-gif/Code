@@ -31,6 +31,7 @@ import { loadUser, isAdmin } from '@/lib/auth'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { supabase } from '@/lib/supabase'
 import { fetchErrorLog, type ErrorLogEntry } from '@/lib/error-log'
+import { createLeaveRequest, cancelLeaveRequest } from '@/lib/leave-requests-service'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1556,11 +1557,8 @@ function LeMieFerieSection() {
 
   const calcDays = (d1: string, d2: string) => Math.max(1, Math.round((new Date(d2).getTime() - new Date(d1).getTime()) / 86400000) + 1)
 
-  const cancel = async (id: string, row: typeof leaves[0]) => {
-    await supabase.from('leave_requests').update({ stato: 'annullata' }).eq('id', id)
-    const { data: admins } = await supabase.from('profiles').select('id').in('role', ['Admin', 'Super Admin', 'Amministrazione'])
-    const nots = (admins ?? []).map(a => ({ user_id: a.id, is_read: false, link: '/amministrazione', message: `${user?.nome || user?.first_name || ''} ha annullato la richiesta di ${row.tipo} dal ${row.data_inizio}` }))
-    if (nots.length > 0) await supabase.from('notifications').insert(nots)
+  const cancel = async (id: string, _row: typeof leaves[0]) => {
+    await cancelLeaveRequest(id)
     load()
   }
 
@@ -1568,11 +1566,7 @@ function LeMieFerieSection() {
     if (!dataInizio || !dataFine || !user?.id) return
     setSaving(true)
     try {
-      await supabase.from('leave_requests').insert({ user_id: user.id, tipo, data_inizio: dataInizio, data_fine: dataFine, ora_inizio: tipo === 'permesso' && oraInizio ? oraInizio : null, ora_fine: tipo === 'permesso' && oraFine ? oraFine : null, motivo: motivo || null })
-      const { data: admins } = await supabase.from('profiles').select('id').in('role', ['Admin', 'Super Admin', 'Amministrazione'])
-      const days = calcDays(dataInizio, dataFine)
-      const nots = (admins ?? []).map(a => ({ user_id: a.id, is_read: false, link: '/amministrazione', message: `${user?.nome || user?.first_name || ''} ha richiesto ${tipo} dal ${dataInizio} al ${dataFine} (${days} giorni)` }))
-      if (nots.length > 0) await supabase.from('notifications').insert(nots)
+      await createLeaveRequest({ tipo, dataInizio, dataFine, oraInizio: oraInizio || undefined, oraFine: oraFine || undefined, motivo: motivo || undefined })
       setShowForm(false); setDataInizio(''); setDataFine(''); setMotivo('')
       load()
     } catch { /* handled */ } finally { setSaving(false) }

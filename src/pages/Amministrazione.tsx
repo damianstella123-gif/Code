@@ -56,6 +56,8 @@ import {
 } from '@/lib/admin-service'
 import { fetchEventPayments, type EventPayment } from '@/lib/event-payments-service'
 import { useToast } from '@/lib/toast'
+import { approveLeaveRequest, rejectLeaveRequest } from '@/lib/leave-requests-service'
+import { LeaveRequestsPanel } from '@/components/LeaveRequestsPanel'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -1189,6 +1191,9 @@ export default function Amministrazione() {
             </div>
           )}
 
+          {/* Leave requests pending */}
+          <LeaveRequestsPanel />
+
           {/* Double-counting alerts */}
           {doppioConteggioAlerts.length > 0 && (
             <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--yellow)', borderRadius: 14, padding: 16 }}>
@@ -1879,7 +1884,7 @@ export default function Amministrazione() {
       )}
 
       {activeTab === 'ferie' && (
-        <FeriePermessiTab currentUserId={currentUser?.id ?? ''} />
+        <FeriePermessiTab />
       )}
 
       {/* Invoice Form Modal */}
@@ -2182,7 +2187,7 @@ interface LeaveRow {
   profiles?: { first_name: string; last_name: string; avatar_url: string | null; role: string }
 }
 
-function FeriePermessiTab({ currentUserId }: { currentUserId: string }) {
+function FeriePermessiTab() {
   const [leaves, setLeaves] = useState<LeaveRow[]>([])
   const [filter, setFilter] = useState<'tutti' | 'in_attesa' | 'approvata' | 'negata'>('tutti')
   const [filterUser, setFilterUser] = useState('tutti')
@@ -2218,16 +2223,14 @@ function FeriePermessiTab({ currentUserId }: { currentUserId: string }) {
     return s + d
   }, 0)
 
-  const approve = async (id: string, row: LeaveRow) => {
-    await supabase.from('leave_requests').update({ stato: 'approvata', approvato_da: currentUserId, approvato_at: new Date().toISOString() }).eq('id', id)
-    await supabase.from('notifications').insert({ user_id: row.user_id, is_read: false, title: 'Ferie approvate \u2713', message: `La tua richiesta di ${row.tipo} dal ${row.data_inizio} al ${row.data_fine} e stata approvata!`, type: 'leave_approved', related_entity_type: 'leave_request', related_entity_id: id })
+  const approve = async (id: string, _row: LeaveRow) => {
+    await approveLeaveRequest(id)
     loadLeaves()
   }
 
-  const deny = async (id: string, row: LeaveRow) => {
+  const deny = async (id: string, _row: LeaveRow) => {
     if (denyNote.length < 10) return
-    await supabase.from('leave_requests').update({ stato: 'negata', note_admin: denyNote, approvato_da: currentUserId, approvato_at: new Date().toISOString() }).eq('id', id)
-    await supabase.from('notifications').insert({ user_id: row.user_id, is_read: false, title: 'Richiesta ferie negata', message: `La tua richiesta di ${row.tipo} e stata negata. Motivazione: ${denyNote}`, type: 'leave_denied', related_entity_type: 'leave_request', related_entity_id: id })
+    await rejectLeaveRequest(id, denyNote)
     setDenyingId(null); setDenyNote('')
     loadLeaves()
   }
