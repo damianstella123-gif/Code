@@ -134,14 +134,14 @@ let _suppliers: Supplier[] = []
 let _events: Event[] = []
 
 function clientName(id: string) {
-  return _clients.find(c => c.id === id)?.nome ?? id
+  return _clients.find(c => c.id === id)?.nome ?? '—'
 }
 function supplierName(id: string) {
-  return _suppliers.find(s => s.id === id)?.nome ?? id
+  return _suppliers.find(s => s.id === id)?.nome ?? '—'
 }
 function eventName(id: string | null) {
   if (!id) return '—'
-  return _events.find(e => e.id === id)?.nome ?? id
+  return _events.find(e => e.id === id)?.nome ?? '—'
 }
 
 // ─── Modale nuovo movimento ───────────────────────────────────────────────────
@@ -1527,7 +1527,7 @@ export default function Amministrazione() {
                         </span>
                       )}
                     </td>
-                    <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }} title={eventName(e.eventoId)}>{eventName(e.eventoId)}</td>
+                    <td className="mobile-hide" style={{ ...tdStyle, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--muted)' }} title={eventName(e.eventoId)}>{eventName(e.eventoId)}</td>
                     <td style={{ ...tdAmount, color: 'var(--green)' }}>{formatEur(e.importo)}</td>
                     <td style={{ padding: '12px 16px' }}><StatoBadge stato={e.stato} /></td>
                     <td style={tdMuted}>{formatDateShort(e.dataPrevista)}</td>
@@ -1612,7 +1612,7 @@ export default function Amministrazione() {
                           </span>
                         )}
                       </td>
-                      <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }} title={eventName(u.eventoId)}>{eventName(u.eventoId)}</td>
+                      <td className="mobile-hide" style={{ ...tdStyle, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--muted)' }} title={eventName(u.eventoId)}>{eventName(u.eventoId)}</td>
                       <td className="mobile-hide" style={tdMuted}>{u.categoria}</td>
                       <td className="mobile-hide" style={tdStyle}>{u.quantity ?? 1}</td>
                       <td className="mobile-hide" style={{ ...tdAmount, color: 'var(--muted)' }}>{u.unitPrice != null ? formatEur(u.unitPrice) : '—'}</td>
@@ -1707,7 +1707,7 @@ export default function Amministrazione() {
                         </span>
                       </td>
                       <td style={{ ...tdStyle, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }} title={f.soggetto}>{f.soggetto}</td>
-                      <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }} title={eventName(f.eventoId)}>{eventName(f.eventoId)}</td>
+                      <td className="mobile-hide" style={{ ...tdStyle, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--muted)' }} title={eventName(f.eventoId)}>{eventName(f.eventoId)}</td>
                       <td className="mobile-hide" style={{ ...tdAmount, color: 'var(--muted)' }}>{formatEur(f.imponibile)}</td>
                       <td className="mobile-hide" style={{ ...tdAmount, color: 'var(--muted)' }}>{formatEur(f.iva)}</td>
                       <td style={{ ...tdAmount, color: f.tipo === 'entrata' ? 'var(--green)' : 'var(--red2)' }}>{formatEur(f.importo)}</td>
