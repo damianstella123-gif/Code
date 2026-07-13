@@ -88,7 +88,7 @@ function monthLabel(d: string) {
 function statoPagColor(s: StatoPagamento) {
   switch (s) {
     case 'pagato': return 'var(--green)'
-    case 'in_attesa': return 'var(--blue)'
+    case 'in_attesa': return 'var(--yellow)'
     case 'scaduto': return 'var(--red2)'
     case 'annullato': return 'var(--muted)'
   }
@@ -393,16 +393,18 @@ function StatoBadge({ stato }: { stato: StatoPagamento }) {
         letterSpacing: '0.04em',
         textTransform: 'uppercase',
         color: statoPagColor(stato),
-        background: `${statoPagColor(stato)}15`,
-        padding: '2px 6px',
+        background: `${statoPagColor(stato)}18`,
+        padding: '3px 8px',
         borderRadius: 4,
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 3,
+        gap: 4,
       }}
     >
       {stato === 'pagato' && <CheckCircle className="w-3 h-3" />}
+      {stato === 'in_attesa' && <Clock className="w-3 h-3" />}
       {stato === 'scaduto' && <AlertTriangle className="w-3 h-3" />}
+      {stato === 'annullato' && <XCircle className="w-3 h-3" />}
       {statoPagLabel(stato)}
     </span>
   )
@@ -978,9 +980,9 @@ export default function Amministrazione() {
   ]
 
   // ─── Shared styles ──────────────────────────────────────────────────────────
-  const thStyle: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6, whiteSpace: 'nowrap', padding: '10px 14px', textAlign: 'left', borderBottom: '1px solid var(--text)' }
+  const thStyle: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', whiteSpace: 'nowrap', padding: '12px 16px', textAlign: 'left', borderBottom: '2px solid var(--line)' }
   const thStyleRight: React.CSSProperties = { ...thStyle, textAlign: 'right' }
-  const tdStyle: React.CSSProperties = { padding: '10px 14px', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }
+  const tdStyle: React.CSSProperties = { padding: '12px 16px', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }
   const tdMuted: React.CSSProperties = { ...tdStyle, color: 'var(--muted)' }
   const tdAmount: React.CSSProperties = { ...tdStyle, textAlign: 'right', fontWeight: 600 }
 
@@ -1525,13 +1527,13 @@ export default function Amministrazione() {
                         </span>
                       )}
                     </td>
-                    <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(e.eventoId)}</td>
+                    <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }} title={eventName(e.eventoId)}>{eventName(e.eventoId)}</td>
                     <td style={{ ...tdAmount, color: 'var(--green)' }}>{formatEur(e.importo)}</td>
-                    <td style={{ padding: '10px 14px' }}><StatoBadge stato={e.stato} /></td>
+                    <td style={{ padding: '12px 16px' }}><StatoBadge stato={e.stato} /></td>
                     <td style={tdMuted}>{formatDateShort(e.dataPrevista)}</td>
                     <td className="mobile-hide" style={{ ...tdMuted, textTransform: 'capitalize' }}>{e.metodoPagamento}</td>
-                    <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.note}</td>
-                    <td style={{ padding: '10px 14px' }}>
+                    <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }} title={e.note}>{e.note}</td>
+                    <td style={{ padding: '12px 16px' }}>
                       <div className="flex items-center gap-1">
                         {e.stato !== 'pagato' && e.stato !== 'annullato' && (
                           <button onClick={() => segnaEntrataPagata(e.id)}
@@ -1610,17 +1612,17 @@ export default function Amministrazione() {
                           </span>
                         )}
                       </td>
-                      <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(u.eventoId)}</td>
+                      <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }} title={eventName(u.eventoId)}>{eventName(u.eventoId)}</td>
                       <td className="mobile-hide" style={tdMuted}>{u.categoria}</td>
                       <td className="mobile-hide" style={tdStyle}>{u.quantity ?? 1}</td>
                       <td className="mobile-hide" style={{ ...tdAmount, color: 'var(--muted)' }}>{u.unitPrice != null ? formatEur(u.unitPrice) : '—'}</td>
                       <td style={{ ...tdAmount, color: 'var(--red2)' }}>{formatEur(u.importo)}</td>
-                      <td style={{ padding: '10px 14px' }}><StatoBadge stato={u.stato} /></td>
+                      <td style={{ padding: '12px 16px' }}><StatoBadge stato={u.stato} /></td>
                       <td style={{ ...tdMuted, color: isScad ? 'var(--red2)' : 'var(--muted)' }}>
                         {formatDateShort(u.scadenza)} {isScad && '!'}
                       </td>
-                      <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.note}</td>
-                      <td style={{ padding: '10px 14px' }}>
+                      <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }} title={u.note}>{u.note}</td>
+                      <td style={{ padding: '12px 16px' }}>
                         <div className="flex items-center gap-1">
                           {u.stato !== 'pagato' && u.stato !== 'annullato' && (
                             <button onClick={() => segnaUscitaPagata(u.id)}
@@ -1692,30 +1694,30 @@ export default function Amministrazione() {
                     <tr key={f.id} style={{ borderBottom: '1px solid var(--line)' }}
                       className="hover:bg-[var(--panel2)] transition-colors">
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{f.numero}</td>
-                      <td className="mobile-hide" style={{ padding: '10px 14px' }}>
+                      <td className="mobile-hide" style={{ padding: '12px 16px' }}>
                         <span style={{
                           fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
                           color: f.tipo === 'entrata' ? 'var(--green)' : 'var(--red2)',
                           background: f.tipo === 'entrata' ? 'rgba(56,210,125,0.12)' : 'rgba(255,49,95,0.12)',
-                          padding: '2px 6px', borderRadius: 4,
-                          display: 'inline-flex', alignItems: 'center', gap: 3,
+                          padding: '3px 8px', borderRadius: 4,
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
                         }}>
                           {f.tipo === 'entrata' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
                           {f.tipo === 'entrata' ? 'ENT' : 'USC'}
                         </span>
                       </td>
-                      <td style={{ ...tdStyle, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.soggetto}</td>
-                      <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventName(f.eventoId)}</td>
+                      <td style={{ ...tdStyle, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }} title={f.soggetto}>{f.soggetto}</td>
+                      <td className="mobile-hide" style={{ ...tdMuted, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }} title={eventName(f.eventoId)}>{eventName(f.eventoId)}</td>
                       <td className="mobile-hide" style={{ ...tdAmount, color: 'var(--muted)' }}>{formatEur(f.imponibile)}</td>
                       <td className="mobile-hide" style={{ ...tdAmount, color: 'var(--muted)' }}>{formatEur(f.iva)}</td>
                       <td style={{ ...tdAmount, color: f.tipo === 'entrata' ? 'var(--green)' : 'var(--red2)' }}>{formatEur(f.importo)}</td>
-                      <td style={{ padding: '10px 14px' }}>
+                      <td style={{ padding: '12px 16px' }}>
                         <span style={{
                           fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
                           color: statoFatColor(f.stato),
-                          background: `${statoFatColor(f.stato)}15`,
-                          padding: '2px 6px', borderRadius: 4,
-                          display: 'inline-flex', alignItems: 'center', gap: 3,
+                          background: `${statoFatColor(f.stato)}18`,
+                          padding: '3px 8px', borderRadius: 4,
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
                         }}>
                           <Icon className="w-3 h-3" />
                           {statoFatLabel(f.stato)}
@@ -1790,18 +1792,18 @@ export default function Amministrazione() {
                         <td className="mobile-hide" style={{ ...tdMuted, textTransform: 'capitalize' }}>{inv.type}</td>
                         <td className="mobile-hide" style={tdMuted}>{subject}</td>
                         <td style={{ ...tdAmount, color: 'var(--text)' }}>{formatEur(inv.amount)}</td>
-                        <td style={{ padding: '10px 14px' }}>
+                        <td style={{ padding: '12px 16px' }}>
                           <span style={{
                             fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
                             color: st?.color ?? 'var(--muted)',
                             background: `${st?.color ?? '#9ba3aa'}20`,
-                            padding: '2px 6px', borderRadius: 4,
+                            padding: '3px 8px', borderRadius: 4,
                           }}>
                             {st?.label ?? inv.status}
                           </span>
                         </td>
                         <td style={tdMuted}>{inv.due_date ? formatDate(inv.due_date) : '-'}</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                           <div className="flex items-center justify-end gap-1">
                             {inv.external_url && (
                               <a href={inv.external_url} target="_blank" rel="noopener noreferrer"

@@ -241,7 +241,7 @@ function EventROISection() {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--line)' }}>
+              <tr style={{ borderBottom: '2px solid var(--line)' }}>
                 <TH label="Evento" field="title" onSort={handleSort} sortField={sortField} sortAsc={sortAsc} />
                 <TH label="Cliente" />
                 <TH label="Ricavi" field="revenue" onSort={handleSort} sortField={sortField} sortAsc={sortAsc} />
@@ -261,18 +261,18 @@ function EventROISection() {
                   style={{ borderBottom: '1px solid var(--line)', cursor: 'pointer', transition: 'background 0.1s' }}
                   onMouseEnter={ev => (ev.currentTarget.style.background = 'var(--panel2)')}
                   onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}>
-                  <td style={{ padding: '10px 12px' }}>
+                  <td style={{ padding: '12px 14px' }}>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{e.title}</span>
                     <br /><span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)' }}>{fmtShort(e.data_fine)}</span>
                   </td>
-                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{e.client || '-'}</td>
-                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{fmtEur(e.revenue)}</td>
-                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{fmtEur(e.costi_totali)}</td>
-                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: e.margine_eur >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmtEur(e.margine_eur)}</td>
-                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: e.margine_pct >= 20 ? 'var(--green)' : e.margine_pct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{e.margine_pct.toFixed(0)}%</td>
-                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: e.roi_pct >= 0 ? 'var(--green)' : 'var(--red2)' }}>{e.roi_pct.toFixed(0)}%</td>
-                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{e.on_time_pct.toFixed(0)}%</td>
-                  <td style={{ padding: '10px 8px' }}>
+                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{e.client || '-'}</td>
+                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{fmtEur(e.revenue)}</td>
+                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{fmtEur(e.costi_totali)}</td>
+                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: e.margine_eur >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmtEur(e.margine_eur)}</td>
+                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: e.margine_pct >= 20 ? 'var(--green)' : e.margine_pct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{e.margine_pct.toFixed(0)}%</td>
+                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: e.roi_pct >= 0 ? 'var(--green)' : 'var(--red2)' }}>{e.roi_pct.toFixed(0)}%</td>
+                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{e.on_time_pct.toFixed(0)}%</td>
+                  <td style={{ padding: '12px 14px' }}>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 6px', borderRadius: 4, background: e.within_budget ? 'color-mix(in srgb, var(--green) 15%, transparent)' : 'color-mix(in srgb, var(--red2) 15%, transparent)', color: e.within_budget ? 'var(--green)' : 'var(--red2)' }}>
                       {e.within_budget ? 'OK' : 'OVER'}
                     </span>
@@ -694,7 +694,7 @@ function TH({ label, field, onSort, sortField, sortAsc }: { label: string; field
   return (
     <th
       onClick={() => field && onSort?.(field)}
-      style={{ fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em', color: active ? 'var(--text)' : 'var(--muted)', padding: '10px 8px', textAlign: 'left', fontWeight: 500, cursor: field ? 'pointer' : 'default', whiteSpace: 'nowrap' }}
+      style={{ fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em', color: active ? 'var(--text)' : 'var(--muted)', padding: '12px 14px', textAlign: 'left', fontWeight: 700, cursor: field ? 'pointer' : 'default', whiteSpace: 'nowrap' }}
     >
       {label} {active && (sortAsc ? <ChevronUp className="w-3 h-3 inline" /> : <ChevronDown className="w-3 h-3 inline" />)}
     </th>
