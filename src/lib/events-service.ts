@@ -415,3 +415,116 @@ export async function regenerateGreenReport(eventId: string): Promise<GreenRepor
   }
   return report as GreenReport | null
 }
+
+// ─── Event ROI / Performance ────────────────────────────────────────────────
+
+export interface EventROI {
+  event_id: string
+  title: string
+  client: string
+  revenue: number
+  costi_totali: number
+  costi_hotel: number
+  costi_catering: number
+  costi_fornitori: number
+  costi_staff: number
+  costi_varie: number
+  margine_eur: number
+  margine_pct: number
+  roi_pct: number
+  on_time_pct: number
+  attendees: number
+  within_budget: boolean
+  data_fine: string
+  status: string
+}
+
+export async function getEventROI(eventId: string): Promise<EventROI | null> {
+  const { data: event } = await supabase.from('events')
+    .select('*').eq('id', eventId).maybeSingle()
+  if (!event) return null
+
+  const [hotels, restaurant, catering, staffInt, staffExt, varie, audioVideo, allestimenti, graficaStampa, experience, assicurazioni, agenziaViaggi, tasks] = await Promise.all([
+    supabase.from('event_hotel_details').select('costo_totale').eq('event_id', eventId),
+    supabase.from('event_restaurant_details').select('costo_totale_reale').eq('event_id', eventId),
+    supabase.from('event_catering_details').select('costo_totale').eq('event_id', eventId),
+    supabase.from('event_staff_interno_details').select('costo_totale').eq('event_id', eventId),
+    supabase.from('event_staff_esterno_details').select('costo_totale').eq('event_id', eventId),
+    supabase.from('event_varie_details').select('costo_totale').eq('event_id', eventId),
+    supabase.from('event_audio_video_details').select('costo_totale').eq('event_id', eventId),
+    supabase.from('event_allestimenti_details').select('costo_totale').eq('event_id', eventId),
+    supabase.from('event_grafica_stampa_details').select('costo_totale').eq('event_id', eventId),
+    supabase.from('event_experience_details').select('costo_totale').eq('event_id', eventId),
+    supabase.from('event_assicurazioni_details').select('costo_totale').eq('event_id', eventId),
+    supabase.from('event_agenzia_viaggi_details').select('costo_totale').eq('event_id', eventId),
+    supabase.from('tasks').select('status').eq('event_id', eventId),
+  ])
+
+  const sum = (rows: any[] | null, field: string) => (rows || []).reduce((s: number, r: any) => s + (Number(r[field]) || 0), 0)
+
+  const costi_hotel = sum(hotels.data, 'costo_totale')
+  const costi_restaurant = sum(restaurant.data, 'costo_totale_reale')
+  const costi_catering = sum(catering.data, 'costo_totale') + costi_restaurant
+  const costi_staff_int = sum(staffInt.data, 'costo_totale')
+  const costi_staff_ext = sum(staffExt.data, 'costo_totale')
+  const costi_varie = sum(varie.data, 'costo_totale')
+  const costi_av = sum(audioVideo.data, 'costo_totale')
+  const costi_allestimenti = sum(allestimenti.data, 'costo_totale')
+  const costi_grafica = sum(graficaStampa.data, 'costo_totale')
+  const costi_experience = sum(experience.data, 'costo_totale')
+  const costi_assicurazioni = sum(assicurazioni.data, 'costo_totale')
+  const costi_agenzia = sum(agenziaViaggi.data, 'costo_totale')
+
+  const costi_fornitori = costi_av + costi_allestimenti + costi_grafica + costi_experience + costi_assicurazioni + costi_agenzia
+  const costi_staff = costi_staff_int + costi_staff_ext
+  const costi_totali = costi_hotel + costi_catering + costi_fornitori + costi_staff + costi_varie
+
+  const revenue = Number(event.ricavo_cliente) || 0
+  const margine_eur = revenue - costi_totali
+  const margine_pct = revenue > 0 ? (margine_eur / revenue) * 100 : 0
+  const roi_pct = costi_totali > 0 ? (margine_eur / costi_totali) * 100 : 0
+
+  const tasksAll = tasks.data || []
+  const tasksCompleted = tasksAll.filter((t: any) => t.status === 'completato' || t.status === 'done').length
+  const on_time_pct = tasksAll.length > 0 ? (tasksCompleted / tasksAll.length) * 100 : 0
+
+  const within_budget = event.margine_target ? margine_pct >= Number(event.margine_target) : costi_totali <= revenue
+
+  return {
+    event_id: eventId,
+    title: event.title || '',
+    client: event.client || '',
+    revenue,
+    costi_totali,
+    costi_hotel,
+    costi_catering,
+    costi_fornitori,
+    costi_staff,
+    costi_varie,
+    margine_eur,
+    margine_pct,
+    roi_pct,
+    on_time_pct,
+    attendees: Number(event.attendees) || 0,
+    within_budget,
+    data_fine: event.end_date,
+    status: event.status || '',
+  }
+}
+
+export async function getAllEventsROI(filters?: {
+  from?: string; to?: string; status?: string; client?: string
+}): Promise<EventROI[]> {
+  let q = supabase.from('events').select('id')
+
+  if (filters?.from) q = q.gte('end_date', filters.from)
+  if (filters?.to) q = q.lte('end_date', filters.to)
+  if (filters?.status) q = q.eq('status', filters.status)
+  if (filters?.client) q = q.ilike('client', `%${filters.client}%`)
+
+  const { data: events } = await q.order('end_date', { ascending: false }).limit(50)
+  if (!events || events.length === 0) return []
+
+  const results = await Promise.all(events.map(e => getEventROI(e.id)))
+  return results.filter((r): r is EventROI => r !== null)
+}

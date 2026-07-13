@@ -1,9 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { TrendingUp, TrendingDown, Minus, Save } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LineChart, Line } from 'recharts'
+import { TrendingUp, TrendingDown, Minus, Save, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { getAllEventsROI, type EventROI } from '@/lib/events-service'
+import { fmtShort } from '@/lib/format'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ImpactRow {
   id: string
@@ -39,7 +43,6 @@ interface ProfileRow {
 }
 
 const MONTH_NAMES = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic']
-
 const ACTION_LABELS: Record<string, string> = {
   fly_response: 'Risposta Fly',
   budget_calc: 'Calcolo Budget',
@@ -49,14 +52,18 @@ const ACTION_LABELS: Record<string, string> = {
   supplier_search: 'Ricerca Fornitori',
   report_gen: 'Generazione Report',
 }
-
 function getActionLabel(type: string): string {
   return ACTION_LABELS[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
+type SortField = 'title' | 'revenue' | 'costi_totali' | 'margine_eur' | 'margine_pct' | 'roi_pct' | 'on_time_pct'
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export default function Performance() {
   const navigate = useNavigate()
   const user = loadUser()
+  const [tab, setTab] = useState<'eventi' | 'synergy'>('eventi')
 
   useEffect(() => {
     if (!user || !['Admin', 'Super Admin'].includes(user.role)) {
@@ -64,6 +71,364 @@ export default function Performance() {
     }
   }, [user, navigate])
 
+  if (!user || !['Admin', 'Super Admin'].includes(user.role)) return null
+
+  return (
+    <div>
+      <div className="wire-masthead">
+        <div>
+          <span className="wire-masthead-title">PERFORMANCE</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>ROI & KPI</span>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1" style={{ marginBottom: 24 }}>
+        {([['eventi', 'Eventi ROI'], ['synergy', 'Synergy Impact']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            style={{
+              fontFamily: 'var(--font-mono)', fontSize: 11, padding: '7px 16px', borderRadius: 8,
+              border: '1px solid var(--line)', cursor: 'pointer',
+              background: tab === id ? 'var(--text)' : 'transparent',
+              color: tab === id ? 'var(--panel-solid)' : 'var(--muted)',
+              fontWeight: tab === id ? 600 : 400,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'eventi' && <EventROISection />}
+      {tab === 'synergy' && <SynergySection />}
+    </div>
+  )
+}
+
+// ─── EVENT ROI SECTION ──────────────────────────────────────────────────────
+
+function EventROISection() {
+  const [events, setEvents] = useState<EventROI[]>([])
+  const [loading, setLoading] = useState(true)
+  const [dateRange, setDateRange] = useState({ from: '', to: '' })
+  const [filterStatus, setFilterStatus] = useState('')
+  const [filterClient, setFilterClient] = useState('')
+  const [sortField, setSortField] = useState<SortField>('margine_eur')
+  const [sortAsc, setSortAsc] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<EventROI | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    getAllEventsROI({
+      from: dateRange.from || undefined,
+      to: dateRange.to || undefined,
+      status: filterStatus || undefined,
+      client: filterClient || undefined,
+    }).then(evts => { setEvents(evts); setLoading(false) })
+  }, [dateRange.from, dateRange.to, filterStatus, filterClient])
+
+  const sorted = useMemo(() => {
+    const list = [...events]
+    list.sort((a, b) => {
+      const av = a[sortField] as number
+      const bv = b[sortField] as number
+      if (typeof av === 'string') return sortAsc ? (av as string).localeCompare(bv as unknown as string) : (bv as unknown as string).localeCompare(av as string)
+      return sortAsc ? av - bv : bv - av
+    })
+    return list
+  }, [events, sortField, sortAsc])
+
+  const totalRevenue = events.reduce((s, e) => s + e.revenue, 0)
+  const totalMargin = events.reduce((s, e) => s + e.margine_eur, 0)
+  const avgROI = events.length > 0 ? events.reduce((s, e) => s + e.roi_pct, 0) / events.length : 0
+  const avgMargin = events.length > 0 ? events.reduce((s, e) => s + e.margine_pct, 0) / events.length : 0
+  const budgetCompliance = events.length > 0 ? (events.filter(e => e.within_budget).length / events.length) * 100 : 0
+
+  function handleSort(field: SortField) {
+    if (sortField === field) setSortAsc(!sortAsc)
+    else { setSortField(field); setSortAsc(false) }
+  }
+
+  // Chart data
+  const costBreakdown = useMemo(() => {
+    const hotel = events.reduce((s, e) => s + e.costi_hotel, 0)
+    const catering = events.reduce((s, e) => s + e.costi_catering, 0)
+    const fornitori = events.reduce((s, e) => s + e.costi_fornitori, 0)
+    const staff = events.reduce((s, e) => s + e.costi_staff, 0)
+    const varie = events.reduce((s, e) => s + e.costi_varie, 0)
+    return [
+      { name: 'Hotel', value: hotel, color: '#3b82f6' },
+      { name: 'Catering', value: catering, color: '#10b981' },
+      { name: 'Fornitori', value: fornitori, color: '#f59e0b' },
+      { name: 'Staff', value: staff, color: '#8b5cf6' },
+      { name: 'Varie', value: varie, color: '#6b7280' },
+    ].filter(d => d.value > 0)
+  }, [events])
+
+  const topByROI = useMemo(() => {
+    return [...events].sort((a, b) => b.roi_pct - a.roi_pct).slice(0, 5).map(e => ({
+      name: e.title.length > 20 ? e.title.slice(0, 18) + '..' : e.title,
+      roi: Math.round(e.roi_pct),
+    }))
+  }, [events])
+
+  const marginTrend = useMemo(() => {
+    const byMonth: Record<string, { revenue: number; costi: number; count: number }> = {}
+    for (const e of events) {
+      if (!e.data_fine) continue
+      const d = new Date(e.data_fine)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      if (!byMonth[key]) byMonth[key] = { revenue: 0, costi: 0, count: 0 }
+      byMonth[key].revenue += e.revenue
+      byMonth[key].costi += e.costi_totali
+      byMonth[key].count++
+    }
+    return Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([key, v]) => {
+      const [y, m] = key.split('-')
+      return { label: `${MONTH_NAMES[parseInt(m) - 1]} ${y.slice(2)}`, margin: v.count > 0 ? ((v.revenue - v.costi) / Math.max(v.revenue, 1)) * 100 : 0 }
+    })
+  }, [events])
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} style={{ borderRadius: 14, border: '1px solid var(--line)', padding: 16, height: 90, background: 'var(--panel)' }}>
+            <div style={{ height: 10, width: '60%', background: 'var(--line)', borderRadius: 4, marginBottom: 10 }} />
+            <div style={{ height: 20, width: '40%', background: 'var(--line)', borderRadius: 4 }} />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <KpiCard label="REVENUE TOTALE" value={fmtEur(totalRevenue)} color="var(--text)" />
+        <KpiCard label="MARGINE TOTALE" value={fmtEur(totalMargin)} color={totalMargin >= 0 ? 'var(--green)' : 'var(--red2)'} />
+        <KpiCard label="ROI MEDIO" value={`${avgROI.toFixed(0)}%`} color={avgROI >= 0 ? 'var(--green)' : 'var(--red2)'} />
+        <KpiCard label="MARGINE MEDIO" value={`${avgMargin.toFixed(0)}%`} color={avgMargin >= 20 ? 'var(--green)' : 'var(--yellow)'} />
+        <KpiCard label="BUDGET OK" value={`${budgetCompliance.toFixed(0)}%`} color={budgetCompliance >= 70 ? 'var(--green)' : 'var(--yellow)'} />
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3" style={{ marginTop: 8 }}>
+        <input type="date" value={dateRange.from} onChange={e => setDateRange(p => ({ ...p, from: e.target.value }))}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)' }} />
+        <input type="date" value={dateRange.to} onChange={e => setDateRange(p => ({ ...p, to: e.target.value }))}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)' }} />
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)' }}>
+          <option value="">Tutti gli stati</option>
+          <option value="confermato">Confermato</option>
+          <option value="in_corso">In corso</option>
+          <option value="completato">Completato</option>
+          <option value="bozza">Bozza</option>
+        </select>
+        <input type="text" placeholder="Filtra cliente..." value={filterClient} onChange={e => setFilterClient(e.target.value)}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)', width: 140 }} />
+      </div>
+
+      {/* Table */}
+      <div style={{ border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                <TH label="Evento" field="title" onSort={handleSort} sortField={sortField} sortAsc={sortAsc} />
+                <TH label="Cliente" />
+                <TH label="Ricavi" field="revenue" onSort={handleSort} sortField={sortField} sortAsc={sortAsc} />
+                <TH label="Costi" field="costi_totali" onSort={handleSort} sortField={sortField} sortAsc={sortAsc} />
+                <TH label="Margine" field="margine_eur" onSort={handleSort} sortField={sortField} sortAsc={sortAsc} />
+                <TH label="Marg %" field="margine_pct" onSort={handleSort} sortField={sortField} sortAsc={sortAsc} />
+                <TH label="ROI %" field="roi_pct" onSort={handleSort} sortField={sortField} sortAsc={sortAsc} />
+                <TH label="Tasks %" field="on_time_pct" onSort={handleSort} sortField={sortField} sortAsc={sortAsc} />
+                <TH label="Budget" />
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.length === 0 ? (
+                <tr><td colSpan={9} style={{ padding: 30, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>Nessun evento trovato</td></tr>
+              ) : sorted.map(e => (
+                <tr key={e.event_id} onClick={() => setSelectedEvent(e)}
+                  style={{ borderBottom: '1px solid var(--line)', cursor: 'pointer', transition: 'background 0.1s' }}
+                  onMouseEnter={ev => (ev.currentTarget.style.background = 'var(--panel2)')}
+                  onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{e.title}</span>
+                    <br /><span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)' }}>{fmtShort(e.data_fine)}</span>
+                  </td>
+                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{e.client || '-'}</td>
+                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{fmtEur(e.revenue)}</td>
+                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{fmtEur(e.costi_totali)}</td>
+                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: e.margine_eur >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmtEur(e.margine_eur)}</td>
+                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: e.margine_pct >= 20 ? 'var(--green)' : e.margine_pct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{e.margine_pct.toFixed(0)}%</td>
+                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: e.roi_pct >= 0 ? 'var(--green)' : 'var(--red2)' }}>{e.roi_pct.toFixed(0)}%</td>
+                  <td style={{ padding: '10px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{e.on_time_pct.toFixed(0)}%</td>
+                  <td style={{ padding: '10px 8px' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 6px', borderRadius: 4, background: e.within_budget ? 'color-mix(in srgb, var(--green) 15%, transparent)' : 'color-mix(in srgb, var(--red2) 15%, transparent)', color: e.within_budget ? 'var(--green)' : 'var(--red2)' }}>
+                      {e.within_budget ? 'OK' : 'OVER'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Charts */}
+      {events.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Cost breakdown pie */}
+          {costBreakdown.length > 0 && (
+            <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 16 }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 12 }}>Distribuzione Costi</p>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={costBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={70} strokeWidth={0}>
+                    {costBreakdown.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ fontFamily: 'var(--font-mono)', fontSize: 10, background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 8 }} formatter={(v) => fmtEur(Number(v))} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex flex-wrap gap-3 justify-center" style={{ marginTop: 8 }}>
+                {costBreakdown.map(d => (
+                  <span key={d.name} className="flex items-center gap-1" style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)' }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color, display: 'inline-block' }} />
+                    {d.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Top 5 by ROI */}
+          {topByROI.length > 0 && (
+            <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 16 }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 12 }}>Top 5 ROI</p>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={topByROI} layout="vertical" margin={{ left: 0, right: 10, top: 0, bottom: 0 }}>
+                  <XAxis type="number" tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--muted)' }} width={80} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ fontFamily: 'var(--font-mono)', fontSize: 10, background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 8 }} formatter={(v) => `${v}%`} />
+                  <Bar dataKey="roi" radius={[0, 4, 4, 0]}>
+                    {topByROI.map((_, i) => <Cell key={i} fill={i === 0 ? 'var(--green)' : 'var(--blue)'} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Margin trend */}
+          {marginTrend.length > 1 && (
+            <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 16 }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 12 }}>Trend Margine %</p>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={marginTrend} margin={{ left: 0, right: 10, top: 10, bottom: 0 }}>
+                  <XAxis dataKey="label" tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--muted)' }} axisLine={false} tickLine={false} width={35} />
+                  <Tooltip contentStyle={{ fontFamily: 'var(--font-mono)', fontSize: 10, background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 8 }} formatter={(v) => `${Number(v).toFixed(0)}%`} />
+                  <Line type="monotone" dataKey="margin" stroke="var(--green)" strokeWidth={2} dot={{ r: 4, fill: 'var(--green)' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {selectedEvent && <EventDetailModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />}
+    </div>
+  )
+}
+
+// ─── Event Detail Modal ──────────────────────────────────────────────────────
+
+function EventDetailModal({ event: e, onClose }: { event: EventROI; onClose: () => void }) {
+  const costRows = [
+    { label: 'Hotel', value: e.costi_hotel },
+    { label: 'Catering/Ristorante', value: e.costi_catering },
+    { label: 'Fornitori (AV, Allestim., Grafica...)', value: e.costi_fornitori },
+    { label: 'Staff (interno + esterno)', value: e.costi_staff },
+    { label: 'Varie', value: e.costi_varie },
+  ]
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} onClick={onClose} />
+      <div style={{ position: 'relative', background: 'var(--panel-solid)', borderRadius: 16, padding: 28, maxWidth: 560, width: '100%', maxHeight: '85vh', overflowY: 'auto', border: '1px solid var(--line)' }}>
+        <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+          <X className="w-5 h-5" />
+        </button>
+
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>DETTAGLIO EVENTO</p>
+        <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{e.title}</p>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginBottom: 20 }}>
+          {e.client} &middot; {fmtShort(e.data_fine)} &middot; {e.attendees} pax
+        </p>
+
+        {/* Revenue vs Cost */}
+        <div className="grid grid-cols-2 gap-3" style={{ marginBottom: 20 }}>
+          <div style={{ padding: 14, borderRadius: 10, background: 'color-mix(in srgb, var(--green) 8%, transparent)', textAlign: 'center' }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', marginBottom: 4 }}>RICAVI</p>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>{fmtEur(e.revenue)}</p>
+          </div>
+          <div style={{ padding: 14, borderRadius: 10, background: 'color-mix(in srgb, var(--red2) 8%, transparent)', textAlign: 'center' }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', marginBottom: 4 }}>COSTI</p>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--red2)' }}>{fmtEur(e.costi_totali)}</p>
+          </div>
+        </div>
+
+        {/* Cost breakdown */}
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 10 }}>Breakdown Costi</p>
+        <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
+          {costRows.map(r => (
+            <div key={r.label} className="flex items-center justify-between" style={{ padding: '8px 12px', borderBottom: '1px solid var(--line)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{r.label}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: r.value > 0 ? 'var(--text)' : 'var(--muted)' }}>{fmtEur(r.value)}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* KPI row */}
+        <div className="grid grid-cols-4 gap-2">
+          <MiniKpi label="Margine" value={`${e.margine_pct.toFixed(0)}%`} color={e.margine_pct >= 20 ? 'var(--green)' : 'var(--yellow)'} />
+          <MiniKpi label="ROI" value={`${e.roi_pct.toFixed(0)}%`} color={e.roi_pct >= 0 ? 'var(--green)' : 'var(--red2)'} />
+          <MiniKpi label="Tasks OK" value={`${e.on_time_pct.toFixed(0)}%`} color="var(--muted)" />
+          <MiniKpi label="Budget" value={e.within_budget ? 'OK' : 'OVER'} color={e.within_budget ? 'var(--green)' : 'var(--red2)'} />
+        </div>
+
+        {e.attendees > 0 && e.revenue > 0 && (
+          <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 8, background: 'var(--panel2)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>
+              Ricavo per persona: <strong style={{ color: 'var(--text)' }}>{fmtEur(e.revenue / e.attendees)}</strong>
+              &nbsp;&middot;&nbsp;
+              Costo per persona: <strong style={{ color: 'var(--text)' }}>{fmtEur(e.costi_totali / e.attendees)}</strong>
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function MiniKpi({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{ textAlign: 'center', padding: 8, borderRadius: 8, background: 'var(--panel2)' }}>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 2 }}>{label}</p>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color }}>{value}</p>
+    </div>
+  )
+}
+
+// ─── SYNERGY SECTION (existing functionality) ────────────────────────────────
+
+function SynergySection() {
   const [impactRows, setImpactRows] = useState<ImpactRow[]>([])
   const [monthlyReports, setMonthlyReports] = useState<MonthlyReport[]>([])
   const [roiConfig, setRoiConfig] = useState<RoiConfig[]>([])
@@ -72,21 +437,17 @@ export default function Performance() {
   const [savingId, setSavingId] = useState<string | null>(null)
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  useEffect(() => { loadData() }, [])
 
   async function loadData() {
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-
     const [impactRes, monthlyRes, configRes, profilesRes] = await Promise.all([
       supabase.from('impact_actions_log').select('*').gte('created_at', startOfMonth),
       supabase.from('impact_monthly_reports').select('*'),
       supabase.from('impact_roi_config').select('*'),
       supabase.from('profiles').select('id, first_name, last_name, role, avatar_url, is_active').eq('is_active', true),
     ])
-
     setImpactRows((impactRes.data ?? []) as ImpactRow[])
     setMonthlyReports((monthlyRes.data ?? []) as MonthlyReport[])
     setRoiConfig((configRes.data ?? []) as RoiConfig[])
@@ -94,40 +455,17 @@ export default function Performance() {
     setLoading(false)
   }
 
-  // ─── KPI ────────────────────────────────────────────────────────────────────
-
-  const oreMese = useMemo(() => {
-    return impactRows.reduce((sum, r) => sum + (r.minuti_risparmiati || 0), 0) / 60
-  }, [impactRows])
-
-  const valoreMese = useMemo(() => {
-    return impactRows.reduce((sum, r) => sum + (r.valore_eur || 0), 0)
-  }, [impactRows])
-
-  const utentiAttivi = useMemo(() => {
-    const ids = new Set(impactRows.map(r => r.user_id))
-    return ids.size
-  }, [impactRows])
-
-  const mediaPerUtente = useMemo(() => {
-    return utentiAttivi > 0 ? oreMese / utentiAttivi : 0
-  }, [oreMese, utentiAttivi])
-
+  const oreMese = useMemo(() => impactRows.reduce((sum, r) => sum + (r.minuti_risparmiati || 0), 0) / 60, [impactRows])
+  const valoreMese = useMemo(() => impactRows.reduce((sum, r) => sum + (r.valore_eur || 0), 0), [impactRows])
+  const utentiAttivi = useMemo(() => new Set(impactRows.map(r => r.user_id)).size, [impactRows])
+  const mediaPerUtente = useMemo(() => utentiAttivi > 0 ? oreMese / utentiAttivi : 0, [oreMese, utentiAttivi])
   const azioneTop = useMemo(() => {
     const counts: Record<string, number> = {}
-    for (const r of impactRows) {
-      const t = r.action_type || 'unknown'
-      counts[t] = (counts[t] || 0) + 1
-    }
-    let max = 0
-    let top = ''
-    for (const [k, v] of Object.entries(counts)) {
-      if (v > max) { max = v; top = k }
-    }
+    for (const r of impactRows) { const t = r.action_type || 'unknown'; counts[t] = (counts[t] || 0) + 1 }
+    let max = 0; let top = ''
+    for (const [k, v] of Object.entries(counts)) { if (v > max) { max = v; top = k } }
     return top
   }, [impactRows])
-
-  // ─── Chart data (last 6 months) ────────────────────────────────────────────
 
   const chartData = useMemo(() => {
     const now = new Date()
@@ -136,307 +474,164 @@ export default function Performance() {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
       months.push({ label: MONTH_NAMES[d.getMonth()], mese: d.getMonth() + 1, anno: d.getFullYear(), ore: 0 })
     }
-
     for (const r of monthlyReports) {
       const match = months.find(m => m.mese === r.mese && m.anno === r.anno)
       if (match) match.ore += r.ore_risparmiate
     }
-
-    // Add current month from live data
     const currentMonth = months[months.length - 1]
-    if (currentMonth) {
-      currentMonth.ore += oreMese
-    }
-
+    if (currentMonth) currentMonth.ore += oreMese
     return months
   }, [monthlyReports, oreMese])
-
-  // ─── Per-user table ─────────────────────────────────────────────────────────
 
   const userRows = useMemo(() => {
     const now = new Date()
     const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const prevMese = prevDate.getMonth() + 1
     const prevAnno = prevDate.getFullYear()
-
-    const activeProfiles = profiles.filter(p => p.is_active)
-
-    return activeProfiles.map(p => {
+    return profiles.filter(p => p.is_active).map(p => {
       const userImpact = impactRows.filter(r => r.user_id === p.id)
       const oreThisMonth = userImpact.reduce((s, r) => s + (r.minuti_risparmiati || 0), 0) / 60
       const valoreThisMonth = userImpact.reduce((s, r) => s + (r.valore_eur || 0), 0)
-
-      // Top action this month
       const counts: Record<string, number> = {}
-      for (const r of userImpact) {
-        const t = r.action_type || 'unknown'
-        counts[t] = (counts[t] || 0) + 1
-      }
-      let topAction = ''
-      let topCount = 0
-      for (const [k, v] of Object.entries(counts)) {
-        if (v > topCount) { topCount = v; topAction = k }
-      }
-
-      // Previous month from monthly reports
+      for (const r of userImpact) { const t = r.action_type || 'unknown'; counts[t] = (counts[t] || 0) + 1 }
+      let topAction = ''; let topCount = 0
+      for (const [k, v] of Object.entries(counts)) { if (v > topCount) { topCount = v; topAction = k } }
       const prevReport = monthlyReports.find(r => r.user_id === p.id && r.mese === prevMese && r.anno === prevAnno)
       const orePrev = prevReport?.ore_risparmiate ?? 0
-
-      // Trend
       let trend: 'up' | 'down' | 'flat' = 'flat'
       if (oreThisMonth > orePrev && orePrev > 0) trend = 'up'
       else if (oreThisMonth < orePrev && orePrev > 0) trend = 'down'
-
-      // Mini chart: last 3 months
       const miniData: { label: string; ore: number }[] = []
       for (let i = 2; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-        const m = d.getMonth() + 1
-        const a = d.getFullYear()
-        if (i === 0) {
-          miniData.push({ label: MONTH_NAMES[d.getMonth()], ore: oreThisMonth })
-        } else {
-          const rep = monthlyReports.find(r => r.user_id === p.id && r.mese === m && r.anno === a)
-          miniData.push({ label: MONTH_NAMES[d.getMonth()], ore: rep?.ore_risparmiate ?? 0 })
-        }
+        if (i === 0) miniData.push({ label: MONTH_NAMES[d.getMonth()], ore: oreThisMonth })
+        else { const rep = monthlyReports.find(r => r.user_id === p.id && r.mese === d.getMonth() + 1 && r.anno === d.getFullYear()); miniData.push({ label: MONTH_NAMES[d.getMonth()], ore: rep?.ore_risparmiate ?? 0 }) }
       }
-
-      return {
-        id: p.id,
-        nome: `${p.first_name} ${p.last_name}`.trim(),
-        role: p.role,
-        avatar_url: p.avatar_url,
-        oreThisMonth,
-        valoreThisMonth,
-        topAction,
-        trend,
-        miniData,
-      }
+      return { id: p.id, nome: `${p.first_name} ${p.last_name}`.trim(), role: p.role, avatar_url: p.avatar_url, oreThisMonth, valoreThisMonth, topAction, trend, miniData }
     }).sort((a, b) => b.oreThisMonth - a.oreThisMonth)
   }, [profiles, impactRows, monthlyReports])
 
-  // ─── Save benchmark config ─────────────────────────────────────────────────
-
   async function handleConfigSave(row: RoiConfig) {
     setSavingId(row.id)
-    await supabase.from('impact_roi_config').update({
-      costo_orario_eur: row.costo_orario_eur,
-      ore_sett_pre_synergy: row.ore_sett_pre_synergy,
-      updated_at: new Date().toISOString(),
-    }).eq('id', row.id)
+    await supabase.from('impact_roi_config').update({ costo_orario_eur: row.costo_orario_eur, ore_sett_pre_synergy: row.ore_sett_pre_synergy, updated_at: new Date().toISOString() }).eq('id', row.id)
     setSavingId(null)
   }
 
-  if (!user || !['Admin', 'Super Admin'].includes(user.role)) return null
   if (loading) {
-    return (
-      <div style={{ padding: '0 16px' }}>
-        <div className="wire-masthead" style={{ marginBottom: 24 }}>
-          <div style={{ height: 20, width: 180, background: 'var(--line)', borderRadius: 6, animation: 'shimmer 1.5s infinite' }} />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} style={{ borderRadius: 14, border: '1px solid var(--line)', padding: 16, background: 'var(--panel)' }}>
-              {[80, 60, 40].map((w, j) => (
-                <div key={j} style={{ height: 12, width: `${w}%`, background: 'var(--line)', borderRadius: 6, marginBottom: 8, animation: 'shimmer 1.5s infinite' }} />
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    )
+    return <div style={{ textAlign: 'center', padding: 40, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>Caricamento...</div>
   }
 
   return (
-    <div>
-      {/* Masthead */}
-      <div className="wire-masthead">
-        <div>
-          <span className="wire-masthead-title">PERFORMANCE</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>SYNERGY ROI</span>
-        </div>
-      </div>
-
+    <div className="space-y-8">
       {/* Ticker */}
       <div className="wire-ticker">
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-          <strong>{oreMese.toFixed(1)}</strong> ore mese
-        </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-          <strong>{valoreMese.toFixed(0)}</strong> EUR mese
-        </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-          <strong>{utentiAttivi}</strong> utenti attivi
-        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}><strong>{oreMese.toFixed(1)}</strong> ore mese</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}><strong>{valoreMese.toFixed(0)}</strong> EUR mese</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}><strong>{utentiAttivi}</strong> utenti attivi</span>
       </div>
 
-      <div className="space-y-8" style={{ marginTop: '24px' }}>
+      {/* KPI */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard label="ORE RISPARMIATE" value={oreMese.toFixed(1)} color="var(--text)" />
+        <KpiCard label="VALORE ECONOMICO" value={`${valoreMese.toFixed(0)} EUR`} color="var(--text)" />
+        <KpiCard label="MEDIA PER UTENTE" value={`${mediaPerUtente.toFixed(1)} ore`} color="var(--text)" />
+        <KpiCard label="AZIONE TOP" value={getActionLabel(azioneTop) || '-'} color="var(--text)" />
+      </div>
 
-        {/* ─── KPI CARDS ─────────────────────────────────────────────────────────── */}
-        <div>
-          <p style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>
-            KPI Aziendali
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="ORE RISPARMIATE" value={oreMese.toFixed(1)} unit="ore" />
-            <KpiCard label="VALORE ECONOMICO" value={`${valoreMese.toFixed(0)}`} unit="EUR" />
-            <KpiCard label="MEDIA PER UTENTE" value={mediaPerUtente.toFixed(1)} unit="ore/mese" />
-            <KpiCard label="AZIONE PIU USATA" value={getActionLabel(azioneTop) || '-'} unit="" />
-          </div>
+      {/* Chart */}
+      <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 12 }}>Trend ultimi 6 mesi</p>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <XAxis dataKey="label" tick={{ fontFamily: 'var(--font-mono)', fontSize: 10, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontFamily: 'var(--font-mono)', fontSize: 10, fill: 'var(--muted)' }} axisLine={false} tickLine={false} width={35} />
+            <Tooltip contentStyle={{ fontFamily: 'var(--font-mono)', fontSize: 10, background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 8 }} formatter={(v) => [`${Number(v).toFixed(1)} ore`, 'Ore']} />
+            <Bar dataKey="ore" radius={[6, 6, 0, 0]}><Cell fill="var(--blue)" /></Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* User Table */}
+      <div style={{ border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--line)' }}>
+              {['Utente', 'Ruolo', 'Ore mese', 'Valore EUR', 'Azione top', 'Trend'].map(h => (
+                <th key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', padding: '10px 12px', textAlign: 'left', fontWeight: 500 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {userRows.map(row => (
+              <SynergyUserRow key={row.id} row={row} expanded={expandedUser === row.id} onToggle={() => setExpandedUser(expandedUser === row.id ? null : row.id)} />
+            ))}
+            {userRows.length === 0 && <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>Nessun dato disponibile</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Benchmark */}
+      <div style={{ border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase', color: 'var(--muted)' }}>Benchmark</p>
         </div>
-
-        {/* ─── CHART ─────────────────────────────────────────────────────────────── */}
-        <div>
-          <p style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>
-            Trend ultimi 6 mesi
-          </p>
-          <div style={{ border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <XAxis dataKey="label" tick={{ fontFamily: 'var(--font-mono)', fontSize: 11, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontFamily: 'var(--font-mono)', fontSize: 11, fill: 'var(--muted)' }} axisLine={false} tickLine={false} width={40} />
-                <Tooltip
-                  contentStyle={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 8 }}
-                  formatter={(v) => [`${Number(v).toFixed(1)} ore`, 'Ore risparmiate']}
-                />
-                <Bar dataKey="ore" radius={[6, 6, 0, 0]}>
-                  {chartData.map((_, i) => (
-                    <Cell key={i} fill="var(--red2)" />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* ─── USER TABLE ────────────────────────────────────────────────────────── */}
-        <div>
-          <p style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>
-            Dettaglio per utente
-          </p>
-          <div style={{ border: '1px solid var(--line)', borderRadius: '14px', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                  {['Utente', 'Ruolo', 'Ore mese', 'Valore EUR', 'Azione top', 'Trend'].map(h => (
-                    <th key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', padding: '10px 12px', textAlign: 'left', fontWeight: 500 }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {userRows.map(row => (
-                  <UserRow
-                    key={row.id}
-                    row={row}
-                    expanded={expandedUser === row.id}
-                    onToggle={() => setExpandedUser(expandedUser === row.id ? null : row.id)}
-                  />
-                ))}
-                {userRows.length === 0 && (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '24px', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)' }}>
-                      Nessun dato di performance disponibile
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ─── BENCHMARK CONFIG ──────────────────────────────────────────────────── */}
-        <div>
-          <div style={{ borderTop: '1px solid var(--line)', paddingTop: '24px', marginTop: '8px' }}>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '16px' }}>
-              BENCHMARK
-            </p>
-          </div>
-          <div style={{ border: '1px solid var(--line)', borderRadius: '14px', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                  {['Ruolo', 'Costo orario EUR', 'Ore/sett pre-Synergy', ''].map(h => (
-                    <th key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', padding: '10px 12px', textAlign: 'left', fontWeight: 500 }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {roiConfig.sort((a, b) => a.role.localeCompare(b.role)).map(row => (
-                  <BenchmarkRow
-                    key={row.id}
-                    row={row}
-                    saving={savingId === row.id}
-                    onChange={(field, value) => {
-                      setRoiConfig(prev => prev.map(r => r.id === row.id ? { ...r, [field]: value } : r))
-                    }}
-                    onSave={() => handleConfigSave(row)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', marginTop: '10px' }}>
-            I benchmark pre-Synergy sono stime. Aggiornali con i dati reali per calcoli piu accurati.
-          </p>
-        </div>
-
-        {/* ─── FLY INSIGHTS — TEAM ─────────────────────────────────────────────────── */}
-        <FlyInsightsSection userRows={userRows} />
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--line)' }}>
+              {['Ruolo', 'Costo orario EUR', 'Ore/sett pre-Synergy', ''].map(h => (
+                <th key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase', color: 'var(--muted)', padding: '10px 12px', textAlign: 'left', fontWeight: 500 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {roiConfig.sort((a, b) => a.role.localeCompare(b.role)).map(row => (
+              <tr key={row.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }}>{row.role}</td>
+                <td style={{ padding: '10px 12px' }}>
+                  <input type="number" value={row.costo_orario_eur} onChange={e => setRoiConfig(prev => prev.map(r => r.id === row.id ? { ...r, costo_orario_eur: parseFloat(e.target.value) || 0 } : r))}
+                    className="w-20 px-2 py-1 rounded-lg" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)', outline: 'none' }} />
+                </td>
+                <td style={{ padding: '10px 12px' }}>
+                  <input type="number" value={row.ore_sett_pre_synergy} onChange={e => setRoiConfig(prev => prev.map(r => r.id === row.id ? { ...r, ore_sett_pre_synergy: parseFloat(e.target.value) || 0 } : r))}
+                    className="w-20 px-2 py-1 rounded-lg" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)', outline: 'none' }} />
+                </td>
+                <td style={{ padding: '10px 12px' }}>
+                  <button onClick={() => handleConfigSave(row)} disabled={savingId === row.id}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, border: '1px solid var(--line)', background: 'transparent', color: savingId === row.id ? 'var(--muted)' : 'var(--text)', cursor: 'pointer' }}>
+                    <Save className="w-3 h-3" />{savingId === row.id ? '...' : 'Salva'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function KpiCard({ label, value, unit }: { label: string; value: string; unit: string }) {
-  return (
-    <div style={{ border: '1px solid var(--line)', borderRadius: '14px', padding: '18px 20px' }}>
-      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', marginBottom: '8px' }}>
-        {label}
-      </p>
-      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', fontWeight: 700, color: 'var(--text)', lineHeight: 1 }}>
-        {value}
-      </p>
-      {unit && (
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', marginTop: '4px' }}>
-          {unit}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function UserRow({ row, expanded, onToggle }: {
+function SynergyUserRow({ row, expanded, onToggle }: {
   row: { id: string; nome: string; role: string; avatar_url: string | null; oreThisMonth: number; valoreThisMonth: number; topAction: string; trend: 'up' | 'down' | 'flat'; miniData: { label: string; ore: number }[] }
   expanded: boolean
   onToggle: () => void
 }) {
   const initials = row.nome.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-
   return (
     <>
-      <tr onClick={onToggle} style={{ borderBottom: '1px solid var(--line)', cursor: 'pointer', transition: 'background 0.12s' }}
+      <tr onClick={onToggle} style={{ borderBottom: '1px solid var(--line)', cursor: 'pointer' }}
         onMouseEnter={e => (e.currentTarget.style.background = 'var(--panel2)')}
         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
         <td style={{ padding: '10px 12px' }}>
           <div className="flex items-center gap-2">
-            {row.avatar_url ? (
-              <img src={row.avatar_url} className="w-6 h-6 rounded-full object-cover" alt="" />
-            ) : (
-              <div className="w-6 h-6 rounded-full flex items-center justify-center text-white" style={{ background: 'var(--red2)', fontSize: '9px', fontWeight: 600 }}>{initials}</div>
-            )}
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }}>{row.nome}</span>
+            {row.avatar_url ? <img src={row.avatar_url} className="w-6 h-6 rounded-full object-cover" alt="" />
+              : <div className="w-6 h-6 rounded-full flex items-center justify-center text-white" style={{ background: 'var(--blue)', fontSize: 9, fontWeight: 600 }}>{initials}</div>}
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }}>{row.nome}</span>
           </div>
         </td>
-        <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>{row.role}</td>
-        <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{row.oreThisMonth.toFixed(1)}</td>
-        <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{row.valoreThisMonth.toFixed(0)}</td>
-        <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>{getActionLabel(row.topAction) || '-'}</td>
+        <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{row.role}</td>
+        <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{row.oreThisMonth.toFixed(1)}</td>
+        <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{row.valoreThisMonth.toFixed(0)}</td>
+        <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{getActionLabel(row.topAction) || '-'}</td>
         <td style={{ padding: '10px 12px' }}>
           {row.trend === 'up' && <TrendingUp className="w-4 h-4" style={{ color: 'var(--green)' }} />}
           {row.trend === 'down' && <TrendingDown className="w-4 h-4" style={{ color: 'var(--red2)' }} />}
@@ -446,16 +641,12 @@ function UserRow({ row, expanded, onToggle }: {
       {expanded && (
         <tr style={{ borderBottom: '1px solid var(--line)' }}>
           <td colSpan={6} style={{ padding: '12px 16px', background: 'var(--panel2)' }}>
-            <div style={{ height: 80, maxWidth: 240 }}>
+            <div style={{ height: 70, maxWidth: 200 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={row.miniData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                   <XAxis dataKey="label" tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
                   <YAxis hide />
-                  <Bar dataKey="ore" radius={[4, 4, 0, 0]}>
-                    {row.miniData.map((_, i) => (
-                      <Cell key={i} fill="var(--red2)" />
-                    ))}
-                  </Bar>
+                  <Bar dataKey="ore" radius={[4, 4, 0, 0]}><Cell fill="var(--blue)" /></Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -466,223 +657,30 @@ function UserRow({ row, expanded, onToggle }: {
   )
 }
 
-function BenchmarkRow({ row, saving, onChange, onSave }: {
-  row: RoiConfig
-  saving: boolean
-  onChange: (field: string, value: number) => void
-  onSave: () => void
-}) {
+// ─── Shared Helpers ──────────────────────────────────────────────────────────
+
+function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <tr style={{ borderBottom: '1px solid var(--line)' }}>
-      <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }}>{row.role}</td>
-      <td style={{ padding: '10px 12px' }}>
-        <input
-          type="number"
-          value={row.costo_orario_eur}
-          onChange={e => onChange('costo_orario_eur', parseFloat(e.target.value) || 0)}
-          className="w-20 px-2 py-1 rounded-lg focus:outline-none"
-          style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)' }}
-        />
-      </td>
-      <td style={{ padding: '10px 12px' }}>
-        <input
-          type="number"
-          value={row.ore_sett_pre_synergy}
-          onChange={e => onChange('ore_sett_pre_synergy', parseFloat(e.target.value) || 0)}
-          className="w-20 px-2 py-1 rounded-lg focus:outline-none"
-          style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)' }}
-        />
-      </td>
-      <td style={{ padding: '10px 12px' }}>
-        <button onClick={onSave} disabled={saving}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all"
-          style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', border: '1px solid var(--line)', background: 'transparent', color: saving ? 'var(--muted)' : 'var(--text)', cursor: saving ? 'wait' : 'pointer' }}>
-          <Save className="w-3 h-3" />
-          {saving ? '...' : 'Salva'}
-        </button>
-      </td>
-    </tr>
-  )
-}
-
-// ─── FLY INSIGHTS ────────────────────────────────────────────────────────────
-
-interface InsightCard {
-  userId: string
-  nome: string
-  role: string
-  avatar_url: string | null
-  insight: string
-}
-
-function FlyInsightsSection({ userRows }: {
-  userRows: { id: string; nome: string; role: string; avatar_url: string | null; oreThisMonth: number; valoreThisMonth: number; topAction: string; trend: 'up' | 'down' | 'flat' }[]
-}) {
-  const [insights, setInsights] = useState<InsightCard[]>([])
-  const [generating, setGenerating] = useState(false)
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null)
-
-  async function handleAnalyze() {
-    setGenerating(true)
-    setInsights([])
-
-    const teamData = userRows.map(u => ({
-      nome: u.nome,
-      ruolo: u.role,
-      ore_mese: parseFloat(u.oreThisMonth.toFixed(1)),
-      valore_eur: parseFloat(u.valoreThisMonth.toFixed(0)),
-      top_action: u.topAction || 'nessuna',
-      trend_vs_mese_prec: u.trend,
-      azioni_count: u.oreThisMonth > 0 ? Math.ceil(u.oreThisMonth * 2) : 0,
-    }))
-
-    try {
-      const { data: session } = await supabase.auth.getSession()
-      const token = session?.session?.access_token
-      if (!token) { setGenerating(false); return }
-
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fly-gateway`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          message: `Analizza le performance del team Simmetria questo mese e dai consigli specifici per ogni utente.\n\nDati team:\n${JSON.stringify(teamData, null, 2)}\n\nRispondi con un insight per ogni utente, una riga ciascuno nel formato:\nNOME: consiglio specifico\n\nMax 2 righe per utente. Tono costruttivo, mai giudicante. Se un utente ha 0 ore/azioni scrivi che i dati sono insufficienti per analizzarlo.`,
-          history: [],
-        }),
-      })
-
-      const json = await res.json()
-      const reply: string = json?.reply || json?.message || ''
-
-      const parsed: InsightCard[] = []
-      const lines = reply.split('\n').filter((l: string) => l.trim().length > 0)
-
-      for (const line of lines) {
-        const colonIdx = line.indexOf(':')
-        if (colonIdx < 1) continue
-        const nameStr = line.slice(0, colonIdx).replace(/^\*\*|\*\*$/g, '').replace(/^-\s*/, '').trim()
-        const insightText = line.slice(colonIdx + 1).trim()
-        if (!insightText) continue
-
-        const matchedUser = userRows.find(u =>
-          u.nome.toLowerCase().includes(nameStr.toLowerCase()) ||
-          nameStr.toLowerCase().includes(u.nome.split(' ')[0].toLowerCase())
-        )
-
-        if (matchedUser) {
-          parsed.push({
-            userId: matchedUser.id,
-            nome: matchedUser.nome,
-            role: matchedUser.role,
-            avatar_url: matchedUser.avatar_url,
-            insight: insightText,
-          })
-        } else {
-          parsed.push({
-            userId: nameStr,
-            nome: nameStr,
-            role: '',
-            avatar_url: null,
-            insight: insightText,
-          })
-        }
-      }
-
-      setInsights(parsed)
-      setGeneratedAt(new Date().toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }))
-    } catch (err) {
-      console.error('Fly insights error:', err)
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  return (
-    <div>
-      <div style={{ borderTop: '1px solid var(--line)', paddingTop: '24px', marginTop: '8px' }}>
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: '6px' }}>
-          FLY INSIGHTS — TEAM
-        </p>
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '16px' }}>
-          Analisi comportamentale del team generata da Fly — aggiornata su richiesta
-        </p>
-      </div>
-
-      <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-        <button
-          onClick={handleAnalyze}
-          disabled={generating}
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '12px',
-            padding: '8px 16px',
-            borderRadius: '10px',
-            border: '1px solid var(--red2)',
-            background: generating ? 'transparent' : 'color-mix(in srgb, var(--red2) 10%, transparent)',
-            color: 'var(--red2)',
-            cursor: generating ? 'wait' : 'pointer',
-            transition: 'all 0.15s',
-          }}
-        >
-          {generating ? 'Analizzando...' : 'Analizza il team con Fly'}
-        </button>
-        {generatedAt && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
-            Aggiornato {generatedAt}
-          </span>
-        )}
-      </div>
-
-      {generating && (
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} style={{ border: '1px solid var(--line)', borderRadius: '12px', padding: '16px', overflow: 'hidden', position: 'relative' }}>
-              <div className="animate-pulse flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full" style={{ background: 'var(--line)' }} />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 rounded" style={{ background: 'var(--line)', width: '30%' }} />
-                  <div className="h-3 rounded" style={{ background: 'var(--line)', width: '80%' }} />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!generating && insights.length > 0 && (
-        <div className="space-y-3">
-          {insights.map((card, idx) => {
-            const initials = card.nome.split(' ').map(w => w[0] || '').join('').slice(0, 2).toUpperCase()
-            return (
-              <div key={idx} className="wire-card-sm" style={{ border: '1px solid var(--line)', borderRadius: '12px', padding: '16px', position: 'relative' }}>
-                <span style={{ position: 'absolute', top: '10px', right: '12px', fontSize: '14px', opacity: 0.4 }}>
-                  FLY
-                </span>
-                <div className="flex items-start gap-3">
-                  {card.avatar_url ? (
-                    <img src={card.avatar_url} className="w-8 h-8 rounded-full object-cover flex-shrink-0" alt="" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0"
-                      style={{ background: 'var(--red2)', fontSize: '9px', fontWeight: 600 }}>{initials}</div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>
-                      {card.nome}
-                      {card.role && <span style={{ fontWeight: 400, color: 'var(--muted)', marginLeft: '8px' }}>{card.role}</span>}
-                    </p>
-                    <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.5 }}>
-                      {card.insight}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+    <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: '16px 18px' }}>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', marginBottom: 6 }}>{label}</p>
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color, lineHeight: 1 }}>{value}</p>
     </div>
   )
+}
+
+function TH({ label, field, onSort, sortField, sortAsc }: { label: string; field?: SortField; onSort?: (f: SortField) => void; sortField?: SortField; sortAsc?: boolean }) {
+  const active = field && sortField === field
+  return (
+    <th
+      onClick={() => field && onSort?.(field)}
+      style={{ fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em', color: active ? 'var(--text)' : 'var(--muted)', padding: '10px 8px', textAlign: 'left', fontWeight: 500, cursor: field ? 'pointer' : 'default', whiteSpace: 'nowrap' }}
+    >
+      {label} {active && (sortAsc ? <ChevronUp className="w-3 h-3 inline" /> : <ChevronDown className="w-3 h-3 inline" />)}
+    </th>
+  )
+}
+
+function fmtEur(n: number): string {
+  if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`
+  return n.toFixed(0)
 }
