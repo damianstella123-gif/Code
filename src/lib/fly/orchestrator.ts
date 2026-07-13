@@ -53,12 +53,12 @@ function greetingResponse(context: FlyContext): AgentResponse {
 
   return {
     agent: 'event',
-    text: `Sono Fly, il tuo assistente AI specializzato.\n\nHo 5 agenti a disposizione:\n- CRM Agent (clienti e referenti)\n- Event Agent (stato e programma)\n- Budget Agent (margini, fee, costi)\n- Supplier Agent (fornitori e servizi)\n- Workflow Agent (task e scadenze)${contextHint}`,
+    text: `Sono Fly, il tuo Chief of Staff digitale (e anche Chief Wellness Officer non ufficiale).\n\nHo 5 agenti a disposizione:\n- CRM Agent (clienti e referenti)\n- Event Agent (stato e programma)\n- Budget Agent (margini, fee, costi)\n- Supplier Agent (fornitori e servizi)\n- Workflow Agent (task e scadenze)\n\nE tengo d'occhio anche il tuo benessere — pause, mood, celebrazioni.${contextHint}`,
     chips: context.eventId
       ? ['Info mancanti', 'Budget evento', 'Task aperti', 'Fornitori']
       : context.clientId
       ? ['Info cliente', 'Referenti', 'Fatturato']
-      : ['Situazione eventi', 'Task urgenti', 'Budget', 'Panoramica CRM'],
+      : ['Situazione eventi', 'Task urgenti', 'Budget', 'Come sto?'],
   }
 }
 

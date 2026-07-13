@@ -240,6 +240,21 @@ const TOOLS = [
       required: ["event_id"] as string[],
     },
   },
+  {
+    name: "get_wellness_status",
+    description:
+      "Controlla lo stato wellness dell'utente: mood recente, pause prese, tempo di lavoro, riconoscimenti. Usa per suggerire pause, celebrare win, o fare check-in sul morale. Chiama quando l'utente sembra stressato, chiede come sta, o quando vuoi aggiungere un tocco wellness alla conversazione.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        include_team: {
+          type: "boolean",
+          description: "Se true, include anche il mood medio del team (solo Admin).",
+        },
+      },
+      required: [] as string[],
+    },
+  },
 ];
 
 // ─── TOOL EXECUTION ────────────────────────────────────────────────────
@@ -1450,6 +1465,100 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
       }
     }
 
+    case "get_wellness_status": {
+      const includeTeam = input.include_team === true;
+
+      // Get user's recent moods (last 7 days)
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: moods } = await supabase
+        .from("wellness_logs")
+        .select("mood, created_at")
+        .eq("tipo", "mood_emoji")
+        .gte("created_at", weekAgo)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      // Get breaks taken today
+      const todayStart = todayISO() + "T00:00:00Z";
+      const { data: breaksToday } = await supabase
+        .from("wellness_logs")
+        .select("break_type, break_duration_minutes, break_effectiveness")
+        .eq("tipo", "break_taken")
+        .gte("created_at", todayStart);
+
+      // Get recent recognitions received
+      const { data: recognitions } = await supabase
+        .from("recognition_logs")
+        .select("tipo, message, created_at, given_by")
+        .gte("created_at", weekAgo)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      // Get last break recommendation
+      const { data: lastRec } = await supabase
+        .from("break_recommendations")
+        .select("recommendation_type, recommendation_text, triggered_at, break_taken")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Get latest wellness pulse
+      const { data: pulse } = await supabase
+        .from("wellness_logs")
+        .select("energy_level, work_life_balance, team_support, burnout_risk_self_reported, created_at")
+        .eq("tipo", "wellness_pulse")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const moodScores: Record<string, number> = { '😍': 5, '😊': 4, '😐': 3, '😕': 2, '😠': 1 };
+      const moodList = (moods || []).filter(m => m.mood).map(m => ({ mood: m.mood, score: moodScores[m.mood!] || 3, when: m.created_at }));
+      const avgMood = moodList.length > 0 ? moodList.reduce((a, b) => a + b.score, 0) / moodList.length : 0;
+
+      const result: Record<string, unknown> = {
+        mood_recente: {
+          entries: moodList.slice(0, 5),
+          media_7gg: Math.round(avgMood * 10) / 10,
+          trend: moodList.length >= 2 ? (moodList[0].score > moodList[moodList.length - 1].score ? "miglioramento" : moodList[0].score < moodList[moodList.length - 1].score ? "calo" : "stabile") : "insufficiente",
+        },
+        pause_oggi: {
+          totale: (breaksToday || []).length,
+          minuti_totali: (breaksToday || []).reduce((s, b) => s + (b.break_duration_minutes || 0), 0),
+          efficacia_media: (() => {
+            const rated = (breaksToday || []).filter(b => b.break_effectiveness);
+            return rated.length > 0 ? Math.round(rated.reduce((s, b) => s + b.break_effectiveness!, 0) / rated.length * 10) / 10 : null;
+          })(),
+        },
+        ultima_raccomandazione: lastRec ? {
+          tipo: lastRec.recommendation_type,
+          testo: lastRec.recommendation_text,
+          seguita: lastRec.break_taken,
+        } : null,
+        riconoscimenti_settimana: (recognitions || []).length,
+        pulse: pulse ? {
+          energia: pulse.energy_level,
+          work_life: pulse.work_life_balance,
+          supporto_team: pulse.team_support,
+          rischio_burnout: pulse.burnout_risk_self_reported,
+          data: pulse.created_at,
+        } : null,
+      };
+
+      // Team mood (admin only)
+      if (includeTeam) {
+        const { data: teamSnapshot } = await supabase
+          .from("team_mood_snapshot")
+          .select("avg_mood_score, total_breaks_taken, burnout_risk_count, snapshot_date")
+          .order("snapshot_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        result.team = teamSnapshot || { nota: "Nessun snapshot team disponibile" };
+      }
+
+      return JSON.stringify(result);
+    }
+
     default:
       return `Tool sconosciuto: ${name}`;
   }
@@ -2149,7 +2258,24 @@ Deno.serve(async (req: Request) => {
       year: "numeric",
     });
 
-    const systemPrompt = `Sei Fly, Chief of Staff digitale di Simmetria Synergy (agenzia eventi corporate). Rispondi in italiano, sintetico e preciso. Usa i tool per dati reali, non inventare mai. Segnala criticita. Non decidere: proponi.
+    const systemPrompt = `Sei Fly, Chief of Staff digitale di Simmetria Synergy (agenzia eventi corporate) E contemporaneamente il Chief Wellness Officer del team — ma in modo FUN, mai sterile.
+
+PERSONALITA WELLNESS: Sei quel collega che:
+- Roasta affettuosamente quando non prendi pause ("3 ore senza alzarti? Nemmeno la sedia ti sopporta piu")
+- Celebra i win come fossero suoi ("BOOM! Margine al 28%? Champagne digitale per tutti!")
+- Suggerisce pause con ironia ("Il tuo cervello sta inviando un SOS. Rispondi con 5 minuti di aria fresca")
+- Nota quando il team e sotto pressione e interviene con leggerezza
+- Usa metafore divertenti, mai il linguaggio HR corporate noioso
+- Se il mood e basso, non fa il coach motivazionale — fa il collega che ti porta il caffe
+
+QUANDO USARE IL TONO WELLNESS:
+- Se l'utente chiede "come stai" o simili -> rispondi con check-in wellness divertente
+- Se noti molti task urgenti / scadenze imminenti -> aggiungi una battuta di supporto
+- Se l'utente lavora da molto -> suggerisci pausa con stile
+- Se ci sono buone notizie (margini alti, task completati) -> celebra esageratamente
+- MAI quando l'utente chiede dati precisi e ha fretta — li capisci dal tono
+
+TONO GENERALE: Rispondi in italiano, sintetico e preciso. Usa i tool per dati reali, non inventare mai. Segnala criticita. Non decidere: proponi. Aggiungi personalita senza sacrificare la sostanza.
 
 STILE: max 5 voci negli elenchi, chiudi con "...e altri N". No tabelle, no markdown pesante. Una frase di risposta, poi solo dettagli utili. Usa sempre i campi *_nome (cliente_nome, pm_nome, assegnato_a_nome, evento_nome, responsabile_nome) al posto degli ID nelle risposte all'utente.
 
