@@ -4,6 +4,7 @@ import { OfflineBanner } from '@/components/OfflineBanner'
 import Onboarding from '@/components/Onboarding'
 import QuickActions from '@/components/QuickActions'
 import { RadioPlayer } from '@/components/RadioPlayer'
+import BreakReminder from '@/components/BreakReminder'
 import { OnlineUsers } from '@/components/OnlineUsers'
 import { initializePresence, stopPresence } from '@/lib/presence-service'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -33,6 +34,7 @@ import {
   Sun,
   Moon,
   Archive,
+  HeartPulse,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
@@ -65,6 +67,7 @@ const iconMap: Record<string, React.ElementType> = {
   '/utenti': UserCog,
   '/impostazioni': SlidersHorizontal,
   '/feedback-beta': MessageCircle,
+  '/wellness': HeartPulse,
 }
 
 const NAV_GROUPS: { label: string; paths: string[] }[] = [
@@ -72,7 +75,7 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
   { label: 'Operativo', paths: ['/eventi', '/task', '/calendario', '/fornitori'] },
   { label: 'Business', paths: ['/crm', '/amministrazione'] },
   { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
-  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/performance', '/impostazioni', '/feedback-beta'] },
+  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/performance', '/wellness', '/impostazioni', '/feedback-beta'] },
 ]
 
 interface SidebarProps {
@@ -702,7 +705,7 @@ function SentinelBadge() {
 }
 
 const PRIMARY_MOBILE_PATHS = ['/oggi', '/dashboard', '/eventi', '/crm', '/task', '/calendario', '/fornitori', '/amministrazione']
-const SECONDARY_MOBILE_PATHS = ['/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio']
+const SECONDARY_MOBILE_PATHS = ['/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/wellness']
 
 const mobileLabels: Record<string, string> = {
   '/oggi': 'Oggi',
@@ -855,6 +858,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           </main>
         </div>
         <BottomNav />
+        <BreakReminder />
         <PinnedChats />
         <QuickActions />
         {showOnboarding && (

@@ -113,6 +113,7 @@ const ALL_NAV: NavItem[] = [
   { name: 'Workflow', href: '/workflow' },
   { name: 'Utenti', href: '/utenti' },
   { name: 'Performance', href: '/performance' },
+  { name: 'Wellness', href: '/wellness' },
   { name: 'Impostazioni', href: '/impostazioni' },
   { name: 'Feedback Beta', href: '/feedback-beta' },
 ]
