@@ -33,7 +33,6 @@ import type {
 } from '@/data/amministrazione'
 import type { Supplier } from '@/data/suppliers'
 import type { Event } from '@/data/events'
-import { fetchBudgets, upsertBudget, updateBudget, deleteBudget } from '@/lib/budgets-service'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchClients } from '@/lib/clients-service'
@@ -46,31 +45,18 @@ import {
 import { fetchAllEventsEconomics, type EventEconomicsSummary } from '@/lib/use-event-services'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import {
-  fetchEntrate as fetchEntrateDB,
   fetchFatture as fetchFattureDB,
-  upsertEntrata,
   upsertFattura,
-  deleteEntrata as deleteEntrataDB,
-  bulkImportEntrate,
-  bulkImportFatture,
 } from '@/lib/admin-service'
-import { fetchEventPayments, type EventPayment } from '@/lib/event-payments-service'
+import {
+  fetchAllUscite, fetchAllEntrate, insertPayment,
+  updatePayment, deletePayment, markAsPaid,
+} from '@/lib/event-payments-service'
 import { useToast } from '@/lib/toast'
 import { approveLeaveRequest, rejectLeaveRequest } from '@/lib/leave-requests-service'
 import { LeaveRequestsPanel } from '@/components/LeaveRequestsPanel'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const SK_ENTRATE = 'simmetria_entrate'
-const SK_FATTURE = 'simmetria_fatture'
-const SK_MIGRATED = 'simmetria_admin_migrated'
-
-function loadLocal<T>(key: string): T[] {
-  try {
-    const r = localStorage.getItem(key)
-    return r ? JSON.parse(r) : []
-  } catch { return [] }
-}
 
 function formatEur(n: number) {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -457,13 +443,9 @@ export default function Amministrazione() {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
   const [editingDoc, setEditingDoc] = useState<AdminDocument | null>(null)
   const [eventEconomics, setEventEconomics] = useState<EventEconomicsSummary[]>([])
-  const [eventPaymentsForFilter, setEventPaymentsForFilter] = useState<EventPayment[]>([])
-  const [eventIncassiForFilter, setEventIncassiForFilter] = useState<EventPayment[]>([])
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([])
   const [blockingId, setBlockingId] = useState<string | null>(null)
   const [blockNote, setBlockNote] = useState('')
-  const [migrationMsg, setMigrationMsg] = useState<string | null>(null)
-  const migrationRan = useRef(false)
 
   useEffect(() => {
     if (searchParams.has('tab') || searchParams.has('id')) {
@@ -471,11 +453,44 @@ export default function Amministrazione() {
     }
   }, [searchParams, setSearchParams])
 
-  const loadEntrateFromDB = useCallback(async () => {
+  const loadEntrateFromEP = useCallback(async () => {
     try {
-      const data = await fetchEntrateDB()
-      setEntrate(data)
-    } catch { /* RLS may block if unauthenticated */ }
+      const data = await fetchAllEntrate()
+      const todayISO = new Date().toISOString().slice(0, 10)
+      setEntrate(data.map(p => ({
+        id: p.id,
+        clienteId: p.client_id || '',
+        eventoId: p.event_id || null,
+        importo: p.importo,
+        stato: p.data_pagamento ? 'pagato' as const : (p.data_scadenza < todayISO ? 'scaduto' as const : 'in_attesa' as const),
+        dataPrevista: p.data_scadenza,
+        dataPagamento: p.data_pagamento,
+        metodoPagamento: 'bonifico' as const,
+        note: p.note || p.descrizione,
+        fatturaId: null,
+      })))
+    } catch { /* RLS may block */ }
+  }, [])
+
+  const loadUsciteFromEP = useCallback(async () => {
+    try {
+      const data = await fetchAllUscite()
+      const todayISO = new Date().toISOString().slice(0, 10)
+      setUscite(data.map(p => ({
+        id: p.id,
+        fornitoreId: p.supplier_id || '',
+        eventoId: p.event_id || null,
+        categoria: p.categoria || p.descrizione,
+        importo: p.importo,
+        quantity: 1,
+        unitPrice: null,
+        stato: p.data_pagamento ? 'pagato' as const : (p.data_scadenza < todayISO ? 'scaduto' as const : 'in_attesa' as const),
+        scadenza: p.data_scadenza,
+        dataPagamento: p.data_pagamento,
+        note: p.note || p.descrizione,
+        fatturaId: null,
+      })))
+    } catch { /* RLS may block */ }
   }, [])
 
   const loadFattureFromDB = useCallback(async () => {
@@ -485,7 +500,7 @@ export default function Amministrazione() {
     } catch { /* RLS may block if unauthenticated */ }
   }, [])
 
-  useRealtimeTable('admin_entrate', loadEntrateFromDB)
+  useRealtimeTable('event_payments', () => { loadEntrateFromEP(); loadUsciteFromEP() })
   useRealtimeTable('admin_fatture', loadFattureFromDB)
 
   const loadPendingApprovals = useCallback(async () => {
@@ -501,15 +516,13 @@ export default function Amministrazione() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([fetchBudgets(), fetchEvents(), fetchSuppliers(), fetchClients(), fetchInvoices(), fetchAdminDocuments(), fetchEntrateDB(), fetchFattureDB()]).then(([bg, ev, sp, cl, inv, docs, ent, fat]) => {
+    Promise.all([fetchEvents(), fetchSuppliers(), fetchClients(), fetchInvoices(), fetchAdminDocuments(), fetchFattureDB()]).then(async ([ev, sp, cl, inv, docs, fat]) => {
       if (cancelled) return
-      setUscite(bg)
       setEvents(ev)
       setSuppliers(sp)
       setClients(cl.map(c => ({ id: c.id, nome: c.nome })))
       setInvoices(inv)
       setAdminDocs(docs)
-      setEntrate(ent)
       setFatture(fat)
       _clients = cl.map(c => ({ id: c.id, nome: c.nome }))
       _suppliers = sp
@@ -521,42 +534,10 @@ export default function Amministrazione() {
         if (!cancelled) setEventEconomics(econ)
       })
 
-      // One-time localStorage migration
-      if (!migrationRan.current && localStorage.getItem(SK_MIGRATED) !== '1') {
-        migrationRan.current = true
-        const localEntrate = loadLocal<Entrata>(SK_ENTRATE)
-        const localFatture = loadLocal<Fattura>(SK_FATTURE)
-        if (localEntrate.length > 0 || localFatture.length > 0) {
-          Promise.all([
-            bulkImportEntrate(localEntrate),
-            bulkImportFatture(localFatture),
-          ]).then(async ([nEnt, nFat]) => {
-            localStorage.setItem(SK_MIGRATED, '1')
-            if (nEnt > 0 || nFat > 0) {
-              setMigrationMsg(`Migrazione completata: ${nEnt} entrate e ${nFat} fatture importate da localStorage.`)
-              const refreshed = await Promise.all([fetchEntrateDB(), fetchFattureDB()])
-              if (!cancelled) {
-                setEntrate(refreshed[0])
-                setFatture(refreshed[1])
-              }
-              setTimeout(() => setMigrationMsg(null), 6000)
-            }
-          }).catch(() => {
-            // Migration failed - will retry next load
-          })
-        } else {
-          localStorage.setItem(SK_MIGRATED, '1')
-        }
-      }
+      await Promise.all([loadEntrateFromEP(), loadUsciteFromEP()])
     })
     return () => { cancelled = true }
   }, [])
-
-  async function refreshUscite() {
-    const remote = await fetchBudgets()
-    setUscite(remote)
-    return remote
-  }
 
   // Filters
   const [filterEvento, setFilterEvento] = useState('tutti')
@@ -564,32 +545,6 @@ export default function Amministrazione() {
   const [filterStato, setFilterStato] = useState('tutti')
   const [filterTipo, setFilterTipo] = useState<'tutti' | TipoMovimento>('tutti')
 
-  // Load event payments when filtering by specific event
-  useEffect(() => {
-    if (filterEvento !== 'tutti') {
-      fetchEventPayments(filterEvento).then(data => {
-        setEventPaymentsForFilter(data.filter(p => p.tipo === 'pagamento_fornitore'))
-        setEventIncassiForFilter(data.filter(p => p.tipo === 'incasso_cliente'))
-      })
-    } else {
-      supabase
-        .from('event_payments')
-        .select('*')
-        .eq('tipo', 'pagamento_fornitore')
-        .not('data_pagamento', 'is', null)
-        .then((res) => {
-          setEventPaymentsForFilter((res.data ?? []) as EventPayment[])
-        })
-      supabase
-        .from('event_payments')
-        .select('*')
-        .eq('tipo', 'incasso_cliente')
-        .not('data_pagamento', 'is', null)
-        .then((res) => {
-          setEventIncassiForFilter((res.data ?? []) as EventPayment[])
-        })
-    }
-  }, [filterEvento])
 
   // ─── Allowed events for Manager ─────────────────────────────────────────────
   const allowedEventIds = useMemo(() => {
@@ -653,21 +608,31 @@ export default function Amministrazione() {
 
   // ─── DSO / DPO ─────────────────────────────────────────────────────────────
   const { dso, dpo } = useMemo(() => {
-    function avgDays(payments: EventPayment[]) {
-      const valid = payments.filter(p => p.data_pagamento && p.created_at)
+    function avgDaysFromEntrate(items: Entrata[]) {
+      const valid = items.filter(e => e.dataPagamento && e.dataPrevista)
       if (valid.length === 0) return 0
-      const totalDays = valid.reduce((sum, p) => {
-        const created = new Date(p.created_at).getTime()
-        const paid = new Date(p.data_pagamento!).getTime()
-        return sum + Math.max(0, (paid - created) / 86400000)
+      const totalDays = valid.reduce((sum, e) => {
+        const expected = new Date(e.dataPrevista).getTime()
+        const paid = new Date(e.dataPagamento!).getTime()
+        return sum + Math.max(0, (paid - expected) / 86400000)
+      }, 0)
+      return Math.round(totalDays / valid.length)
+    }
+    function avgDaysFromUscite(items: Uscita[]) {
+      const valid = items.filter(u => u.dataPagamento && u.scadenza)
+      if (valid.length === 0) return 0
+      const totalDays = valid.reduce((sum, u) => {
+        const expected = new Date(u.scadenza).getTime()
+        const paid = new Date(u.dataPagamento!).getTime()
+        return sum + Math.max(0, (paid - expected) / 86400000)
       }, 0)
       return Math.round(totalDays / valid.length)
     }
     return {
-      dso: avgDays(eventIncassiForFilter),
-      dpo: avgDays(eventPaymentsForFilter),
+      dso: avgDaysFromEntrate(entrate),
+      dpo: avgDaysFromUscite(uscite),
     }
-  }, [eventIncassiForFilter, eventPaymentsForFilter])
+  }, [entrate, uscite])
 
   // ─── Double-counting detection ───────────────────────────────────────────────
   const doppioConteggioAlerts = useMemo(() => {
@@ -727,46 +692,9 @@ export default function Amministrazione() {
   const filteredEntrate = applyFilters(visibleEntrate, 'dataPrevista')
   const filteredUscite = applyFilters(visibleUscite, 'scadenza')
 
-  // Merge event_payments (supplier) into uscite when filtering by event
-  const mergedUscite = useMemo(() => {
-    if (eventPaymentsForFilter.length === 0) return filteredUscite
-    const epAsUscite: Uscita[] = eventPaymentsForFilter.map(p => ({
-      id: `ep_${p.id}`,
-      fornitoreId: p.supplier_id ?? '',
-      eventoId: p.event_id,
-      categoria: 'Cash Flow',
-      importo: p.importo,
-      quantity: 1,
-      unitPrice: p.importo,
-      scadenza: p.data_scadenza,
-      dataPagamento: p.data_pagamento,
-      stato: (p.data_pagamento ? 'pagato' : p.data_scadenza < todayISO() ? 'scaduto' : 'in_attesa') as StatoPagamento,
-      note: p.descrizione + (p.note ? ` - ${p.note}` : ''),
-      fatturaId: null,
-    }))
-    const existingIds = new Set(filteredUscite.map(u => u.fornitoreId + u.importo + u.scadenza))
-    const unique = epAsUscite.filter(ep => !existingIds.has(ep.fornitoreId + ep.importo + ep.scadenza))
-    return [...filteredUscite, ...unique]
-  }, [filteredUscite, eventPaymentsForFilter])
-
-  const mergedEntrate = useMemo(() => {
-    if (eventIncassiForFilter.length === 0) return filteredEntrate
-    const epAsEntrate: Entrata[] = eventIncassiForFilter.map(p => ({
-      id: `ep_${p.id}`,
-      clienteId: '',
-      eventoId: p.event_id,
-      importo: p.importo,
-      stato: (p.data_pagamento ? 'pagato' : p.data_scadenza < todayISO() ? 'scaduto' : 'in_attesa') as StatoPagamento,
-      dataPrevista: p.data_scadenza,
-      dataPagamento: p.data_pagamento,
-      metodoPagamento: 'bonifico' as const,
-      note: p.descrizione + (p.note ? ` - ${p.note}` : ''),
-      fatturaId: null,
-    }))
-    const existingIds = new Set(filteredEntrate.map(e => e.clienteId + e.importo + e.dataPrevista))
-    const unique = epAsEntrate.filter(ep => !existingIds.has(ep.clienteId + ep.importo + ep.dataPrevista))
-    return [...filteredEntrate, ...unique]
-  }, [filteredEntrate, eventIncassiForFilter])
+  // event_payments IS the single source of truth now — no merge needed
+  const mergedUscite = filteredUscite
+  const mergedEntrate = filteredEntrate
 
   const filteredFatture = visibleFatture.filter(f => {
     const matchEvento = filterEvento === 'tutti' || f.eventoId === filterEvento
@@ -779,42 +707,33 @@ export default function Amministrazione() {
   // ─── Actions ─────────────────────────────────────────────────────────────────
 
   function segnaEntrataPagata(id: string) {
-    const updated = entrate.find(e => e.id === id)
-    if (!updated) return
-    const patched = { ...updated, stato: 'pagato' as StatoPagamento, dataPagamento: todayISO() }
-    setEntrate(prev => prev.map(e => e.id === id ? patched : e))
-    upsertEntrata(patched)
+    setEntrate(prev => prev.map(e => e.id === id ? { ...e, stato: 'pagato' as StatoPagamento, dataPagamento: todayISO() } : e))
+    markAsPaid(id).then(() => loadEntrateFromEP())
   }
 
   function segnaUscitaPagata(id: string) {
-    const today = todayISO()
-    setUscite(prev => prev.map(u =>
-      u.id === id ? { ...u, stato: 'pagato' as StatoPagamento, dataPagamento: today } : u
-    ))
-    updateBudget(id, { stato: 'pagato', dataPagamento: today }).then(() => refreshUscite())
+    setUscite(prev => prev.map(u => u.id === id ? { ...u, stato: 'pagato' as StatoPagamento, dataPagamento: todayISO() } : u))
+    markAsPaid(id).then(() => loadUsciteFromEP())
   }
 
   function eliminaEntrata(id: string) {
     setEntrate(prev => prev.filter(e => e.id !== id))
-    deleteEntrataDB(id)
+    deletePayment(id)
   }
 
   function eliminaUscita(id: string) {
     setUscite(prev => prev.filter(u => u.id !== id))
-    deleteBudget(id).then(() => refreshUscite())
+    deletePayment(id)
   }
 
   function editEntrata(id: string, importo: number, note: string) {
-    const existing = entrate.find(e => e.id === id)
-    if (!existing) return
-    const patched = { ...existing, importo, note }
-    setEntrate(prev => prev.map(e => e.id === id ? patched : e))
-    upsertEntrata(patched)
+    setEntrate(prev => prev.map(e => e.id === id ? { ...e, importo, note } : e))
+    updatePayment(id, { importo, note })
   }
 
   function editUscita(id: string, importo: number, note: string) {
     setUscite(prev => prev.map(u => u.id === id ? { ...u, importo, note } : u))
-    updateBudget(id, { importo, note }).then(() => refreshUscite())
+    updatePayment(id, { importo, note })
   }
 
   function generaFattura(tipo: TipoMovimento, soggettoId: string, soggetto: string, importo: number, eventoId: string | null) {
@@ -901,40 +820,27 @@ export default function Amministrazione() {
     doc.save(`simmetria_budget_${todayISO()}.pdf`)
   }
 
-  function handleNuovoMovimento(tipo: TipoMovimento, importo: number, note: string, eventoId: string | null, soggettoId: string, quantity: number, unitPrice: number | null) {
+  function handleNuovoMovimento(tipo: TipoMovimento, importo: number, note: string, eventoId: string | null, soggettoId: string, _quantity: number, _unitPrice: number | null) {
     const today = todayISO()
     if (tipo === 'entrata') {
-      const newE: Entrata = {
-        id: `ent_new_${Date.now()}`,
-        clienteId: soggettoId,
-        eventoId,
+      insertPayment({
+        event_id: eventoId || null,
+        tipo: 'incasso_cliente',
+        descrizione: note || 'Incasso',
         importo,
-        stato: 'in_attesa',
-        dataPrevista: today,
-        dataPagamento: null,
-        metodoPagamento: 'bonifico',
-        note,
-        fatturaId: null,
-      }
-      setEntrate(prev => [...prev, newE])
-      upsertEntrata(newE)
+        data_scadenza: today,
+        client_id: soggettoId || null,
+      }).then(() => loadEntrateFromEP())
     } else {
-      const newU: Uscita = {
-        id: `usc_new_${Date.now()}`,
-        fornitoreId: soggettoId,
-        eventoId,
-        categoria: 'Altro',
+      insertPayment({
+        event_id: eventoId || null,
+        tipo: 'pagamento_fornitore',
+        descrizione: note || 'Pagamento',
         importo,
-        quantity,
-        unitPrice,
-        stato: 'in_attesa',
-        scadenza: today,
-        dataPagamento: null,
-        note,
-        fatturaId: null,
-      }
-      setUscite(prev => [...prev, newU])
-      upsertBudget(newU).then(() => refreshUscite())
+        data_scadenza: today,
+        supplier_id: soggettoId || null,
+        categoria: 'Altro',
+      }).then(() => loadUsciteFromEP())
     }
     setShowNuovoMovimento(false)
   }
@@ -988,12 +894,6 @@ export default function Amministrazione() {
 
   return (
     <div className="space-y-0">
-      {/* Migration toast */}
-      {migrationMsg && (
-        <div className="fixed top-4 right-4 z-50 animate-fade-in" style={{ background: 'var(--green)', color: '#000', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, padding: '10px 16px', borderRadius: 8, maxWidth: 360 }}>
-          {migrationMsg}
-        </div>
-      )}
       {/* Wire Card Header */}
       <div className="wire-card-flat" style={{ padding: '16px', marginBottom: '20px', borderRadius: 12, border: '1px solid var(--line)' }}>
         {/* Wire Masthead */}

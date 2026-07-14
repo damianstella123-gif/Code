@@ -3,13 +3,15 @@ import { logError } from './error-log'
 
 export interface EventPayment {
   id: string
-  event_id: string
+  event_id: string | null
   tipo: 'incasso_cliente' | 'pagamento_fornitore'
   descrizione: string
   importo: number
   data_scadenza: string
   data_pagamento: string | null
   supplier_id: string | null
+  client_id: string | null
+  categoria: string | null
   stato: 'atteso' | 'pagato' | 'in_ritardo'
   note: string | null
   created_by: string | null
@@ -17,13 +19,15 @@ export interface EventPayment {
 }
 
 export interface PaymentInsert {
-  event_id: string
+  event_id?: string | null
   tipo: 'incasso_cliente' | 'pagamento_fornitore'
   descrizione: string
   importo: number
   data_scadenza: string
   data_pagamento?: string | null
   supplier_id?: string | null
+  client_id?: string | null
+  categoria?: string | null
   stato?: 'atteso' | 'pagato' | 'in_ritardo'
   note?: string | null
   created_by?: string | null
@@ -45,6 +49,8 @@ function rowToPayment(r: any): EventPayment {
     data_scadenza: r.data_scadenza,
     data_pagamento: r.data_pagamento,
     supplier_id: r.supplier_id,
+    client_id: r.client_id,
+    categoria: r.categoria,
     stato: r.stato,
     note: r.note,
     created_by: r.created_by,
@@ -112,5 +118,25 @@ export async function fetchAllPendingPayments(daysAhead: number = 7): Promise<Ev
     .lte('data_scadenza', limitISO)
     .order('data_scadenza', { ascending: true })
   if (error) { logError('event-payments', 'fetchAllPendingPayments', error); return [] }
+  return (data ?? []).map(rowToPayment)
+}
+
+export async function fetchAllUscite(): Promise<EventPayment[]> {
+  const { data, error } = await supabase
+    .from('event_payments')
+    .select('*')
+    .eq('tipo', 'pagamento_fornitore')
+    .order('data_scadenza', { ascending: false })
+  if (error) { logError('event-payments', 'fetchAllUscite', error); return [] }
+  return (data ?? []).map(rowToPayment)
+}
+
+export async function fetchAllEntrate(): Promise<EventPayment[]> {
+  const { data, error } = await supabase
+    .from('event_payments')
+    .select('*')
+    .eq('tipo', 'incasso_cliente')
+    .order('data_scadenza', { ascending: false })
+  if (error) { logError('event-payments', 'fetchAllEntrate', error); return [] }
   return (data ?? []).map(rowToPayment)
 }
