@@ -1,8 +1,22 @@
 import { useRef } from 'react'
-import { Clock, Edit3, Trash2, Users, Truck, MapPin, Link2, Copy, GripVertical } from 'lucide-react'
+import { Clock, Edit3, Trash2, Users, Truck, MapPin, Link2, Copy, GripVertical, Moon } from 'lucide-react'
 import { fmtFullLong } from '@/lib/format'
 import type { Supplier } from '@/data/suppliers'
 import type { ProgramEntry } from './types'
+
+function formatMultiDay(dataInizio: string, dataFine: string): { label: string; nights: number } {
+  const start = new Date(dataInizio)
+  const end = new Date(dataFine)
+  const nights = Math.round((end.getTime() - start.getTime()) / 86400000)
+  const fmtDay = (d: Date) => d.toLocaleDateString('it-IT', { day: 'numeric' })
+  const fmtMonth = (d: Date) => d.toLocaleDateString('it-IT', { month: 'short' })
+  const startMonth = fmtMonth(start)
+  const endMonth = fmtMonth(end)
+  const label = startMonth === endMonth
+    ? `${fmtDay(start)} → ${fmtDay(end)} ${endMonth}`
+    : `${fmtDay(start)} ${startMonth} → ${fmtDay(end)} ${endMonth}`
+  return { label, nights }
+}
 
 interface ProgrammaTimelineProps {
   allEntries: ProgramEntry[]
@@ -81,11 +95,17 @@ export function ProgrammaTimeline({ allEntries, showForm, grouped, suppliers, op
                               style={{ background: entry.manual ? 'color-mix(in srgb, var(--blue) 10%, transparent)' : 'color-mix(in srgb, var(--red2) 10%, transparent)', color: entry.manual ? 'var(--blue)' : 'var(--red2)' }}>
                               {entry.categoria}
                             </span>
-                            {entry.data_fine && entry.data_fine !== entry.data && (
-                              <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                                fino al {fmtFullLong(entry.data_fine)}
-                              </span>
-                            )}
+                            {entry.data_fine && entry.data_fine !== entry.data && (() => {
+                              const { label, nights } = formatMultiDay(entry.data, entry.data_fine)
+                              return (
+                                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                                  style={{ background: 'color-mix(in srgb, var(--blue) 12%, transparent)', color: 'var(--blue)' }}>
+                                  <Moon className="w-3 h-3" />
+                                  {label}
+                                  <span className="opacity-70">({nights} {nights === 1 ? 'notte' : 'notti'})</span>
+                                </span>
+                              )
+                            })()}
                             {entry.pax && (
                               <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>
                                 <Users className="w-3 h-3 inline mr-0.5" />{entry.pax} pax

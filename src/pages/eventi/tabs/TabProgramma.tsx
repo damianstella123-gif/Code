@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Plus, Printer } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useToast } from '@/lib/toast'
 import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
 import type { ProgramEntry, ManualProgramRow } from './programma/types'
@@ -9,6 +10,7 @@ import { ProgrammaForm } from './programma/ProgrammaForm'
 import { ProgrammaTimeline } from './programma/ProgrammaTimeline'
 
 export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
+  const { showToast } = useToast()
   const [autoEntries, setAutoEntries] = useState<ProgramEntry[]>([])
   const [manualEntries, setManualEntries] = useState<ManualProgramRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -136,6 +138,7 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
     })
     setEditingId(null)
     setShowForm(true)
+    showToast('Voce duplicata — modifica i dettagli', 'success')
   }
 
   async function handleSave() {
