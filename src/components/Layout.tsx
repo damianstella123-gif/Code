@@ -99,6 +99,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
     <>
       {open && (
         <div
+          <SplashScreen />
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
           onClick={() => setOpen(false)}
         />
