@@ -842,9 +842,10 @@ export default function Layout({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer)
   }, [])
 
-  return (
-    <ChatNotificationsProvider>
-      <div className="shell-environment">
+return (
+  <ChatNotificationsProvider>
+    <SplashScreen />
+    <div className="shell-environment">
         {/* Ambient environment — directional light from top-left */}
         <div className="shell-ambient" aria-hidden="true">
           <div className="shell-light-primary" />
