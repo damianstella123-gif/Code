@@ -8,7 +8,7 @@ import BreakReminder from '@/components/BreakReminder'
 import { OnlineUsers } from '@/components/OnlineUsers'
 import { initializePresence, stopPresence } from '@/lib/presence-service'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import {
+import SplashScreen from '@/components/splash/SplashScreen'
   LayoutDashboard,
   Calendar,
   Users,
