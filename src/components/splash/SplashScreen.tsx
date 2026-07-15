@@ -38,7 +38,8 @@ export default function SplashScreen() {
   useEffect(() => {
     if (!visible) return
     shownThisSession = true
-    loadUser().then(u => setName(u?.first_name || ''))
+ const user = loadUser()
+setName(user?.first_name || '')
     const total = quick ? QUICK_MS : FULL_MS
     const t1 = setTimeout(() => setExiting(true), total)
     const t2 = setTimeout(() => setVisible(false), total + EXIT_MS)
