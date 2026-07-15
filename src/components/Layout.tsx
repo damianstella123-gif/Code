@@ -9,6 +9,7 @@ import { OnlineUsers } from '@/components/OnlineUsers'
 import { initializePresence, stopPresence } from '@/lib/presence-service'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import SplashScreen from '@/components/splash/SplashScreen'
+import {
   LayoutDashboard,
   Calendar,
   Users,
