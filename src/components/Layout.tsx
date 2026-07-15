@@ -98,12 +98,14 @@ function Sidebar({ open, setOpen }: SidebarProps) {
 
   return (
     <>
-      {open && (
-        <div
-          <SplashScreen />
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-          onClick={() => setOpen(false)}
-        />
+{open && (
+  <div
+    className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+    onClick={() => setOpen(false)}
+  >
+    <SplashScreen />
+  </div>
+)}
       )}
 
       <aside
