@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, Clock, ShieldCheck, Lock, Plus } from 'lucide-react'
+import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, Clock, ShieldCheck, Lock, Plus, Pencil } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { loadUser } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
 import { calcRowEconomics, normalizzaImporto, calcRowCommission } from '@/lib/event-economics'
+import { isSupportedTable } from '@/lib/economic-lines-service'
+import BudgetLineEditModal from '@/components/BudgetLineEditModal'
 import { fmtDate as fmtDateCentral } from '@/lib/format'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import type { Event } from '@/data/events'
@@ -103,6 +105,8 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   const [margineTarget, setMargineTarget] = useState(event.margine_target ?? 25)
   const [editingTarget, setEditingTarget] = useState(false)
   const [targetInput, setTargetInput] = useState(String(event.margine_target ?? 25))
+
+  const [editingLine, setEditingLine] = useState<{ id: string; table: string; categoria: string } | null>(null)
 
   async function saveFee(newPct: number) {
     setSavingFee(true)
@@ -911,7 +915,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     const Icon = statoConf.icon
 
     return (
-      <div key={item.id} style={{ borderBottom: '1px solid var(--line)' }}>
+      <div key={item.id} className="group relative" style={{ borderBottom: '1px solid var(--line)' }}>
         <button
           className="w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.02] transition-colors"
           onClick={() => setExpandedId(isExpanded ? null : item.id)}
@@ -935,6 +939,15 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
           <span className="w-20 text-xs text-right font-medium" style={{ color: item.margine >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmt(item.margine)}</span>
           <span className="w-10 text-xs text-right font-medium" style={{ color: item.marginePct >= margineTarget ? 'var(--green)' : item.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)' }}>{item.marginePct.toFixed(0)}%</span>
         </button>
+        {isSupportedTable(item.table) && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setEditingLine({ id: item.id, table: item.table, categoria: item.categoria }) }}
+            className="absolute right-2 top-2.5 p-1 rounded hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100"
+            title="Modifica voce economica"
+          >
+            <Pencil className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+          </button>
+        )}
         {isExpanded && (
           <div className="px-4 pb-4 pt-2" style={{ background: 'var(--bg)' }}>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 mb-3">
@@ -959,15 +972,37 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
               <Detail label="Margine %" value={`${item.marginePct.toFixed(1)}%`} />
             </div>
             {item.stato_conferma === 'richiesto' && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(255,194,75,0.08)', border: '1px solid rgba(255,194,75,0.2)' }}>
-                <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--yellow)' }} />
-                <span style={{ color: 'var(--yellow)' }}>Costo stimato - fornitore non confermato. Modifica dal tab Fornitori.</span>
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(255,194,75,0.08)', border: '1px solid rgba(255,194,75,0.2)' }}>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--yellow)' }} />
+                  <span style={{ color: 'var(--yellow)' }}>Costo stimato - fornitore non confermato.</span>
+                </div>
+                {isSupportedTable(item.table) && (
+                  <button
+                    onClick={() => setEditingLine({ id: item.id, table: item.table, categoria: item.categoria })}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors"
+                    style={{ background: 'var(--accent)', color: '#fff' }}
+                  >
+                    <Pencil className="w-3 h-3" /> Modifica
+                  </button>
+                )}
               </div>
             )}
             {item.stato_conferma !== 'richiesto' && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(56,210,125,0.06)', border: '1px solid rgba(56,210,125,0.15)' }}>
-                <Lock className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />
-                <span style={{ color: 'var(--muted)' }}>Costo confermato. Per modificare i valori vai al tab Fornitori.</span>
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(56,210,125,0.06)', border: '1px solid rgba(56,210,125,0.15)' }}>
+                <div className="flex items-center gap-2">
+                  <Lock className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />
+                  <span style={{ color: 'var(--muted)' }}>Costo confermato.</span>
+                </div>
+                {isSupportedTable(item.table) && (
+                  <button
+                    onClick={() => setEditingLine({ id: item.id, table: item.table, categoria: item.categoria })}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors"
+                    style={{ background: 'var(--accent)', color: '#fff' }}
+                  >
+                    <Pencil className="w-3 h-3" /> Modifica
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1376,6 +1411,22 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
             </div>
           </div>
         </div>
+      )}
+
+      {/* ══════ EDIT MODAL ══════ */}
+      {editingLine && (
+        <BudgetLineEditModal
+          lineId={editingLine.id}
+          table={editingLine.table}
+          categoria={editingLine.categoria}
+          suppliers={suppliers}
+          onClose={() => setEditingLine(null)}
+          onSaved={() => {
+            setEditingLine(null)
+            loadData()
+            showToast('Voce economica aggiornata', 'success')
+          }}
+        />
       )}
     </div>
   )
