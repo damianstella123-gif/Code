@@ -3,6 +3,7 @@ import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangl
 import { supabase } from '@/lib/supabase'
 import { loadUser } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
+import { cloneBudgetVersion } from '@/lib/budget-versions-service'
 import { calcRowEconomics, normalizzaImporto, calcRowCommission } from '@/lib/event-economics'
 import { isSupportedTable } from '@/lib/economic-lines-service'
 import BudgetLineEditModal from '@/components/BudgetLineEditModal'
@@ -107,6 +108,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   const [targetInput, setTargetInput] = useState(String(event.margine_target ?? 25))
 
   const [editingLine, setEditingLine] = useState<{ id: string; table: string; categoria: string } | null>(null)
+  const [cloning, setCloning] = useState(false)
 
   async function saveFee(newPct: number) {
     setSavingFee(true)
@@ -150,52 +152,46 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   }
 
   async function createConsuntivo(fromId: string) {
-    const { data: newV } = await supabase.from('budget_versions')
-      .insert({ event_id: event.id, nome: 'Consuntivo', tipo: 'consuntivo', stato: 'bozza', created_by: user?.id })
-      .select().single()
-    if (!newV) return
-    const tables = ['event_hotel_details', 'event_restaurant_details', 'event_experience_details',
-      'event_catering_details', 'event_staff_interno_details', 'event_staff_esterno_details',
-      'event_varie_details', 'event_audio_video_details', 'event_allestimenti_details',
-      'event_grafica_stampa_details', 'event_supplier_services']
-    for (const table of tables) {
-      const { data: rows } = await supabase.from(table as any).select('*').eq('budget_version_id', fromId)
-      if (rows?.length) {
-        const copies = rows.map((r: any) => {
-          const { id: _id, created_at: _ca, ...rest } = r
-          return { ...rest, budget_version_id: newV.id }
-        })
-        await supabase.from(table as any).insert(copies)
-      }
+    if (cloning) return
+    setCloning(true)
+    const result = await cloneBudgetVersion({
+      sourceVersionId: fromId,
+      targetType: 'consuntivo',
+      targetName: 'Consuntivo',
+    })
+    if (!result.success) {
+      showToast(result.error || 'Errore durante la creazione del consuntivo', 'error')
+      setCloning(false)
+      return
     }
-    setVersions(prev => [...prev, newV])
-    setActiveVersion(newV.id)
+    const { data: freshVersions } = await supabase.from('budget_versions')
+      .select('*').eq('event_id', event.id).order('created_at', { ascending: true })
+    setVersions(freshVersions || [])
+    setActiveVersion(result.newVersionId!)
     showToast('Consuntivo creato', 'success')
+    setCloning(false)
   }
 
   async function duplicateVersion(fromId: string) {
+    if (cloning) return
+    setCloning(true)
     const source = versions.find(v => v.id === fromId)
-    const { data: newV } = await supabase.from('budget_versions')
-      .insert({ event_id: event.id, nome: `${source?.nome} (copia)`, tipo: 'preventivo', stato: 'bozza', created_by: user?.id })
-      .select().single()
-    if (!newV) return
-    const tables = ['event_hotel_details', 'event_restaurant_details', 'event_experience_details',
-      'event_catering_details', 'event_staff_interno_details', 'event_staff_esterno_details',
-      'event_varie_details', 'event_audio_video_details', 'event_allestimenti_details',
-      'event_grafica_stampa_details', 'event_supplier_services']
-    for (const table of tables) {
-      const { data: rows } = await supabase.from(table as any).select('*').eq('budget_version_id', fromId)
-      if (rows?.length) {
-        const copies = rows.map((r: any) => {
-          const { id: _id, created_at: _ca, ...rest } = r
-          return { ...rest, budget_version_id: newV.id }
-        })
-        await supabase.from(table as any).insert(copies)
-      }
+    const result = await cloneBudgetVersion({
+      sourceVersionId: fromId,
+      targetType: 'preventivo',
+      targetName: `${source?.nome || 'Preventivo'} (copia)`,
+    })
+    if (!result.success) {
+      showToast(result.error || 'Errore durante la duplicazione', 'error')
+      setCloning(false)
+      return
     }
-    setVersions(prev => [...prev, newV])
-    setActiveVersion(newV.id)
+    const { data: freshVersions } = await supabase.from('budget_versions')
+      .select('*').eq('event_id', event.id).order('created_at', { ascending: true })
+    setVersions(freshVersions || [])
+    setActiveVersion(result.newVersionId!)
     showToast('Versione duplicata', 'success')
+    setCloning(false)
   }
 
   function getSupName(id: string | null | undefined) {
@@ -1071,20 +1067,20 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
             {v.tipo === 'preventivo' && (
               <>
                 {v.stato !== 'approvato' && (
-                  <button onClick={() => approveVersion(v.id)}
-                    style={{ padding: '5px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--green)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--green)' }}>
+                  <button onClick={() => approveVersion(v.id)} disabled={cloning}
+                    style={{ padding: '5px 12px', borderRadius: 8, cursor: cloning ? 'not-allowed' : 'pointer', border: '1px solid var(--green)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--green)', opacity: cloning ? 0.5 : 1 }}>
                     Approva
                   </button>
                 )}
-                {v.stato === 'approvato' && (
-                  <button onClick={() => createConsuntivo(v.id)}
-                    style={{ padding: '5px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--blue)', background: 'rgba(58,123,213,0.08)', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--blue)' }}>
-                    Crea consuntivo
+                {v.stato === 'approvato' && !versions.some(x => x.tipo === 'consuntivo' && x.source_version_id === v.id) && (
+                  <button onClick={() => createConsuntivo(v.id)} disabled={cloning}
+                    style={{ padding: '5px 12px', borderRadius: 8, cursor: cloning ? 'not-allowed' : 'pointer', border: '1px solid var(--blue)', background: 'rgba(58,123,213,0.08)', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--blue)', opacity: cloning ? 0.5 : 1 }}>
+                    {cloning ? 'Clonazione...' : 'Crea consuntivo'}
                   </button>
                 )}
-                <button onClick={() => duplicateVersion(v.id)}
-                  style={{ padding: '5px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--line)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>
-                  Duplica
+                <button onClick={() => duplicateVersion(v.id)} disabled={cloning}
+                  style={{ padding: '5px 12px', borderRadius: 8, cursor: cloning ? 'not-allowed' : 'pointer', border: '1px solid var(--line)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', opacity: cloning ? 0.5 : 1 }}>
+                  {cloning ? 'Clonazione...' : 'Duplica'}
                 </button>
               </>
             )}
