@@ -6,6 +6,7 @@ import {
   recordToEditableData,
   saveLine,
   hasSupplierField,
+  hasCommissionFields,
   getTableMap,
   type EditableLineData,
 } from '@/lib/economic-lines-service'
@@ -377,31 +378,35 @@ export default function BudgetLineEditModal({ lineId, table, categoria, supplier
               </div>
 
               {/* Commissione */}
-              <div>
-                <FieldLabel label="Commissione %" />
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={data.commissionePct ?? ''}
-                  onChange={e => updateField('commissionePct', e.target.value === '' ? null : parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 rounded-lg text-sm"
-                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
-                />
-              </div>
-              <div>
-                <FieldLabel label="Commissione importo fisso" />
-                <input
-                  type="number"
-                  step="any"
-                  min="0"
-                  value={data.commissioneImporto ?? ''}
-                  onChange={e => updateField('commissioneImporto', e.target.value === '' ? null : parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 rounded-lg text-sm"
-                  style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
-                />
-              </div>
+              {hasCommissionFields(table) && (
+                <>
+                  <div>
+                    <FieldLabel label="Commissione %" />
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={data.commissionePct ?? ''}
+                      onChange={e => updateField('commissionePct', e.target.value === '' ? null : parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 rounded-lg text-sm"
+                      style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel label="Commissione importo fisso" />
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={data.commissioneImporto ?? ''}
+                      onChange={e => updateField('commissioneImporto', e.target.value === '' ? null : parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 rounded-lg text-sm"
+                      style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                    />
+                  </div>
+                </>
+              )}
 
               {/* Note */}
               <div className="sm:col-span-2">
@@ -423,7 +428,7 @@ export default function BudgetLineEditModal({ lineId, table, categoria, supplier
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   <PreviewKpi label="Venduto netto" value={fmt(preview.vendutoNetto)} />
                   <PreviewKpi label="Costo netto" value={fmt(preview.costoNetto)} />
-                  <PreviewKpi label="Commissione" value={fmt(preview.commissione)} />
+                  {hasCommissionFields(table) && <PreviewKpi label="Commissione" value={fmt(preview.commissione)} />}
                   <PreviewKpi label="Margine" value={fmt(preview.margine)} color={preview.margine >= 0 ? 'var(--green)' : 'var(--red2)'} />
                   <PreviewKpi label="Margine %" value={`${preview.marginePct.toFixed(1)}%`} color={preview.marginePct >= 0 ? 'var(--green)' : 'var(--red2)'} />
                 </div>
