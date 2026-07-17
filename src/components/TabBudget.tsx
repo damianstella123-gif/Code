@@ -3,7 +3,7 @@ import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangl
 import { supabase } from '@/lib/supabase'
 import { loadUser } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
-import { calcRowEconomics } from '@/lib/event-economics'
+import { calcRowEconomics, normalizzaImporto, calcRowCommission } from '@/lib/event-economics'
 import { fmtDate as fmtDateCentral } from '@/lib/format'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import type { Event } from '@/data/events'
@@ -61,12 +61,15 @@ interface BudgetLine {
   qty: number
   venduto: number
   costo: number
+  vendutoNetto: number
+  costoNetto: number
   aliquota_iva_venduto: string
   iva_inclusa_venduto: boolean
   aliquota_iva_costo: string
   iva_inclusa_costo: boolean
   commissione_pct: number | null
   commissione_importo: number | null
+  commissione: number
   margine: number
   marginePct: number
   stato_conferma: StatoConferma
@@ -244,15 +247,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
     const all: BudgetLine[] = []
 
-    function normalizzaImporto(importo: number, aliquota: string | number | null, inclusa: boolean): number {
-      if (!importo || importo === 0) return 0
-      if (inclusa) {
-        const pct = parseFloat(String(aliquota || 22)) || 22
-        return importo / (1 + pct / 100)
-      }
-      return importo
-    }
-
     function pushLine(row: Record<string, unknown>, categoria: string, table: string, opts: {
       descrizione: string
       qty: number
@@ -263,16 +257,17 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       commissione_importo?: number | null
       dateLabel?: string
     }) {
-      const costoNetto = normalizzaImporto(
-        opts.costo,
-        (row.aliquota_iva_costo as string | number | null) ?? 22,
-        (row.iva_inclusa_costo as boolean) ?? false
-      )
       const vendutoNetto = normalizzaImporto(
         opts.venduto,
         (row.aliquota_iva_venduto as string | number | null) ?? 22,
         (row.iva_inclusa_venduto as boolean) ?? false
       )
+      const costoNetto = normalizzaImporto(
+        opts.costo,
+        (row.aliquota_iva_costo as string | number | null) ?? 22,
+        (row.iva_inclusa_costo as boolean) ?? false
+      )
+      const commissione = calcRowCommission(row, costoNetto)
       const margine = vendutoNetto - costoNetto
       const marginePct = vendutoNetto > 0 ? (margine / vendutoNetto) * 100 : 0
       all.push({
@@ -286,12 +281,15 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         qty: opts.qty,
         venduto: opts.venduto,
         costo: opts.costo,
+        vendutoNetto,
+        costoNetto,
         aliquota_iva_venduto: (row.aliquota_iva_venduto as string) || '22',
         iva_inclusa_venduto: (row.iva_inclusa_venduto as boolean) ?? false,
         aliquota_iva_costo: (row.aliquota_iva_costo as string) || '22',
         iva_inclusa_costo: (row.iva_inclusa_costo as boolean) ?? false,
         commissione_pct: opts.commissione_pct ?? null,
         commissione_importo: opts.commissione_importo ?? null,
+        commissione,
         margine,
         marginePct,
         stato_conferma: resolveStato(row.supplier_id as string),
@@ -466,16 +464,12 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
   useEffect(() => { if (activeVersion !== null || versions.length === 0) loadData() }, [loadData, activeVersion, versions.length])
 
-  // Aggregated totals
+  // Aggregated totals — all based on net (VAT-excluded) amounts
   const totals = useMemo(() => {
-    const venduto = lines.reduce((s, l) => s + l.venduto, 0)
-    const costo = lines.reduce((s, l) => s + l.costo, 0)
+    const venduto = lines.reduce((s, l) => s + l.vendutoNetto, 0)
+    const costo = lines.reduce((s, l) => s + l.costoNetto, 0)
     const fee = venduto * feePct / 100
-    const commissioni = lines.reduce((s, l) => {
-      if (l.commissione_importo) return s + l.commissione_importo
-      if (l.commissione_pct && l.costo > 0) return s + (l.costo * l.commissione_pct / 100)
-      return s
-    }, 0)
+    const commissioni = lines.reduce((s, l) => s + l.commissione, 0)
     const ricavi = venduto + fee + commissioni
     const margine = ricavi - costo
     const marginePct = ricavi > 0 ? (margine / ricavi) * 100 : 0
@@ -485,14 +479,14 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   const fmt = (n: number) => '\u20AC' + n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
   const fmtN = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
 
-  // Confirmed vs estimated split
+  // Confirmed vs estimated split — uses net amounts
   const confirmSplit = useMemo(() => {
     const confermati = lines.filter(l => l.stato_conferma !== 'richiesto')
     const stimati = lines.filter(l => l.stato_conferma === 'richiesto')
-    const costoConfermato = confermati.reduce((s, l) => s + l.costo, 0)
-    const costoStimato = stimati.reduce((s, l) => s + l.costo, 0)
-    const vendutoConfermato = confermati.reduce((s, l) => s + l.venduto, 0)
-    const vendutoStimato = stimati.reduce((s, l) => s + l.venduto, 0)
+    const costoConfermato = confermati.reduce((s, l) => s + l.costoNetto, 0)
+    const costoStimato = stimati.reduce((s, l) => s + l.costoNetto, 0)
+    const vendutoConfermato = confermati.reduce((s, l) => s + l.vendutoNetto, 0)
+    const vendutoStimato = stimati.reduce((s, l) => s + l.vendutoNetto, 0)
     const pctConfermato = totals.costo > 0 ? (costoConfermato / totals.costo) * 100 : 0
     return { costoConfermato, costoStimato, vendutoConfermato, vendutoStimato, pctConfermato, countConfermati: confermati.length, countStimati: stimati.length }
   }, [lines, totals.costo])
@@ -518,10 +512,11 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       catMap[l.categoria].push(l)
     }
     for (const [cat, items] of Object.entries(catMap)) {
-      const catV = items.reduce((s, i) => s + i.venduto, 0)
-      const catC = items.reduce((s, i) => s + i.costo, 0)
+      const catV = items.reduce((s, i) => s + i.vendutoNetto, 0)
+      const catC = items.reduce((s, i) => s + i.costoNetto, 0)
+      const catComm = items.reduce((s, i) => s + i.commissione, 0)
       const catFee = catV * feePct / 100
-      const catRicavi = catV + catFee
+      const catRicavi = catV + catFee + catComm
       const catMp = catRicavi > 0 ? ((catRicavi - catC) / catRicavi) * 100 : 0
       if (catMp < margineTarget && catMp >= 0) catWarnings.push(`${cat} (${catMp.toFixed(0)}%)`)
     }
@@ -530,7 +525,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     }
 
     // Lines without costs
-    const noCost = lines.filter(l => l.costo === 0 && l.venduto === 0)
+    const noCost = lines.filter(l => l.costoNetto === 0 && l.vendutoNetto === 0)
     if (noCost.length > 0) {
       result.push({ type: 'warning', message: `${noCost.length} ${noCost.length === 1 ? 'voce' : 'voci'} senza valori economici` })
     }
@@ -606,35 +601,41 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     doc.setFontSize(14)
     doc.setTextColor(208, 0, 58)
     doc.text('BUDGET INTERNO', 14, 16)
+    doc.setFontSize(9)
+    doc.setTextColor(120)
+    doc.text('Importi economici al netto IVA', 14, 22)
     doc.setFontSize(11)
     doc.setTextColor(0)
-    doc.text(evName, 14, 24)
+    doc.text(evName, 14, 28)
     doc.setFontSize(9)
     doc.setTextColor(80)
-    if (clientName) doc.text(`Cliente: ${clientName}`, 14, 30)
-    doc.text(`Preventivo al ${fmtDateCentral(new Date().toISOString())}`, 14, clientName ? 36 : 30)
+    if (clientName) doc.text(`Cliente: ${clientName}`, 14, 34)
+    doc.text(`Preventivo al ${fmtDateCentral(new Date().toISOString())}`, 14, clientName ? 40 : 34)
 
-    let startY = clientName ? 42 : 36
+    let startY = clientName ? 46 : 40
 
     for (const cat of exportGroups) {
-      const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
-      const catC = cat.items.reduce((s, i) => s + i.costo, 0)
+      const catV = cat.items.reduce((s, i) => s + i.vendutoNetto, 0)
+      const catC = cat.items.reduce((s, i) => s + i.costoNetto, 0)
+      const catComm = cat.items.reduce((s, i) => s + i.commissione, 0)
       const catFee = catV * feePct / 100
-      const catM = catV + catFee - catC
-      const catMp = (catV + catFee) > 0 ? (catM / (catV + catFee) * 100).toFixed(1) : '0.0'
+      const catRicavi = catV + catFee + catComm
+      const catM = catRicavi - catC
+      const catMp = catRicavi > 0 ? (catM / catRicavi * 100).toFixed(1) : '0.0'
 
       const body: unknown[][] = cat.items.map(item => {
-        const itemFee = item.venduto * feePct / 100
-        const itemMargine = item.venduto + itemFee - item.costo
-        const itemMp = (item.venduto + itemFee) > 0 ? ((itemMargine / (item.venduto + itemFee)) * 100).toFixed(1) : '0.0'
+        const itemFee = item.vendutoNetto * feePct / 100
+        const itemRicavi = item.vendutoNetto + itemFee + item.commissione
+        const itemMargine = itemRicavi - item.costoNetto
+        const itemMp = itemRicavi > 0 ? ((itemMargine / itemRicavi) * 100).toFixed(1) : '0.0'
         const statoLabel = item.stato_conferma === 'contrattualizzato' ? 'C' : item.stato_conferma === 'confermato' ? 'OK' : '?'
         return [
           item.descrizione,
           item.fornitore || '-',
           statoLabel,
           String(item.qty),
-          fmtN(item.venduto),
-          fmtN(item.costo),
+          fmtN(item.vendutoNetto),
+          fmtN(item.costoNetto),
           fmtN(itemFee),
           fmtN(itemMargine),
           `${itemMp}%`,
@@ -653,7 +654,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
       autoTable(doc, {
         startY,
-        head: [[cat.label, 'Fornitore', 'St.', 'Qty', 'Venduto', 'Costo', `Fee ${feePct}%`, 'Margine', 'M%']],
+        head: [[cat.label, 'Fornitore', 'St.', 'Qty', 'Venduto netto', 'Costo netto', `Fee ${feePct}%`, 'Margine', 'M%']],
         body: body as string[][],
         theme: 'grid',
         headStyles: { fillColor: [208, 0, 58], textColor: 255, fontSize: 7.5, fontStyle: 'bold' },
@@ -671,10 +672,11 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
     // RIEPILOGO
     const riepilogoBody: unknown[][] = exportGroups.map(cat => {
-      const cv = cat.items.reduce((s, i) => s + i.venduto, 0)
-      const cc = cat.items.reduce((s, i) => s + i.costo, 0)
+      const cv = cat.items.reduce((s, i) => s + i.vendutoNetto, 0)
+      const cc = cat.items.reduce((s, i) => s + i.costoNetto, 0)
+      const catComm = cat.items.reduce((s, i) => s + i.commissione, 0)
       const cf = cv * feePct / 100
-      const cm = cv + cf - cc
+      const cm = cv + cf + catComm - cc
       return [cat.label, fmtN(cv), fmtN(cc), fmtN(cf), fmtN(cm)]
     })
     riepilogoBody.push([
@@ -686,7 +688,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     ])
     if (totals.commissioni > 0) {
       riepilogoBody.push([
-        { content: 'COMMISSIONI HOTEL (interno)', styles: { fontStyle: 'italic' } },
+        { content: 'COMMISSIONI (interno)', styles: { fontStyle: 'italic' } },
         { content: '', styles: {} },
         { content: '', styles: {} },
         { content: '', styles: {} },
@@ -696,7 +698,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
     autoTable(doc, {
       startY: startY + 4,
-      head: [['RIEPILOGO DEI SERVIZI', 'Venduto', 'Costi', 'Fee', 'Margine']],
+      head: [['RIEPILOGO DEI SERVIZI (netto IVA)', 'Venduto netto', 'Costi netto', 'Fee', 'Margine']],
       body: riepilogoBody as string[][],
       theme: 'grid',
       headStyles: { fillColor: [208, 0, 58], textColor: 255, fontSize: 8.5, fontStyle: 'bold' },
@@ -762,9 +764,10 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const cv = cat.items.reduce((s, i) => s + i.venduto, 0)
       return [cat.label, `\u20AC ${fmtN(cv)}`]
     })
+    const clientTotal = lines.reduce((s, l) => s + l.venduto, 0)
     riepilogoBody.push([
       { content: 'TOTALE', styles: { fontStyle: 'bold' } },
-      { content: `\u20AC ${fmtN(totals.venduto)}`, styles: { fontStyle: 'bold' } },
+      { content: `\u20AC ${fmtN(clientTotal)}`, styles: { fontStyle: 'bold' } },
     ])
 
     autoTable(doc, {
@@ -804,38 +807,42 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     rows.push([`Preventivo al ${fmtDateCentral(new Date().toISOString())}`])
     rows.push([])
     rows.push([])
-    rows.push(['CATEGORIA', 'DESCRIZIONE', 'FORNITORE', 'STATO', 'QTY', 'VENDUTO CLIENTE', 'COSTO REALE', `FEE ${feePct}%`, 'MARGINE NETTO', 'MARGINE %'])
+    rows.push(['CATEGORIA', 'DESCRIZIONE', 'FORNITORE', 'STATO', 'QTY', 'VENDUTO NETTO', 'COSTO NETTO', `FEE ${feePct}%`, 'MARGINE NETTO', 'MARGINE %'])
 
     for (const cat of exportGroups) {
       rows.push([cat.label, '', '', '', '', '', '', '', '', ''])
       for (const item of cat.items) {
-        const itemFee = item.venduto * feePct / 100
-        const itemMargine = item.venduto + itemFee - item.costo
-        const itemMp = (item.venduto + itemFee) > 0 ? ((itemMargine / (item.venduto + itemFee)) * 100) : 0
+        const itemFee = item.vendutoNetto * feePct / 100
+        const itemRicavi = item.vendutoNetto + itemFee + item.commissione
+        const itemMargine = itemRicavi - item.costoNetto
+        const itemMp = itemRicavi > 0 ? ((itemMargine / itemRicavi) * 100) : 0
         const statoLabel = STATO_CONFIG[item.stato_conferma].label
-        rows.push(['', item.descrizione, item.fornitore || '', statoLabel, item.qty, item.venduto, item.costo, itemFee, itemMargine, itemMp / 100])
+        rows.push(['', item.descrizione, item.fornitore || '', statoLabel, item.qty, item.vendutoNetto, item.costoNetto, itemFee, itemMargine, itemMp / 100])
       }
-      const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
-      const catC = cat.items.reduce((s, i) => s + i.costo, 0)
+      const catV = cat.items.reduce((s, i) => s + i.vendutoNetto, 0)
+      const catC = cat.items.reduce((s, i) => s + i.costoNetto, 0)
+      const catComm = cat.items.reduce((s, i) => s + i.commissione, 0)
       const catFee = catV * feePct / 100
-      const catM = catV + catFee - catC
-      const catMp = (catV + catFee) > 0 ? catM / (catV + catFee) : 0
+      const catRicavi = catV + catFee + catComm
+      const catM = catRicavi - catC
+      const catMp = catRicavi > 0 ? catM / catRicavi : 0
       rows.push(['', `Totale ${cat.label}`, '', '', '', catV, catC, catFee, catM, catMp])
       rows.push([])
     }
 
     rows.push([])
-    rows.push(['RIEPILOGO', '', '', '', '', 'VENDUTO', 'COSTI', 'FEE', 'MARGINE', ''])
+    rows.push(['RIEPILOGO (netto IVA)', '', '', '', '', 'VENDUTO', 'COSTI', 'FEE', 'MARGINE', ''])
     for (const cat of exportGroups) {
-      const cv = cat.items.reduce((s, i) => s + i.venduto, 0)
-      const cc = cat.items.reduce((s, i) => s + i.costo, 0)
+      const cv = cat.items.reduce((s, i) => s + i.vendutoNetto, 0)
+      const cc = cat.items.reduce((s, i) => s + i.costoNetto, 0)
+      const catComm = cat.items.reduce((s, i) => s + i.commissione, 0)
       const cf = cv * feePct / 100
-      const cm = cv + cf - cc
+      const cm = cv + cf + catComm - cc
       rows.push([cat.label, '', '', '', '', cv, cc, cf, cm, ''])
     }
     rows.push(['TOTALE EVENTO', '', '', '', '', totals.venduto, totals.costo, totals.fee, totals.margine, totals.marginePct / 100])
     if (totals.commissioni > 0) {
-      rows.push(['COMMISSIONI HOTEL (interno)', '', '', '', '', '', '', '', totals.commissioni, ''])
+      rows.push(['COMMISSIONI (interno)', '', '', '', '', '', '', '', totals.commissioni, ''])
     }
 
     const ws = XLSX.utils.aoa_to_sheet(rows)
@@ -943,8 +950,10 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
               <Detail label="Costo reale" value={fmt(item.costo)} />
               <Detail label="IVA Venduto" value={`${item.aliquota_iva_venduto}% ${item.iva_inclusa_venduto ? '(inclusa)' : '(esclusa)'}`} />
               <Detail label="IVA Costo" value={`${item.aliquota_iva_costo}% ${item.iva_inclusa_costo ? '(inclusa)' : '(esclusa)'}`} />
+              <Detail label="Venduto netto" value={fmt(item.vendutoNetto)} />
+              <Detail label="Costo netto" value={fmt(item.costoNetto)} />
               {item.commissione_pct != null && item.commissione_pct > 0 && (
-                <Detail label="Commissione Hotel" value={`${item.commissione_pct}% sul costo = ${fmt(item.costo * item.commissione_pct / 100)}`} />
+                <Detail label="Commissione" value={`${item.commissione_pct}% sul costo netto = ${fmt(item.commissione)}`} />
               )}
               <Detail label="Margine" value={fmt(item.margine)} />
               <Detail label="Margine %" value={`${item.marginePct.toFixed(1)}%`} />
@@ -1100,10 +1109,11 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
               )}
             </div>
             {totals.commissioni > 0 && (
-              <Kpi label="Commissioni Hotel" value={fmt(totals.commissioni)} color="var(--green)" />
+              <Kpi label="Commissioni" value={fmt(totals.commissioni)} color="var(--green)" />
             )}
             <Kpi label="Totale Ricavi" value={fmt(totals.ricavi)} color="var(--text)" />
           </div>
+          <p className="text-[10px] text-right" style={{ color: 'var(--muted)' }}>Importi economici al netto IVA</p>
           <div className="h-px" style={{ background: 'var(--line)' }} />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Kpi label="Totale Costi" value={fmt(totals.costo)} color="var(--yellow)" />
@@ -1229,10 +1239,11 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       ) : (
         <div className="space-y-4">
           {grouped.map(cat => {
-            const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
-            const catC = cat.items.reduce((s, i) => s + i.costo, 0)
+            const catV = cat.items.reduce((s, i) => s + i.vendutoNetto, 0)
+            const catC = cat.items.reduce((s, i) => s + i.costoNetto, 0)
+            const catComm = cat.items.reduce((s, i) => s + i.commissione, 0)
             const catFee = catV * feePct / 100
-            const catRicavi = catV + catFee
+            const catRicavi = catV + catFee + catComm
             const catM = catRicavi - catC
             const catMp = catRicavi > 0 ? (catM / catRicavi) * 100 : 0
             const catStimati = cat.items.filter(i => i.stato_conferma === 'richiesto').length
@@ -1326,6 +1337,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
               <strong style={{ color: totals.marginePct >= margineTarget ? 'var(--green)' : 'var(--yellow)' }}>{totals.marginePct.toFixed(1)}%</strong>
             </div>
           </div>
+          <p className="text-[10px] text-right mt-1" style={{ color: 'var(--muted)' }}>Importi economici al netto IVA</p>
         </div>
       )}
 
