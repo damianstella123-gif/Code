@@ -16,13 +16,17 @@ import {
   fetchAdminPaymentRequests,
   fetchRequestLineLinks,
   fetchRequestInvoiceLinks,
+  fetchPaymentExecutions,
   fetchLinkableInvoices,
   createSupplierInvoiceDraft,
   transitionPaymentRequest,
   linkInvoiceToRequest,
+  createPaymentExecution,
+  transitionPaymentExecution,
   type AdminPaymentRequest,
   type RequestLineLink,
   type RequestInvoiceLink,
+  type PaymentExecution,
   type LinkableInvoice,
 } from '@/lib/payment-admin-service'
 
@@ -245,25 +249,33 @@ function RequestCard({ request, expanded, onToggle, onReload, userId }: RequestC
 function RequestDetail({ request, onReload, userId }: { request: AdminPaymentRequest; onReload: () => void; userId: string }) {
   const [lineLinks, setLineLinks] = useState<RequestLineLink[]>([])
   const [invoiceLinks, setInvoiceLinks] = useState<RequestInvoiceLink[]>([])
+  const [executions, setExecutions] = useState<PaymentExecution[]>([])
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [noteInput, setNoteInput] = useState('')
   const [showLinkInvoice, setShowLinkInvoice] = useState(false)
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
+  const [showCreateExecution, setShowCreateExecution] = useState(false)
 
   const loadDetail = useCallback(async () => {
-    const [lines, invoices] = await Promise.all([
+    const [lines, invoices, execs] = await Promise.all([
       fetchRequestLineLinks(request.id),
       fetchRequestInvoiceLinks(request.id),
+      fetchPaymentExecutions(request.id),
     ])
     setLineLinks(lines)
     setInvoiceLinks(invoices)
+    setExecutions(execs)
   }, [request.id])
 
   useEffect(() => { loadDetail() }, [loadDetail])
 
   const totalCovered = invoiceLinks.reduce((s, l) => s + l.allocated_amount, 0)
   const residuo = request.importo - totalCovered
+  const activeExecs = executions.filter(e => e.execution_status !== 'annullato')
+  const totalDisposto = activeExecs.reduce((s, e) => s + e.amount, 0)
+  const totalEseguito = executions.filter(e => e.execution_status === 'eseguito').reduce((s, e) => s + e.amount, 0)
+  const residuoDaDisporre = request.importo - totalDisposto
 
   async function handleTransition(targetStatus: string, requireNote: boolean) {
     if (requireNote && noteInput.trim().length < 5) {
@@ -344,12 +356,24 @@ function RequestDetail({ request, onReload, userId }: { request: AdminPaymentReq
           <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{formatEur(request.importo)}</p>
         </div>
         <div>
-          <p style={{ fontSize: 12, color: 'var(--muted)' }}>Coperto</p>
+          <p style={{ fontSize: 12, color: 'var(--muted)' }}>Coperto fatture</p>
           <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--green)' }}>{formatEur(totalCovered)}</p>
         </div>
         <div>
-          <p style={{ fontSize: 12, color: 'var(--muted)' }}>Residuo</p>
+          <p style={{ fontSize: 12, color: 'var(--muted)' }}>Residuo copertura</p>
           <p style={{ fontSize: 14, fontWeight: 700, color: residuo > 0 ? 'var(--yellow)' : 'var(--green)' }}>{formatEur(residuo)}</p>
+        </div>
+        <div>
+          <p style={{ fontSize: 12, color: 'var(--muted)' }}>Totale disposto</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{formatEur(totalDisposto)}</p>
+        </div>
+        <div>
+          <p style={{ fontSize: 12, color: 'var(--muted)' }}>Totale eseguito</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: totalEseguito > 0 ? 'var(--green)' : 'var(--muted)' }}>{formatEur(totalEseguito)}</p>
+        </div>
+        <div>
+          <p style={{ fontSize: 12, color: 'var(--muted)' }}>Residuo da disporre</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: residuoDaDisporre > 0 ? 'var(--yellow)' : 'var(--green)' }}>{formatEur(residuoDaDisporre)}</p>
         </div>
       </div>
 
@@ -400,7 +424,33 @@ function RequestDetail({ request, onReload, userId }: { request: AdminPaymentReq
             <ActionButton label="Collega altra fattura" icon={<Link2 className="w-4 h-4" />} busy={busy} onClick={() => setShowLinkInvoice(true)} />
           </div>
         )}
+
+        {status === 'approvata' && (
+          <div className="flex flex-wrap gap-2">
+            <ActionButton label="Crea disposizione" icon={<Plus className="w-4 h-4" />} busy={busy} onClick={() => setShowCreateExecution(true)} />
+          </div>
+        )}
       </div>
+
+      {/* Executions list */}
+      {executions.length > 0 && (
+        <ExecutionsList
+          executions={executions}
+          invoiceLinks={invoiceLinks}
+          onReload={async () => { await loadDetail(); await onReload() }}
+        />
+      )}
+
+      {/* Create execution panel */}
+      {showCreateExecution && (
+        <CreateExecutionPanel
+          request={request}
+          invoiceLinks={invoiceLinks}
+          residuoDaDisporre={residuoDaDisporre}
+          onClose={() => setShowCreateExecution(false)}
+          onDone={async () => { setShowCreateExecution(false); await loadDetail(); await onReload() }}
+        />
+      )}
 
       {/* Link invoice panel */}
       {showLinkInvoice && (
@@ -671,6 +721,267 @@ function FieldInput({ label, value, onChange, type = 'text' }: { label: string; 
         step={type === 'number' ? '0.01' : undefined}
         style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontSize: 13 }}
       />
+    </div>
+  )
+}
+
+// ─── Execution status helpers ────────────────────────────────────────────────
+
+const EXEC_STATUS_LABELS: Record<string, string> = {
+  da_pianificare: 'DA PIANIFICARE',
+  pianificato: 'PIANIFICATO',
+  autorizzato: 'AUTORIZZATO',
+  eseguito: 'ESEGUITO',
+  annullato: 'ANNULLATO',
+}
+
+const EXEC_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  da_pianificare: { bg: 'var(--bg3, var(--bg2))', color: 'var(--text)' },
+  pianificato: { bg: 'var(--yellow)', color: '#000' },
+  autorizzato: { bg: '#3b82f6', color: '#fff' },
+  eseguito: { bg: 'var(--green)', color: '#fff' },
+  annullato: { bg: 'var(--bg3, var(--bg2))', color: 'var(--muted)' },
+}
+
+function ExecStatusBadge({ status }: { status: string }) {
+  const s = EXEC_STATUS_COLORS[status] ?? { bg: 'var(--bg3)', color: 'var(--muted)' }
+  return (
+    <span style={{ background: s.bg, color: s.color, padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+      {EXEC_STATUS_LABELS[status] ?? status}
+    </span>
+  )
+}
+
+// ─── Executions list ─────────────────────────────────────────────────────────
+
+function ExecutionsList({ executions, invoiceLinks, onReload }: { executions: PaymentExecution[]; invoiceLinks: RequestInvoiceLink[]; onReload: () => Promise<void> }) {
+  return (
+    <div style={{ marginTop: 16 }}>
+      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)', marginBottom: 8 }}>Disposizioni di pagamento</p>
+      <div className="space-y-2">
+        {executions.map(ex => (
+          <ExecutionRow key={ex.id} execution={ex} invoiceLinks={invoiceLinks} onReload={onReload} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ExecutionRow({ execution, invoiceLinks, onReload }: { execution: PaymentExecution; invoiceLinks: RequestInvoiceLink[]; onReload: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [showTransition, setShowTransition] = useState(false)
+  const [scheduledDate, setScheduledDate] = useState('')
+  const [executedDate, setExecutedDate] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('')
+  const [bankReference, setBankReference] = useState('')
+  const [transNote, setTransNote] = useState('')
+
+  const linkedInv = invoiceLinks.find(l => l.invoice_id === execution.invoice_id)
+  const status = execution.execution_status
+
+  async function handleTransition(targetStatus: string) {
+    if (targetStatus === 'pianificato' && !scheduledDate) {
+      setError('La data pianificata e obbligatoria.')
+      return
+    }
+    if (targetStatus === 'autorizzato') {
+      if (!confirm('Confermi di voler autorizzare questa disposizione?')) return
+    }
+    if (targetStatus === 'eseguito') {
+      if (!executedDate) { setError('La data esecuzione e obbligatoria.'); return }
+      if (!paymentMethod.trim()) { setError('Il metodo di pagamento e obbligatorio.'); return }
+      if (!confirm('Confermi di voler registrare questa esecuzione?')) return
+    }
+    setBusy(true)
+    setError(null)
+    const result = await transitionPaymentExecution({
+      executionId: execution.id,
+      targetStatus,
+      scheduledDate: targetStatus === 'pianificato' ? scheduledDate : undefined,
+      executedDate: targetStatus === 'eseguito' ? executedDate : undefined,
+      paymentMethod: targetStatus === 'eseguito' ? paymentMethod.trim() : undefined,
+      bankReference: bankReference.trim() || undefined,
+      note: transNote.trim() || undefined,
+    })
+    if (result.error) {
+      setError(result.error)
+    } else {
+      setShowTransition(false)
+      await onReload()
+    }
+    setBusy(false)
+  }
+
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 12, background: 'var(--panel-solid)' }}>
+      <div className="flex flex-wrap items-center gap-3" style={{ marginBottom: showTransition ? 10 : 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{formatEur(execution.amount)}</span>
+        <ExecStatusBadge status={status} />
+        {execution.due_date && <span style={{ fontSize: 12, color: 'var(--muted)' }}>Scad: {fmtDateShort(execution.due_date)}</span>}
+        {execution.scheduled_date && <span style={{ fontSize: 12, color: 'var(--muted)' }}>Pian: {fmtDateShort(execution.scheduled_date)}</span>}
+        {execution.executed_date && <span style={{ fontSize: 12, color: 'var(--green)' }}>Eseg: {fmtDateShort(execution.executed_date)}</span>}
+        {linkedInv && <span style={{ fontSize: 12, color: 'var(--muted)' }}>Fatt: {linkedInv.invoice?.numero ?? '—'}</span>}
+        {execution.payment_method && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{execution.payment_method}</span>}
+        {execution.bank_reference && <span style={{ fontSize: 12, color: 'var(--muted)' }}>Rif: {execution.bank_reference}</span>}
+
+        {/* Show transition button */}
+        {(status === 'da_pianificare' || status === 'pianificato' || status === 'autorizzato') && !showTransition && (
+          <button
+            onClick={() => setShowTransition(true)}
+            style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 6, background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer' }}
+          >
+            {status === 'da_pianificare' && 'Pianifica'}
+            {status === 'pianificato' && 'Autorizza'}
+            {status === 'autorizzato' && 'Registra esecuzione'}
+          </button>
+        )}
+      </div>
+
+      {showTransition && (
+        <div style={{ paddingTop: 10, borderTop: '1px solid var(--line)' }}>
+          {status === 'da_pianificare' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" style={{ marginBottom: 10 }}>
+              <FieldInput label="Data pianificata *" value={scheduledDate} onChange={setScheduledDate} type="date" />
+              <FieldInput label="Nota (opzionale)" value={transNote} onChange={setTransNote} />
+            </div>
+          )}
+          {status === 'pianificato' && (
+            <div style={{ marginBottom: 10 }}>
+              <FieldInput label="Nota (opzionale)" value={transNote} onChange={setTransNote} />
+            </div>
+          )}
+          {status === 'autorizzato' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" style={{ marginBottom: 10 }}>
+              <FieldInput label="Data esecuzione *" value={executedDate} onChange={setExecutedDate} type="date" />
+              <FieldInput label="Metodo pagamento *" value={paymentMethod} onChange={setPaymentMethod} />
+              <FieldInput label="Riferimento bancario" value={bankReference} onChange={setBankReference} />
+              <FieldInput label="Nota (opzionale)" value={transNote} onChange={setTransNote} />
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-center gap-2" style={{ marginBottom: 8, fontSize: 13, color: 'var(--red2)' }}>
+              <AlertTriangle className="w-4 h-4" /> {error}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              disabled={busy}
+              onClick={() => {
+                if (status === 'da_pianificare') handleTransition('pianificato')
+                else if (status === 'pianificato') handleTransition('autorizzato')
+                else if (status === 'autorizzato') handleTransition('eseguito')
+              }}
+              style={{ padding: '6px 14px', borderRadius: 6, background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600, opacity: busy ? 0.5 : 1, cursor: busy ? 'not-allowed' : 'pointer', border: 'none' }}
+            >
+              {busy ? 'Attendere...' : 'Conferma'}
+            </button>
+            <button
+              onClick={() => { setShowTransition(false); setError(null) }}
+              style={{ padding: '6px 14px', borderRadius: 6, background: 'var(--bg3, var(--bg2))', color: 'var(--text)', fontSize: 13, border: '1px solid var(--line)', cursor: 'pointer' }}
+            >
+              Annulla
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Create execution panel ──────────────────────────────────────────────────
+
+function CreateExecutionPanel({ request, invoiceLinks, residuoDaDisporre, onClose, onDone }: {
+  request: AdminPaymentRequest
+  invoiceLinks: RequestInvoiceLink[]
+  residuoDaDisporre: number
+  onClose: () => void
+  onDone: () => Promise<void>
+}) {
+  const [amount, setAmount] = useState('')
+  const [invoiceId, setInvoiceId] = useState('')
+  const [dueDate, setDueDate] = useState('')
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const amountNum = parseFloat(amount) || 0
+
+  async function handleCreate() {
+    if (amountNum <= 0) { setError('L\'importo deve essere maggiore di zero.'); return }
+    if (amountNum > residuoDaDisporre && residuoDaDisporre > 0) { setError(`L'importo non puo superare il residuo da disporre (${formatEur(residuoDaDisporre)}).`); return }
+    setBusy(true)
+    setError(null)
+    const result = await createPaymentExecution({
+      paymentRequestId: request.id,
+      amount: amountNum,
+      invoiceId: invoiceId || null,
+      dueDate: dueDate || null,
+      note: note.trim() || null,
+    })
+    if (result.error) {
+      setError(result.error)
+      setBusy(false)
+    } else {
+      await onDone()
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 16, padding: 16, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2, var(--panel-solid))' }}>
+      <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Nuova disposizione</p>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+          <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+        </button>
+      </div>
+
+      <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+        Residuo disponibile: <strong style={{ color: 'var(--text)' }}>{formatEur(residuoDaDisporre)}</strong>
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" style={{ marginBottom: 12 }}>
+        <FieldInput label="Importo *" value={amount} onChange={setAmount} type="number" />
+        <FieldInput label="Data scadenza" value={dueDate} onChange={setDueDate} type="date" />
+      </div>
+
+      {invoiceLinks.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Fattura collegata (opzionale)</label>
+          <select
+            value={invoiceId}
+            onChange={e => setInvoiceId(e.target.value)}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontSize: 13 }}
+          >
+            <option value="">Nessuna</option>
+            {invoiceLinks.map(l => (
+              <option key={l.invoice_id} value={l.invoice_id}>
+                {l.invoice?.numero ?? l.invoice_id} - {formatEur(l.allocated_amount)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div style={{ marginBottom: 12 }}>
+        <FieldInput label="Nota (opzionale)" value={note} onChange={setNote} />
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2" style={{ marginBottom: 8, fontSize: 13, color: 'var(--red2)' }}>
+          <AlertTriangle className="w-4 h-4" /> {error}
+        </div>
+      )}
+
+      <button
+        disabled={busy || amountNum <= 0}
+        onClick={handleCreate}
+        style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600, opacity: busy ? 0.5 : 1, cursor: busy ? 'not-allowed' : 'pointer', border: 'none' }}
+      >
+        {busy ? 'Creazione...' : 'Crea disposizione'}
+      </button>
     </div>
   )
 }

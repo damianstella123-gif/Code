@@ -52,9 +52,9 @@ import {
   fetchAllUscite, fetchAllEntrate, insertPayment,
   updatePayment, deletePayment, markAsPaid,
 } from '@/lib/event-payments-service'
-import { useToast } from '@/lib/toast'
 import { approveLeaveRequest, rejectLeaveRequest } from '@/lib/leave-requests-service'
 import { LeaveRequestsPanel } from '@/components/LeaveRequestsPanel'
+import AdminPaymentRequests from '@/components/AdminPaymentRequests'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -398,7 +398,7 @@ function StatoBadge({ stato }: { stato: StatoPagamento }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-type TabId = 'dashboard' | 'entrate' | 'uscite' | 'fatture' | 'invoices' | 'documenti' | 'ferie'
+type TabId = 'dashboard' | 'entrate' | 'uscite' | 'fatture' | 'invoices' | 'documenti' | 'ferie' | 'richieste_pm'
 
 export default function Amministrazione() {
   const currentUser = loadUser()
@@ -420,12 +420,11 @@ export default function Amministrazione() {
   }
 
   const isManagerOnly = currentUser.ruolo === 'Manager'
-  const { showToast } = useToast()
 
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     const paramTab = searchParams.get('tab')
-    if (paramTab === 'entrate' || paramTab === 'uscite' || paramTab === 'fatture' || paramTab === 'invoices' || paramTab === 'documenti' || paramTab === 'ferie') return paramTab
+    if (paramTab === 'entrate' || paramTab === 'uscite' || paramTab === 'fatture' || paramTab === 'invoices' || paramTab === 'documenti' || paramTab === 'ferie' || paramTab === 'richieste_pm') return paramTab
     return 'dashboard'
   })
   const [entrate, setEntrate] = useState<Entrata[]>([])
@@ -443,9 +442,6 @@ export default function Amministrazione() {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
   const [editingDoc, setEditingDoc] = useState<AdminDocument | null>(null)
   const [eventEconomics, setEventEconomics] = useState<EventEconomicsSummary[]>([])
-  const [pendingApprovals, setPendingApprovals] = useState<any[]>([])
-  const [blockingId, setBlockingId] = useState<string | null>(null)
-  const [blockNote, setBlockNote] = useState('')
 
   useEffect(() => {
     if (searchParams.has('tab') || searchParams.has('id')) {
@@ -502,17 +498,6 @@ export default function Amministrazione() {
 
   useRealtimeTable('event_payments', () => { loadEntrateFromEP(); loadUsciteFromEP() })
   useRealtimeTable('admin_fatture', loadFattureFromDB)
-
-  const loadPendingApprovals = useCallback(async () => {
-    const { data } = await supabase
-      .from('event_payments')
-      .select('*, profiles!event_payments_created_by_fkey(first_name, last_name)')
-      .eq('stato_approvazione', 'in_attesa')
-      .order('created_at', { ascending: false })
-    setPendingApprovals(data ?? [])
-  }, [])
-
-  useEffect(() => { loadPendingApprovals() }, [loadPendingApprovals])
 
   useEffect(() => {
     let cancelled = false
@@ -853,28 +838,6 @@ export default function Amministrazione() {
     return Array.from(set).sort()
   }, [visibleEntrate, visibleUscite, visibleFatture])
 
-  async function approvePayment(p: any) {
-    await supabase.from('event_payments').update({ stato_approvazione: 'approvato', approvato_da: currentUser!.id, approvato_at: new Date().toISOString() }).eq('id', p.id)
-    if (p.created_by) {
-      const supplierNome = suppliers.find(s => s.id === p.supplier_id)?.nome ?? 'Fornitore'
-      await supabase.from('notifications').insert({ user_id: p.created_by, title: 'Pagamento approvato \u2713', message: `Il pagamento di \u20AC${Number(p.importo).toLocaleString('it-IT')} a ${supplierNome} e stato approvato.`, type: 'payment_approved', related_entity_type: 'event_payment', related_entity_id: p.id, is_read: false })
-    }
-    setPendingApprovals(prev => prev.filter(x => x.id !== p.id))
-    showToast('Pagamento approvato')
-  }
-
-  async function blockPayment(p: any) {
-    if (blockNote.length < 5) return
-    await supabase.from('event_payments').update({ stato_approvazione: 'bloccato', approvato_da: currentUser!.id, approvato_at: new Date().toISOString() }).eq('id', p.id)
-    if (p.created_by) {
-      await supabase.from('notifications').insert({ user_id: p.created_by, title: 'Pagamento bloccato', message: `Il pagamento di \u20AC${Number(p.importo).toLocaleString('it-IT')} e stato bloccato. Motivazione: ${blockNote}`, type: 'payment_blocked', related_entity_type: 'event_payment', related_entity_id: p.id, is_read: false })
-    }
-    setPendingApprovals(prev => prev.filter(x => x.id !== p.id))
-    setBlockingId(null)
-    setBlockNote('')
-    showToast('Pagamento bloccato')
-  }
-
   const tabs: { id: TabId; label: string }[] = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'entrate', label: `Entrate (${mergedEntrate.length})` },
@@ -883,6 +846,7 @@ export default function Amministrazione() {
     { id: 'invoices', label: `Fatture DB (${invoices.length})` },
     { id: 'documenti', label: `Documenti (${adminDocs.length})` },
     { id: 'ferie', label: 'Ferie & Permessi' },
+    { id: 'richieste_pm', label: 'Richieste PM' },
   ]
 
   // ─── Shared styles ──────────────────────────────────────────────────────────
@@ -1024,75 +988,6 @@ export default function Amministrazione() {
       {/* ─── TAB: DASHBOARD ────────────────────────────────────────────────────── */}
       {activeTab === 'dashboard' && (
         <div className="space-y-6 animate-fade-in" style={{ paddingTop: 20 }}>
-
-          {/* Pending payment approvals */}
-          {pendingApprovals.length > 0 && (
-            <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--yellow)', borderRadius: 14, padding: 16 }}>
-              <div className="flex items-center gap-2" style={{ marginBottom: 12 }}>
-                <Clock className="w-4 h-4" style={{ color: 'var(--yellow)' }} />
-                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--yellow)' }}>
-                  Pagamenti in attesa di approvazione ({pendingApprovals.length})
-                </p>
-              </div>
-              <div className="space-y-2">
-                {pendingApprovals.map(p => {
-                  const evName = events.find(e => e.id === p.event_id)?.nome ?? p.event_id
-                  const supName = suppliers.find(s => s.id === p.supplier_id)?.nome ?? '—'
-                  const prof = p.profiles as any
-                  const pmName = prof ? `${prof.first_name ?? ''} ${prof.last_name ?? ''}`.trim() : '—'
-                  return (
-                    <div key={p.id} className="wire-card-accent-yellow" style={{ background: 'var(--panel2)' }}>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>
-                            {evName} &middot; {supName} &middot; <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>{formatEur(Number(p.importo))}</span>
-                          </p>
-                          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                            Richiesto da {pmName} &middot; {fmtDateShort(p.created_at)}
-                            {p.descrizione ? ` \u2014 ${p.descrizione}` : ''}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {blockingId === p.id ? (
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="text"
-                                value={blockNote}
-                                onChange={e => setBlockNote(e.target.value)}
-                                placeholder="Motivazione (min 5 car.)"
-                                style={{ background: 'var(--bg3)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 8px', fontSize: 11, color: 'var(--text)', width: 180 }}
-                              />
-                              <button onClick={() => blockPayment(p)} disabled={blockNote.length < 5}
-                                className="px-2 py-1 rounded text-[10px] font-bold"
-                                style={{ background: 'var(--red2)', color: '#fff', opacity: blockNote.length < 5 ? 0.4 : 1 }}>
-                                BLOCCA
-                              </button>
-                              <button onClick={() => { setBlockingId(null); setBlockNote('') }} className="p-1 rounded hover:opacity-70">
-                                <X className="w-3 h-3" style={{ color: 'var(--muted)' }} />
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              <button onClick={() => approvePayment(p)}
-                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-80"
-                                style={{ background: 'var(--green)', color: '#000' }}>
-                                <CheckCircle className="w-3 h-3" /> APPROVA
-                              </button>
-                              <button onClick={() => setBlockingId(p.id)}
-                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-80"
-                                style={{ background: 'var(--red2)', color: '#fff' }}>
-                                <XCircle className="w-3 h-3" /> BLOCCA
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Leave requests pending */}
           <LeaveRequestsPanel />
@@ -1788,6 +1683,10 @@ export default function Amministrazione() {
 
       {activeTab === 'ferie' && (
         <FeriePermessiTab />
+      )}
+
+      {activeTab === 'richieste_pm' && (
+        <AdminPaymentRequests />
       )}
 
       {/* Invoice Form Modal */}

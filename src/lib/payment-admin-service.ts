@@ -154,7 +154,7 @@ export async function fetchAdminPaymentRequests(): Promise<AdminPaymentRequest[]
 
   if (error) {
     logError('payment-admin', 'fetchAdminPaymentRequests', error)
-    return []
+    throw new Error(error.message || 'Errore nel caricamento delle richieste.')
   }
 
   return (data ?? []).map((r: any) => ({
