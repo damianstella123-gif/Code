@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ArrowUpRight, ArrowDownLeft, Plus, X, Check, Trash2 } from 'lucide-react'
+import { ArrowUpRight, ArrowDownLeft, Plus, X, Check, Trash2, Send } from 'lucide-react'
 import { useToast } from '@/lib/toast'
-import { loadUser } from '@/lib/auth'
+import { loadUser, type AuthUser } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { addDaysISO, todayISO, fmtDate } from '@/lib/format'
 import {
@@ -11,7 +11,9 @@ import {
   deletePayment,
   type EventPayment,
   type PaymentInsert,
+  type RequestStatus,
 } from '@/lib/event-payments-service'
+import PaymentRequestForm from '@/components/PaymentRequestForm'
 import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
 import type { Client } from '@/data/clients'
@@ -26,11 +28,20 @@ function fmtEuro(n: number): string {
   return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
+const PM_ROLES = ['Project Manager', 'Senior PM']
+
+
+function isPMRole(user: AuthUser | null): boolean {
+  return PM_ROLES.includes(user?.role || '')
+}
+
 export default function TabPagamenti({ event, suppliers, clients = [] }: Props) {
   const [payments, setPayments] = useState<EventPayment[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
+  const [showLegacyForm, setShowLegacyForm] = useState(false)
+  const [showRequestForm, setShowRequestForm] = useState(false)
   const { showToast } = useToast()
+  const user = loadUser()
 
   const load = useCallback(async () => {
     const data = await fetchEventPayments(event.id)
@@ -56,7 +67,7 @@ export default function TabPagamenti({ event, suppliers, clients = [] }: Props) 
   }, [loading])
 
   async function autoSuggest() {
-    const user = await loadUser()
+    const u = loadUser()
     const half = Math.round(event.budget * 0.5)
     const today = todayISO()
     const saldoDate = addDaysISO(event.dataFine, 30)
@@ -64,7 +75,7 @@ export default function TabPagamenti({ event, suppliers, clients = [] }: Props) 
       event_id: event.id,
       tipo: 'incasso_cliente',
       stato: 'atteso',
-      created_by: user?.id ?? null,
+      created_by: u?.id ?? null,
     }
     await insertPayment({ ...base, descrizione: 'Acconto cliente 50%', importo: half, data_scadenza: today })
     await insertPayment({ ...base, descrizione: 'Saldo cliente 50%', importo: half, data_scadenza: saldoDate })
@@ -87,16 +98,11 @@ export default function TabPagamenti({ event, suppliers, clients = [] }: Props) 
     return { incassato, daIncassare, pagato, daPagare, liquidita, previsione }
   }, [payments])
 
-  const timeline = useMemo(() => {
-    const today = todayISO()
-    return payments.map(p => {
-      let computedStato = p.stato
-      if (!p.data_pagamento && p.data_scadenza < today && p.stato !== 'pagato') {
-        computedStato = 'in_ritardo'
-      }
-      return { ...p, computedStato }
-    })
-  }, [payments])
+  const fornitorePayments = useMemo(() =>
+    payments.filter(p => p.tipo === 'pagamento_fornitore'), [payments])
+
+  const clientePayments = useMemo(() =>
+    payments.filter(p => p.tipo === 'incasso_cliente'), [payments])
 
   async function handleMarkPaid(id: string) {
     const ok = await markAsPaid(id)
@@ -132,92 +138,165 @@ export default function TabPagamenti({ event, suppliers, clients = [] }: Props) 
         </p>
       </div>
 
-      {/* Previsione */}
-      <div className="rounded-xl p-4 text-center" style={{ background: 'var(--bg2)' }}>
-        <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--muted)' }}>
-          A fine evento
-        </p>
-        <p className="text-xl font-semibold" style={{ color: kpi.previsione >= 0 ? 'var(--green)' : 'var(--red2)' }}>
-          {fmtEuro(kpi.previsione)}
-        </p>
-      </div>
-
-      {/* Add Button */}
-      <div className="flex justify-end">
+      {/* Add Buttons */}
+      <div className="flex flex-wrap justify-end gap-2">
         <button
-          onClick={() => setShowForm(true)}
+          onClick={() => setShowRequestForm(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
           style={{ background: 'var(--accent)', color: '#fff' }}
         >
-          <Plus className="w-4 h-4" /> Aggiungi
+          <Send className="w-4 h-4" /> Richiesta pagamento fornitore
         </button>
+        {!isPMRole(user) && (
+          <button
+            onClick={() => setShowLegacyForm(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+            style={{ background: 'var(--bg3, var(--bg2))', color: 'var(--text)', border: '1px solid var(--line)' }}
+          >
+            <Plus className="w-4 h-4" /> Movimento diretto
+          </button>
+        )}
       </div>
 
-      {/* Form */}
-      {showForm && (
-        <PaymentForm
+      {/* Payment Request Form */}
+      {showRequestForm && (
+        <PaymentRequestForm
           eventId={event.id}
-          eventName={event.nome}
           suppliers={suppliers}
-          clients={clients}
-          onDone={() => { setShowForm(false); load() }}
-          onCancel={() => setShowForm(false)}
+          onDone={() => { setShowRequestForm(false); load() }}
+          onCancel={() => setShowRequestForm(false)}
         />
       )}
 
-      {/* Timeline */}
+      {/* Legacy Form */}
+      {showLegacyForm && (
+        <LegacyPaymentForm
+          eventId={event.id}
+
+          suppliers={suppliers}
+          clients={clients}
+          onDone={() => { setShowLegacyForm(false); load() }}
+          onCancel={() => setShowLegacyForm(false)}
+        />
+      )}
+
+      {/* Richieste di pagamento fornitore */}
       <div className="space-y-2">
         <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
-          Timeline pagamenti
+          Richieste di pagamento
         </h3>
-        {timeline.length === 0 && (
-          <p className="text-sm py-4 text-center" style={{ color: 'var(--muted)' }}>Nessun pagamento registrato</p>
+        {fornitorePayments.length === 0 && (
+          <p className="text-sm py-4 text-center" style={{ color: 'var(--muted)' }}>Nessuna richiesta di pagamento</p>
         )}
-        {timeline.map(p => (
-          <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'var(--bg2)' }}>
-            <div className="flex-shrink-0">
-              {p.tipo === 'incasso_cliente'
-                ? <ArrowDownLeft className="w-5 h-5" style={{ color: 'var(--green)' }} />
-                : <ArrowUpRight className="w-5 h-5" style={{ color: 'var(--red2)' }} />
-              }
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium truncate">{p.descrizione}</span>
-                <StatoBadge stato={p.computedStato} />
-              </div>
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                {fmtDate(p.data_scadenza)}
-                {p.supplier_id && suppliers.find(s => s.id === p.supplier_id) && (
-                  <> &middot; {suppliers.find(s => s.id === p.supplier_id)!.nome}</>
-                )}
-              </p>
-            </div>
-            <div className="text-right flex items-center gap-2">
-              <span className="text-sm font-semibold" style={{ color: p.tipo === 'incasso_cliente' ? 'var(--green)' : 'var(--red2)' }}>
-                {p.tipo === 'incasso_cliente' ? '+' : '-'}{fmtEuro(p.importo)}
-              </span>
-              {p.computedStato !== 'pagato' && (
-                <button
-                  onClick={() => handleMarkPaid(p.id)}
-                  title="Segna come pagato"
-                  className="p-1.5 rounded-lg hover:opacity-80 transition-all"
-                  style={{ background: 'var(--green)', color: '#fff' }}
-                >
-                  <Check className="w-3.5 h-3.5" />
-                </button>
-              )}
-              <button
-                onClick={() => handleDelete(p.id)}
-                title="Elimina"
-                className="p-1.5 rounded-lg hover:opacity-80 transition-all"
-                style={{ background: 'var(--bg3, var(--bg2))' }}
-              >
-                <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-              </button>
-            </div>
-          </div>
+        {fornitorePayments.map(p => (
+          <PaymentRow
+            key={p.id}
+            payment={p}
+            suppliers={suppliers}
+            clients={clients}
+            user={user}
+            onMarkPaid={handleMarkPaid}
+            onDelete={handleDelete}
+          />
         ))}
+      </div>
+
+      {/* Incassi cliente */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
+          Incassi cliente
+        </h3>
+        {clientePayments.length === 0 && (
+          <p className="text-sm py-4 text-center" style={{ color: 'var(--muted)' }}>Nessun incasso cliente</p>
+        )}
+        {clientePayments.map(p => (
+          <PaymentRow
+            key={p.id}
+            payment={p}
+            suppliers={suppliers}
+            clients={clients}
+            user={user}
+            onMarkPaid={handleMarkPaid}
+            onDelete={handleDelete}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PaymentRow({ payment: p, suppliers, clients, user, onMarkPaid, onDelete }: {
+  payment: EventPayment & { computedStato?: string }
+  suppliers: Supplier[]
+  clients: Client[]
+  user: AuthUser | null
+  onMarkPaid: (id: string) => void
+  onDelete: (id: string) => void
+}) {
+  const today = todayISO()
+  const computedStato = !p.data_pagamento && p.data_scadenza < today && p.stato !== 'pagato' ? 'in_ritardo' : p.stato
+  const isFornitore = p.tipo === 'pagamento_fornitore'
+  const isPM = isPMRole(user)
+  const isLegacy = p.request_status === null
+
+  const canMarkPaid = (() => {
+    if (computedStato === 'pagato') return false
+    if (isFornitore && isPM) return false
+    return true
+  })()
+
+  const canDelete = (() => {
+    if (isPM && isFornitore && !isLegacy && p.request_status !== 'bozza') return false
+    return true
+  })()
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'var(--bg2)' }}>
+      <div className="flex-shrink-0">
+        {p.tipo === 'incasso_cliente'
+          ? <ArrowDownLeft className="w-5 h-5" style={{ color: 'var(--green)' }} />
+          : <ArrowUpRight className="w-5 h-5" style={{ color: 'var(--red2)' }} />
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium truncate">{p.descrizione}</span>
+          <RequestStatusBadge requestStatus={p.request_status} stato={computedStato} />
+        </div>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+          {fmtDate(p.data_scadenza)}
+          {p.supplier_id && suppliers.find(s => s.id === p.supplier_id) && (
+            <> &middot; {suppliers.find(s => s.id === p.supplier_id)!.nome}</>
+          )}
+          {p.client_id && clients.find(c => c.id === p.client_id) && (
+            <> &middot; {clients.find(c => c.id === p.client_id)!.nome}</>
+          )}
+        </p>
+      </div>
+      <div className="text-right flex items-center gap-2">
+        <span className="text-sm font-semibold" style={{ color: p.tipo === 'incasso_cliente' ? 'var(--green)' : 'var(--red2)' }}>
+          {p.tipo === 'incasso_cliente' ? '+' : '-'}{fmtEuro(p.importo)}
+        </span>
+        {canMarkPaid && (
+          <button
+            onClick={() => onMarkPaid(p.id)}
+            title="Segna come pagato"
+            className="p-1.5 rounded-lg hover:opacity-80 transition-all"
+            style={{ background: 'var(--green)', color: '#fff' }}
+          >
+            <Check className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {canDelete && (
+          <button
+            onClick={() => onDelete(p.id)}
+            title="Elimina"
+            className="p-1.5 rounded-lg hover:opacity-80 transition-all"
+            style={{ background: 'var(--bg3, var(--bg2))' }}
+          >
+            <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -232,13 +311,33 @@ function KpiCard({ label, value, color }: { label: string; value: number; color:
   )
 }
 
-function StatoBadge({ stato }: { stato: string }) {
-  const map: Record<string, { label: string; bg: string; color: string }> = {
-    pagato: { label: 'PAGATO', bg: 'var(--green)', color: '#fff' },
-    atteso: { label: 'IN ATTESA', bg: 'var(--bg3, var(--bg2))', color: 'var(--muted)' },
-    in_ritardo: { label: 'IN RITARDO', bg: 'var(--red2)', color: '#fff' },
+function RequestStatusBadge({ requestStatus, stato }: { requestStatus: RequestStatus | null; stato: string }) {
+  if (requestStatus === null) {
+    // Legacy record
+    const legacyMap: Record<string, { label: string; bg: string; color: string }> = {
+      pagato: { label: 'PAGATO', bg: 'var(--green)', color: '#fff' },
+      atteso: { label: 'LEGACY', bg: 'var(--bg3, var(--bg2))', color: 'var(--muted)' },
+      in_ritardo: { label: 'IN RITARDO', bg: 'var(--red2)', color: '#fff' },
+    }
+    const s = legacyMap[stato] ?? legacyMap.atteso
+    return (
+      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase" style={{ background: s.bg, color: s.color }}>
+        {s.label}
+      </span>
+    )
   }
-  const s = map[stato] ?? map.atteso
+
+  const map: Record<string, { label: string; bg: string; color: string }> = {
+    bozza: { label: 'BOZZA', bg: 'var(--bg3, var(--bg2))', color: 'var(--muted)' },
+    inviata: { label: 'INVIATA ALL\'AMM.', bg: 'var(--accent)', color: '#fff' },
+    in_verifica: { label: 'IN VERIFICA', bg: 'var(--yellow)', color: '#000' },
+    da_integrare: { label: 'DA INTEGRARE', bg: 'var(--orange, #f59e0b)', color: '#fff' },
+    approvata: { label: 'APPROVATA', bg: 'var(--green)', color: '#fff' },
+    rifiutata: { label: 'RIFIUTATA', bg: 'var(--red2)', color: '#fff' },
+    completata: { label: 'COMPLETATA', bg: 'var(--green)', color: '#fff' },
+    annullata: { label: 'ANNULLATA', bg: 'var(--bg3, var(--bg2))', color: 'var(--muted)' },
+  }
+  const s = map[requestStatus] ?? map.bozza
   return (
     <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase" style={{ background: s.bg, color: s.color }}>
       {s.label}
@@ -246,15 +345,15 @@ function StatoBadge({ stato }: { stato: string }) {
   )
 }
 
-function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel }: {
+// Legacy form for admin/direct movements (incassi cliente, etc.)
+function LegacyPaymentForm({ eventId, suppliers, clients, onDone, onCancel }: {
   eventId: string
-  eventName: string
   suppliers: Supplier[]
   clients: Client[]
   onDone: () => void
   onCancel: () => void
 }) {
-  const [tipo, setTipo] = useState<'incasso_cliente' | 'pagamento_fornitore'>('pagamento_fornitore')
+  const [tipo, setTipo] = useState<'incasso_cliente' | 'pagamento_fornitore'>('incasso_cliente')
   const [descrizione, setDescrizione] = useState('')
   const [importo, setImporto] = useState('')
   const [dataScadenza, setDataScadenza] = useState(todayISO())
@@ -262,7 +361,6 @@ function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel 
   const [clientId, setClientId] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
-  const [soglia, setSoglia] = useState(2000)
   const { showToast } = useToast()
 
   const [supplierSearch, setSupplierSearch] = useState('')
@@ -272,13 +370,6 @@ function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel 
   const [clientSearch, setClientSearch] = useState('')
   const [clientOpen, setClientOpen] = useState(false)
   const [clientLabel, setClientLabel] = useState('')
-
-  useEffect(() => {
-    supabase.from('cashflow_config').select('soglia_autonomia_pm_eur').limit(1).maybeSingle()
-      .then(({ data }) => { if (data?.soglia_autonomia_pm_eur) setSoglia(Number(data.soglia_autonomia_pm_eur)) })
-  }, [])
-
-  const needsApproval = tipo === 'pagamento_fornitore' && Number(importo) > soglia
 
   const filteredSuppliers = supplierSearch.length > 0
     ? suppliers.filter(s =>
@@ -306,46 +397,19 @@ function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel 
   }, [clientOpen])
 
   useEffect(() => {
-    if (tipo !== 'pagamento_fornitore') {
-      setSupplierId('')
-      setSupplierLabel('')
-      setSupplierSearch('')
-      setSupplierOpen(false)
-    }
-    if (tipo !== 'incasso_cliente') {
-      setClientId('')
-      setClientLabel('')
-      setClientSearch('')
-      setClientOpen(false)
-    }
+    if (tipo !== 'pagamento_fornitore') { setSupplierId(''); setSupplierLabel(''); setSupplierSearch('') }
+    if (tipo !== 'incasso_cliente') { setClientId(''); setClientLabel(''); setClientSearch('') }
   }, [tipo])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!descrizione.trim() || !importo) return
-
     if (tipo === 'pagamento_fornitore' && !supplierId) {
-      showToast('Seleziona un fornitore per l\'uscita', 'error')
+      showToast('Seleziona un fornitore', 'error')
       return
     }
-
     setSaving(true)
-    const user = await loadUser()
-    const statoApprovazione = needsApproval ? 'in_attesa' : 'autonomo'
-
-    const soggetto = tipo === 'pagamento_fornitore'
-      ? suppliers.find(s => s.id === supplierId)?.nome || ''
-      : clients.find(c => c.id === clientId)?.nome || ''
-
-    console.log('%c PAGAMENTO', 'background: #222; color: #0f0; font-size: 14px; padding: 4px 8px;', {
-      tipo,
-      direzione: tipo === 'pagamento_fornitore' ? 'USCITA (soldi escono)' : 'ENTRATA (soldi entrano)',
-      fornitore: tipo === 'pagamento_fornitore' ? soggetto : null,
-      cliente: tipo === 'incasso_cliente' ? soggetto : null,
-      importo: Number(importo),
-      evento: eventName,
-    })
-
+    const u = loadUser()
     const result = await insertPayment({
       event_id: eventId,
       tipo,
@@ -353,32 +417,14 @@ function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel 
       importo: Number(importo),
       data_scadenza: dataScadenza,
       supplier_id: tipo === 'pagamento_fornitore' && supplierId ? supplierId : null,
+      client_id: tipo === 'incasso_cliente' && clientId ? clientId : null,
       note: note.trim() || null,
-      created_by: user?.id ?? null,
-      stato_approvazione: statoApprovazione as any,
+      created_by: u?.id ?? null,
+      stato: 'atteso',
     })
-    if (result && needsApproval) {
-      const { data: admins } = await supabase.from('profiles').select('id').in('role', ['Admin', 'Super Admin', 'Amministrazione'])
-      const fornitoreNome = suppliers.find(s => s.id === supplierId)?.nome || 'Fornitore'
-      for (const a of admins ?? []) {
-        await supabase.from('notifications').insert({
-          user_id: a.id,
-          title: 'Approvazione pagamento richiesta',
-          message: `Richiesta di \u20AC${Number(importo).toLocaleString('it-IT')} a ${fornitoreNome} per evento "${eventName}" attende la tua approvazione.`,
-          type: 'payment_approval',
-          related_entity_type: 'event_payment',
-          related_entity_id: result.id,
-          is_read: false,
-        })
-      }
-    }
     setSaving(false)
-    if (result) {
-      showToast(needsApproval ? 'Pagamento inviato in approvazione' : 'Pagamento registrato', 'success')
-      onDone()
-    } else {
-      showToast('Errore salvataggio', 'error')
-    }
+    if (result) { showToast('Movimento registrato', 'success'); onDone() }
+    else showToast('Errore salvataggio', 'error')
   }
 
   const inputStyle: React.CSSProperties = {
@@ -394,11 +440,10 @@ function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel 
   return (
     <form onSubmit={handleSubmit} className="rounded-xl p-4 space-y-3" style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-sm font-semibold">Nuovo pagamento</h4>
+        <h4 className="text-sm font-semibold">Movimento diretto</h4>
         <button type="button" onClick={onCancel} className="p-1 rounded hover:opacity-70"><X className="w-4 h-4" /></button>
       </div>
 
-      {/* Tipo radio buttons */}
       <div>
         <label className="text-xs mb-2 block" style={{ color: 'var(--muted)' }}>Tipo movimento</label>
         <div className="grid grid-cols-2 gap-2">
@@ -414,7 +459,7 @@ function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel 
             }}
           >
             <ArrowDownLeft className="w-4 h-4" />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '.03em' }}>ENTRATA</span>
+            <span className="text-xs uppercase tracking-wider">Entrata</span>
           </button>
           <button
             type="button"
@@ -428,12 +473,9 @@ function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel 
             }}
           >
             <ArrowUpRight className="w-4 h-4" />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '.03em' }}>USCITA</span>
+            <span className="text-xs uppercase tracking-wider">Uscita</span>
           </button>
         </div>
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6, fontStyle: 'italic' }}>
-          {tipo === 'incasso_cliente' ? 'Incasso da cliente (soldi entrano)' : 'Pagamento a fornitore (soldi escono)'}
-        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -450,7 +492,6 @@ function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel 
           <input type="text" value={descrizione} onChange={e => setDescrizione(e.target.value)} placeholder="Es. Acconto hotel..." style={inputStyle} required />
         </div>
 
-        {/* Supplier selector for USCITA */}
         {tipo === 'pagamento_fornitore' && (
           <div className="md:col-span-2">
             <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Fornitore *</label>
@@ -458,53 +499,17 @@ function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel 
               <input
                 type="text"
                 value={supplierLabel}
-                onChange={e => {
-                  setSupplierLabel(e.target.value)
-                  setSupplierSearch(e.target.value)
-                  setSupplierId('')
-                  setSupplierOpen(true)
-                }}
+                onChange={e => { setSupplierLabel(e.target.value); setSupplierSearch(e.target.value); setSupplierId(''); setSupplierOpen(true) }}
                 onFocus={() => setSupplierOpen(true)}
                 placeholder="Cerca fornitore..."
                 style={inputStyle}
                 autoComplete="off"
               />
               {supplierOpen && filteredSuppliers.length > 0 && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0, right: 0,
-                  zIndex: 50,
-                  background: 'var(--panel-solid, var(--bg2))',
-                  border: '1px solid var(--line)',
-                  borderRadius: 12,
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                  maxHeight: 220,
-                  overflowY: 'auto',
-                }} onMouseDown={e => e.stopPropagation()}>
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--panel-solid, var(--bg2))', border: '1px solid var(--line)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto' }} onMouseDown={e => e.stopPropagation()}>
                   {filteredSuppliers.map(s => (
-                    <div
-                      key={s.id}
-                      onClick={() => {
-                        setSupplierId(s.id)
-                        setSupplierLabel(s.nome)
-                        setSupplierSearch('')
-                        setSupplierOpen(false)
-                      }}
-                      style={{
-                        padding: '10px 14px',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid var(--line)',
-                        fontSize: 13,
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--panel2, var(--bg3))')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
+                    <div key={s.id} onClick={() => { setSupplierId(s.id); setSupplierLabel(s.nome); setSupplierSearch(''); setSupplierOpen(false) }} style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--line)', fontSize: 13 }} onMouseEnter={e => (e.currentTarget.style.background = 'var(--panel2, var(--bg3))')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       <div style={{ fontWeight: 500, color: 'var(--text)' }}>{s.nome}</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                        {(s.categorie?.[0] || s.categoria || '')}
-                        {s.city ? ` \u00B7 ${s.city}` : ''}
-                      </div>
                     </div>
                   ))}
                 </div>
@@ -513,7 +518,6 @@ function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel 
           </div>
         )}
 
-        {/* Client selector for ENTRATA */}
         {tipo === 'incasso_cliente' && clients.length > 0 && (
           <div className="md:col-span-2">
             <label className="text-xs mb-1 block" style={{ color: 'var(--muted)' }}>Cliente</label>
@@ -521,52 +525,17 @@ function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel 
               <input
                 type="text"
                 value={clientLabel}
-                onChange={e => {
-                  setClientLabel(e.target.value)
-                  setClientSearch(e.target.value)
-                  setClientId('')
-                  setClientOpen(true)
-                }}
+                onChange={e => { setClientLabel(e.target.value); setClientSearch(e.target.value); setClientId(''); setClientOpen(true) }}
                 onFocus={() => setClientOpen(true)}
                 placeholder="Cerca cliente..."
                 style={inputStyle}
                 autoComplete="off"
               />
               {clientOpen && filteredClients.length > 0 && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0, right: 0,
-                  zIndex: 50,
-                  background: 'var(--panel-solid, var(--bg2))',
-                  border: '1px solid var(--line)',
-                  borderRadius: 12,
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                  maxHeight: 220,
-                  overflowY: 'auto',
-                }} onMouseDown={e => e.stopPropagation()}>
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--panel-solid, var(--bg2))', border: '1px solid var(--line)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto' }} onMouseDown={e => e.stopPropagation()}>
                   {filteredClients.map(c => (
-                    <div
-                      key={c.id}
-                      onClick={() => {
-                        setClientId(c.id)
-                        setClientLabel(c.nome)
-                        setClientSearch('')
-                        setClientOpen(false)
-                      }}
-                      style={{
-                        padding: '10px 14px',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid var(--line)',
-                        fontSize: 13,
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--panel2, var(--bg3))')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
+                    <div key={c.id} onClick={() => { setClientId(c.id); setClientLabel(c.nome); setClientSearch(''); setClientOpen(false) }} style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--line)', fontSize: 13 }} onMouseEnter={e => (e.currentTarget.style.background = 'var(--panel2, var(--bg3))')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       <div style={{ fontWeight: 500, color: 'var(--text)' }}>{c.nome}</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                        {c.settore || ''}{c.citta ? ` \u00B7 ${c.citta}` : ''}
-                      </div>
                     </div>
                   ))}
                 </div>
@@ -581,24 +550,10 @@ function PaymentForm({ eventId, eventName, suppliers, clients, onDone, onCancel 
         </div>
       </div>
 
-      {needsApproval && (
-        <div style={{
-          background: 'color-mix(in srgb, var(--yellow) 12%, transparent)',
-          border: '1px solid var(--yellow)',
-          borderRadius: 10,
-          padding: '10px 14px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 12,
-          color: 'var(--yellow)',
-        }}>
-          Questo pagamento ({fmtEuro(Number(importo))}) supera la soglia di autonomia ({fmtEuro(soglia)}). Sara inviato in approvazione all'Amministrazione.
-        </div>
-      )}
-
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg text-sm" style={{ color: 'var(--muted)' }}>Annulla</button>
         <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--accent)', color: '#fff', opacity: saving ? 0.6 : 1 }}>
-          {saving ? (needsApproval ? 'Invio approvazione...' : 'Salvando...') : (needsApproval ? 'Invia per approvazione' : 'Salva')}
+          {saving ? 'Salvando...' : 'Salva'}
         </button>
       </div>
     </form>

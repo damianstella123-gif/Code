@@ -1,6 +1,16 @@
 import { supabase } from './supabase'
 import { logError } from './error-log'
 
+export type RequestStatus =
+  | 'bozza'
+  | 'inviata'
+  | 'in_verifica'
+  | 'da_integrare'
+  | 'approvata'
+  | 'rifiutata'
+  | 'completata'
+  | 'annullata'
+
 export interface EventPayment {
   id: string
   event_id: string | null
@@ -16,6 +26,11 @@ export interface EventPayment {
   note: string | null
   created_by: string | null
   created_at: string
+  request_status: RequestStatus | null
+  submitted_at: string | null
+  submitted_by: string | null
+  request_note: string | null
+  stato_approvazione: string | null
 }
 
 export interface PaymentInsert {
@@ -32,6 +47,24 @@ export interface PaymentInsert {
   note?: string | null
   created_by?: string | null
   stato_approvazione?: 'autonomo' | 'in_attesa' | 'approvato' | 'bloccato'
+  request_status?: string | null
+  request_note?: string | null
+}
+
+export interface BudgetVersion {
+  id: string
+  event_id: string
+  nome: string
+  tipo: 'preventivo' | 'consuntivo'
+  stato: 'bozza' | 'approvato' | 'rifiutato'
+}
+
+export interface BudgetLine {
+  id: string
+  source_table: string
+  description: string
+  categoria: string
+  costo_totale: number
 }
 
 function num(x: number | string | null | undefined): number {
@@ -55,6 +88,11 @@ function rowToPayment(r: any): EventPayment {
     note: r.note,
     created_by: r.created_by,
     created_at: r.created_at,
+    request_status: r.request_status ?? null,
+    submitted_at: r.submitted_at ?? null,
+    submitted_by: r.submitted_by ?? null,
+    request_note: r.request_note ?? null,
+    stato_approvazione: r.stato_approvazione ?? null,
   }
 }
 
@@ -139,4 +177,132 @@ export async function fetchAllEntrate(): Promise<EventPayment[]> {
     .order('data_scadenza', { ascending: false })
   if (error) { logError('event-payments', 'fetchAllEntrate', error); return [] }
   return (data ?? []).map(rowToPayment)
+}
+
+// --- Budget versions ---
+
+export async function fetchValidBudgetVersions(eventId: string): Promise<BudgetVersion[]> {
+  const { data, error } = await supabase
+    .from('budget_versions')
+    .select('id, event_id, nome, tipo, stato')
+    .eq('event_id', eventId)
+    .or('and(tipo.eq.preventivo,stato.eq.approvato),and(tipo.eq.consuntivo,stato.eq.bozza)')
+    .order('created_at', { ascending: false })
+  if (error) { logError('event-payments', 'fetchValidBudgetVersions', error); return [] }
+  return (data ?? []) as BudgetVersion[]
+}
+
+// --- Budget lines for a supplier in a version ---
+
+const SOURCE_TABLES = [
+  { table: 'event_supplier_services', label: 'Servizi', descCol: 'titolo', catCol: 'categoria' },
+  { table: 'event_hotel_details', label: 'Hotel', descCol: 'titolo', catCol: null },
+  { table: 'event_restaurant_details', label: 'Ristorante', descCol: 'tipo', catCol: null },
+  { table: 'event_experience_details', label: 'Experience', descCol: 'descrizione', catCol: null },
+  { table: 'event_catering_details', label: 'Catering', descCol: 'tipologia', catCol: null },
+  { table: 'event_staff_interno_details', label: 'Staff Interno', descCol: 'tipologia', catCol: null },
+  { table: 'event_staff_esterno_details', label: 'Staff Esterno', descCol: 'tipologia', catCol: null },
+  { table: 'event_varie_details', label: 'Varie', descCol: 'descrizione', catCol: 'tipologia' },
+  { table: 'event_audio_video_details', label: 'Audio/Video', descCol: 'tipologia_servizio', catCol: null },
+  { table: 'event_allestimenti_details', label: 'Allestimenti', descCol: 'descrizione', catCol: null },
+  { table: 'event_grafica_stampa_details', label: 'Grafica/Stampa', descCol: 'tipo_materiale', catCol: null },
+] as const
+
+export async function fetchBudgetLinesForSupplier(
+  eventId: string,
+  budgetVersionId: string,
+  supplierId: string
+): Promise<BudgetLine[]> {
+  const results: BudgetLine[] = []
+
+  for (const src of SOURCE_TABLES) {
+    const { data, error } = await supabase
+      .from(src.table)
+      .select('id, costo_totale' + (src.descCol ? `, ${src.descCol}` : '') + (src.catCol ? `, ${src.catCol}` : ''))
+      .eq('event_id', eventId)
+      .eq('budget_version_id', budgetVersionId)
+      .eq('supplier_id', supplierId)
+
+    if (error) {
+      logError('event-payments', `fetchLines:${src.table}`, error)
+      continue
+    }
+    for (const row of data ?? []) {
+      const r = row as any
+      results.push({
+        id: String(r.id),
+        source_table: src.table,
+        description: r[src.descCol] || src.label,
+        categoria: src.catCol ? (r[src.catCol] || src.label) : src.label,
+        costo_totale: num(r.costo_totale),
+      })
+    }
+  }
+
+  return results
+}
+
+// --- RPC wrappers ---
+
+const RPC_ERROR_MESSAGES: Record<string, string> = {
+  AUTH_REQUIRED: 'Sessione scaduta. Effettua nuovamente il login.',
+  ROLE_NOT_ALLOWED: 'Non hai i permessi per questa operazione.',
+  REQUEST_NOT_FOUND: 'Richiesta di pagamento non trovata.',
+  REQUEST_NOT_EDITABLE: 'La richiesta non e modificabile nello stato attuale.',
+  INVALID_SOURCE_TABLE: 'Tipo di voce economica non valido.',
+  SOURCE_LINE_NOT_FOUND: 'Voce economica non trovata.',
+  LINE_ALREADY_LINKED: 'Questa voce e gia collegata alla richiesta.',
+  VERSION_MISMATCH: 'La versione budget non corrisponde.',
+  VERSION_NOT_ALLOWED: 'Versione budget non utilizzabile (deve essere preventivo approvato o consuntivo in bozza).',
+  EVENT_MISMATCH: 'La voce non appartiene a questo evento.',
+  SUPPLIER_MISMATCH: 'La voce appartiene a un fornitore diverso.',
+  INVALID_ALLOCATION: 'L\'importo allocato deve essere maggiore di zero.',
+  ALLOCATION_EXCEEDS_REQUEST: 'L\'importo allocato supera il totale della richiesta.',
+  NO_LINES: 'Collega almeno una voce economica prima di inviare.',
+  ALLOCATION_MISMATCH: 'Il totale allocato non corrisponde all\'importo della richiesta.',
+  SUPPLIER_REQUIRED: 'Il fornitore e obbligatorio per i pagamenti fornitore.',
+  DESCRIPTION_REQUIRED: 'La descrizione e obbligatoria.',
+  DUE_DATE_REQUIRED: 'La data di scadenza e obbligatoria.',
+  INVALID_AMOUNT: 'L\'importo deve essere maggiore di zero.',
+  CLIENT_REQUIRED: 'Il cliente e obbligatorio per gli incassi.',
+}
+
+function extractRpcError(error: any): string {
+  const msg = error?.message || error?.details || ''
+  for (const code of Object.keys(RPC_ERROR_MESSAGES)) {
+    if (msg.includes(code)) return RPC_ERROR_MESSAGES[code]
+  }
+  return msg || 'Errore imprevisto.'
+}
+
+export async function addPaymentRequestLine(params: {
+  paymentRequestId: string
+  budgetVersionId: string
+  sourceTable: string
+  sourceLineId: string
+  allocatedAmount: number
+}): Promise<{ id: string | null; error: string | null }> {
+  const { data, error } = await supabase.rpc('add_payment_request_line', {
+    p_payment_request_id: params.paymentRequestId,
+    p_budget_version_id: params.budgetVersionId,
+    p_source_table: params.sourceTable,
+    p_source_line_id: params.sourceLineId,
+    p_allocated_amount: params.allocatedAmount,
+  })
+  if (error) {
+    logError('event-payments', 'addPaymentRequestLine', error)
+    return { id: null, error: extractRpcError(error) }
+  }
+  return { id: data as string, error: null }
+}
+
+export async function submitPaymentRequest(paymentRequestId: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.rpc('submit_payment_request', {
+    p_payment_request_id: paymentRequestId,
+  })
+  if (error) {
+    logError('event-payments', 'submitPaymentRequest', error)
+    return { error: extractRpcError(error) }
+  }
+  return { error: null }
 }
