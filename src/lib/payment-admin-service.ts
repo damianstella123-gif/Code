@@ -286,7 +286,7 @@ export async function createSupplierInvoiceDraft(params: {
       stato: 'bozza',
       data_emissione: params.dataEmissione,
       scadenza: params.scadenza,
-      note: params.note || null,
+      note: params.note || '',
       created_by: params.userId,
       external_provider: 'manuale',
       sync_status: 'non_sincronizzata',
