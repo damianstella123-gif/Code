@@ -3,14 +3,13 @@ import { ArrowUpRight, ArrowDownLeft, Plus, X, Check, Trash2, Send } from 'lucid
 import { useToast } from '@/lib/toast'
 import { loadUser, type AuthUser } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
-import { addDaysISO, todayISO, fmtDate } from '@/lib/format'
+import { todayISO, fmtDate } from '@/lib/format'
 import {
   fetchEventPayments,
   insertPayment,
   markAsPaid,
   deletePayment,
   type EventPayment,
-  type PaymentInsert,
   type RequestStatus,
 } from '@/lib/event-payments-service'
 import PaymentRequestForm from '@/components/PaymentRequestForm'
@@ -28,11 +27,28 @@ function fmtEuro(n: number): string {
   return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
-const PM_ROLES = ['Project Manager', 'Senior PM']
+const PAYMENT_REQUEST_ROLES = ['Project Manager', 'Senior PM', 'Admin', 'Super Admin', 'Amministrazione']
+const DIRECT_MOVEMENT_ROLES = ['Admin', 'Super Admin', 'Amministrazione']
+const MARK_PAID_ROLES = ['Admin', 'Super Admin', 'Amministrazione']
 
+function canRequestPayment(user: AuthUser | null): boolean {
+  return PAYMENT_REQUEST_ROLES.includes(user?.role || '')
+}
+
+function canDirectMovement(user: AuthUser | null): boolean {
+  return DIRECT_MOVEMENT_ROLES.includes(user?.role || '')
+}
+
+function canMarkPaidRole(user: AuthUser | null): boolean {
+  return MARK_PAID_ROLES.includes(user?.role || '')
+}
+
+function isAdminOrSuper(user: AuthUser | null): boolean {
+  return user?.role === 'Admin' || user?.role === 'Super Admin'
+}
 
 function isPMRole(user: AuthUser | null): boolean {
-  return PM_ROLES.includes(user?.role || '')
+  return user?.role === 'Project Manager' || user?.role === 'Senior PM'
 }
 
 export default function TabPagamenti({ event, suppliers, clients = [] }: Props) {
@@ -59,29 +75,6 @@ export default function TabPagamenti({ event, suppliers, clients = [] }: Props) 
     return () => { supabase.removeChannel(channel) }
   }, [event.id, load])
 
-  useEffect(() => {
-    if (!loading && payments.length === 0 && event.budget > 0) {
-      autoSuggest()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading])
-
-  async function autoSuggest() {
-    const u = loadUser()
-    const half = Math.round(event.budget * 0.5)
-    const today = todayISO()
-    const saldoDate = addDaysISO(event.dataFine, 30)
-    const base: Omit<PaymentInsert, 'descrizione' | 'importo' | 'data_scadenza'> = {
-      event_id: event.id,
-      tipo: 'incasso_cliente',
-      stato: 'atteso',
-      created_by: u?.id ?? null,
-    }
-    await insertPayment({ ...base, descrizione: 'Acconto cliente 50%', importo: half, data_scadenza: today })
-    await insertPayment({ ...base, descrizione: 'Saldo cliente 50%', importo: half, data_scadenza: saldoDate })
-    load()
-  }
-
   const kpi = useMemo(() => {
     let incassato = 0, daIncassare = 0, pagato = 0, daPagare = 0
     for (const p of payments) {
@@ -94,8 +87,7 @@ export default function TabPagamenti({ event, suppliers, clients = [] }: Props) 
       }
     }
     const liquidita = incassato - pagato
-    const previsione = (incassato + daIncassare) - (pagato + daPagare)
-    return { incassato, daIncassare, pagato, daPagare, liquidita, previsione }
+    return { incassato, daIncassare, pagato, daPagare, liquidita }
   }, [payments])
 
   const fornitorePayments = useMemo(() =>
@@ -140,14 +132,16 @@ export default function TabPagamenti({ event, suppliers, clients = [] }: Props) 
 
       {/* Add Buttons */}
       <div className="flex flex-wrap justify-end gap-2">
-        <button
-          onClick={() => setShowRequestForm(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
-          style={{ background: 'var(--accent)', color: '#fff' }}
-        >
-          <Send className="w-4 h-4" /> Richiesta pagamento fornitore
-        </button>
-        {!isPMRole(user) && (
+        {canRequestPayment(user) && (
+          <button
+            onClick={() => setShowRequestForm(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+            style={{ background: 'var(--accent)', color: '#fff' }}
+          >
+            <Send className="w-4 h-4" /> Richiesta pagamento fornitore
+          </button>
+        )}
+        {canDirectMovement(user) && (
           <button
             onClick={() => setShowLegacyForm(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
@@ -172,7 +166,6 @@ export default function TabPagamenti({ event, suppliers, clients = [] }: Props) 
       {showLegacyForm && (
         <LegacyPaymentForm
           eventId={event.id}
-
           suppliers={suppliers}
           clients={clients}
           onDone={() => { setShowLegacyForm(false); load() }}
@@ -226,7 +219,7 @@ export default function TabPagamenti({ event, suppliers, clients = [] }: Props) 
 }
 
 function PaymentRow({ payment: p, suppliers, clients, user, onMarkPaid, onDelete }: {
-  payment: EventPayment & { computedStato?: string }
+  payment: EventPayment
   suppliers: Supplier[]
   clients: Client[]
   user: AuthUser | null
@@ -235,19 +228,19 @@ function PaymentRow({ payment: p, suppliers, clients, user, onMarkPaid, onDelete
 }) {
   const today = todayISO()
   const computedStato = !p.data_pagamento && p.data_scadenza < today && p.stato !== 'pagato' ? 'in_ritardo' : p.stato
-  const isFornitore = p.tipo === 'pagamento_fornitore'
-  const isPM = isPMRole(user)
   const isLegacy = p.request_status === null
 
   const canMarkPaid = (() => {
     if (computedStato === 'pagato') return false
-    if (isFornitore && isPM) return false
+    if (!isLegacy) return false
+    if (!canMarkPaidRole(user)) return false
     return true
   })()
 
   const canDelete = (() => {
-    if (isPM && isFornitore && !isLegacy && p.request_status !== 'bozza') return false
-    return true
+    if (isAdminOrSuper(user)) return true
+    if (isPMRole(user) && !isLegacy && p.request_status === 'bozza' && p.created_by === user?.id) return true
+    return false
   })()
 
   return (
@@ -313,7 +306,6 @@ function KpiCard({ label, value, color }: { label: string; value: number; color:
 
 function RequestStatusBadge({ requestStatus, stato }: { requestStatus: RequestStatus | null; stato: string }) {
   if (requestStatus === null) {
-    // Legacy record
     const legacyMap: Record<string, { label: string; bg: string; color: string }> = {
       pagato: { label: 'PAGATO', bg: 'var(--green)', color: '#fff' },
       atteso: { label: 'LEGACY', bg: 'var(--bg3, var(--bg2))', color: 'var(--muted)' },
@@ -321,7 +313,7 @@ function RequestStatusBadge({ requestStatus, stato }: { requestStatus: RequestSt
     }
     const s = legacyMap[stato] ?? legacyMap.atteso
     return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase" style={{ background: s.bg, color: s.color }}>
+      <span className="px-2 py-0.5 rounded text-xs font-bold uppercase" style={{ background: s.bg, color: s.color }}>
         {s.label}
       </span>
     )
@@ -339,13 +331,12 @@ function RequestStatusBadge({ requestStatus, stato }: { requestStatus: RequestSt
   }
   const s = map[requestStatus] ?? map.bozza
   return (
-    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase" style={{ background: s.bg, color: s.color }}>
+    <span className="px-2 py-0.5 rounded text-xs font-bold uppercase" style={{ background: s.bg, color: s.color }}>
       {s.label}
     </span>
   )
 }
 
-// Legacy form for admin/direct movements (incassi cliente, etc.)
 function LegacyPaymentForm({ eventId, suppliers, clients, onDone, onCancel }: {
   eventId: string
   suppliers: Supplier[]

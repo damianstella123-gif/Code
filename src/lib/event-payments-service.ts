@@ -195,17 +195,17 @@ export async function fetchValidBudgetVersions(eventId: string): Promise<BudgetV
 // --- Budget lines for a supplier in a version ---
 
 const SOURCE_TABLES = [
-  { table: 'event_supplier_services', label: 'Servizi', descCol: 'titolo', catCol: 'categoria' },
-  { table: 'event_hotel_details', label: 'Hotel', descCol: 'titolo', catCol: null },
-  { table: 'event_restaurant_details', label: 'Ristorante', descCol: 'tipo', catCol: null },
-  { table: 'event_experience_details', label: 'Experience', descCol: 'descrizione', catCol: null },
-  { table: 'event_catering_details', label: 'Catering', descCol: 'tipologia', catCol: null },
-  { table: 'event_staff_interno_details', label: 'Staff Interno', descCol: 'tipologia', catCol: null },
-  { table: 'event_staff_esterno_details', label: 'Staff Esterno', descCol: 'tipologia', catCol: null },
-  { table: 'event_varie_details', label: 'Varie', descCol: 'descrizione', catCol: 'tipologia' },
-  { table: 'event_audio_video_details', label: 'Audio/Video', descCol: 'tipologia_servizio', catCol: null },
-  { table: 'event_allestimenti_details', label: 'Allestimenti', descCol: 'descrizione', catCol: null },
-  { table: 'event_grafica_stampa_details', label: 'Grafica/Stampa', descCol: 'tipo_materiale', catCol: null },
+  { table: 'event_supplier_services', label: 'Servizi', descCol: 'titolo', costCol: 'costo_totale', catCol: 'categoria' },
+  { table: 'event_hotel_details', label: 'Hotel', descCol: 'titolo', costCol: 'costo_totale', catCol: null },
+  { table: 'event_restaurant_details', label: 'Ristorante', descCol: 'tipologia_servizio', costCol: 'costo_totale_reale', catCol: null },
+  { table: 'event_experience_details', label: 'Experience', descCol: 'nome_attivita', costCol: 'costo_totale', catCol: null },
+  { table: 'event_catering_details', label: 'Catering', descCol: 'tipologia', costCol: 'costo_totale', catCol: null },
+  { table: 'event_staff_interno_details', label: 'Staff Interno', descCol: 'ruolo', costCol: 'costo_totale', catCol: null },
+  { table: 'event_staff_esterno_details', label: 'Staff Esterno', descCol: 'ruolo', costCol: 'costo_totale', catCol: null },
+  { table: 'event_varie_details', label: 'Varie', descCol: 'descrizione', costCol: 'costo_totale', catCol: 'tipologia' },
+  { table: 'event_audio_video_details', label: 'Audio/Video', descCol: 'tipologia_servizio', costCol: 'costo_totale', catCol: null },
+  { table: 'event_allestimenti_details', label: 'Allestimenti', descCol: 'descrizione', costCol: 'costo_totale', catCol: null },
+  { table: 'event_grafica_stampa_details', label: 'Grafica/Stampa', descCol: 'tipo_materiale', costCol: 'costo_totale', catCol: null },
 ] as const
 
 export async function fetchBudgetLinesForSupplier(
@@ -216,9 +216,10 @@ export async function fetchBudgetLinesForSupplier(
   const results: BudgetLine[] = []
 
   for (const src of SOURCE_TABLES) {
+    const cols = ['id', src.costCol, src.descCol, src.catCol].filter(Boolean).join(', ')
     const { data, error } = await supabase
       .from(src.table)
-      .select('id, costo_totale' + (src.descCol ? `, ${src.descCol}` : '') + (src.catCol ? `, ${src.catCol}` : ''))
+      .select(cols)
       .eq('event_id', eventId)
       .eq('budget_version_id', budgetVersionId)
       .eq('supplier_id', supplierId)
@@ -234,7 +235,7 @@ export async function fetchBudgetLinesForSupplier(
         source_table: src.table,
         description: r[src.descCol] || src.label,
         categoria: src.catCol ? (r[src.catCol] || src.label) : src.label,
-        costo_totale: num(r.costo_totale),
+        costo_totale: num(r[src.costCol]),
       })
     }
   }
