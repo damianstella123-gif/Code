@@ -323,9 +323,10 @@ function RequestStatusBadge({ requestStatus, stato }: { requestStatus: RequestSt
     bozza: { label: 'BOZZA', bg: 'var(--bg3, var(--bg2))', color: 'var(--muted)' },
     inviata: { label: 'INVIATA ALL\'AMM.', bg: 'var(--accent)', color: '#fff' },
     in_verifica: { label: 'IN VERIFICA', bg: 'var(--yellow)', color: '#000' },
-    da_integrare: { label: 'DA INTEGRARE', bg: 'var(--orange, #f59e0b)', color: '#fff' },
+    in_attesa_fattura: { label: 'IN ATTESA FATTURA', bg: 'var(--orange, #f59e0b)', color: '#fff' },
     approvata: { label: 'APPROVATA', bg: 'var(--green)', color: '#fff' },
-    rifiutata: { label: 'RIFIUTATA', bg: 'var(--red2)', color: '#fff' },
+    respinta: { label: 'RESPINTA', bg: 'var(--red2)', color: '#fff' },
+    parzialmente_coperta: { label: 'COPERTURA PARZIALE', bg: 'var(--blue, #3b82f6)', color: '#fff' },
     completata: { label: 'COMPLETATA', bg: 'var(--green)', color: '#fff' },
     annullata: { label: 'ANNULLATA', bg: 'var(--bg3, var(--bg2))', color: 'var(--muted)' },
   }

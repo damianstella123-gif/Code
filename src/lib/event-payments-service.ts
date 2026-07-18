@@ -5,9 +5,10 @@ export type RequestStatus =
   | 'bozza'
   | 'inviata'
   | 'in_verifica'
-  | 'da_integrare'
+  | 'in_attesa_fattura'
   | 'approvata'
-  | 'rifiutata'
+  | 'respinta'
+  | 'parzialmente_coperta'
   | 'completata'
   | 'annullata'
 
