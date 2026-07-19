@@ -178,7 +178,7 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
       <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm text-gray-500">Caricamento partecipanti...</p>
+          <p className="text-gray-500" style={{ fontSize: '13px' }}>Caricamento partecipanti...</p>
         </div>
       </div>
     )
@@ -187,10 +187,11 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
-        <p className="text-sm text-red-600">{error}</p>
+        <p className="text-red-600" style={{ fontSize: '13px' }}>{error}</p>
         <button
           onClick={load}
-          className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          style={{ fontSize: '13px' }}
           aria-label="Riprova caricamento"
         >
           Riprova
@@ -202,7 +203,7 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
   if (registrations.length === 0) {
     return (
       <div className="flex items-center justify-center py-16">
-        <p className="text-sm text-gray-500">Nessun partecipante registrato.</p>
+        <p className="text-gray-500" style={{ fontSize: '13px' }}>Nessun partecipante registrato.</p>
       </div>
     )
   }
@@ -220,7 +221,7 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
         ] as const).map((s) => (
           <div key={s.label} className={`rounded-xl border p-3 text-center ${s.color}`}>
             <p className="text-2xl font-bold">{s.value}</p>
-            <p className="text-xs text-gray-600 mt-1">{s.label}</p>
+            <p className="text-gray-600 mt-1" style={{ fontSize: '13px' }}>{s.label}</p>
           </div>
         ))}
       </div>
@@ -232,13 +233,15 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
           placeholder="Cerca nome, email, azienda..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style={{ fontSize: '13px' }}
           aria-label="Cerca partecipanti"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as 'all' | RegistrationStatus)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          className="rounded-lg border border-gray-300 px-3 py-2"
+          style={{ fontSize: '13px' }}
           aria-label="Filtra per stato"
         >
           <option value="all">Tutti gli stati</option>
@@ -249,7 +252,8 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
         <select
           value={checkInFilter}
           onChange={(e) => setCheckInFilter(e.target.value as 'all' | 'checked' | 'not_checked')}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          className="rounded-lg border border-gray-300 px-3 py-2"
+          style={{ fontSize: '13px' }}
           aria-label="Filtra per check-in"
         >
           <option value="all">Tutti</option>
@@ -258,7 +262,8 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
         </select>
         <button
           onClick={exportCsv}
-          className="px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors whitespace-nowrap"
+          className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors whitespace-nowrap"
+          style={{ fontSize: '13px' }}
           aria-label="Esporta CSV"
         >
           Esporta CSV
@@ -266,7 +271,7 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
       </div>
 
       {/* Results count */}
-      <p className="text-xs text-gray-500">{filtered.length} risultati</p>
+      <p className="text-gray-500" style={{ fontSize: '13px' }}>{filtered.length} risultati</p>
 
       {/* List */}
       <div className="space-y-2">
@@ -282,15 +287,15 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
                 aria-label={`Dettagli ${reg.first_name} ${reg.last_name}`}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">
+                  <p className="font-medium truncate" style={{ fontSize: '13px' }}>
                     {reg.first_name} {reg.last_name}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">{reg.email}</p>
+                  <p className="text-gray-500 truncate" style={{ fontSize: '13px' }}>{reg.email}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {reg.phone && <span className="text-xs text-gray-500">{reg.phone}</span>}
-                  {reg.company && <span className="text-xs text-gray-500">{reg.company}</span>}
-                  {reg.job_title && <span className="text-xs text-gray-400">· {reg.job_title}</span>}
+                  {reg.phone && <span className="text-gray-500" style={{ fontSize: '13px' }}>{reg.phone}</span>}
+                  {reg.company && <span className="text-gray-500" style={{ fontSize: '13px' }}>{reg.company}</span>}
+                  {reg.job_title && <span className="text-gray-400" style={{ fontSize: '13px' }}>· {reg.job_title}</span>}
                   <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[reg.registration_status]}`} style={{ fontSize: '12px' }}>
                     {STATUS_LABELS[reg.registration_status]}
                   </span>
@@ -299,13 +304,13 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
                       Check-in
                     </span>
                   )}
-                  <span className="text-xs text-gray-400">{formatDate(reg.created_at)}</span>
+                  <span className="text-gray-400" style={{ fontSize: '13px' }}>{formatDate(reg.created_at)}</span>
                 </div>
               </button>
 
               {isExpanded && (
                 <div className="border-t border-gray-100 px-4 py-3 bg-gray-50 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" style={{ fontSize: '13px' }}>
                     {reg.checked_in_at && (
                       <p><span className="font-medium">Check-in:</span> {formatDate(reg.checked_in_at)}</p>
                     )}
@@ -331,42 +336,49 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
                   </div>
 
                   {!readOnly && (
-                    <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
-                      {reg.registration_status !== 'confirmed' && (
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200 items-center" style={{ fontSize: '13px' }}>
+                      {/* Conferma: only for non-confirmed AND not checked-in */}
+                      {reg.registration_status !== 'confirmed' && !reg.checked_in_at && (
                         <button
                           disabled={isLoading}
                           onClick={() => handleStatusChange(reg.id, 'confirmed')}
-                          className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                          className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                          style={{ fontSize: '13px' }}
                           title="Conferma registrazione"
                         >
                           Conferma
                         </button>
                       )}
-                      {reg.registration_status !== 'waitlist' && (
+                      {/* Lista d'attesa: only when not already waitlist AND not checked-in */}
+                      {reg.registration_status !== 'waitlist' && !reg.checked_in_at && (
                         <button
                           disabled={isLoading}
                           onClick={() => handleStatusChange(reg.id, 'waitlist')}
-                          className="text-xs px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                          className="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                          style={{ fontSize: '13px' }}
                           title="Sposta in lista d'attesa"
                         >
                           Lista d'attesa
                         </button>
                       )}
-                      {reg.registration_status !== 'cancelled' && (
+                      {/* Cancella: only when not already cancelled AND not checked-in */}
+                      {reg.registration_status !== 'cancelled' && !reg.checked_in_at && (
                         <>
                           {confirmAction?.id === reg.id && confirmAction.type === 'cancel' ? (
                             <div className="flex items-center gap-1">
-                              <span className="text-xs text-red-600">Confermare?</span>
+                              <span className="text-red-600" style={{ fontSize: '13px' }}>Confermare?</span>
                               <button
                                 disabled={isLoading}
                                 onClick={() => handleCancel(reg.id)}
-                                className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                                className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                                style={{ fontSize: '13px' }}
                               >
                                 Sì
                               </button>
                               <button
                                 onClick={() => setConfirmAction(null)}
-                                className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                className="px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                style={{ fontSize: '13px' }}
                               >
                                 No
                               </button>
@@ -375,7 +387,8 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
                             <button
                               disabled={isLoading}
                               onClick={() => setConfirmAction({ id: reg.id, type: 'cancel' })}
-                              className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                              className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                              style={{ fontSize: '13px' }}
                               title="Cancella registrazione"
                             >
                               Cancella
@@ -383,30 +396,42 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
                           )}
                         </>
                       )}
-                      {!reg.checked_in_at ? (
+                      {/* Check-in: only when confirmed AND not already checked-in */}
+                      {!reg.checked_in_at && reg.registration_status === 'confirmed' && (
                         <button
                           disabled={isLoading}
                           onClick={() => handleCheckIn(reg.id)}
-                          className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                          style={{ fontSize: '13px' }}
                           title="Effettua check-in"
                         >
                           Check-in
                         </button>
-                      ) : (
+                      )}
+                      {/* Note: check-in not allowed for non-confirmed */}
+                      {!reg.checked_in_at && reg.registration_status !== 'confirmed' && (
+                        <span className="text-gray-500 italic" style={{ fontSize: '13px' }}>
+                          Conferma la registrazione prima del check-in.
+                        </span>
+                      )}
+                      {/* Undo check-in */}
+                      {reg.checked_in_at && (
                         <>
                           {confirmAction?.id === reg.id && confirmAction.type === 'undo_checkin' ? (
                             <div className="flex items-center gap-1">
-                              <span className="text-xs text-gray-600">Annullare check-in?</span>
+                              <span className="text-gray-600" style={{ fontSize: '13px' }}>Annullare check-in?</span>
                               <button
                                 disabled={isLoading}
                                 onClick={() => handleUndoCheckIn(reg.id)}
-                                className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                                className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                                style={{ fontSize: '13px' }}
                               >
                                 Sì
                               </button>
                               <button
                                 onClick={() => setConfirmAction(null)}
-                                className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                className="px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                style={{ fontSize: '13px' }}
                               >
                                 No
                               </button>
@@ -415,12 +440,16 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
                             <button
                               disabled={isLoading}
                               onClick={() => setConfirmAction({ id: reg.id, type: 'undo_checkin' })}
-                              className="text-xs px-3 py-1.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                              className="px-3 py-1.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                              style={{ fontSize: '13px' }}
                               title="Annulla check-in"
                             >
                               Annulla check-in
                             </button>
                           )}
+                          <span className="text-gray-500 italic" style={{ fontSize: '13px' }}>
+                            Annulla prima il check-in per cambiare stato.
+                          </span>
                         </>
                       )}
                     </div>
@@ -432,7 +461,7 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
         })}
 
         {filtered.length === 0 && (
-          <p className="text-sm text-gray-500 text-center py-8">Nessun partecipante trovato con i filtri selezionati.</p>
+          <p className="text-gray-500 text-center py-8" style={{ fontSize: '13px' }}>Nessun partecipante trovato con i filtri selezionati.</p>
         )}
       </div>
     </div>
