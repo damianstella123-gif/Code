@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase'
 import type { Event } from '@/data/events'
 import { fmtLong } from '@/lib/format'
 import CreativeTemplateManager from '@/components/CreativeTemplateManager'
+import CreativePresentationGenerator from '@/components/CreativePresentationGenerator'
 
 interface Client { id: string; nome: string }
 
@@ -285,6 +286,9 @@ export default function CreativeStudio() {
       )}
 
       {/* KPIs - only for project sections */}
+      {activeSection === 'presentazioni' && (
+        <CreativePresentationGenerator projects={projects} clients={clients} />
+      )}
       {isProjectSection && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
