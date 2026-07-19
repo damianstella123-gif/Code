@@ -56,15 +56,20 @@ function escapeXml(str: string): string {
 function replacePlaceholders(
   xml: string,
   values: Record<string, string>,
+  replacementCounts: Record<string, number>,
 ): string {
-  const placeholderPattern = /(<a:t>)(.*?)(<\/a:t>)/gs;
+  const placeholderPattern = /(<a:t(?:\s[^>]*)?>)(.*?)(<\/a:t>)/gs;
 
   return xml.replace(placeholderPattern, (_match, open, text, close) => {
     let replaced = text as string;
     for (const [key, val] of Object.entries(values)) {
       const token = `{{${key}}}`;
       if (replaced.includes(token)) {
+        const before = replaced;
         replaced = replaced.replaceAll(token, escapeXml(val));
+        const occurrences =
+          (before.split(token).length - 1);
+        replacementCounts[key] = (replacementCounts[key] ?? 0) + occurrences;
       }
     }
     return `${open}${replaced}${close}`;
@@ -102,6 +107,10 @@ Deno.serve(async (req: Request) => {
   try {
     body = await req.json();
   } catch {
+    return errJson("Corpo della richiesta non valido.", 400);
+  }
+
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
     return errJson("Corpo della richiesta non valido.", 400);
   }
 
@@ -306,12 +315,26 @@ Deno.serve(async (req: Request) => {
       slidePattern.test(name),
     );
 
+    if (slideNames.length === 0) {
+      await markError("Il template non contiene slide valide.");
+      return errJson("Errore nella generazione del documento.", 500);
+    }
+
+    const replacementCounts: Record<string, number> = {};
+
     for (const slideName of slideNames) {
       const file = zip.file(slideName);
       if (!file) continue;
       const xmlContent = await file.async("string");
-      const processed = replacePlaceholders(xmlContent, validValues);
+      const processed = replacePlaceholders(xmlContent, validValues, replacementCounts);
       zip.file(slideName, processed);
+    }
+
+    for (const key of requiredKeys) {
+      if (!replacementCounts[key] || replacementCounts[key] === 0) {
+        await markError("Uno o più placeholder non sono presenti nel template.");
+        return errJson("Errore nella generazione del documento.", 500);
+      }
     }
 
     outputBytes = await zip.generateAsync({
