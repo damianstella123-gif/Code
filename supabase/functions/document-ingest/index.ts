@@ -432,6 +432,27 @@ async function extractPptx(fileBytes: Uint8Array): Promise<string> {
   return parts.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// ─── Safe error mapper ──────────────────────────────────────────────────────
+
+function toSafeMessage(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("max_tokens") || lower.includes("limite di token") || lower.includes("troppo lungo"))
+    return "Documento troppo lungo per l'analisi automatica.";
+  if (lower.includes("troppo grande") || lower.includes("25 mb"))
+    return "File troppo grande (limite: 25 MB).";
+  if (lower.includes("non supportato") || lower.includes("formato legacy") || lower.includes("unsupported"))
+    return "Formato file non supportato per l'analisi.";
+  if (lower.includes("nessun testo") || lower.includes("estrarre testo") || lower.includes("content vuoto"))
+    return "Nessun testo estraibile dal documento.";
+  if (lower.includes("non scaricabile") || lower.includes("download") || lower.includes("bucket"))
+    return "Impossibile scaricare il file dal server.";
+  if (lower.includes("api claude") || lower.includes("anthropic") || lower.includes("api_key") || lower.includes("503") || lower.includes("529") || lower.includes("overloaded"))
+    return "Servizio di analisi temporaneamente non disponibile. Riprovare tra qualche minuto.";
+  if (lower.includes("salvataggio dei chunk"))
+    return "Errore durante il salvataggio dell'analisi.";
+  return "Errore interno durante l'analisi.";
+}
+
 // ─── Mark error helper ──────────────────────────────────────────────────────
 
 async function markError(
@@ -509,11 +530,11 @@ Deno.serve(async (req: Request) => {
       if (!isOwner) {
         const { data: profile } = await userClient
           .from("profiles")
-          .select("ruolo")
+          .select("role")
           .eq("id", user.id)
           .maybeSingle();
         const allowedRoles = ["Admin", "Super Admin", "Amministrazione"];
-        if (!profile || !allowedRoles.includes(profile.ruolo)) {
+        if (!profile || !allowedRoles.includes(profile.role)) {
           return errorResponse("Permesso negato: solo il proprietario o un amministratore puo elaborare questo documento", 403);
         }
       }
@@ -533,16 +554,16 @@ Deno.serve(async (req: Request) => {
       .download(doc.file_path);
 
     if (storageErr || !fileData) {
-      await markError(serviceClient, documentId, "File non scaricabile dal bucket di archiviazione");
-      return errorResponse("Impossibile scaricare il file");
+      await markError(serviceClient, documentId, "Impossibile scaricare il file dal server.");
+      return errorResponse("Impossibile scaricare il file dal server.");
     }
 
     const fileBytes = new Uint8Array(await fileData.arrayBuffer());
 
     // Size check
     if (fileBytes.length > MAX_FILE_SIZE) {
-      await markError(serviceClient, documentId, "File troppo grande (limite: 25 MB)");
-      return errorResponse("Il file supera il limite di 25 MB");
+      await markError(serviceClient, documentId, "File troppo grande (limite: 25 MB).");
+      return errorResponse("File troppo grande (limite: 25 MB).");
     }
 
     // Hash
@@ -617,8 +638,8 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!extractedText || extractedText.trim().length === 0) {
-        await markError(serviceClient, documentId, "Impossibile estrarre testo dal file Office");
-        return errorResponse("Impossibile estrarre testo dal file Office");
+        await markError(serviceClient, documentId, "Nessun testo estraibile dal documento.");
+        return errorResponse("Nessun testo estraibile dal documento.");
       }
 
       const analysis = await analyzeTextWithClaude(extractedText, doc.file_name);
@@ -638,11 +659,11 @@ Deno.serve(async (req: Request) => {
         .from("documents")
         .update({
           analysis_status: "non_supportato",
-          analysis_error: `Tipo file non supportato: ${fileType}`,
+          analysis_error: "Formato file non supportato per l'analisi.",
           content_hash: hash,
         })
         .eq("id", documentId);
-      return jsonResponse({ status: "non_supportato", document_id: documentId, reason: `Tipo non supportato: ${fileType}` });
+      return jsonResponse({ status: "non_supportato", document_id: documentId, reason: "Formato file non supportato per l'analisi." });
     }
 
     // Build chunks from extractedText ONLY
@@ -663,13 +684,13 @@ Deno.serve(async (req: Request) => {
     });
 
     if (rpcErr) {
-      await markError(serviceClient, documentId, "Errore durante il salvataggio dei chunk");
-      return errorResponse("Errore durante il salvataggio dei chunk");
+      await markError(serviceClient, documentId, "Errore durante il salvataggio dell'analisi.");
+      return errorResponse("Errore durante il salvataggio dell'analisi.");
     }
 
     // If extractedText is empty after trimming, mark as errore
     if (!extractedText || extractedText.trim().length === 0) {
-      await markError(serviceClient, documentId, "Nessun testo estraibile dal documento");
+      await markError(serviceClient, documentId, "Nessun testo estraibile dal documento.");
       return jsonResponse({
         status: "errore",
         document_id: documentId,
@@ -698,10 +719,11 @@ Deno.serve(async (req: Request) => {
       summary_length: summary.length,
     });
   } catch (err) {
-    const message = (err as Error).message || "Errore interno sconosciuto";
+    const raw = (err as Error).message || "";
+    const safeMessage = toSafeMessage(raw);
     if (documentId && authorized) {
-      await markError(serviceClient, documentId, message);
+      await markError(serviceClient, documentId, safeMessage);
     }
-    return errorResponse(message, 500);
+    return errorResponse(safeMessage, 500);
   }
 });

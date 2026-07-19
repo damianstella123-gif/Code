@@ -202,7 +202,7 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
     await loadDocs()
 
     if (result.success) {
-      showToast(`Analisi completata: ${result.chunks_created ?? 0} sezioni create.`, 'success')
+      showToast(`Analisi completata: ${result.chunks_created ?? 0} contenuti indicizzati.`, 'success')
     } else {
       showToast(result.error || 'Errore durante l\'analisi', 'error')
     }
@@ -286,7 +286,7 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
                         {statusCfg.label}
                       </span>
                       {doc.analyzed_at && status === 'elaborato' && (
-                        <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+                        <span className="inline-flex items-center gap-1 text-xs" style={{ color: 'var(--muted)' }}>
                           <Clock className="w-3 h-3" />
                           {formatAnalyzedAt(doc.analyzed_at)}
                         </span>
