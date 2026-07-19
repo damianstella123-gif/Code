@@ -1642,32 +1642,34 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
 
       let eventCtx: Record<string, unknown> | null = null;
       if (project.event_id) {
-        const { data: ev } = await supabase
+        const { data: ev, error: evErr } = await supabase
           .from("events")
-          .select("id, nome, data_inizio, data_fine, location, destinazione")
+          .select("id, title, start_date, end_date, location")
           .eq("id", project.event_id)
           .maybeSingle();
-        if (ev) {
-          eventCtx = {
-            id: ev.id,
-            nome: ev.nome,
-            data_inizio: ev.data_inizio,
-            data_fine: ev.data_fine,
-            location: ev.location ?? ev.destinazione ?? null,
-          };
+        if (evErr || !ev) {
+          return JSON.stringify({ error: "Impossibile caricare l'evento collegato al progetto." });
         }
+        eventCtx = {
+          id: ev.id,
+          nome: ev.title,
+          data_inizio: ev.start_date,
+          data_fine: ev.end_date,
+          location: ev.location ?? null,
+        };
       }
 
       let clientCtx: Record<string, unknown> | null = null;
       if (project.client_id) {
-        const { data: cl } = await supabase
+        const { data: cl, error: clErr } = await supabase
           .from("clients")
-          .select("id, nome, settore")
+          .select("id, name, company")
           .eq("id", project.client_id)
           .maybeSingle();
-        if (cl) {
-          clientCtx = { id: cl.id, nome: cl.nome, settore: cl.settore ?? null };
+        if (clErr || !cl) {
+          return JSON.stringify({ error: "Impossibile caricare il cliente collegato al progetto." });
         }
+        clientCtx = { id: cl.id, nome: cl.name, settore: cl.company ?? null };
       }
 
       const { data: tpls } = await supabase
