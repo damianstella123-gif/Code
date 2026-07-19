@@ -10,6 +10,14 @@ export type OnsiteProgramStatus =
 
 export type OnsiteIncidentStatus = 'open' | 'in_progress' | 'resolved'
 
+export type OnsiteIncidentCategory =
+  | 'logistica'
+  | 'fornitore'
+  | 'partecipante'
+  | 'sicurezza'
+  | 'tecnica'
+  | 'altro'
+
 export type OnsiteIncidentSeverity = 'info' | 'warning' | 'critical'
 
 export interface EventProgramRow {
@@ -49,7 +57,7 @@ export interface OnsiteIncidentRow {
   event_id: string
   title: string
   description: string
-  category: string
+  category: OnsiteIncidentCategory
   severity: OnsiteIncidentSeverity
   incident_status: OnsiteIncidentStatus
   location: string
@@ -171,7 +179,7 @@ export async function fetchOnsiteIncidents(eventId: string): Promise<OnsiteIncid
 
 export async function createOnsiteIncident(
   eventId: string,
-  input: { title: string; description?: string; category?: string; severity?: OnsiteIncidentSeverity; location?: string; assigned_to?: string | null }
+  input: { title: string; description?: string; category?: OnsiteIncidentCategory; severity?: OnsiteIncidentSeverity; location?: string; assigned_to?: string | null }
 ): Promise<OnsiteIncidentRow> {
   const user = await getUser()
 
@@ -197,9 +205,18 @@ export async function createOnsiteIncident(
   return data as OnsiteIncidentRow
 }
 
+export interface OnsiteIncidentEditablePatch {
+  title?: string
+  description?: string
+  category?: OnsiteIncidentCategory
+  severity?: OnsiteIncidentSeverity
+  location?: string
+  assigned_to?: string | null
+}
+
 export async function updateOnsiteIncident(
   id: string,
-  patch: Partial<Omit<OnsiteIncidentRow, 'id' | 'event_id' | 'reported_by' | 'created_at'>>
+  patch: OnsiteIncidentEditablePatch
 ): Promise<OnsiteIncidentRow> {
   const { data, error } = await supabase
     .from('onsite_incidents')
