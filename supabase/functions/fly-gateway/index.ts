@@ -256,6 +256,21 @@ const TOOLS = [
     },
   },
   {
+    name: "get_creative_presentation_context",
+    description:
+      "Recupera il contesto completo per preparare una bozza di presentazione PPTX: progetto creativo, evento collegato, cliente, e template compatibili con i relativi placeholder. Usa PRIMA di preparare qualsiasi bozza di presentazione.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        creative_project_id: {
+          type: "string",
+          description: "UUID del progetto creativo di tipo presentazione.",
+        },
+      },
+      required: ["creative_project_id"] as string[],
+    },
+  },
+  {
     name: "search_documents",
     description:
       "Cerca testo esatto indicizzato nei documenti accessibili dall'utente autenticato. Usa quando l'utente chiede informazioni su file caricati, brief, contratti, preventivi, presentazioni, PDF, fatture, requisiti o altri contenuti documentali.",
@@ -1590,6 +1605,97 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
       return JSON.stringify(result);
     }
 
+    case "get_creative_presentation_context": {
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const projectId =
+        typeof input.creative_project_id === "string" ? input.creative_project_id.trim() : "";
+      if (!projectId || !UUID_RE.test(projectId)) {
+        return JSON.stringify({ error: "creative_project_id deve essere un UUID valido." });
+      }
+
+      const { data: project, error: projErr } = await supabase
+        .from("creative_projects")
+        .select("id, title, type, status, notes, event_id, client_id")
+        .eq("id", projectId)
+        .maybeSingle();
+      if (projErr || !project) {
+        return JSON.stringify({ error: "Progetto creativo non trovato o accesso negato." });
+      }
+      if (project.type !== "presentazione") {
+        return JSON.stringify({ error: "Questo strumento è riservato a progetti di tipo presentazione." });
+      }
+
+      if (project.event_id) {
+        const { data: perm } = await supabase.rpc("has_event_permission", {
+          p_event_id: project.event_id,
+          p_permission: "can_manage_creative",
+        });
+        if (!perm) {
+          return JSON.stringify({ error: "Non hai i permessi creativi su questo evento." });
+        }
+      } else {
+        const { data: globalPerm } = await supabase.rpc("can_manage_global_creative");
+        if (!globalPerm) {
+          return JSON.stringify({ error: "Non hai i permessi per gestire i creativi globali." });
+        }
+      }
+
+      let eventCtx: Record<string, unknown> | null = null;
+      if (project.event_id) {
+        const { data: ev } = await supabase
+          .from("events")
+          .select("id, nome, data_inizio, data_fine, location, destinazione")
+          .eq("id", project.event_id)
+          .maybeSingle();
+        if (ev) {
+          eventCtx = {
+            id: ev.id,
+            nome: ev.nome,
+            data_inizio: ev.data_inizio,
+            data_fine: ev.data_fine,
+            location: ev.location ?? ev.destinazione ?? null,
+          };
+        }
+      }
+
+      let clientCtx: Record<string, unknown> | null = null;
+      if (project.client_id) {
+        const { data: cl } = await supabase
+          .from("clients")
+          .select("id, nome, settore")
+          .eq("id", project.client_id)
+          .maybeSingle();
+        if (cl) {
+          clientCtx = { id: cl.id, nome: cl.nome, settore: cl.settore ?? null };
+        }
+      }
+
+      const { data: tpls } = await supabase
+        .from("creative_templates")
+        .select("id, name, description, client_id, placeholder_keys")
+        .eq("is_active", true)
+        .eq("template_type", "pptx");
+      const compatibleTemplates = (tpls ?? []).filter(
+        (t: { client_id: string | null }) =>
+          t.client_id === null || t.client_id === project.client_id,
+      );
+
+      return JSON.stringify({
+        project: {
+          id: project.id,
+          title: project.title,
+          type: project.type,
+          status: project.status,
+          notes: project.notes,
+          event_id: project.event_id,
+          client_id: project.client_id,
+        },
+        event: eventCtx,
+        client: clientCtx,
+        compatible_templates: compatibleTemplates,
+      });
+    }
+
     case "search_documents": {
       const query = typeof input.query === "string" ? input.query.trim() : "";
       if (!query) return JSON.stringify({ error: "Parametro query obbligatorio." });
@@ -2392,7 +2498,18 @@ REGOLE DOCUMENTI:
 - Non colmare lacune con conoscenza generale salvo esplicito avviso che si tratta di un suggerimento generico.
 - Non rivelare documenti non restituiti dal tool user-scoped.
 - Non citare testi eccessivamente lunghi; usa brevi estratti e parafrasi concise con citazione.
-- Se documenti diversi sono in conflitto, segnala il conflitto e cita entrambe le fonti.${memorySection}`;
+- Se documenti diversi sono in conflitto, segnala il conflitto e cita entrambe le fonti.
+
+REGOLE PRESENTAZIONI CREATIVE:
+- Quando l'utente chiede a Fly di preparare una presentazione per un progetto Creative Studio esistente, chiama PRIMA get_creative_presentation_context.
+- Se nessun progetto e identificabile dal contesto, chiedi all'utente quale progetto usare.
+- Seleziona UNO SOLO dei compatible_templates restituiti dallo strumento.
+- Puoi usare search_documents con event_id/client_id restituiti quando servono evidenze documentali.
+- Prepara valori SOLO per le chiavi in placeholder_keys del template selezionato.
+- Identifica chiaramente le informazioni mancanti invece di inventarle.
+- Restituisci sempre una bozza strutturata contenente: selected_template_id, selected_template_name, draft_values, missing_information, sources_used.
+- NON invocare mai creative-generate-pptx e NON dichiarare mai che un PPTX e stato generato.
+- La conferma umana resta OBBLIGATORIA prima di qualsiasi generazione.${memorySection}`;
 
     // ─── BUILD MESSAGES WITH CONTEXT MANAGEMENT ─────────────────────────
     const messages: AnthropicMessage[] = [];
@@ -2409,8 +2526,10 @@ REGOLE DOCUMENTI:
 
     // ─── CACHE CHECK ────────────────────────────────────────────────────
     const DOC_QUERY_KEYWORDS = ["documento", "file", "allegato", "pdf", "contratto", "brief", "presentazione", "cosa dice", "caricato", "preventivo", "fattura"];
+    const CREATIVE_PRES_KEYWORDS = ["presentazione", "pptx", "slide", "template creativo", "genera presentazione", "prepara presentazione", "bozza presentazione"];
     const messageLower = message.toLowerCase();
     const isDocumentQuery = DOC_QUERY_KEYWORDS.some(kw => messageLower.includes(kw));
+    const isCreativePresentationQuery = CREATIVE_PRES_KEYWORDS.some(kw => messageLower.includes(kw));
 
     const queryHash = btoa(unescape(encodeURIComponent(message.slice(0, 100))));
     const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
@@ -2424,7 +2543,7 @@ REGOLE DOCUMENTI:
       .then(() => {});
 
     let cached: { response: string } | null = null;
-    if (!isDocumentQuery) {
+    if (!isDocumentQuery && !isCreativePresentationQuery) {
       const { data } = await userClient
         .from("fly_cache")
         .select("response")
@@ -2495,7 +2614,8 @@ REGOLE DOCUMENTI:
 
     // ─── SAVE TO CACHE (fire-and-forget) ─────────────────────────────────
     const usedDocSearch = logToolsCalled.includes("search_documents");
-    if (textReply && !proposal && !isDocumentQuery && !usedDocSearch) {
+    const usedCreativePresContext = logToolsCalled.includes("get_creative_presentation_context");
+    if (textReply && !proposal && !isDocumentQuery && !usedDocSearch && !isCreativePresentationQuery && !usedCreativePresContext) {
       userClient
         .from("fly_cache")
         .insert({ user_id: user.id, query_hash: queryHash, response: textReply })
