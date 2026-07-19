@@ -42,9 +42,18 @@ function formatTime(time: string): string {
   return time.slice(0, 5)
 }
 
-function isCurrentlyLive(item: MergedProgramItem): boolean {
+function localToday(): string {
   const now = new Date()
-  const today = now.toISOString().split('T')[0]
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function isCurrentlyLive(item: MergedProgramItem): boolean {
+  if (item.onsite_status === 'completed' || item.onsite_status === 'cancelled') return false
+  const now = new Date()
+  const today = localToday()
   if (item.data !== today) return false
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
   const [sh, sm] = item.ora_inizio.split(':').map(Number)
@@ -57,12 +66,12 @@ function isCurrentlyLive(item: MergedProgramItem): boolean {
 
 function isNextUpcoming(item: MergedProgramItem, allItems: MergedProgramItem[]): boolean {
   const now = new Date()
-  const today = now.toISOString().split('T')[0]
+  const today = localToday()
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
 
   const upcoming = allItems
     .filter((i) => {
-      if (i.onsite_status === 'completed' || i.onsite_status === 'cancelled') return false
+      if (i.onsite_status === 'completed' || i.onsite_status === 'cancelled' || i.onsite_status === 'in_progress') return false
       if (i.data > today) return true
       if (i.data < today) return false
       const [h, m] = i.ora_inizio.split(':').map(Number)
@@ -127,6 +136,9 @@ export default function OnsiteLiveProgram({ eventId, disabled = false }: Props) 
     }
     if (target === 'completed') {
       patch.actual_end = new Date().toISOString()
+      if (!item.actual_start) {
+        patch.actual_start = new Date().toISOString()
+      }
     }
     await save(item.id, patch)
   }
@@ -165,7 +177,7 @@ export default function OnsiteLiveProgram({ eventId, disabled = false }: Props) 
 
   // Auto-expand today
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = localToday()
     if (sortedDates.includes(today)) setExpandedDate(today)
     else if (sortedDates.length > 0 && !expandedDate) setExpandedDate(sortedDates[0])
   }, [sortedDates.join(',')])
@@ -292,7 +304,7 @@ export default function OnsiteLiveProgram({ eventId, disabled = false }: Props) 
                       </div>
 
                       {/* Meta */}
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
                         {item.categoria && item.categoria !== 'altro' && (
                           <span className="capitalize">{item.categoria}</span>
                         )}
@@ -311,12 +323,12 @@ export default function OnsiteLiveProgram({ eventId, disabled = false }: Props) 
 
                       {/* Notes */}
                       {item.note && (
-                        <p className="text-xs text-gray-500 italic">{item.note}</p>
+                        <p className="text-sm text-gray-500 italic">{item.note}</p>
                       )}
 
                       {/* Onsite details */}
                       {(item.actual_start || item.actual_end || item.delay_minutes > 0 || item.onsite_note) && (
-                        <div className="text-xs bg-white border border-gray-200 rounded-lg p-2 space-y-0.5">
+                        <div className="text-sm bg-white border border-gray-200 rounded-lg p-2 space-y-0.5">
                           {item.actual_start && (
                             <p className="text-gray-600">
                               <Clock className="w-3 h-3 inline mr-1" />
@@ -403,22 +415,25 @@ export default function OnsiteLiveProgram({ eventId, disabled = false }: Props) 
                               className="bg-red-100 text-red-700 hover:bg-red-200"
                             />
                           )}
-                          {/* Note edit */}
-                          {noteEdit?.itemId !== item.id && (
-                            <ActionBtn
-                              onClick={() => setNoteEdit({ itemId: item.id, note: item.onsite_note || '' })}
-                              disabled={isSaving}
-                              label="Nota"
-                              className="bg-gray-100 text-gray-700 hover:bg-gray-200"
-                            />
-                          )}
+                        </div>
+                      )}
+
+                      {/* Note edit button - available for all statuses */}
+                      {!disabled && noteEdit?.itemId !== item.id && (
+                        <div className="pt-1">
+                          <ActionBtn
+                            onClick={() => setNoteEdit({ itemId: item.id, note: item.onsite_note || '' })}
+                            disabled={isSaving}
+                            label="Nota"
+                            className="bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          />
                         </div>
                       )}
 
                       {/* Delay form */}
                       {delayForm?.itemId === item.id && !disabled && (
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
-                          <label className="block text-xs font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-700">
                             Minuti di ritardo *
                           </label>
                           <input
@@ -430,7 +445,7 @@ export default function OnsiteLiveProgram({ eventId, disabled = false }: Props) 
                             placeholder="es. 15"
                             aria-label="Minuti di ritardo"
                           />
-                          <label className="block text-xs font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-700">
                             Nota (opzionale)
                           </label>
                           <input
@@ -461,7 +476,7 @@ export default function OnsiteLiveProgram({ eventId, disabled = false }: Props) 
                       {/* Note edit form */}
                       {noteEdit?.itemId === item.id && !disabled && (
                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
-                          <label className="block text-xs font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-700">
                             Nota operativa
                           </label>
                           <input
@@ -517,7 +532,7 @@ function ActionBtn({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[44px] transition-colors disabled:opacity-50 disabled:pointer-events-none ${className}`}
+      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium min-h-[44px] transition-colors disabled:opacity-50 disabled:pointer-events-none ${className}`}
       aria-label={label}
     >
       {icon}
