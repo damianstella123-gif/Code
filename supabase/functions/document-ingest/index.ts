@@ -457,6 +457,7 @@ Deno.serve(async (req: Request) => {
 
   let documentId: string | null = null;
   let force = false;
+  let authorized = false;
 
   let body: Record<string, unknown>;
   try {
@@ -493,6 +494,32 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (docErr || !doc) return errorResponse("Documento non trovato o accesso negato", 404);
+
+    // ── Authorization check ──────────────────────────────────────────────────
+    if (doc.event_id) {
+      const { data: permData, error: permErr } = await userClient.rpc(
+        "has_event_permission",
+        { p_event_id: doc.event_id, p_permission: "can_manage_documents" }
+      );
+      if (permErr || permData !== true) {
+        return errorResponse("Permesso negato: non hai i permessi per elaborare questo documento", 403);
+      }
+    } else {
+      const isOwner = doc.uploaded_by === user.id;
+      if (!isOwner) {
+        const { data: profile } = await userClient
+          .from("profiles")
+          .select("ruolo")
+          .eq("id", user.id)
+          .maybeSingle();
+        const allowedRoles = ["Admin", "Super Admin", "Amministrazione"];
+        if (!profile || !allowedRoles.includes(profile.ruolo)) {
+          return errorResponse("Permesso negato: solo il proprietario o un amministratore puo elaborare questo documento", 403);
+        }
+      }
+    }
+
+    authorized = true;
 
     // Mark in_elaborazione
     await serviceClient
@@ -672,7 +699,9 @@ Deno.serve(async (req: Request) => {
     });
   } catch (err) {
     const message = (err as Error).message || "Errore interno sconosciuto";
-    await markError(serviceClient, documentId!, message);
+    if (documentId && authorized) {
+      await markError(serviceClient, documentId, message);
+    }
     return errorResponse(message, 500);
   }
 });

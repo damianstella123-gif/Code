@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
-import { FileText, Upload, Download, Eye, Trash2, X, ExternalLink } from 'lucide-react'
+import { FileText, Upload, Download, Eye, Trash2, X, ExternalLink, Sparkles, RefreshCw, ChevronDown, ChevronUp, AlertCircle, Clock, CheckCircle2, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { trackAction } from '@/lib/impact-tracker'
 import { fmtLong } from '@/lib/format'
 import { checkEventPermission } from '@/lib/event-members-service'
+import { analyzeDocument } from '@/lib/document-analysis-service'
+import { useToast } from '@/lib/toast'
 import type { Event } from '@/data/events'
 
 interface EventDocument {
@@ -17,6 +19,11 @@ interface EventDocument {
   file_size: number
   uploaded_by: string
   created_at: string
+  analysis_status: string
+  analysis_error: string | null
+  analyzed_at: string | null
+  summary: string | null
+  analysis_metadata: Record<string, unknown> | null
 }
 
 const DOC_CATEGORIE = [
@@ -45,6 +52,16 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / 1048576).toFixed(1)} MB`
 }
 
+type AnalysisStatus = 'non_elaborato' | 'in_elaborazione' | 'elaborato' | 'errore' | 'non_supportato'
+
+const STATUS_CONFIG: Record<AnalysisStatus, { label: string; color: string; bg: string }> = {
+  non_elaborato: { label: 'Non analizzato', color: 'var(--muted)', bg: 'color-mix(in srgb, var(--muted) 12%, transparent)' },
+  in_elaborazione: { label: 'Analisi in corso', color: 'var(--orange, #e67e22)', bg: 'color-mix(in srgb, var(--orange, #e67e22) 12%, transparent)' },
+  elaborato: { label: 'Analizzato', color: 'var(--green)', bg: 'color-mix(in srgb, var(--green) 12%, transparent)' },
+  errore: { label: 'Errore', color: 'var(--red2)', bg: 'color-mix(in srgb, var(--red2) 12%, transparent)' },
+  non_supportato: { label: 'Non supportato', color: 'var(--muted)', bg: 'color-mix(in srgb, var(--muted) 8%, transparent)' },
+}
+
 export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?: boolean }) {
   const [docs, setDocs] = useState<EventDocument[]>([])
   const [loading, setLoading] = useState(true)
@@ -52,11 +69,14 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
   const [docCategoria, setDocCategoria] = useState('Materiali Evento')
   const [deletingDoc, setDeletingDoc] = useState<string | null>(null)
   const [canManageDocs, setCanManageDocs] = useState(false)
+  const [processingDocId, setProcessingDocId] = useState<string | null>(null)
+  const [expandedSummary, setExpandedSummary] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   async function loadDocs() {
     const { data } = await supabase
       .from('documents')
-      .select('*')
+      .select('id, nome, categoria, event_id, file_path, file_name, file_type, file_size, uploaded_by, created_at, analysis_status, analysis_error, analyzed_at, summary, analysis_metadata')
       .eq('event_id', event.id)
       .order('created_at', { ascending: false })
     setDocs((data ?? []) as EventDocument[])
@@ -174,6 +194,34 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
     setDocs(prev => prev.filter(d => d.id !== id))
   }
 
+  async function handleAnalyze(docId: string, force: boolean) {
+    if (processingDocId) return
+    setProcessingDocId(docId)
+
+    const result = await analyzeDocument(docId, force)
+    await loadDocs()
+
+    if (result.success) {
+      showToast(`Analisi completata: ${result.chunks_created ?? 0} sezioni create.`, 'success')
+    } else {
+      showToast(result.error || 'Errore durante l\'analisi', 'error')
+    }
+
+    setProcessingDocId(null)
+  }
+
+  function formatAnalyzedAt(dateStr: string | null): string {
+    if (!dateStr) return ''
+    try {
+      return new Intl.DateTimeFormat('it-IT', {
+        day: 'numeric', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      }).format(new Date(dateStr))
+    } catch {
+      return dateStr
+    }
+  }
+
   if (loading) {
     return <div className="panel p-10 text-center"><div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento documenti...</div></div>
   }
@@ -212,40 +260,148 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
           {docs.map(doc => {
             const label = getFileLabel(doc.file_type)
             const labelColor = label === 'PDF' ? 'var(--red2)' : label === 'XLSX' || label === 'XLS' ? 'var(--green)' : label === 'PPTX' || label === 'PPT' ? '#e67e22' : label === 'DOCX' ? 'var(--blue)' : 'var(--muted)'
+            const status = (doc.analysis_status || 'non_elaborato') as AnalysisStatus
+            const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.non_elaborato
+            const isProcessing = processingDocId === doc.id
+            const isSummaryExpanded = expandedSummary === doc.id
+
             return (
-              <div key={doc.id} className="panel p-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                  style={{ background: `${labelColor}15`, color: labelColor }}>
-                  {label}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{doc.nome || doc.file_name}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                    {doc.categoria} · {formatFileSize(doc.file_size)} · {fmtLong(doc.created_at)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <button onClick={() => handlePreview(doc)} title={getActionLabel(doc)}
-                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-[var(--line)]"
-                    style={{ color: 'var(--green)' }}>
-                    {OFFICE_EXTS.includes(doc.file_name.split('.').pop()?.toLowerCase() ?? '') ? (
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    ) : (
-                      <Eye className="w-3.5 h-3.5" />
+              <div key={doc.id} className="panel overflow-hidden">
+                <div className="p-4 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                    style={{ background: `${labelColor}15`, color: labelColor }}>
+                    {label}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{doc.nome || doc.file_name}</p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                        {doc.categoria} · {formatFileSize(doc.file_size)} · {fmtLong(doc.created_at)}
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium"
+                        style={{ background: statusCfg.bg, color: statusCfg.color }}>
+                        {status === 'in_elaborazione' && <Loader2 className="w-3 h-3 animate-spin" />}
+                        {status === 'elaborato' && <CheckCircle2 className="w-3 h-3" />}
+                        {status === 'errore' && <AlertCircle className="w-3 h-3" />}
+                        {statusCfg.label}
+                      </span>
+                      {doc.analyzed_at && status === 'elaborato' && (
+                        <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+                          <Clock className="w-3 h-3" />
+                          {formatAnalyzedAt(doc.analyzed_at)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* Analysis action */}
+                    {canManageDocs && !isArchived && (
+                      <>
+                        {status === 'non_elaborato' && (
+                          <button
+                            onClick={() => handleAnalyze(doc.id, false)}
+                            disabled={isProcessing || !!processingDocId}
+                            aria-label="Analizza documento con intelligenza artificiale"
+                            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-[var(--line)] disabled:opacity-40"
+                            style={{ color: 'var(--green)' }}>
+                            {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                            <span className="hidden sm:inline">Analizza con Fly</span>
+                          </button>
+                        )}
+                        {status === 'errore' && (
+                          <button
+                            onClick={() => handleAnalyze(doc.id, true)}
+                            disabled={isProcessing || !!processingDocId}
+                            aria-label="Riprova analisi documento"
+                            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-[var(--line)] disabled:opacity-40"
+                            style={{ color: 'var(--orange, #e67e22)' }}>
+                            {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                            <span className="hidden sm:inline">Riprova analisi</span>
+                          </button>
+                        )}
+                        {status === 'elaborato' && (
+                          <button
+                            onClick={() => handleAnalyze(doc.id, true)}
+                            disabled={isProcessing || !!processingDocId}
+                            aria-label="Rianalizza documento"
+                            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-[var(--line)] disabled:opacity-40"
+                            style={{ color: 'var(--muted)' }}>
+                            {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                            <span className="hidden sm:inline">Rianalizza</span>
+                          </button>
+                        )}
+                        {status === 'in_elaborazione' && (
+                          <span className="flex items-center gap-1 px-2 py-1.5 text-xs" style={{ color: 'var(--orange, #e67e22)' }}>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span className="hidden sm:inline">In corso...</span>
+                          </span>
+                        )}
+                      </>
                     )}
-                    <span>{getActionLabel(doc)}</span>
-                  </button>
-                  <button onClick={() => handleDownload(doc)} title="Scarica"
-                    className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
-                    <Download className="w-4 h-4" style={{ color: 'var(--blue)' }} />
-                  </button>
-                  {canManageDocs && (
-                    <button onClick={() => setDeletingDoc(doc.id)} title="Elimina"
-                      className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
-                      <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
+
+                    {/* Summary toggle */}
+                    {doc.summary && (
+                      <button
+                        onClick={() => setExpandedSummary(isSummaryExpanded ? null : doc.id)}
+                        aria-label={isSummaryExpanded ? 'Chiudi riassunto' : 'Mostra riassunto'}
+                        className="p-2 rounded-lg transition-all hover:bg-[var(--line)]"
+                        style={{ color: 'var(--green)' }}>
+                        {isSummaryExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    )}
+
+                    <button onClick={() => handlePreview(doc)} title={getActionLabel(doc)}
+                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-[var(--line)]"
+                      style={{ color: 'var(--green)' }}>
+                      {OFFICE_EXTS.includes(doc.file_name.split('.').pop()?.toLowerCase() ?? '') ? (
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      ) : (
+                        <Eye className="w-3.5 h-3.5" />
+                      )}
+                      <span className="hidden sm:inline">{getActionLabel(doc)}</span>
                     </button>
-                  )}
+                    <button onClick={() => handleDownload(doc)} title="Scarica"
+                      className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
+                      <Download className="w-4 h-4" style={{ color: 'var(--blue)' }} />
+                    </button>
+                    {canManageDocs && (
+                      <button onClick={() => setDeletingDoc(doc.id)} title="Elimina"
+                        className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
+                        <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {/* Error message */}
+                {status === 'errore' && doc.analysis_error && (
+                  <div className="px-4 pb-3">
+                    <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'color-mix(in srgb, var(--red2) 8%, transparent)', color: 'var(--red2)' }}>
+                      {doc.analysis_error}
+                    </p>
+                  </div>
+                )}
+
+                {/* Non supportato reason */}
+                {status === 'non_supportato' && doc.analysis_error && (
+                  <div className="px-4 pb-3">
+                    <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'color-mix(in srgb, var(--muted) 8%, transparent)', color: 'var(--muted)' }}>
+                      {doc.analysis_error}
+                    </p>
+                  </div>
+                )}
+
+                {/* Expandable summary */}
+                {isSummaryExpanded && doc.summary && (
+                  <div className="px-4 pb-4">
+                    <div className="p-3 rounded-lg" style={{ background: 'color-mix(in srgb, var(--green) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--green) 20%, transparent)' }}>
+                      <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--green)' }}>Riassunto AI</p>
+                      <p className="text-[13px] leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text)' }}>
+                        {doc.summary}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
