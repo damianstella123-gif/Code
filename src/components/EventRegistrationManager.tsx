@@ -13,6 +13,7 @@ import {
   type RegistrationSiteUpdate,
 } from '@/lib/registration-site-service'
 import RegistrationFieldsManager from '@/components/RegistrationFieldsManager'
+import RegistrationParticipantsManager from '@/components/RegistrationParticipantsManager'
 
 interface Props {
   eventId: string
@@ -331,6 +332,12 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
         </div>
 
         <RegistrationFieldsManager siteId={site.id} readOnly={readOnly} />
+
+        <RegistrationParticipantsManager
+          eventId={eventId}
+          siteId={site.id}
+          readOnly={readOnly}
+        />
 
         {!readOnly && (
           <div style={styles.footerActions}>
