@@ -3,6 +3,7 @@ import { checkEventPermission } from '@/lib/event-members-service'
 import OnsiteQrScanner from '@/components/OnsiteQrScanner'
 import OnsiteLiveProgram from '@/components/OnsiteLiveProgram'
 import OnsiteIncidentsManager from '@/components/OnsiteIncidentsManager'
+import OnsiteOperationsOverview from '@/components/OnsiteOperationsOverview'
 
 interface Props {
   eventId: string
@@ -15,9 +16,10 @@ type PermState =
   | { kind: 'denied' }
   | { kind: 'granted'; canOnsite: boolean; canRegistration: boolean }
 
-type Tab = 'checkin' | 'regia' | 'criticita'
+type Tab = 'panoramica' | 'checkin' | 'regia' | 'criticita'
 
 const TAB_LABELS: Record<Tab, string> = {
+  panoramica: 'Panoramica',
   checkin: 'Check-in',
   regia: 'Regia Live',
   criticita: 'Criticità',
@@ -25,7 +27,7 @@ const TAB_LABELS: Record<Tab, string> = {
 
 export default function EventOnsitePanel({ eventId, eventName, isArchived }: Props) {
   const [perm, setPerm] = useState<PermState>({ kind: 'loading' })
-  const [activeTab, setActiveTab] = useState<Tab>('checkin')
+  const [activeTab, setActiveTab] = useState<Tab>('panoramica')
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -77,7 +79,7 @@ export default function EventOnsitePanel({ eventId, eventName, isArchived }: Pro
   const checkinEnabled = !archived && (canOnsite || canRegistration)
   const editEnabled = !archived && canOnsite
 
-  const tabs: Tab[] = ['checkin', 'regia', 'criticita']
+  const tabs: Tab[] = ['panoramica', 'checkin', 'regia', 'criticita']
 
   return (
     <div className="flex flex-col w-full max-w-2xl mx-auto px-4 py-6 gap-5" style={{ fontSize: '14px' }}>
@@ -91,12 +93,12 @@ export default function EventOnsitePanel({ eventId, eventName, isArchived }: Pro
       </div>
 
       {/* Tabs */}
-      <nav className="flex border-b border-gray-200" aria-label="Sezioni On Site">
+      <nav className="flex border-b border-gray-200 overflow-x-auto" aria-label="Sezioni On Site">
         {tabs.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`flex-1 text-center px-3 py-3 text-sm font-medium min-h-[44px] transition-colors border-b-2 ${
+            className={`flex-1 text-center px-3 py-3 text-sm font-medium min-h-[44px] whitespace-nowrap transition-colors border-b-2 ${
               activeTab === tab
                 ? 'border-gray-900 text-gray-900'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -112,6 +114,13 @@ export default function EventOnsitePanel({ eventId, eventName, isArchived }: Pro
 
       {/* Tab content */}
       <div role="tabpanel">
+        {activeTab === 'panoramica' && (
+          <OnsiteOperationsOverview
+            eventId={eventId}
+            onNavigate={(tab) => setActiveTab(tab)}
+          />
+        )}
+
         {activeTab === 'checkin' && (
           checkinEnabled ? (
             <div className="space-y-3">
