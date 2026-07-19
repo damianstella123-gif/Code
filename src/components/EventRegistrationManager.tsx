@@ -3,6 +3,7 @@ import { Globe, Copy, Trash2, Save, Send, RotateCcw, XCircle, Eye, Lock } from '
 import { useToast } from '@/lib/toast'
 import {
   fetchRegistrationSites,
+  fetchRegistrationFields,
   createRegistrationSite,
   updateRegistrationSite,
   deleteRegistrationSite,
@@ -11,6 +12,7 @@ import {
   type RegistrationSite,
   type RegistrationSiteUpdate,
 } from '@/lib/registration-site-service'
+import RegistrationFieldsManager from '@/components/RegistrationFieldsManager'
 
 interface Props {
   eventId: string
@@ -148,6 +150,16 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
     if (publish) {
       const err = validateForPublish(form)
       if (err) { showToast(err, 'error'); return }
+      if (!site) {
+        showToast('Salva prima la bozza per poter configurare i campi e pubblicare.', 'error')
+        return
+      }
+      const fields = await fetchRegistrationFields(site.id)
+      const activeFields = fields.filter(f => f.is_active)
+      if (activeFields.length === 0) {
+        showToast('Aggiungi almeno un campo attivo prima di pubblicare.', 'error')
+        return
+      }
     }
     setSaving(true)
     try {
@@ -155,6 +167,8 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
       if (publish) {
         payload.status = 'published'
         if (!site?.published_at) payload.published_at = new Date().toISOString()
+      } else if (site && site.status === 'published') {
+        payload.status = 'published'
       }
       let updated: RegistrationSite
       if (site) {
@@ -170,7 +184,7 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
       setSite(updated)
       setForm(siteToForm(updated))
       setEditing(false)
-      showToast(publish ? 'Sito pubblicato con successo' : 'Salvato come bozza', 'success')
+      showToast(publish ? 'Sito pubblicato con successo' : 'Modifiche salvate', 'success')
     } catch (err: any) {
       const msg = err.message === 'DUPLICATE_SLUG'
         ? 'Questo slug è già in uso. Scegliere un altro indirizzo.'
@@ -316,6 +330,8 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
           <InfoRow label="Pubblicato il" value={site.published_at ? new Date(site.published_at).toLocaleString('it-IT') : '—'} />
         </div>
 
+        <RegistrationFieldsManager siteId={site.id} readOnly={readOnly} />
+
         {!readOnly && (
           <div style={styles.footerActions}>
             {site.status === 'published' && (
@@ -388,12 +404,16 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
         </div>
       </div>
 
+      {site && (
+        <RegistrationFieldsManager siteId={site.id} readOnly={readOnly} />
+      )}
+
       <div style={styles.footerActions}>
         <button style={styles.btnOutline} onClick={() => { setEditing(false); if (site) setForm(siteToForm(site)) }} disabled={saving}>
           Annulla
         </button>
         <button style={styles.btnOutline} onClick={() => handleSave(false)} disabled={saving}>
-          <Save size={14} /> {saving ? 'Salvataggio...' : 'Salva Bozza'}
+          <Save size={14} /> {saving ? 'Salvataggio...' : (site ? 'Salva modifiche' : 'Salva Bozza')}
         </button>
         <button style={styles.btnPrimary} onClick={() => handleSave(true)} disabled={saving}>
           <Send size={14} /> {saving ? 'Pubblicazione...' : 'Pubblica'}
@@ -424,7 +444,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span style={{
       display: 'inline-block',
-      fontSize: '11px',
+      fontSize: '12px',
       fontWeight: 600,
       padding: '2px 8px',
       borderRadius: 6,
@@ -476,7 +496,7 @@ function Field({ label, value, onChange, multiline, type, placeholder, hint }: {
       ) : (
         <input style={inputStyle} type={type ?? 'text'} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
       )}
-      {hint && <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{hint}</span>}
+      {hint && <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{hint}</span>}
     </div>
   )
 }
