@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { FileDown, FileText, CheckCircle, AlertCircle, Clock, Sparkles, Loader2 } from 'lucide-react'
 import { useToast } from '@/lib/toast'
 import { fetchCreativeTemplates, type CreativeTemplate } from '@/lib/creative-template-service'
@@ -52,6 +52,14 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
   const [historyLoading, setHistoryLoading] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
+  const historySeqRef = useRef(0)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+
   const selectedProject = presentationProjects.find(p => p.id === selectedProjectId) ?? null
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId) ?? null
   const projectClient = clients.find(c => c.id === selectedProject?.client_id) ?? null
@@ -66,24 +74,29 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
     setTemplatesLoading(true)
     try {
       const data = await fetchCreativeTemplates()
-      setTemplates(data)
+      if (mountedRef.current) setTemplates(data)
     } catch {
-      showToast('Errore caricamento template')
+      if (mountedRef.current) showToast('Errore caricamento template')
     } finally {
-      setTemplatesLoading(false)
+      if (mountedRef.current) setTemplatesLoading(false)
     }
   }, [showToast])
 
-  const loadHistory = useCallback(async (projectId: string) => {
+  const loadHistory = useCallback(async (projectId: string): Promise<void> => {
     if (!projectId) return
+    const seq = ++historySeqRef.current
     setHistoryLoading(true)
     try {
       const data = await fetchCreativeGenerations(projectId)
+      if (!mountedRef.current || seq !== historySeqRef.current) return
       setGenerations(data)
     } catch {
+      if (!mountedRef.current || seq !== historySeqRef.current) return
       showToast('Errore caricamento storico generazioni')
     } finally {
-      setHistoryLoading(false)
+      if (mountedRef.current && seq === historySeqRef.current) {
+        setHistoryLoading(false)
+      }
     }
   }, [showToast])
 
@@ -92,10 +105,12 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
   }, [loadTemplates])
 
   useEffect(() => {
+    setGenerations([])
     if (selectedProjectId) {
       loadHistory(selectedProjectId)
     } else {
-      setGenerations([])
+      historySeqRef.current++
+      setHistoryLoading(false)
     }
   }, [selectedProjectId, loadHistory])
 
@@ -115,7 +130,6 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
     } else {
       setValues({})
     }
-    // Only reset when template changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTemplateId])
 
@@ -130,13 +144,15 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
     setGenerating(true)
     try {
       await generateCreativePptx(selectedProject.id, selectedTemplate.id, values)
+      if (!mountedRef.current) return
       showToast('Presentazione generata con successo!')
-      loadHistory(selectedProject.id)
+      await loadHistory(selectedProject.id)
     } catch (err) {
+      if (!mountedRef.current) return
       const msg = err instanceof Error ? err.message : 'Errore nella generazione.'
       showToast(msg)
     } finally {
-      setGenerating(false)
+      if (mountedRef.current) setGenerating(false)
     }
   }
 
@@ -150,7 +166,7 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
       const msg = err instanceof Error ? err.message : 'Errore download.'
       showToast(msg)
     } finally {
-      setDownloadingId(null)
+      if (mountedRef.current) setDownloadingId(null)
     }
   }
 
@@ -168,14 +184,14 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
       {/* Project Selection */}
       <div className="space-y-3">
         <div>
-          <label className="text-xs font-medium block mb-1" style={{ color: 'var(--muted)' }}>
+          <label className="block mb-1 font-medium" style={{ color: 'var(--muted)', fontSize: 14 }}>
             Progetto Presentazione
           </label>
           <select
             value={selectedProjectId}
             onChange={e => setSelectedProjectId(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl text-sm"
-            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)', minHeight: 44 }}
+            className="w-full px-3 py-2.5 rounded-xl"
+            style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)', minHeight: 44, fontSize: 14 }}
           >
             <option value="">Seleziona progetto...</option>
             {presentationProjects.map(p => (
@@ -187,8 +203,8 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
         {/* Project Context */}
         {selectedProject && (
           <div
-            className="flex flex-wrap gap-3 text-xs px-3 py-2 rounded-lg"
-            style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}
+            className="flex flex-wrap gap-3 px-3 py-2 rounded-lg"
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', fontSize: 14 }}
           >
             <span style={{ color: 'var(--text)' }}>
               Progetto: <strong>{selectedProject.title}</strong>
@@ -204,21 +220,21 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
         {/* Template Selection */}
         {selectedProject && (
           <div>
-            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--muted)' }}>
+            <label className="block mb-1 font-medium" style={{ color: 'var(--muted)', fontSize: 14 }}>
               Template PPTX
             </label>
             {templatesLoading ? (
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>Caricamento template...</p>
+              <p style={{ color: 'var(--muted)', fontSize: 14 }}>Caricamento template...</p>
             ) : compatibleTemplates.length === 0 ? (
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>
+              <p style={{ color: 'var(--muted)', fontSize: 14 }}>
                 Nessun template PPTX compatibile disponibile.
               </p>
             ) : (
               <select
                 value={selectedTemplateId}
                 onChange={e => setSelectedTemplateId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl text-sm"
-                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)', minHeight: 44 }}
+                className="w-full px-3 py-2.5 rounded-xl"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)', minHeight: 44, fontSize: 14 }}
               >
                 <option value="">Seleziona template...</option>
                 {compatibleTemplates.map(t => (
@@ -234,8 +250,8 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
         {/* Template Info */}
         {selectedTemplate && (
           <div
-            className="text-xs px-3 py-2 rounded-lg"
-            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--muted)' }}
+            className="px-3 py-2 rounded-lg"
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--muted)', fontSize: 14 }}
           >
             Template: <strong style={{ color: 'var(--text)' }}>{selectedTemplate.name}</strong>
             {' \u2014 '}
@@ -248,11 +264,11 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
       {selectedTemplate && (selectedTemplate.placeholder_keys ?? []).length > 0 && (
         <div className="space-y-3">
           <div
-            className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs"
-            style={{ background: '#4db4ff0d', border: '1px solid #4db4ff30', color: '#4db4ff' }}
+            className="flex items-start gap-2 px-3 py-2.5 rounded-xl"
+            style={{ background: '#4db4ff0d', border: '1px solid #4db4ff30' }}
           >
-            <Sparkles className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-            <span style={{ color: 'var(--text)', lineHeight: 1.5 }}>
+            <Sparkles className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: '#4db4ff' }} />
+            <span style={{ color: 'var(--text)', lineHeight: 1.5, fontSize: 14 }}>
               Questi contenuti potranno essere preparati automaticamente da Fly. Per ora puoi compilarli e verificarli manualmente.
             </span>
           </div>
@@ -260,8 +276,8 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
           {(selectedTemplate.placeholder_keys ?? []).map(key => (
             <div key={key}>
               <label
-                className="text-xs font-medium block mb-1"
-                style={{ color: 'var(--muted)' }}
+                className="block mb-1 font-medium"
+                style={{ color: 'var(--muted)', fontSize: 14 }}
               >
                 {humanizeKey(key)}
               </label>
@@ -269,12 +285,13 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
                 value={values[key] ?? ''}
                 onChange={e => setValues(prev => ({ ...prev, [key]: e.target.value }))}
                 rows={2}
-                className="w-full px-3 py-2.5 rounded-xl text-sm resize-y"
+                className="w-full px-3 py-2.5 rounded-xl resize-y"
                 style={{
                   background: 'var(--bg)',
                   border: `1px solid ${(values[key] ?? '').trim() ? 'var(--line)' : '#f9706640'}`,
                   color: 'var(--text)',
                   minHeight: 44,
+                  fontSize: 14,
                 }}
                 placeholder={`Inserisci ${humanizeKey(key).toLowerCase()}...`}
               />
@@ -288,13 +305,14 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
         <button
           onClick={handleGenerate}
           disabled={!canGenerate}
-          className="w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+          className="w-full py-3 rounded-xl font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2"
           style={{
             background: canGenerate
               ? 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)'
               : 'var(--panel2)',
             color: canGenerate ? 'white' : 'var(--muted)',
             minHeight: 44,
+            fontSize: 14,
           }}
         >
           {generating ? (
@@ -314,14 +332,14 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
       {/* Generation History */}
       {selectedProject && (
         <div className="space-y-3 pt-3" style={{ borderTop: '1px solid var(--line)' }}>
-          <h3 className="text-xs font-semibold" style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: 'var(--muted)', textTransform: 'uppercase' }}>
+          <h3 className="font-semibold" style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: 'var(--muted)', textTransform: 'uppercase', fontSize: 14 }}>
             Storico Generazioni
           </h3>
 
           {historyLoading ? (
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>Caricamento...</p>
+            <p style={{ color: 'var(--muted)', fontSize: 14 }}>Caricamento...</p>
           ) : generations.length === 0 ? (
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>Nessuna generazione per questo progetto.</p>
+            <p style={{ color: 'var(--muted)', fontSize: 14 }}>Nessuna generazione per questo progetto.</p>
           ) : (
             <div className="space-y-2">
               {generations.map(gen => {
@@ -334,22 +352,22 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
                   >
                     <badge.Icon className="w-4 h-4 flex-shrink-0" style={{ color: badge.color }} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate" style={{ color: 'var(--text)' }}>
+                      <p className="truncate" style={{ color: 'var(--text)', fontSize: 14 }}>
                         {templateNameById(gen.template_id)}
                       </p>
                       <div className="flex flex-wrap items-center gap-2 mt-0.5">
                         <span
-                          className="text-xs px-1.5 py-0.5 rounded font-medium"
+                          className="px-1.5 py-0.5 rounded font-medium"
                           style={{ background: `${badge.color}18`, color: badge.color, fontSize: 12 }}
                         >
                           {badge.label}
                         </span>
-                        <span className="text-xs" style={{ color: 'var(--muted)', fontSize: 12 }}>
+                        <span style={{ color: 'var(--muted)', fontSize: 12 }}>
                           {fmtLong(gen.created_at)}
                         </span>
                       </div>
                       {gen.generation_status === 'error' && gen.error_message && (
-                        <p className="text-xs mt-1" style={{ color: '#f97066', fontSize: 12 }}>
+                        <p className="mt-1" style={{ color: '#f97066', fontSize: 14 }}>
                           {gen.error_message}
                         </p>
                       )}
@@ -358,8 +376,8 @@ export default function CreativePresentationGenerator({ projects, clients }: Pro
                       <button
                         onClick={() => handleDownload(gen)}
                         disabled={downloadingId === gen.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80 flex-shrink-0"
-                        style={{ background: '#38d27d18', color: '#38d27d', minHeight: 44 }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all hover:opacity-80 flex-shrink-0"
+                        style={{ background: '#38d27d18', color: '#38d27d', minHeight: 44, fontSize: 14 }}
                       >
                         {downloadingId === gen.id ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
