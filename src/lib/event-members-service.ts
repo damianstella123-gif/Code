@@ -115,7 +115,7 @@ export function translateError(error: string): string {
   return error || 'Errore imprevisto.'
 }
 
-export async function fetchEventMembers(eventId: string): Promise<EventMember[]> {
+export async function fetchEventMembers(eventId: string): Promise<{ data: EventMember[]; error: string | null }> {
   const { data, error } = await supabase
     .from('event_members')
     .select('*')
@@ -123,9 +123,9 @@ export async function fetchEventMembers(eventId: string): Promise<EventMember[]>
     .order('created_at', { ascending: true })
   if (error) {
     console.error('fetchEventMembers:', error.message)
-    return []
+    return { data: [], error: 'Impossibile caricare il team dell\'evento.' }
   }
-  return (data ?? []) as EventMember[]
+  return { data: (data ?? []) as EventMember[], error: null }
 }
 
 export async function checkCanManageMembers(eventId: string): Promise<boolean> {

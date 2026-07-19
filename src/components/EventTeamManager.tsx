@@ -26,6 +26,30 @@ interface Props {
   onClose: () => void
 }
 
+function normalizePerms(
+  preset: Record<PermissionKey, boolean>,
+  callerPerms: Record<PermissionKey, boolean>,
+  isAdmin: boolean,
+  role: MemberRole,
+): Record<PermissionKey, boolean> {
+  if (role === 'sola_lettura') return ROLE_PRESETS.sola_lettura
+  const result = { ...preset }
+  if (!isAdmin) {
+    for (const key of ALL_PERMISSIONS) {
+      if (!callerPerms[key]) result[key] = false
+    }
+  }
+  if (role === 'responsabile') result.can_manage_members = true
+  return result
+}
+
+function memberHasEscalatedPerms(
+  member: EventMember,
+  callerPerms: Record<PermissionKey, boolean>,
+): boolean {
+  return ALL_PERMISSIONS.some(p => member[p] && !callerPerms[p])
+}
+
 export default function EventTeamManager({ eventId, responsabileId, isArchived, onClose }: Props) {
   const { showToast } = useToast()
   const [members, setMembers] = useState<EventMember[]>([])
@@ -33,21 +57,29 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
   const [canManage, setCanManage] = useState(false)
   const [callerPerms, setCallerPerms] = useState<Record<PermissionKey, boolean> | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<EventMember | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<EventMember | null>(null)
   const [saving, setSaving] = useState(false)
 
   const currentUser = loadUser()
+  const callerIsAdmin = currentUser != null && ['Admin', 'Super Admin', 'Amministrazione'].includes(currentUser.role)
 
   const reload = useCallback(async () => {
     setLoading(true)
-    const [m, manage, perms] = await Promise.all([
+    setLoadError(null)
+    const [result, manage, perms] = await Promise.all([
       fetchEventMembers(eventId),
       checkCanManageMembers(eventId),
       checkAllPermissions(eventId),
     ])
-    setMembers(m)
+    if (result.error) {
+      setLoadError(result.error)
+      setMembers([])
+    } else {
+      setMembers(result.data)
+    }
     setCanManage(manage && !isArchived)
     setCallerPerms(perms)
     setLoading(false)
@@ -79,7 +111,6 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
   }
 
   const isOwner = (userId: string) => userId === responsabileId
-
   const effectiveCanManage = canManage && !isArchived
 
   return (
@@ -96,19 +127,19 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Users className="w-4 h-4" style={{ color: 'var(--red2)' }} />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Team evento</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>({members.length})</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Team evento</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>({members.length})</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {effectiveCanManage && (
               <button
                 onClick={() => { setEditingMember(null); setFormOpen(true) }}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--red2)', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--red2)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600 }}
               >
-                <Plus className="w-3 h-3" /> Aggiungi
+                <Plus className="w-3.5 h-3.5" /> Aggiungi
               </button>
             )}
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex' }}>
+            <button onClick={onClose} aria-label="Chiudi pannello team" title="Chiudi" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex' }}>
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -117,9 +148,19 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>Caricamento...</div>
+            <div style={{ padding: 40, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)' }}>Caricamento...</div>
+          ) : loadError ? (
+            <div style={{ padding: 40, textAlign: 'center' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--red2)', marginBottom: 12 }}>{loadError}</p>
+              <button
+                onClick={reload}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
+              >
+                Riprova
+              </button>
+            </div>
           ) : members.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>Nessun membro assegnato.</div>
+            <div style={{ padding: 40, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)' }}>Nessun membro assegnato.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {members.map(m => {
@@ -127,6 +168,8 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
                 const memberIsOwner = isOwner(m.user_id)
                 const name = profile ? `${profile.first_name} ${profile.last_name}` : m.user_id
                 const activePerms = ALL_PERMISSIONS.filter(p => m[p])
+                const hasEscalated = !callerIsAdmin && !isOwner(currentUser?.id ?? '') && callerPerms != null && memberHasEscalatedPerms(m, callerPerms)
+
                 return (
                   <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: memberIsOwner ? 'color-mix(in srgb, var(--red2) 4%, transparent)' : 'transparent', transition: 'background 0.12s' }}>
                     <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 600, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
@@ -136,15 +179,15 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
                         {memberIsOwner && (
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: 'var(--red2)', background: 'color-mix(in srgb, var(--red2) 10%, transparent)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                            Responsabile evento
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--red2)', background: 'color-mix(in srgb, var(--red2) 10%, transparent)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                            Resp. evento
                           </span>
                         )}
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', background: 'var(--line)', padding: '2px 6px', borderRadius: 4 }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)', background: 'var(--line)', padding: '2px 6px', borderRadius: 4 }}>
                           {ROLE_LABELS[m.member_role]}
                         </span>
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
                         {profile && <span>{profile.email}</span>}
                         {profile && <span style={{ opacity: 0.5 }}>&middot;</span>}
                         {profile && <span>{profile.role}</span>}
@@ -152,7 +195,7 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
                       {activePerms.length > 0 && (
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
                           {activePerms.map(p => (
-                            <span key={p} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--blue)', background: 'color-mix(in srgb, var(--blue) 8%, transparent)', padding: '1px 5px', borderRadius: 3 }}>
+                            <span key={p} style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--blue)', background: 'color-mix(in srgb, var(--blue) 8%, transparent)', padding: '1px 6px', borderRadius: 3 }}>
                               {PERMISSION_LABELS[p]}
                             </span>
                           ))}
@@ -161,16 +204,31 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
                     </div>
                     {effectiveCanManage && !memberIsOwner && (
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <button
-                          onClick={() => { setEditingMember(m); setFormOpen(true) }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 4, borderRadius: 4, transition: 'color 0.12s' }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
+                        {hasEscalated ? (
+                          <button
+                            disabled
+                            title="Non puoi modificare un membro con permessi superiori ai tuoi"
+                            aria-label="Non puoi modificare un membro con permessi superiori ai tuoi"
+                            style={{ background: 'none', border: 'none', color: 'var(--muted)', padding: 4, borderRadius: 4, opacity: 0.35, cursor: 'not-allowed' }}
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => { setEditingMember(m); setFormOpen(true) }}
+                            title="Modifica membro"
+                            aria-label="Modifica membro"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 4, borderRadius: 4, transition: 'color 0.12s' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => setConfirmRemove(m)}
+                          title="Rimuovi membro"
+                          aria-label="Rimuovi membro"
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 4, borderRadius: 4, transition: 'color 0.12s' }}
                           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
                           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
@@ -179,9 +237,11 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
                         </button>
                       </div>
                     )}
-                    {effectiveCanManage && memberIsOwner && currentUser && (currentUser.role === 'Admin' || currentUser.role === 'Super Admin' || currentUser.role === 'Amministrazione' || currentUser.id === responsabileId) && (
+                    {effectiveCanManage && memberIsOwner && currentUser && (callerIsAdmin || currentUser.id === responsabileId) && (
                       <button
                         onClick={() => { setEditingMember(m); setFormOpen(true) }}
+                        title="Modifica membro"
+                        aria-label="Modifica membro"
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 4, borderRadius: 4, transition: 'color 0.12s', flexShrink: 0 }}
                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)' }}
                         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
@@ -204,7 +264,7 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
             profiles={profiles}
             existingMemberIds={members.map(m => m.user_id)}
             callerPerms={callerPerms}
-
+            callerIsAdmin={callerIsAdmin}
             onSaved={async () => { setFormOpen(false); setEditingMember(null); await reload() }}
             onCancel={() => { setFormOpen(false); setEditingMember(null) }}
             showToast={showToast}
@@ -215,22 +275,22 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
         {confirmRemove && (
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, borderRadius: 16 }}>
             <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 12, padding: 24, maxWidth: 360, width: '90%' }}>
-              <p style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8, fontWeight: 600 }}>Rimuovere questo membro?</p>
-              <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 14, color: 'var(--text)', marginBottom: 8, fontWeight: 600 }}>Rimuovere questo membro?</p>
+              <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.5 }}>
                 {profileMap.get(confirmRemove.user_id)?.first_name} {profileMap.get(confirmRemove.user_id)?.last_name} perderà l'accesso a questo evento e ai moduli collegati (documenti, budget, pagamenti, creative).
               </p>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button
                   onClick={() => setConfirmRemove(null)}
                   disabled={saving}
-                  style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
                 >
                   Annulla
                 </button>
                 <button
                   onClick={handleRemove}
                   disabled={saving}
-                  style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 12px', borderRadius: 6, border: 'none', background: 'var(--red2)', color: '#fff', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 12px', borderRadius: 6, border: 'none', background: 'var(--red2)', color: '#fff', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}
                 >
                   {saving ? 'Rimozione...' : 'Rimuovi'}
                 </button>
@@ -251,25 +311,24 @@ interface MemberFormProps {
   profiles: Profile[]
   existingMemberIds: string[]
   callerPerms: Record<PermissionKey, boolean>
+  callerIsAdmin: boolean
   onSaved: () => void
   onCancel: () => void
   showToast: (msg: string, type?: 'error' | 'success' | 'info') => void
 }
 
-function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms, onSaved, onCancel, showToast }: MemberFormProps) {
+function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms, callerIsAdmin, onSaved, onCancel, showToast }: MemberFormProps) {
   const [search, setSearch] = useState('')
   const [selectedUserId, setSelectedUserId] = useState<string | null>(editing?.user_id ?? null)
   const [role, setRole] = useState<MemberRole>(editing?.member_role ?? 'collaboratore')
-  const [perms, setPerms] = useState<Record<PermissionKey, boolean>>(
-    editing
+  const [perms, setPerms] = useState<Record<PermissionKey, boolean>>(() => {
+    const base = editing
       ? Object.fromEntries(ALL_PERMISSIONS.map(p => [p, editing[p]])) as Record<PermissionKey, boolean>
       : ROLE_PRESETS.collaboratore
-  )
+    return normalizePerms(base, callerPerms, callerIsAdmin, editing?.member_role ?? 'collaboratore')
+  })
   const [saving, setSaving] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-
-  const currentUser = loadUser()
-  const callerIsAdmin = currentUser && ['Admin', 'Super Admin', 'Amministrazione'].includes(currentUser.role)
 
   const availableProfiles = useMemo(() => {
     if (editing) return []
@@ -284,13 +343,12 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
 
   const handleRoleChange = (newRole: MemberRole) => {
     setRole(newRole)
-    setPerms(ROLE_PRESETS[newRole])
+    setPerms(normalizePerms(ROLE_PRESETS[newRole], callerPerms, callerIsAdmin, newRole))
     setDropdownOpen(false)
   }
 
   const handlePermToggle = (key: PermissionKey) => {
-    if (role === 'sola_lettura') return
-    if (role === 'responsabile' && key === 'can_manage_members') return
+    if (isPermDisabled(key)) return
     setPerms(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
@@ -306,12 +364,13 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
       showToast('Seleziona un utente.', 'error')
       return
     }
+    const finalPerms = normalizePerms(perms, callerPerms, callerIsAdmin, role)
     setSaving(true)
     const { error } = await upsertEventMember({
       event_id: eventId,
       user_id: selectedUserId,
       member_role: role,
-      ...perms,
+      ...finalPerms,
     })
     setSaving(false)
     if (error) {
@@ -328,10 +387,10 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
     <div style={{ position: 'absolute', inset: 0, background: 'var(--panel-solid)', display: 'flex', flexDirection: 'column', borderRadius: 16, zIndex: 5 }}>
       {/* Form Header */}
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
           {editing ? 'Modifica membro' : 'Aggiungi membro'}
         </span>
-        <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+        <button onClick={onCancel} aria-label="Chiudi form" title="Chiudi" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -340,15 +399,15 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
         {/* User selection (only for add) */}
         {!editing && (
           <div>
-            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6, display: 'block' }}>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6, display: 'block' }}>
               Utente
             </label>
             {selectedProfile ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'color-mix(in srgb, var(--blue) 4%, transparent)' }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', flex: 1 }}>{selectedProfile.first_name} {selectedProfile.last_name}</span>
-                <span style={{ fontSize: 11, color: 'var(--muted)' }}>{selectedProfile.email}</span>
-                <button onClick={() => setSelectedUserId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
-                  <X className="w-3 h-3" />
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>{selectedProfile.email}</span>
+                <button onClick={() => setSelectedUserId(null)} aria-label="Rimuovi selezione" title="Rimuovi selezione" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             ) : (
@@ -359,7 +418,7 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Cerca per nome o email..."
-                    style={{ border: 'none', background: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)', width: '100%' }}
+                    style={{ border: 'none', background: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text)', width: '100%' }}
                   />
                 </div>
                 {search.length > 0 && availableProfiles.length > 0 && (
@@ -372,19 +431,19 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--line)' }}
                         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
                       >
-                        <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 600, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                        <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
                           {p.first_name[0]}{p.last_name[0]}
                         </div>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{p.first_name} {p.last_name}</div>
-                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>{p.email} &middot; {p.role}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{p.first_name} {p.last_name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{p.email} &middot; {p.role}</div>
                         </div>
                       </button>
                     ))}
                   </div>
                 )}
                 {search.length > 1 && availableProfiles.length === 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 8, padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 8, padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)' }}>
                     Nessun utente disponibile.
                   </div>
                 )}
@@ -398,7 +457,7 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
               {profiles.find(p => p.id === editing.user_id)?.first_name} {profiles.find(p => p.id === editing.user_id)?.last_name}
             </span>
-            <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 8 }}>
               {profiles.find(p => p.id === editing.user_id)?.email}
             </span>
           </div>
@@ -406,13 +465,13 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
 
         {/* Role selector */}
         <div>
-          <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6, display: 'block' }}>
+          <label style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6, display: 'block' }}>
             Ruolo evento
           </label>
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 8, background: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 8, background: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text)' }}
             >
               {ROLE_LABELS[role]}
               <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
@@ -423,7 +482,7 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
                   <button
                     key={r}
                     onClick={() => handleRoleChange(r)}
-                    style={{ display: 'block', width: '100%', padding: '8px 12px', border: 'none', background: r === role ? 'var(--line)' : 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 12, color: r === role ? 'var(--text)' : 'var(--muted)', fontWeight: r === role ? 600 : 400, transition: 'background 0.1s' }}
+                    style={{ display: 'block', width: '100%', padding: '8px 12px', border: 'none', background: r === role ? 'var(--line)' : 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 13, color: r === role ? 'var(--text)' : 'var(--muted)', fontWeight: r === role ? 600 : 400, transition: 'background 0.1s' }}
                     onMouseEnter={e => { if (r !== role) (e.currentTarget as HTMLButtonElement).style.background = 'color-mix(in srgb, var(--line) 50%, transparent)' }}
                     onMouseLeave={e => { if (r !== role) (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
                   >
@@ -437,8 +496,8 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
 
         {/* Permissions */}
         <div>
-          <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Shield className="w-3 h-3" /> Permessi
+          <label style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Shield className="w-3.5 h-3.5" /> Permessi
           </label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {ALL_PERMISSIONS.map(key => {
@@ -447,7 +506,7 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
               return (
                 <button
                   key={key}
-                  onClick={() => !disabled && handlePermToggle(key)}
+                  onClick={() => handlePermToggle(key)}
                   disabled={disabled}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
@@ -465,13 +524,13 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     transition: 'all 0.12s',
                   }}>
-                    {active && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>&#10003;</span>}
+                    {active && <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>&#10003;</span>}
                   </div>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text)' }}>
                     {PERMISSION_LABELS[key]}
                   </span>
-                  {disabled && !callerIsAdmin && callerPerms && !callerPerms[key] && role !== 'sola_lettura' && (
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', marginLeft: 'auto' }}>
+                  {disabled && !callerIsAdmin && !callerPerms[key] && role !== 'sola_lettura' && (
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>
                       Non disponibile
                     </span>
                   )}
@@ -487,14 +546,14 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
         <button
           onClick={onCancel}
           disabled={saving}
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, padding: '7px 14px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
         >
           Annulla
         </button>
         <button
           onClick={handleSave}
           disabled={saving || (!editing && !selectedUserId)}
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, padding: '7px 14px', borderRadius: 6, border: 'none', background: 'var(--red2)', color: '#fff', cursor: 'pointer', opacity: (saving || (!editing && !selectedUserId)) ? 0.5 : 1 }}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 6, border: 'none', background: 'var(--red2)', color: '#fff', cursor: 'pointer', opacity: (saving || (!editing && !selectedUserId)) ? 0.5 : 1 }}
         >
           {saving ? 'Salvataggio...' : editing ? 'Aggiorna' : 'Aggiungi'}
         </button>
