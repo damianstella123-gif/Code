@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 import {
   fetchPublicRegistrationSite,
   submitPublicRegistration,
@@ -273,7 +274,14 @@ export default function PublicRegistration() {
     const isWaitlist = result.registration_status === 'waitlist'
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-12" style={{ backgroundColor: bgColor }}>
-        <div className="max-w-lg w-full bg-white rounded-2xl shadow-lg p-8 text-center">
+        <style>{`
+        @media print {
+          body { font-size: 14px; }
+          .print-hidden { display: none !important; }
+          .print-section { break-inside: avoid; }
+        }
+      `}</style>
+      <div className="max-w-lg w-full bg-white rounded-2xl shadow-lg p-8 text-center">
           {site.logo_url && (
             <img src={site.logo_url} alt="" className="h-12 mx-auto mb-6 object-contain" />
           )}
@@ -291,6 +299,36 @@ export default function PublicRegistration() {
           {result.confirmation_message && (
             <p className="text-gray-600 mt-4 text-sm leading-relaxed">{result.confirmation_message}</p>
           )}
+
+          {!isWaitlist && result.registration_status === 'confirmed' && result.qr_token && result.qr_token.trim() !== '' ? (
+            <div className="mt-6 print-section">
+              <div className="inline-block p-4 bg-white border border-gray-200 rounded-xl">
+                <QRCodeSVG
+                  value={result.qr_token}
+                  size={200}
+                  level="M"
+                  bgColor="#ffffff"
+                  marginSize={2}
+                  title="Codice QR di accesso all'evento"
+                />
+              </div>
+              <p className="text-gray-600 text-sm mt-4" style={{ minHeight: '1.25rem' }}>
+                Conserva questo codice e presentalo all'ingresso.
+              </p>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90 print-hidden"
+                style={{ backgroundColor: primaryColor }}
+              >
+                Stampa o salva QR
+              </button>
+            </div>
+          ) : isWaitlist ? (
+            <p className="text-gray-600 text-sm mt-4">
+              Riceverai conferma prima di poter accedere all'evento.
+            </p>
+          ) : null}
         </div>
       </div>
     )
