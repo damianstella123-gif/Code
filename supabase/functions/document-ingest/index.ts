@@ -8,9 +8,13 @@ const corsHeaders = {
     "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
-const CHUNK_TARGET = 1500; // ~1200-1800 chars
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const CHUNK_TARGET = 1500;
 const CHUNK_OVERLAP = 200;
+const CLAUDE_MODEL = "claude-sonnet-4-6";
+const CLAUDE_TEXT_CAP = 80_000; // max chars sent to Claude for office text analysis
+
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 interface ClaudeAnalysis {
   extracted_text: string;
@@ -25,7 +29,7 @@ interface ClaudeAnalysis {
   language: string;
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Response helpers ───────────────────────────────────────────────────────
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -38,12 +42,28 @@ function errorResponse(message: string, status = 400) {
   return jsonResponse({ error: message }, status);
 }
 
+// ─── Base64 encoding (chunked, no per-byte array) ───────────────────────────
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  const CHUNK_SIZE = 32768;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    const slice = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length));
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
+}
+
+// ─── SHA-256 ────────────────────────────────────────────────────────────────
+
 async function sha256(data: Uint8Array): Promise<string> {
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(hashBuffer))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
+// ─── Chunking ───────────────────────────────────────────────────────────────
 
 function chunkText(
   text: string,
@@ -106,6 +126,8 @@ function splitIntoChunks(text: string): string[] {
   return chunks;
 }
 
+// ─── File type detection ────────────────────────────────────────────────────
+
 function getMediaType(fileType: string): string | null {
   const map: Record<string, string> = {
     "application/pdf": "application/pdf",
@@ -117,11 +139,7 @@ function getMediaType(fileType: string): string | null {
 }
 
 function isTextFile(fileType: string): boolean {
-  return (
-    fileType.startsWith("text/") ||
-    fileType === "text/csv" ||
-    fileType === "text/plain"
-  );
+  return fileType.startsWith("text/") || fileType === "text/csv" || fileType === "text/plain";
 }
 
 function isOfficeFile(fileType: string): boolean {
@@ -147,38 +165,26 @@ function isPdfOrImage(fileType: string): boolean {
   return fileType === "application/pdf" || fileType.startsWith("image/");
 }
 
-// ─── Claude API call ────────────────────────────────────────────────────────
+// ─── Claude API: PDF/Image analysis ────────────────────────────────────────
 
-async function analyzeWithClaude(
+async function analyzeFileWithClaude(
   fileBytes: Uint8Array,
   fileType: string,
   fileName: string
 ): Promise<ClaudeAnalysis> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
+  if (!apiKey) throw new Error("Chiave ANTHROPIC_API_KEY non configurata sul server");
 
-  const base64 = btoa(
-    Array.from(fileBytes)
-      .map((b) => String.fromCharCode(b))
-      .join("")
-  );
-
+  const base64 = uint8ToBase64(fileBytes);
   const mediaType = getMediaType(fileType);
   const isPdf = fileType === "application/pdf";
   const isImage = fileType.startsWith("image/");
 
-  let content: unknown[];
+  const prompt = isPdf
+    ? `Analizza questo documento PDF ("${fileName}"). Rispondi ESCLUSIVAMENTE con un JSON valido senza markdown. Non inventare informazioni non presenti nel documento.`
+    : `Analizza questa immagine ("${fileName}"). Estrai tutto il testo visibile e descrivi il contenuto. Rispondi ESCLUSIVAMENTE con un JSON valido senza markdown. Non inventare informazioni non presenti.`;
 
-  if (isPdf) {
-    content = [
-      {
-        type: "document",
-        source: { type: "base64", media_type: "application/pdf", data: base64 },
-      },
-      {
-        type: "text",
-        text: `Analizza questo documento PDF ("${fileName}"). Rispondi ESCLUSIVAMENTE con un JSON valido senza markdown. Non inventare informazioni non presenti nel documento.
-
+  const schema = `
 Schema JSON richiesto:
 {
   "extracted_text": "testo completo estratto dal documento",
@@ -191,36 +197,21 @@ Schema JSON richiesto:
   "people": ["persone menzionate"],
   "action_items": ["azioni o impegni identificati"],
   "language": "lingua principale del documento"
-}`,
-      },
+}`;
+
+  let content: unknown[];
+  if (isPdf) {
+    content = [
+      { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
+      { type: "text", text: prompt + "\n" + schema },
     ];
   } else if (isImage && mediaType) {
     content = [
-      {
-        type: "image",
-        source: { type: "base64", media_type: mediaType, data: base64 },
-      },
-      {
-        type: "text",
-        text: `Analizza questa immagine ("${fileName}"). Estrai tutto il testo visibile e descrivi il contenuto. Rispondi ESCLUSIVAMENTE con un JSON valido senza markdown. Non inventare informazioni non presenti.
-
-Schema JSON richiesto:
-{
-  "extracted_text": "tutto il testo visibile nell'immagine",
-  "summary": "descrizione del contenuto in italiano",
-  "sections": [{"label": "descrizione area", "content": "testo/contenuto di quell'area"}],
-  "entities": ["entita rilevanti"],
-  "dates": ["date trovate"],
-  "amounts": ["importi trovati"],
-  "companies": ["aziende/organizzazioni"],
-  "people": ["persone"],
-  "action_items": ["azioni identificate"],
-  "language": "lingua del contenuto"
-}`,
-      },
+      { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+      { type: "text", text: prompt + "\n" + schema },
     ];
   } else {
-    throw new Error("File type not supported for Claude analysis");
+    throw new Error("Tipo file non supportato per analisi Claude");
   }
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -231,7 +222,7 @@ Schema JSON richiesto:
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 8192,
       messages: [{ role: "user", content }],
     }),
@@ -239,27 +230,115 @@ Schema JSON richiesto:
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Claude API error ${response.status}: ${errText.slice(0, 200)}`);
+    throw new Error(`Errore API Claude (${response.status}): ${errText.slice(0, 300)}`);
   }
 
   const result = await response.json();
-  const textBlock = result.content?.find((b: { type: string }) => b.type === "text");
-  if (!textBlock?.text) throw new Error("No text response from Claude");
 
-  let parsed: ClaudeAnalysis;
+  // Check for stop reason indicating truncation
+  if (result.stop_reason === "max_tokens") {
+    throw new Error("Analisi interrotta: il documento e troppo lungo e Claude ha raggiunto il limite di token. Provare con un documento piu breve.");
+  }
+
+  const textBlock = result.content?.find((b: { type: string }) => b.type === "text");
+  if (!textBlock?.text) throw new Error("Nessuna risposta testuale ricevuta da Claude");
+
+  return parseClaudeJson(textBlock.text);
+}
+
+// ─── Claude API: Text analysis (for Office documents) ───────────────────────
+
+async function analyzeTextWithClaude(
+  text: string,
+  fileName: string
+): Promise<Omit<ClaudeAnalysis, "extracted_text">> {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) throw new Error("Chiave ANTHROPIC_API_KEY non configurata sul server");
+
+  const cappedText = text.length > CLAUDE_TEXT_CAP ? text.slice(0, CLAUDE_TEXT_CAP) : text;
+
+  const prompt = `Analizza il seguente testo estratto dal file "${fileName}" (${cappedText.length} caratteri${text.length > CLAUDE_TEXT_CAP ? ", troncato per limiti di elaborazione" : ""}). Rispondi ESCLUSIVAMENTE con un JSON valido senza markdown. Non inventare informazioni non presenti nel testo.
+
+Schema JSON richiesto:
+{
+  "summary": "sintesi del contenuto in italiano, massimo 500 parole",
+  "sections": [{"label": "nome sezione", "content": "testo della sezione"}],
+  "entities": ["entita rilevanti menzionate"],
+  "dates": ["date trovate"],
+  "amounts": ["importi monetari trovati"],
+  "companies": ["aziende/organizzazioni menzionate"],
+  "people": ["persone menzionate"],
+  "action_items": ["azioni o impegni identificati"],
+  "language": "lingua principale del testo"
+}
+
+TESTO:
+${cappedText}`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: 4096,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Errore API Claude (${response.status}): ${errText.slice(0, 300)}`);
+  }
+
+  const result = await response.json();
+
+  if (result.stop_reason === "max_tokens") {
+    throw new Error("Analisi interrotta: il testo e troppo lungo e Claude ha raggiunto il limite di token.");
+  }
+
+  const textBlock = result.content?.find((b: { type: string }) => b.type === "text");
+  if (!textBlock?.text) throw new Error("Nessuna risposta testuale ricevuta da Claude");
+
+  const parsed = parseClaudeJson(textBlock.text);
+  return {
+    summary: parsed.summary,
+    sections: parsed.sections,
+    entities: parsed.entities,
+    dates: parsed.dates,
+    amounts: parsed.amounts,
+    companies: parsed.companies,
+    people: parsed.people,
+    action_items: parsed.action_items,
+    language: parsed.language,
+  };
+}
+
+// ─── Parse Claude JSON safely ───────────────────────────────────────────────
+
+function parseClaudeJson(raw: string): ClaudeAnalysis {
+  let cleaned = raw.trim();
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+  }
+
+  let parsed: Record<string, unknown>;
   try {
-    let raw = textBlock.text.trim();
-    if (raw.startsWith("```")) {
-      raw = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(cleaned);
   } catch {
-    throw new Error("Failed to parse Claude JSON response");
+    throw new Error("Risposta Claude non e un JSON valido. L'analisi potrebbe essere stata troncata.");
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("Risposta Claude non e un oggetto JSON valido.");
   }
 
   return {
-    extracted_text: parsed.extracted_text || "",
-    summary: parsed.summary || "",
+    extracted_text: typeof parsed.extracted_text === "string" ? parsed.extracted_text : "",
+    summary: typeof parsed.summary === "string" ? parsed.summary : "",
     sections: Array.isArray(parsed.sections) ? parsed.sections : [],
     entities: Array.isArray(parsed.entities) ? parsed.entities : [],
     dates: Array.isArray(parsed.dates) ? parsed.dates : [],
@@ -267,17 +346,14 @@ Schema JSON richiesto:
     companies: Array.isArray(parsed.companies) ? parsed.companies : [],
     people: Array.isArray(parsed.people) ? parsed.people : [],
     action_items: Array.isArray(parsed.action_items) ? parsed.action_items : [],
-    language: parsed.language || "it",
+    language: typeof parsed.language === "string" ? parsed.language : "it",
   };
 }
 
-// ─── Text extraction for local types ────────────────────────────────────────
+// ─── Office text extraction (local) ────────────────────────────────────────
 
-function extractTextLocal(fileBytes: Uint8Array, fileType: string): string {
-  if (isTextFile(fileType)) {
-    return new TextDecoder("utf-8").decode(fileBytes);
-  }
-  return "";
+function extractTextLocal(fileBytes: Uint8Array): string {
+  return new TextDecoder("utf-8").decode(fileBytes);
 }
 
 async function extractDocx(fileBytes: Uint8Array): Promise<string> {
@@ -310,9 +386,9 @@ async function extractXlsx(fileBytes: Uint8Array): Promise<string> {
   }
 
   const lines: string[] = [];
-  const sheetFiles = Object.keys(zip.files).filter((f) =>
-    f.match(/^xl\/worksheets\/sheet\d+\.xml$/)
-  );
+  const sheetFiles = Object.keys(zip.files)
+    .filter((f) => f.match(/^xl\/worksheets\/sheet\d+\.xml$/))
+    .sort();
   for (const sheetFile of sheetFiles.slice(0, 5)) {
     const xml = await zip.file(sheetFile)?.async("string");
     if (!xml) continue;
@@ -359,6 +435,22 @@ async function extractPptx(fileBytes: Uint8Array): Promise<string> {
   return parts.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// ─── Mark error helper ──────────────────────────────────────────────────────
+
+async function markError(
+  serviceClient: ReturnType<typeof createClient>,
+  documentId: string,
+  message: string
+): Promise<void> {
+  await serviceClient
+    .from("documents")
+    .update({
+      analysis_status: "errore",
+      analysis_error: message.slice(0, 500),
+    })
+    .eq("id", documentId);
+}
+
 // ─── Main handler ───────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -366,89 +458,93 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
-  try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return errorResponse("Authorization required", 401);
+  // Parse body ONCE, keep documentId available for error handling
+  let documentId: string | null = null;
+  let force = false;
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+    documentId = typeof body.document_id === "string" ? body.document_id : null;
+    force = body.force === true;
+  } catch {
+    return errorResponse("Corpo della richiesta non valido");
+  }
+
+  if (!documentId) return errorResponse("document_id e obbligatorio");
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const serviceClient = createClient(supabaseUrl, serviceKey);
+
+  try {
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return errorResponse("Autenticazione richiesta", 401);
 
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
 
     const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) return errorResponse("Unauthorized", 401);
+    if (authError || !user) return errorResponse("Non autorizzato", 401);
 
-    const body = await req.json();
-    const { document_id, force } = body;
-    if (!document_id) return errorResponse("document_id is required");
-
-    // Load document (through user's RLS)
+    // Load document through user RLS
     const { data: doc, error: docErr } = await userClient
       .from("documents")
       .select("*")
-      .eq("id", document_id)
+      .eq("id", documentId)
       .maybeSingle();
 
-    if (docErr || !doc) return errorResponse("Document not found or access denied", 404);
+    if (docErr || !doc) return errorResponse("Documento non trovato o accesso negato", 404);
 
-    // Service client for writes (bypasses RLS)
-    const serviceClient = createClient(supabaseUrl, serviceKey);
-
-    // Set in_elaborazione
+    // Mark in_elaborazione
     await serviceClient
       .from("documents")
       .update({ analysis_status: "in_elaborazione", analysis_error: null })
-      .eq("id", document_id);
+      .eq("id", documentId);
 
-    // Download file from storage
+    // Download from storage
     const { data: fileData, error: storageErr } = await serviceClient.storage
       .from("documents")
       .download(doc.file_path);
 
     if (storageErr || !fileData) {
-      await serviceClient
-        .from("documents")
-        .update({ analysis_status: "errore", analysis_error: "File non scaricabile dal bucket" })
-        .eq("id", document_id);
-      return errorResponse("Failed to download file from storage");
+      await markError(serviceClient, documentId, "File non scaricabile dal bucket di archiviazione");
+      return errorResponse("Impossibile scaricare il file");
     }
 
     const fileBytes = new Uint8Array(await fileData.arrayBuffer());
 
-    // Check size
+    // Size check
     if (fileBytes.length > MAX_FILE_SIZE) {
-      await serviceClient
-        .from("documents")
-        .update({ analysis_status: "errore", analysis_error: "File troppo grande (max 25 MB)" })
-        .eq("id", document_id);
-      return errorResponse("File exceeds 25 MB limit");
+      await markError(serviceClient, documentId, "File troppo grande (limite: 25 MB)");
+      return errorResponse("Il file supera il limite di 25 MB");
     }
 
-    // Compute hash
+    // Hash
     const hash = await sha256(fileBytes);
     if (doc.content_hash === hash && !force) {
       await serviceClient
         .from("documents")
         .update({ analysis_status: "elaborato" })
-        .eq("id", document_id);
-      return jsonResponse({ status: "already_processed", document_id });
+        .eq("id", documentId);
+      return jsonResponse({ status: "already_processed", document_id: documentId });
     }
 
     const fileType = (doc.file_type || "").toLowerCase();
 
-    // Legacy office: mark as non_supportato
+    // Legacy Office: not supported
     if (isLegacyOffice(fileType)) {
       await serviceClient
         .from("documents")
         .update({
           analysis_status: "non_supportato",
-          analysis_error: "Formato legacy (DOC/XLS/PPT) non supportato. Convertire in formato OOXML.",
+          analysis_error: "Formato legacy (DOC/XLS/PPT) non supportato. Convertire in formato OOXML (DOCX/XLSX/PPTX).",
           content_hash: hash,
         })
-        .eq("id", document_id);
-      return jsonResponse({ status: "non_supportato", document_id, reason: "legacy_format" });
+        .eq("id", documentId);
+      return jsonResponse({ status: "non_supportato", document_id: documentId, reason: "Formato legacy non supportato" });
     }
 
     let extractedText = "";
@@ -457,8 +553,8 @@ Deno.serve(async (req: Request) => {
     let metadata: Record<string, unknown> = {};
 
     if (isPdfOrImage(fileType)) {
-      // Use Claude for PDF and images
-      const analysis = await analyzeWithClaude(fileBytes, fileType, doc.file_name);
+      // Claude vision/document analysis
+      const analysis = await analyzeFileWithClaude(fileBytes, fileType, doc.file_name);
       extractedText = analysis.extracted_text;
       summary = analysis.summary;
       sections = analysis.sections;
@@ -472,9 +568,24 @@ Deno.serve(async (req: Request) => {
         language: analysis.language,
       };
     } else if (isTextFile(fileType)) {
-      extractedText = extractTextLocal(fileBytes, fileType);
-      summary = extractedText.slice(0, 500) + (extractedText.length > 500 ? "..." : "");
+      // Local text extraction + Claude analysis
+      extractedText = extractTextLocal(fileBytes);
+      if (extractedText.trim().length > 0) {
+        const analysis = await analyzeTextWithClaude(extractedText, doc.file_name);
+        summary = analysis.summary;
+        sections = analysis.sections;
+        metadata = {
+          entities: analysis.entities,
+          dates: analysis.dates,
+          amounts: analysis.amounts,
+          companies: analysis.companies,
+          people: analysis.people,
+          action_items: analysis.action_items,
+          language: analysis.language,
+        };
+      }
     } else if (isOfficeFile(fileType)) {
+      // Local extraction then Claude analysis on text
       if (fileType.includes("wordprocessingml")) {
         extractedText = await extractDocx(fileBytes);
       } else if (fileType.includes("spreadsheetml")) {
@@ -482,18 +593,24 @@ Deno.serve(async (req: Request) => {
       } else if (fileType.includes("presentationml")) {
         extractedText = await extractPptx(fileBytes);
       }
-      if (!extractedText) {
-        await serviceClient
-          .from("documents")
-          .update({
-            analysis_status: "errore",
-            analysis_error: "Impossibile estrarre testo dal file Office",
-            content_hash: hash,
-          })
-          .eq("id", document_id);
-        return errorResponse("Could not extract text from Office file");
+
+      if (!extractedText || extractedText.trim().length === 0) {
+        await markError(serviceClient, documentId, "Impossibile estrarre testo dal file Office");
+        return errorResponse("Impossibile estrarre testo dal file Office");
       }
-      summary = extractedText.slice(0, 500) + (extractedText.length > 500 ? "..." : "");
+
+      const analysis = await analyzeTextWithClaude(extractedText, doc.file_name);
+      summary = analysis.summary;
+      sections = analysis.sections;
+      metadata = {
+        entities: analysis.entities,
+        dates: analysis.dates,
+        amounts: analysis.amounts,
+        companies: analysis.companies,
+        people: analysis.people,
+        action_items: analysis.action_items,
+        language: analysis.language,
+      };
     } else {
       await serviceClient
         .from("documents")
@@ -502,22 +619,16 @@ Deno.serve(async (req: Request) => {
           analysis_error: `Tipo file non supportato: ${fileType}`,
           content_hash: hash,
         })
-        .eq("id", document_id);
-      return jsonResponse({ status: "non_supportato", document_id, reason: "unsupported_type" });
+        .eq("id", documentId);
+      return jsonResponse({ status: "non_supportato", document_id: documentId, reason: `Tipo non supportato: ${fileType}` });
     }
 
-    // Create chunks
+    // Build chunks
     const chunks = chunkText(extractedText, sections.length > 0 ? sections : undefined);
 
-    // Atomic replacement: delete old chunks then insert new
-    await serviceClient
-      .from("document_chunks")
-      .delete()
-      .eq("document_id", document_id);
-
+    // Atomic chunk replacement via RPC
     if (chunks.length > 0) {
-      const rows = chunks.map((c, i) => ({
-        document_id,
+      const chunksPayload = chunks.map((c, i) => ({
         chunk_index: i,
         content: c.content,
         section_label: c.section_label,
@@ -525,20 +636,18 @@ Deno.serve(async (req: Request) => {
         metadata: {},
       }));
 
-      const { error: insertErr } = await serviceClient
-        .from("document_chunks")
-        .insert(rows);
+      const { error: rpcErr } = await serviceClient.rpc("replace_document_chunks", {
+        p_document_id: documentId,
+        p_chunks: chunksPayload,
+      });
 
-      if (insertErr) {
-        await serviceClient
-          .from("documents")
-          .update({ analysis_status: "errore", analysis_error: "Errore inserimento chunk: " + insertErr.message })
-          .eq("id", document_id);
-        return errorResponse("Failed to insert chunks");
+      if (rpcErr) {
+        await markError(serviceClient, documentId, "Errore durante il salvataggio dei chunk: " + (rpcErr.message || "sconosciuto").slice(0, 400));
+        return errorResponse("Errore durante il salvataggio dei chunk");
       }
     }
 
-    // Update document as elaborato
+    // Mark as elaborato
     await serviceClient
       .from("documents")
       .update({
@@ -550,33 +659,18 @@ Deno.serve(async (req: Request) => {
         extracted_text: extractedText,
         analysis_metadata: metadata,
       })
-      .eq("id", document_id);
+      .eq("id", documentId);
 
     return jsonResponse({
       status: "elaborato",
-      document_id,
+      document_id: documentId,
       chunks_created: chunks.length,
       summary_length: summary.length,
     });
   } catch (err) {
-    // Try to update status to errore if we have the document_id
-    try {
-      const body = await req.clone().json().catch(() => null);
-      if (body?.document_id) {
-        const serviceClient = createClient(
-          Deno.env.get("SUPABASE_URL")!,
-          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-        );
-        await serviceClient
-          .from("documents")
-          .update({
-            analysis_status: "errore",
-            analysis_error: (err as Error).message?.slice(0, 500) || "Errore sconosciuto",
-          })
-          .eq("id", body.document_id);
-      }
-    } catch { /* best effort */ }
-
-    return errorResponse((err as Error).message || "Internal error", 500);
+    const message = (err as Error).message || "Errore interno sconosciuto";
+    // Always mark errore so we never leave in_elaborazione
+    await markError(serviceClient, documentId!, message);
+    return errorResponse(message, 500);
   }
 });
