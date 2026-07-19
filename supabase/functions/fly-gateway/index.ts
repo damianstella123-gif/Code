@@ -1595,7 +1595,15 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
       if (!query) return JSON.stringify({ error: "Parametro query obbligatorio." });
       const searchQuery = query.slice(0, 500);
 
-      const rawLimit = typeof input.limit === "number" ? input.limit : 8;
+      if (
+        (input.event_id !== undefined && typeof input.event_id !== "string") ||
+        (input.client_id !== undefined && typeof input.client_id !== "string") ||
+        (input.supplier_id !== undefined && typeof input.supplier_id !== "string")
+      ) {
+        return JSON.stringify({ error: "Filtri documentali non validi" });
+      }
+
+      const rawLimit = typeof input.limit === "number" && Number.isFinite(input.limit) ? input.limit : 8;
       const limit = Math.max(1, Math.min(10, Math.round(rawLimit)));
 
       const eventId = typeof input.event_id === "string" ? input.event_id : null;
@@ -1628,7 +1636,7 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
         section_label: row.section_label || null,
         page_number: row.page_number || null,
         exact_content: row.content,
-        relevance: row.relevance,
+        relevance: row.rank,
       }));
 
       return JSON.stringify({ found: true, result_count: sources.length, sources });
