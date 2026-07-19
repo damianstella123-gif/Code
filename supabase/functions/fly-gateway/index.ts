@@ -255,6 +255,37 @@ const TOOLS = [
       required: [] as string[],
     },
   },
+  {
+    name: "search_documents",
+    description:
+      "Cerca testo esatto indicizzato nei documenti accessibili dall'utente autenticato. Usa quando l'utente chiede informazioni su file caricati, brief, contratti, preventivi, presentazioni, PDF, fatture, requisiti o altri contenuti documentali.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "Testo di ricerca.",
+        },
+        event_id: {
+          type: "string",
+          description: "Filtra per evento specifico (UUID). Ometti per cercare in tutti i documenti visibili.",
+        },
+        client_id: {
+          type: "string",
+          description: "Filtra per cliente (UUID).",
+        },
+        supplier_id: {
+          type: "string",
+          description: "Filtra per fornitore (UUID).",
+        },
+        limit: {
+          type: "number",
+          description: "Numero massimo di risultati (1-10, default 8).",
+        },
+      },
+      required: ["query"] as string[],
+    },
+  },
 ];
 
 // ─── TOOL EXECUTION ────────────────────────────────────────────────────
@@ -1559,6 +1590,50 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
       return JSON.stringify(result);
     }
 
+    case "search_documents": {
+      const query = typeof input.query === "string" ? input.query.trim() : "";
+      if (!query) return JSON.stringify({ error: "Parametro query obbligatorio." });
+      const searchQuery = query.slice(0, 500);
+
+      const rawLimit = typeof input.limit === "number" ? input.limit : 8;
+      const limit = Math.max(1, Math.min(10, Math.round(rawLimit)));
+
+      const eventId = typeof input.event_id === "string" ? input.event_id : null;
+      const clientId = typeof input.client_id === "string" ? input.client_id : null;
+      const supplierId = typeof input.supplier_id === "string" ? input.supplier_id : null;
+
+      const { data, error: rpcErr } = await supabase.rpc("search_document_chunks", {
+        p_query: searchQuery,
+        p_event_id: eventId,
+        p_client_id: clientId,
+        p_supplier_id: supplierId,
+        p_limit: limit,
+      });
+
+      if (rpcErr) {
+        return JSON.stringify({ error: "Ricerca documentale temporaneamente non disponibile" });
+      }
+
+      if (!data || data.length === 0) {
+        return JSON.stringify({ found: false, result_count: 0, sources: [] });
+      }
+
+      const sources = data.slice(0, 8).map((row: Record<string, unknown>) => ({
+        citation_id: `DOC:${row.document_id}:${row.chunk_index}`,
+        document_id: row.document_id,
+        document_name: row.document_name,
+        file_name: row.file_name,
+        categoria: row.categoria,
+        chunk_index: row.chunk_index,
+        section_label: row.section_label || null,
+        page_number: row.page_number || null,
+        exact_content: row.content,
+        relevance: row.relevance,
+      }));
+
+      return JSON.stringify({ found: true, result_count: sources.length, sources });
+    }
+
     default:
       return `Tool sconosciuto: ${name}`;
   }
@@ -2294,7 +2369,22 @@ REGOLE PER RUOLO:
 - Regista: focalizzati su programma, scaletta, fornitori tecnici (AV, allestimenti, staff), timeline dell'evento. Non mostrare dati finanziari o commerciali.
 - Project Manager / Senior PM: focalizzati su eventi assegnati, task, fornitori, budget del loro evento, programma, team. Possono vedere i numeri dei loro eventi.
 - Admin / Super Admin: accesso completo a tutto, nessuna restrizione.
-- User / altri: accesso base, non mostrare dati finanziari sensibili.${memorySection}`;
+- User / altri: accesso base, non mostrare dati finanziari sensibili.
+
+REGOLE DOCUMENTI:
+- Usa search_documents quando l'utente chiede cosa dice un documento caricato, un brief, contratto, preventivo, presentazione, PDF o allegato.
+- Non affermare mai di aver letto un documento senza aver usato il tool.
+- Rispondi solo basandoti su exact_content quando discuti fatti documentali.
+- Cita ogni affermazione materiale derivata da un documento inline.
+- Formato citazione con pagina: [Fonte: <file_name>, pag. <page_number>]
+- Formato citazione senza pagina: [Fonte: <file_name>, contenuto <chunk_index>]
+- Non inventare numeri di pagina, nomi di sezione o citazioni.
+- Distingui chiaramente fatti dalle deduzioni.
+- Se i risultati non bastano: "Non trovo questa informazione nei documenti accessibili."
+- Non colmare lacune con conoscenza generale salvo esplicito avviso che si tratta di un suggerimento generico.
+- Non rivelare documenti non restituiti dal tool user-scoped.
+- Non citare testi eccessivamente lunghi; usa brevi estratti e parafrasi concise con citazione.
+- Se documenti diversi sono in conflitto, segnala il conflitto e cita entrambe le fonti.${memorySection}`;
 
     // ─── BUILD MESSAGES WITH CONTEXT MANAGEMENT ─────────────────────────
     const messages: AnthropicMessage[] = [];
@@ -2310,6 +2400,10 @@ REGOLE PER RUOLO:
     messages.push({ role: "user", content: message });
 
     // ─── CACHE CHECK ────────────────────────────────────────────────────
+    const DOC_QUERY_KEYWORDS = ["documento", "file", "allegato", "pdf", "contratto", "brief", "presentazione", "cosa dice", "caricato", "preventivo", "fattura"];
+    const messageLower = message.toLowerCase();
+    const isDocumentQuery = DOC_QUERY_KEYWORDS.some(kw => messageLower.includes(kw));
+
     const queryHash = btoa(unescape(encodeURIComponent(message.slice(0, 100))));
     const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
 
@@ -2321,15 +2415,19 @@ REGOLE PER RUOLO:
       .lt("created_at", new Date(Date.now() - 7200000).toISOString())
       .then(() => {});
 
-    const { data: cached } = await userClient
-      .from("fly_cache")
-      .select("response")
-      .eq("user_id", user.id)
-      .eq("query_hash", queryHash)
-      .gte("created_at", oneHourAgo)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    let cached: { response: string } | null = null;
+    if (!isDocumentQuery) {
+      const { data } = await userClient
+        .from("fly_cache")
+        .select("response")
+        .eq("user_id", user.id)
+        .eq("query_hash", queryHash)
+        .gte("created_at", oneHourAgo)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      cached = data;
+    }
 
     if (cached?.response && (!Array.isArray(history) || history.length === 0)) {
       // Return cached response as SSE stream
@@ -2388,7 +2486,8 @@ REGOLE PER RUOLO:
     }
 
     // ─── SAVE TO CACHE (fire-and-forget) ─────────────────────────────────
-    if (textReply && !proposal) {
+    const usedDocSearch = logToolsCalled.includes("search_documents");
+    if (textReply && !proposal && !isDocumentQuery && !usedDocSearch) {
       userClient
         .from("fly_cache")
         .insert({ user_id: user.id, query_hash: queryHash, response: textReply })
