@@ -13,8 +13,8 @@ export interface OnsiteRegistration {
 }
 
 const ERROR_MESSAGES: Record<string, string> = {
-  UNAUTHENTICATED: 'Autenticazione richiesta.',
-  UNAUTHORIZED: 'Non hai i permessi per questa operazione.',
+  AUTH_REQUIRED: 'Autenticazione richiesta.',
+  NOT_AUTHORIZED: 'Non hai i permessi per questa operazione.',
   INVALID_QR: 'Codice QR non valido.',
   REGISTRATION_NOT_FOUND: 'Registrazione non trovata.',
   NOT_CONFIRMED: 'La registrazione non è confermata.',
@@ -46,6 +46,11 @@ export async function lookupOnsiteRegistration(
   if (error) throw new Error('Errore imprevisto.')
   if (data?.error) throw new Error(translateError(data.error))
 
+  if (!data?.registration_id || typeof data.registration_id !== 'string' ||
+      typeof data.registration_status !== 'string') {
+    throw new Error('Risposta del servizio non valida.')
+  }
+
   return data as OnsiteRegistration
 }
 
@@ -64,6 +69,11 @@ export async function checkInOnsiteRegistration(
   if (error) throw new Error('Errore imprevisto.')
   if (data?.error) throw new Error(translateError(data.error))
 
+  if (!data?.registration_id || typeof data.registration_id !== 'string' ||
+      typeof data.registration_status !== 'string') {
+    throw new Error('Risposta del servizio non valida.')
+  }
+
   return data as OnsiteRegistration
 }
 
@@ -78,6 +88,11 @@ export async function undoOnsiteRegistrationCheckIn(
 
   if (error) throw new Error('Errore imprevisto.')
   if (data?.error) throw new Error(translateError(data.error))
+
+  if (!data?.registration_id || typeof data.registration_id !== 'string' ||
+      typeof data.status !== 'string') {
+    throw new Error('Risposta del servizio non valida.')
+  }
 
   return data as { registration_id: string; status: string }
 }
