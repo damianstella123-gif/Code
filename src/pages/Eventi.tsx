@@ -45,6 +45,7 @@ import { TabProgramma } from './eventi/tabs/TabProgramma'
 import { TabDocumenti } from './eventi/tabs/TabDocumenti'
 import { TabComunicazioni } from './eventi/tabs/TabComunicazioni'
 import { TabGreenReport } from './eventi/tabs/TabGreenReport'
+import EventOnsitePanel from '@/components/EventOnsitePanel'
 
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 
@@ -175,6 +176,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
     { id: 'comunicazioni', label: 'Comunicazioni' },
     { id: 'documenti', label: 'Documenti' },
     { id: 'registrazioni', label: 'Registrazioni' },
+    { id: 'onsite', label: 'On Site' },
     { id: 'green', label: 'Green Report' },
   ]
 
@@ -374,6 +376,13 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
         {activeTab === 'programma' && <TabProgramma event={event} suppliers={suppliers} />}
         {activeTab === 'registrazioni' && (
           <EventRegistrationManager
+            eventId={event.id}
+            eventName={event.nome}
+            isArchived={isArchived}
+          />
+        )}
+        {activeTab === 'onsite' && (
+          <EventOnsitePanel
             eventId={event.id}
             eventName={event.nome}
             isArchived={isArchived}
