@@ -26,6 +26,7 @@ export default function OnsiteQrScanner({ eventId, disabled }: Props) {
   const [actionLoading, setActionLoading] = useState(false)
 
   const scannerRef = useRef<any>(null)
+  const startingRef = useRef(false)
   const lastScannedRef = useRef<string | null>(null)
   const mountedRef = useRef(true)
   const containerIdRef = useRef(`qr-reader-${Math.random().toString(36).slice(2, 10)}`)
@@ -36,15 +37,17 @@ export default function OnsiteQrScanner({ eventId, disabled }: Props) {
   }, [])
 
   const stopCamera = useCallback(async () => {
-    if (scannerRef.current) {
+    const scanner = scannerRef.current
+    scannerRef.current = null
+    startingRef.current = false
+    if (scanner) {
       try {
-        const state = scannerRef.current.getState?.()
-        if (state === 2) {
-          await scannerRef.current.stop()
-        }
-        scannerRef.current.clear()
-      } catch { /* safe cleanup */ }
-      scannerRef.current = null
+        const scanning = typeof scanner.isScanning === 'boolean'
+          ? scanner.isScanning
+          : scanner.getState?.() === 2
+        if (scanning) await scanner.stop()
+      } catch { /* safe */ }
+      try { scanner.clear() } catch { /* safe */ }
     }
     if (mountedRef.current) setCameraActive(false)
   }, [])
@@ -52,6 +55,10 @@ export default function OnsiteQrScanner({ eventId, disabled }: Props) {
   useEffect(() => {
     return () => { stopCamera() }
   }, [stopCamera])
+
+  useEffect(() => {
+    if (disabled && cameraActive) { stopCamera() }
+  }, [disabled, cameraActive, stopCamera])
 
   const handleScanResult = useCallback(async (token: string) => {
     if (!token || token === lastScannedRef.current) return
@@ -61,24 +68,34 @@ export default function OnsiteQrScanner({ eventId, disabled }: Props) {
   }, [eventId, stopCamera])
 
   const startCamera = useCallback(async () => {
-    if (disabled) return
+    if (disabled || startingRef.current || scannerRef.current) return
+    startingRef.current = true
     lastScannedRef.current = null
     setView({ kind: 'idle' })
-
-    const { Html5Qrcode } = await import('html5-qrcode')
-    const scanner = new Html5Qrcode(containerIdRef.current)
-    scannerRef.current = scanner
+    setCameraActive(true)
 
     try {
+      const { Html5Qrcode } = await import('html5-qrcode')
+      const scanner = new Html5Qrcode(containerIdRef.current)
+      scannerRef.current = scanner
+
       await scanner.start(
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decoded: string) => { handleScanResult(decoded) },
         () => {}
       )
-      if (mountedRef.current) setCameraActive(true)
+      startingRef.current = false
     } catch (err: any) {
+      const scanner = scannerRef.current
+      scannerRef.current = null
+      startingRef.current = false
+      if (scanner) {
+        try { if (scanner.isScanning) await scanner.stop() } catch { /* safe */ }
+        try { scanner.clear() } catch { /* safe */ }
+      }
       if (mountedRef.current) {
+        setCameraActive(false)
         const msg = err?.message?.toLowerCase?.() ?? ''
         if (msg.includes('permission') || msg.includes('denied')) {
           setView({ kind: 'error', message: 'Permesso fotocamera negato. Consenti l\'accesso nelle impostazioni del browser.' })
@@ -159,7 +176,7 @@ export default function OnsiteQrScanner({ eventId, disabled }: Props) {
       <div
         id={containerIdRef.current}
         className="w-full rounded-lg overflow-hidden bg-gray-900"
-        style={{ minHeight: cameraActive ? 280 : 0, display: cameraActive ? 'block' : 'none' }}
+        style={{ minHeight: cameraActive ? 280 : 0, height: cameraActive ? 'auto' : 0, overflow: 'hidden' }}
       />
 
       {/* Camera controls */}
@@ -260,12 +277,12 @@ export default function OnsiteQrScanner({ eventId, disabled }: Props) {
 
           {/* Alerts */}
           {view.data.dietary_requirements && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800" style={{ fontSize: '12px' }}>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
               <strong>Dieta:</strong> {view.data.dietary_requirements}
             </div>
           )}
           {view.data.accessibility_requirements && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800" style={{ fontSize: '12px' }}>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
               <strong>Accessibilità:</strong> {view.data.accessibility_requirements}
             </div>
           )}
