@@ -24,6 +24,7 @@ import type { Client } from '@/data/clients'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import EventTeamManager from '@/components/EventTeamManager'
+import EventRegistrationManager from '@/components/EventRegistrationManager'
 import TabBudget from '@/components/TabBudget'
 import TabPagamenti from '@/components/TabPagamenti'
 import { useToast } from '@/lib/toast'
@@ -173,6 +174,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
     { id: 'pagamenti', label: 'Pagamenti' },
     { id: 'comunicazioni', label: 'Comunicazioni' },
     { id: 'documenti', label: 'Documenti' },
+    { id: 'registrazioni', label: 'Registrazioni' },
     { id: 'green', label: 'Green Report' },
   ]
 
@@ -370,6 +372,13 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
         {activeTab === 'documenti' && <TabDocumenti event={event} isArchived={isArchived} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} />}
         {activeTab === 'programma' && <TabProgramma event={event} suppliers={suppliers} />}
+        {activeTab === 'registrazioni' && (
+          <EventRegistrationManager
+            eventId={event.id}
+            eventName={event.nome}
+            isArchived={isArchived}
+          />
+        )}
         {activeTab === 'green' && <TabGreenReport event={event} suppliers={suppliers} />}
       </div>
 
