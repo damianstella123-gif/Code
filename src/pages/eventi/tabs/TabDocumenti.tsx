@@ -3,6 +3,7 @@ import { FileText, Upload, Download, Eye, Trash2, X, ExternalLink } from 'lucide
 import { supabase } from '@/lib/supabase'
 import { trackAction } from '@/lib/impact-tracker'
 import { fmtLong } from '@/lib/format'
+import { checkEventPermission } from '@/lib/event-members-service'
 import type { Event } from '@/data/events'
 
 interface EventDocument {
@@ -44,12 +45,13 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / 1048576).toFixed(1)} MB`
 }
 
-export function TabDocumenti({ event }: { event: Event }) {
+export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?: boolean }) {
   const [docs, setDocs] = useState<EventDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [docCategoria, setDocCategoria] = useState('Materiali Evento')
   const [deletingDoc, setDeletingDoc] = useState<string | null>(null)
+  const [canManageDocs, setCanManageDocs] = useState(false)
 
   async function loadDocs() {
     const { data } = await supabase
@@ -62,6 +64,11 @@ export function TabDocumenti({ event }: { event: Event }) {
   }
 
   useEffect(() => { loadDocs() }, [event.id])
+
+  useEffect(() => {
+    if (isArchived) { setCanManageDocs(false); return }
+    checkEventPermission(event.id, 'can_manage_documents').then(setCanManageDocs)
+  }, [event.id, isArchived])
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files
@@ -80,6 +87,7 @@ export function TabDocumenti({ event }: { event: Event }) {
         continue
       }
 
+      const { data: { user } } = await supabase.auth.getUser()
       await supabase.from('documents').insert({
         nome: file.name.replace(/\.[^/.]+$/, ''),
         categoria: docCategoria,
@@ -88,7 +96,7 @@ export function TabDocumenti({ event }: { event: Event }) {
         file_name: file.name,
         file_size: file.size,
         file_type: file.type || 'application/octet-stream',
-        uploaded_by: '',
+        uploaded_by: user?.id ?? '',
       })
       trackAction('document_uploaded', { eventId: event.id })
     }
@@ -176,19 +184,21 @@ export function TabDocumenti({ event }: { event: Event }) {
         <p className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
           Documenti Evento ({docs.length})
         </p>
-        <div className="flex items-center gap-2">
-          <select value={docCategoria} onChange={e => setDocCategoria(e.target.value)}
-            className="px-2 py-1.5 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-            {DOC_CATEGORIE.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer"
-            style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)', border: '1px solid var(--red2)' }}>
-            <Upload className="w-3.5 h-3.5" />
-            {uploading ? 'Caricamento...' : 'Carica'}
-            <input type="file" className="hidden" onChange={handleUpload} multiple disabled={uploading}
-              accept=".pdf,.xlsx,.xls,.pptx,.ppt,.docx,.jpg,.jpeg,.png" />
-          </label>
-        </div>
+        {canManageDocs && (
+          <div className="flex items-center gap-2">
+            <select value={docCategoria} onChange={e => setDocCategoria(e.target.value)}
+              className="px-2 py-1.5 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+              {DOC_CATEGORIE.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer"
+              style={{ background: 'color-mix(in srgb, var(--red2) 12%, transparent)', color: 'var(--red2)', border: '1px solid var(--red2)' }}>
+              <Upload className="w-3.5 h-3.5" />
+              {uploading ? 'Caricamento...' : 'Carica'}
+              <input type="file" className="hidden" onChange={handleUpload} multiple disabled={uploading}
+                accept=".pdf,.xlsx,.xls,.pptx,.ppt,.docx,.jpg,.jpeg,.png" />
+            </label>
+          </div>
+        )}
       </div>
 
       {docs.length === 0 ? (
@@ -229,10 +239,12 @@ export function TabDocumenti({ event }: { event: Event }) {
                     className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
                     <Download className="w-4 h-4" style={{ color: 'var(--blue)' }} />
                   </button>
-                  <button onClick={() => setDeletingDoc(doc.id)} title="Elimina"
-                    className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
-                    <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
-                  </button>
+                  {canManageDocs && (
+                    <button onClick={() => setDeletingDoc(doc.id)} title="Elimina"
+                      className="p-2 rounded-lg transition-all hover:bg-[var(--line)]">
+                      <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
+                    </button>
+                  )}
                 </div>
               </div>
             )

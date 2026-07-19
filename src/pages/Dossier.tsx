@@ -569,6 +569,7 @@ function DetailView({ dossier, onBack, onEdit, onDelete, allEvents, allUsers }: 
       setUploading(false)
       return
     }
+    const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('documents').insert({
       nome: file.name.replace(/\.[^/.]+$/, ''),
       categoria: 'Varie',
@@ -578,7 +579,7 @@ function DetailView({ dossier, onBack, onEdit, onDelete, allEvents, allUsers }: 
       file_name: file.name,
       file_size: file.size,
       file_type: file.type,
-      uploaded_by: '',
+      uploaded_by: user?.id ?? '',
       dossier_id: dossier.id,
     })
     setUploading(false)
