@@ -17,6 +17,7 @@ import { fetchAllProfiles, type Profile } from '@/lib/profiles'
 import { supabase } from '@/lib/supabase'
 import type { Event } from '@/data/events'
 import { fmtLong } from '@/lib/format'
+import CreativeTemplateManager from '@/components/CreativeTemplateManager'
 
 interface Client { id: string; nome: string }
 
@@ -141,9 +142,6 @@ export default function CreativeStudio() {
     return [...projects].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 3)
   }, [projects])
 
-  const templates = useMemo(() => {
-    return projects.filter(p => p.status === 'approvato')
-  }, [projects])
 
   const stats = useMemo(() => ({
     total: projects.length,
@@ -167,21 +165,6 @@ export default function CreativeStudio() {
     setProjects(prev => prev.map(p => p.id === id ? { ...p, status } : p))
   }
 
-  function useAsTemplate(template: CreativeProject) {
-    setEditing(null)
-    setShowForm(true)
-    setTimeout(() => {
-      setEditing({
-        ...template,
-        id: '',
-        title: `${template.title} (copia)`,
-        status: 'bozza',
-        event_id: null,
-        created_at: '',
-        updated_at: '',
-      })
-    }, 0)
-  }
 
   async function askFly(prompt: string) {
     if (!navigator.onLine) {
@@ -273,7 +256,7 @@ export default function CreativeStudio() {
 
       {/* Template Section */}
       {activeSection === 'template' && (
-        <TemplateSection templates={templates} events={events} clients={clients} onUseTemplate={useAsTemplate} />
+        <CreativeTemplateManager clients={clients} />
       )}
 
       {/* Show media library if that section is active */}
@@ -566,59 +549,7 @@ function BrandKitSection() {
 
 // ─── Template Section ─────────────────────────────────────────────────────────
 
-function TemplateSection({ templates, events, clients, onUseTemplate }: {
-  templates: CreativeProject[]
-  events: Event[]
-  clients: Client[]
-  onUseTemplate: (t: CreativeProject) => void
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="panel p-4 rounded-xl">
-        <p className="text-sm" style={{ color: 'var(--text)' }}>
-          <span className="font-bold">{templates.length} template disponibili</span>
-          <span style={{ color: 'var(--muted)' }}> — creati dai tuoi migliori lavori approvati</span>
-        </p>
-      </div>
-      {templates.length === 0 ? (
-        <div className="text-center py-12 panel rounded-2xl">
-          <Layout className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--muted)' }} />
-          <p style={{ color: 'var(--muted)' }}>Nessun template ancora. I progetti approvati appariranno qui.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {templates.map(t => {
-            const event = events.find(e => e.id === t.event_id)
-            const client = clients.find(c => c.id === t.client_id)
-            return (
-              <div key={t.id} className="panel p-4 rounded-2xl space-y-3 hover:shadow-lg transition-all">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                    style={{ background: '#38d27d20', color: '#38d27d' }}>
-                    {typeLabel(t.type)}
-                  </span>
-                  {event && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full"
-                      style={{ background: '#4db4ff18', color: '#4db4ff' }}>
-                      {event.nome}
-                    </span>
-                  )}
-                </div>
-                <h3 className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{t.title}</h3>
-                {client && <p className="text-xs" style={{ color: 'var(--muted)' }}>{client.nome}</p>}
-                <button onClick={() => onUseTemplate(t)}
-                  className="w-full py-2 rounded-xl text-xs font-medium transition-all hover:opacity-80"
-                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--red2)' }}>
-                  Usa come template &rarr;
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
+
 
 // ─── Project Card ─────────────────────────────────────────────────────────────
 
