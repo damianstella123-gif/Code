@@ -12,7 +12,7 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024;
 const CHUNK_TARGET = 1500;
 const CHUNK_OVERLAP = 200;
 const CLAUDE_MODEL = "claude-sonnet-4-6";
-const CLAUDE_TEXT_CAP = 80_000; // max chars sent to Claude for office text analysis
+const CLAUDE_TEXT_CAP = 80_000;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -63,36 +63,18 @@ async function sha256(data: Uint8Array): Promise<string> {
     .join("");
 }
 
-// ─── Chunking ───────────────────────────────────────────────────────────────
+// ─── Chunking (source-only, from extractedText) ─────────────────────────────
 
 function chunkText(
-  text: string,
-  sections?: { label: string; content: string; page?: number }[]
-): { content: string; section_label: string | null; page_number: number | null }[] {
-  const chunks: { content: string; section_label: string | null; page_number: number | null }[] = [];
-
-  if (sections && sections.length > 0) {
-    for (const section of sections) {
-      const sectionChunks = splitIntoChunks(section.content);
-      for (const c of sectionChunks) {
-        if (c.trim().length > 0) {
-          chunks.push({
-            content: c.trim(),
-            section_label: section.label || null,
-            page_number: section.page ?? null,
-          });
-        }
-      }
-    }
-  } else {
-    const rawChunks = splitIntoChunks(text);
-    for (const c of rawChunks) {
-      if (c.trim().length > 0) {
-        chunks.push({ content: c.trim(), section_label: null, page_number: null });
-      }
+  text: string
+): { content: string; section_label: null; page_number: null }[] {
+  const chunks: { content: string; section_label: null; page_number: null }[] = [];
+  const rawChunks = splitIntoChunks(text);
+  for (const c of rawChunks) {
+    if (c.trim().length > 0) {
+      chunks.push({ content: c.trim(), section_label: null, page_number: null });
     }
   }
-
   return chunks;
 }
 
@@ -181,13 +163,29 @@ async function analyzeFileWithClaude(
   const isImage = fileType.startsWith("image/");
 
   const prompt = isPdf
-    ? `Analizza questo documento PDF ("${fileName}"). Rispondi ESCLUSIVAMENTE con un JSON valido senza markdown. Non inventare informazioni non presenti nel documento.`
-    : `Analizza questa immagine ("${fileName}"). Estrai tutto il testo visibile e descrivi il contenuto. Rispondi ESCLUSIVAMENTE con un JSON valido senza markdown. Non inventare informazioni non presenti.`;
+    ? `Analizza questo documento PDF ("${fileName}"). Rispondi ESCLUSIVAMENTE con un JSON valido senza markdown.
+
+REGOLE PER extracted_text:
+- Trascrivi FEDELMENTE tutto il testo visibile nel documento, nell'ordine originale.
+- NON riassumere, NON parafrasare, NON omettere parti.
+- Se una trascrizione affidabile e impossibile, lascia extracted_text come stringa vuota "".
+- NON inventare testo non presente nel documento.
+
+Le sezioni (sections), il riassunto (summary) e i metadati sono SEPARATI dalla trascrizione.`
+    : `Analizza questa immagine ("${fileName}"). Rispondi ESCLUSIVAMENTE con un JSON valido senza markdown.
+
+REGOLE PER extracted_text:
+- Trascrivi FEDELMENTE tutto il testo visibile nell'immagine, nell'ordine di lettura.
+- NON riassumere, NON parafrasare.
+- Se non c'e testo leggibile o la trascrizione affidabile e impossibile, lascia extracted_text come stringa vuota "".
+- NON inventare testo non presente nell'immagine.
+
+Le sezioni (sections), il riassunto (summary) e i metadati sono SEPARATI dalla trascrizione.`;
 
   const schema = `
 Schema JSON richiesto:
 {
-  "extracted_text": "testo completo estratto dal documento",
+  "extracted_text": "trascrizione fedele e completa del testo originale",
   "summary": "sintesi del contenuto in italiano, massimo 500 parole",
   "sections": [{"label": "nome sezione", "content": "testo della sezione", "page": 1}],
   "entities": ["entita rilevanti menzionate"],
@@ -235,7 +233,6 @@ Schema JSON richiesto:
 
   const result = await response.json();
 
-  // Check for stop reason indicating truncation
   if (result.stop_reason === "max_tokens") {
     throw new Error("Analisi interrotta: il documento e troppo lungo e Claude ha raggiunto il limite di token. Provare con un documento piu breve.");
   }
@@ -458,7 +455,6 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
-  // Parse body ONCE, keep documentId available for error handling
   let documentId: string | null = null;
   let force = false;
 
@@ -549,16 +545,15 @@ Deno.serve(async (req: Request) => {
 
     let extractedText = "";
     let summary = "";
-    let sections: { label: string; content: string; page?: number }[] = [];
     let metadata: Record<string, unknown> = {};
 
     if (isPdfOrImage(fileType)) {
-      // Claude vision/document analysis
+      // Claude vision/document analysis — extracted_text is faithful transcription
       const analysis = await analyzeFileWithClaude(fileBytes, fileType, doc.file_name);
       extractedText = analysis.extracted_text;
       summary = analysis.summary;
-      sections = analysis.sections;
       metadata = {
+        sections: analysis.sections,
         entities: analysis.entities,
         dates: analysis.dates,
         amounts: analysis.amounts,
@@ -568,13 +563,13 @@ Deno.serve(async (req: Request) => {
         language: analysis.language,
       };
     } else if (isTextFile(fileType)) {
-      // Local text extraction + Claude analysis
+      // Local text extraction — this IS the source text
       extractedText = extractTextLocal(fileBytes);
       if (extractedText.trim().length > 0) {
         const analysis = await analyzeTextWithClaude(extractedText, doc.file_name);
         summary = analysis.summary;
-        sections = analysis.sections;
         metadata = {
+          sections: analysis.sections,
           entities: analysis.entities,
           dates: analysis.dates,
           amounts: analysis.amounts,
@@ -585,7 +580,7 @@ Deno.serve(async (req: Request) => {
         };
       }
     } else if (isOfficeFile(fileType)) {
-      // Local extraction then Claude analysis on text
+      // Local extraction — this IS the source text
       if (fileType.includes("wordprocessingml")) {
         extractedText = await extractDocx(fileBytes);
       } else if (fileType.includes("spreadsheetml")) {
@@ -601,8 +596,8 @@ Deno.serve(async (req: Request) => {
 
       const analysis = await analyzeTextWithClaude(extractedText, doc.file_name);
       summary = analysis.summary;
-      sections = analysis.sections;
       metadata = {
+        sections: analysis.sections,
         entities: analysis.entities,
         dates: analysis.dates,
         amounts: analysis.amounts,
@@ -623,28 +618,36 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ status: "non_supportato", document_id: documentId, reason: `Tipo non supportato: ${fileType}` });
     }
 
-    // Build chunks
-    const chunks = chunkText(extractedText, sections.length > 0 ? sections : undefined);
+    // Build chunks from extractedText ONLY
+    const chunks = chunkText(extractedText);
 
-    // Atomic chunk replacement via RPC
-    if (chunks.length > 0) {
-      const chunksPayload = chunks.map((c, i) => ({
-        chunk_index: i,
-        content: c.content,
-        section_label: c.section_label,
-        page_number: c.page_number,
-        metadata: {},
-      }));
+    // Always call replace_document_chunks (even if chunks is empty, to remove obsolete chunks)
+    const chunksPayload = chunks.map((c, i) => ({
+      chunk_index: i,
+      content: c.content,
+      section_label: c.section_label,
+      page_number: c.page_number,
+      metadata: {},
+    }));
 
-      const { error: rpcErr } = await serviceClient.rpc("replace_document_chunks", {
-        p_document_id: documentId,
-        p_chunks: chunksPayload,
+    const { error: rpcErr } = await serviceClient.rpc("replace_document_chunks", {
+      p_document_id: documentId,
+      p_chunks: chunksPayload,
+    });
+
+    if (rpcErr) {
+      await markError(serviceClient, documentId, "Errore durante il salvataggio dei chunk");
+      return errorResponse("Errore durante il salvataggio dei chunk");
+    }
+
+    // If extractedText is empty after trimming, mark as errore
+    if (!extractedText || extractedText.trim().length === 0) {
+      await markError(serviceClient, documentId, "Nessun testo estraibile dal documento");
+      return jsonResponse({
+        status: "errore",
+        document_id: documentId,
+        reason: "Nessun testo estraibile dal documento",
       });
-
-      if (rpcErr) {
-        await markError(serviceClient, documentId, "Errore durante il salvataggio dei chunk: " + (rpcErr.message || "sconosciuto").slice(0, 400));
-        return errorResponse("Errore durante il salvataggio dei chunk");
-      }
     }
 
     // Mark as elaborato
@@ -669,7 +672,6 @@ Deno.serve(async (req: Request) => {
     });
   } catch (err) {
     const message = (err as Error).message || "Errore interno sconosciuto";
-    // Always mark errore so we never leave in_elaborazione
     await markError(serviceClient, documentId!, message);
     return errorResponse(message, 500);
   }
