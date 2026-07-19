@@ -107,8 +107,30 @@ export async function submitPublicRegistration(input: RegistrationSubmission): P
   })
 
   if (error) {
-    throw new Error(translateError(error.message))
+    throw new Error('Si è verificato un errore. Riprovare più tardi.')
   }
 
-  return data as unknown as RegistrationResult
+  const result = data as Record<string, unknown> | null
+  if (!result || typeof result !== 'object') {
+    throw new Error('Si è verificato un errore. Riprovare più tardi.')
+  }
+
+  if (typeof result.error === 'string' && result.error.length > 0) {
+    throw new Error(translateError(result.error))
+  }
+
+  if (
+    typeof result.registration_id !== 'string' ||
+    typeof result.registration_status !== 'string' ||
+    typeof result.qr_token !== 'string'
+  ) {
+    throw new Error('Si è verificato un errore. Riprovare più tardi.')
+  }
+
+  return {
+    registration_id: result.registration_id,
+    registration_status: result.registration_status,
+    qr_token: result.qr_token,
+    confirmation_message: typeof result.confirmation_message === 'string' ? result.confirmation_message : null,
+  }
 }
