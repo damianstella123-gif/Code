@@ -10,6 +10,7 @@ import {
   Trash2,
   Archive,
   RotateCcw,
+  Users,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { loadTasksFromStorage, cacheEventsSnapshot, loadWorkflowsFromStorage } from '@/lib/storage'
@@ -22,6 +23,7 @@ import { fetchClients as fetchClientsService } from '@/lib/clients-service'
 import type { Client } from '@/data/clients'
 import { fetchAllProfiles } from '@/lib/profiles'
 import { useRealtimeTable } from '@/lib/use-realtime'
+import EventTeamManager from '@/components/EventTeamManager'
 import TabBudget from '@/components/TabBudget'
 import TabPagamenti from '@/components/TabPagamenti'
 import { useToast } from '@/lib/toast'
@@ -134,6 +136,7 @@ interface EventDetailProps {
 function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, onStatusChange, budgets, suppliers, comunicazioni, internalUsers, clients, onSuppliersChanged }: EventDetailProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [eventTasks, setEventTasks] = useState<Task[]>([])
+  const [showTeamPanel, setShowTeamPanel] = useState(false)
   const navigateRouter = useNavigate()
   const tabsContainerRef = useRef<HTMLDivElement>(null)
 
@@ -227,6 +230,14 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
             </span>
             {!isArchived && (
               <>
+                <button onClick={() => setShowTeamPanel(true)}
+                  title="Team evento"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                </button>
                 <button onClick={() => onEdit(event)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
@@ -254,6 +265,15 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
               </>
             )}
             {isArchived && (
+              <>
+              <button onClick={() => setShowTeamPanel(true)}
+                title="Team evento"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
+              >
+                <Users className="w-3.5 h-3.5" />
+              </button>
               <button onClick={() => { restoreEvent(event.id).then(() => { onBack() }) }}
                 title="Ripristina"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
@@ -262,6 +282,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
+              </>
             )}
           </div>
         </div>
@@ -351,6 +372,15 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
         {activeTab === 'programma' && <TabProgramma event={event} suppliers={suppliers} />}
         {activeTab === 'green' && <TabGreenReport event={event} suppliers={suppliers} />}
       </div>
+
+      {showTeamPanel && (
+        <EventTeamManager
+          eventId={event.id}
+          responsabileId={event.responsabile}
+          isArchived={isArchived}
+          onClose={() => setShowTeamPanel(false)}
+        />
+      )}
     </div>
   )
 }
