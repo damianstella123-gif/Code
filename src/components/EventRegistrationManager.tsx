@@ -3,7 +3,6 @@ import { Globe, Copy, Trash2, Save, Send, RotateCcw, XCircle, Eye, Lock, Chevron
 import { useToast } from '@/lib/toast'
 import {
   fetchRegistrationSites,
-  fetchRegistrationFields,
   createRegistrationSite,
   updateRegistrationSite,
   deleteRegistrationSite,
@@ -164,13 +163,7 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
       const err = validateForPublish(form)
       if (err) { showToast(err, 'error'); return }
       if (!site) {
-        showToast('Salva prima la bozza per poter configurare i campi e pubblicare.', 'error')
-        return
-      }
-      const fields = await fetchRegistrationFields(site.id)
-      const activeFields = fields.filter(f => f.is_active)
-      if (activeFields.length === 0) {
-        showToast('Aggiungi almeno un campo attivo prima di pubblicare.', 'error')
+        showToast('Salva prima la bozza per poter pubblicare.', 'error')
         return
       }
     }
