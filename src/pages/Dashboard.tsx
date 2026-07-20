@@ -324,16 +324,16 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="wire-page">
-      <div className="wire-masthead">
-        <span className="wire-masthead-title">SIMMETRIA WIRE{firstName ? ` — ${firstName.toUpperCase()}` : ''}</span>
-        <div className="wire-masthead-right">
-          <span className="wire-clock">
+    <div className="wire-page" style={{ minWidth: 0, maxWidth: '100%', overflowX: 'hidden' }}>
+      <div className="wire-masthead" style={{ flexWrap: 'wrap', gap: '4px 12px' }}>
+        <span className="wire-masthead-title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>SIMMETRIA WIRE{firstName ? ` — ${firstName.toUpperCase()}` : ''}</span>
+        <div className="wire-masthead-right" style={{ flexShrink: 0 }}>
+          <span className="wire-clock" style={{ fontSize: '12px' }}>
             {now.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase()} · {now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
           <span className="wire-live-dot" />
-          <button onClick={toggleTheme} className="wire-theme-toggle" title={resolved === 'dark' ? 'Passa a Light' : 'Passa a Dark'}>
-            {resolved === 'dark' ? <Moon size={13} style={{ color: 'var(--blue)' }} /> : <Sun size={13} style={{ color: 'var(--yellow)' }} />}
+          <button onClick={toggleTheme} className="wire-theme-toggle" title={resolved === 'dark' ? 'Passa a Light' : 'Passa a Dark'} style={{ minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            {resolved === 'dark' ? <Moon size={16} style={{ color: 'var(--blue)' }} /> : <Sun size={16} style={{ color: 'var(--yellow)' }} />}
           </button>
         </div>
       </div>
@@ -345,9 +345,9 @@ export default function Dashboard() {
         onFilter={handleFilter}
       />
 
-      <div className="wire-ticker">
+      <div className="wire-ticker" style={{ flexWrap: 'wrap', gap: '4px 12px', fontSize: '14px' }}>
         <span><strong>{kpi.taskAperti}</strong> task aperti</span>
-        <span><strong>{kpi.eventiImminenti}</strong> eventi nei prossimi 14 giorni</span>
+        <span><strong>{kpi.eventiImminenti}</strong> eventi prossimi 14gg</span>
         <span><strong>{kpi.clientiAttivi}</strong> clienti attivi</span>
       </div>
 
@@ -358,12 +358,13 @@ export default function Dashboard() {
         navigate={navigate}
       />
 
-      <div className="wire-tabs">
+      <div className="wire-tabs" style={{ flexWrap: 'wrap', gap: '4px' }}>
         {(['tutto', 'eventi', 'task', 'clienti'] as const).map(t => (
           <button
             key={t}
             className={`wire-tab ${tab === t ? 'wire-tab--active' : ''}`}
             onClick={() => { setTab(t); setFeedFilter(null) }}
+            style={{ minHeight: 44, fontSize: '14px' }}
           >
             {t}
           </button>
@@ -371,7 +372,7 @@ export default function Dashboard() {
         {feedFilter && (
           <button
             className="wire-tab"
-            style={{ opacity: 1, color: 'var(--red2)' }}
+            style={{ opacity: 1, color: 'var(--red2)', minHeight: 44, fontSize: '14px' }}
             onClick={() => setFeedFilter(null)}
           >
             × reset filtro
@@ -380,7 +381,7 @@ export default function Dashboard() {
       </div>
 
       {filteredStories.length === 0 ? (
-        <div className="wire-empty" style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: 1.7 }}>
+        <div className="wire-empty" style={{ fontFamily: 'var(--font-mono)', fontSize: '14px', lineHeight: 1.7 }}>
           Il feed e silenzioso. Significa che tutto e sotto controllo<br/>oppure che e ora di mettere in moto qualcosa.
         </div>
       ) : (
@@ -462,7 +463,7 @@ function MorningEditionCard({ edition }: { edition: { id: string; message: strin
     >
       <span
         className="wire-story-tag"
-        style={{ color: '#ca8a04', borderColor: '#ca8a04', fontSize: 10 }}
+        style={{ color: '#ca8a04', borderColor: '#ca8a04', fontSize: 12 }}
       >
         EDIZIONE DEL MATTINO
       </span>
@@ -533,7 +534,7 @@ function DashboardWidgets({ events, tasks, setTasks, navigate }: {
   }, [unread])
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-4 py-3" style={{ maxWidth: 900, margin: '0 auto' }}>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-4 py-3" style={{ maxWidth: 900, margin: '0 auto', minWidth: 0 }}>
       {/* EVENTI */}
       <div
         className="rounded-[14px] p-4 transition-all cursor-pointer group"
@@ -543,30 +544,30 @@ function DashboardWidgets({ events, tasks, setTasks, navigate }: {
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line)')}
       >
         <div className="flex items-center justify-between mb-2 pb-2" style={{ borderBottom: '1px solid var(--line)' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Eventi</span>
-          <Calendar className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Eventi</span>
+          <Calendar className="w-4 h-4" style={{ color: 'var(--muted)' }} />
         </div>
         <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--text)', lineHeight: 1.1 }}>
           {activeEvents.length}
         </p>
-        <p className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>attivi</p>
-        <div className="space-y-1.5">
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>attivi</p>
+        <div className="space-y-1.5" style={{ minWidth: 0 }}>
           {activeEvents.slice(0, 3).map(e => {
             const dl = daysLeft(e.dataInizio)
             return (
-              <div key={e.id} className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>
-                <span className="truncate flex-1">{e.nome}</span>
-                <span style={{ color: dl <= 7 ? 'var(--red2)' : 'var(--muted)', fontSize: 10 }}>
+              <div key={e.id} className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--text)', minWidth: 0 }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{e.nome}</span>
+                <span style={{ color: dl <= 7 ? 'var(--red2)' : 'var(--muted)', fontSize: 12, flexShrink: 0 }}>
                   T{dl >= 0 ? `-${dl}` : `+${Math.abs(dl)}`}
                 </span>
               </div>
             )
           })}
           {activeEvents.length === 0 && (
-            <p className="text-xs" style={{ color: 'var(--green)' }}>Nessun evento in corso</p>
+            <p style={{ fontSize: 14, color: 'var(--green)' }}>Nessun evento in corso</p>
           )}
         </div>
-        <div className="flex items-center gap-1 mt-3 text-[10px] font-medium" style={{ color: 'var(--red2)' }}>
+        <div className="flex items-center gap-1 mt-3 font-medium" style={{ color: 'var(--red2)', fontSize: 12 }}>
           Vedi tutti <ChevronRight className="w-3 h-3" />
         </div>
       </div>
@@ -580,38 +581,38 @@ function DashboardWidgets({ events, tasks, setTasks, navigate }: {
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line)')}
       >
         <div className="flex items-center justify-between mb-2 pb-2" style={{ borderBottom: '1px solid var(--line)' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Task</span>
-          <ListTodo className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Task</span>
+          <ListTodo className="w-4 h-4" style={{ color: 'var(--muted)' }} />
         </div>
         <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--text)', lineHeight: 1.1 }}>
           {openTasks.length}
         </p>
-        <p className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>aperti</p>
-        <div className="space-y-1.5">
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>aperti</p>
+        <div className="space-y-1.5" style={{ minWidth: 0 }}>
           {openTasks.slice(0, 3).map(t => {
             const dl = daysLeft(t.scadenza)
             return (
-              <div key={t.id} className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>
+              <div key={t.id} className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--text)', minWidth: 0 }}>
                 <input
                   type="checkbox"
-                  className="w-3.5 h-3.5 rounded flex-shrink-0 cursor-pointer"
-                  style={{ accentColor: 'var(--green)' }}
+                  className="rounded flex-shrink-0 cursor-pointer"
+                  style={{ accentColor: 'var(--green)', width: 20, height: 20, minWidth: 20, minHeight: 20 }}
                   checked={false}
                   onClick={e => { e.stopPropagation(); toggleTask(t.id) }}
                   onChange={() => {}}
                 />
-                <span className="truncate flex-1">{t.titolo}</span>
-                <span style={{ color: dl <= 0 ? 'var(--red2)' : dl <= 2 ? 'var(--yellow)' : 'var(--muted)', fontSize: 10 }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{t.titolo}</span>
+                <span style={{ color: dl <= 0 ? 'var(--red2)' : dl <= 2 ? 'var(--yellow)' : 'var(--muted)', fontSize: 12, flexShrink: 0 }}>
                   {dl === 0 ? 'oggi' : dl < 0 ? `${Math.abs(dl)}g fa` : `${dl}g`}
                 </span>
               </div>
             )
           })}
           {openTasks.length === 0 && (
-            <p className="text-xs" style={{ color: 'var(--green)' }}>Tutti i task completati</p>
+            <p style={{ fontSize: 14, color: 'var(--green)' }}>Tutti i task completati</p>
           )}
         </div>
-        <div className="flex items-center gap-1 mt-3 text-[10px] font-medium" style={{ color: 'var(--red2)' }}>
+        <div className="flex items-center gap-1 mt-3 font-medium" style={{ color: 'var(--red2)', fontSize: 12 }}>
           Vedi tutti <ChevronRight className="w-3 h-3" />
         </div>
       </div>
@@ -625,25 +626,25 @@ function DashboardWidgets({ events, tasks, setTasks, navigate }: {
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line)')}
       >
         <div className="flex items-center justify-between mb-2 pb-2" style={{ borderBottom: '1px solid var(--line)' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Scadenze</span>
-          <AlertCircle className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Scadenze</span>
+          <AlertCircle className="w-4 h-4" style={{ color: 'var(--muted)' }} />
         </div>
         {deadlines.length > 0 ? (
           <>
             <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--red2)', lineHeight: 1.1 }}>
               {deadlines.length}
             </p>
-            <div className="flex items-center gap-1.5 mb-3">
+            <div className="flex items-center gap-1.5 mb-3" style={{ flexWrap: 'wrap' }}>
               {deadlines.some(t => t.scadenza?.slice(0, 10) === todayStr) && (
-                <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-bold" style={{ background: 'color-mix(in srgb, var(--red2) 15%, transparent)', color: 'var(--red2)' }}>Oggi</span>
+                <span className="uppercase px-1.5 py-0.5 rounded font-bold" style={{ fontSize: 12, background: 'color-mix(in srgb, var(--red2) 15%, transparent)', color: 'var(--red2)' }}>Oggi</span>
               )}
               {deadlines.some(t => t.scadenza?.slice(0, 10) === tomorrowStr) && (
-                <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-bold" style={{ background: 'color-mix(in srgb, var(--yellow) 15%, transparent)', color: 'var(--yellow)' }}>Domani</span>
+                <span className="uppercase px-1.5 py-0.5 rounded font-bold" style={{ fontSize: 12, background: 'color-mix(in srgb, var(--yellow) 15%, transparent)', color: 'var(--yellow)' }}>Domani</span>
               )}
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" style={{ minWidth: 0 }}>
               {deadlines.slice(0, 3).map(t => (
-                <div key={t.id} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }} className="truncate">
+                <div key={t.id} style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {t.titolo}
                 </div>
               ))}
@@ -652,10 +653,10 @@ function DashboardWidgets({ events, tasks, setTasks, navigate }: {
         ) : (
           <>
             <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--green)', lineHeight: 1.1 }}>0</p>
-            <p className="text-xs mt-2" style={{ color: 'var(--green)' }}>Nessuna scadenza urgente</p>
+            <p style={{ fontSize: 14, color: 'var(--green)', marginTop: 8 }}>Nessuna scadenza urgente</p>
           </>
         )}
-        <div className="flex items-center gap-1 mt-3 text-[10px] font-medium" style={{ color: 'var(--red2)' }}>
+        <div className="flex items-center gap-1 mt-3 font-medium" style={{ color: 'var(--red2)', fontSize: 12 }}>
           Calendario <ChevronRight className="w-3 h-3" />
         </div>
       </div>
@@ -669,20 +670,20 @@ function DashboardWidgets({ events, tasks, setTasks, navigate }: {
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line)')}
       >
         <div className="flex items-center justify-between mb-2 pb-2" style={{ borderBottom: '1px solid var(--line)' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Messaggi</span>
-          <MessageSquare className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Messaggi</span>
+          <MessageSquare className="w-4 h-4" style={{ color: 'var(--muted)' }} />
         </div>
         {unread && unread.total > 0 ? (
           <>
             <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--text)', lineHeight: 1.1 }}>
               {unread.total}
             </p>
-            <p className="text-[10px] mb-3" style={{ color: 'var(--muted)' }}>non letti</p>
-            <div className="space-y-1.5">
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>non letti</p>
+            <div className="space-y-1.5" style={{ minWidth: 0 }}>
               {unreadConvs.map(c => (
-                <div key={c.id} className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>
-                  <span className="truncate flex-1">{c.title}</span>
-                  <span style={{ color: 'var(--blue)', fontSize: 10 }}>{c.count} nuov{c.count === 1 ? 'o' : 'i'}</span>
+                <div key={c.id} className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--text)', minWidth: 0 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{c.title}</span>
+                  <span style={{ color: 'var(--blue)', fontSize: 12, flexShrink: 0 }}>{c.count} nuov{c.count === 1 ? 'o' : 'i'}</span>
                 </div>
               ))}
             </div>
@@ -690,10 +691,10 @@ function DashboardWidgets({ events, tasks, setTasks, navigate }: {
         ) : (
           <>
             <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--green)', lineHeight: 1.1 }}>0</p>
-            <p className="text-xs mt-2" style={{ color: 'var(--green)' }}>Tutto letto</p>
+            <p style={{ fontSize: 14, color: 'var(--green)', marginTop: 8 }}>Tutto letto</p>
           </>
         )}
-        <div className="flex items-center gap-1 mt-3 text-[10px] font-medium" style={{ color: 'var(--red2)' }}>
+        <div className="flex items-center gap-1 mt-3 font-medium" style={{ color: 'var(--red2)', fontSize: 12 }}>
           Chat <ChevronRight className="w-3 h-3" />
         </div>
       </div>
