@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Globe, Copy, Trash2, Save, Send, RotateCcw, XCircle, Eye, Lock } from 'lucide-react'
+import { Globe, Copy, Trash2, Save, Send, RotateCcw, XCircle, Eye, Lock, ChevronDown, ChevronRight } from 'lucide-react'
 import { useToast } from '@/lib/toast'
 import {
   fetchRegistrationSites,
@@ -96,8 +96,7 @@ function validateForPublish(form: FormState): string | null {
   if (!form.privacy_url.trim() && !form.privacy_text.trim()) {
     return 'Inserire URL privacy o testo privacy per pubblicare.'
   }
-  if (!form.opens_at || !form.closes_at) return 'Le date di apertura e chiusura sono obbligatorie.'
-  if (new Date(form.closes_at) <= new Date(form.opens_at)) {
+  if (form.opens_at && form.closes_at && new Date(form.closes_at) <= new Date(form.opens_at)) {
     return 'La data di chiusura deve essere successiva a quella di apertura.'
   }
   return null
@@ -112,6 +111,12 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
   const [form, setForm] = useState<FormState>(emptyForm)
   const [showDelete, setShowDelete] = useState(false)
   const [editing, setEditing] = useState(false)
+
+  // Collapsible sections
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [privacyOpen, setPrivacyOpen] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [fieldsOpen, setFieldsOpen] = useState(false)
 
   const readOnly = isArchived || !canManage
 
@@ -139,7 +144,14 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
   useEffect(() => { load() }, [load])
 
   const handleChange = (key: keyof FormState, value: string | boolean) => {
-    setForm(prev => ({ ...prev, [key]: value }))
+    setForm(prev => {
+      const next = { ...prev, [key]: value }
+      // Auto-generate slug from title for new sites only
+      if (key === 'title' && !site) {
+        next.slug = normalizeRegistrationSlug(value as string)
+      }
+      return next
+    })
   }
 
   const handleSlugChange = (value: string) => {
@@ -162,6 +174,13 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
         return
       }
     }
+
+    // Date validation
+    if (form.opens_at && form.closes_at && new Date(form.closes_at) <= new Date(form.opens_at)) {
+      showToast('La data di chiusura deve essere successiva a quella di apertura.', 'error')
+      return
+    }
+
     setSaving(true)
     try {
       const payload = formToPayload(form)
@@ -273,7 +292,7 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
           {!readOnly && (
             <button
               style={styles.btnPrimary}
-              onClick={() => { setForm({ ...emptyForm, title: eventName }); setEditing(true) }}
+              onClick={() => { setForm({ ...emptyForm, title: eventName, slug: normalizeRegistrationSlug(eventName) }); setEditing(true) }}
             >
               Crea Sito Registrazione
             </button>
@@ -315,17 +334,16 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
         {site.status === 'published' && (
           <div style={styles.publicPath}>
             <Globe size={14} style={{ color: 'var(--green)' }} />
-            <span style={{ fontFamily: 'var(--font-code)', fontSize: '13px' }}>
+            <span style={{ fontFamily: 'var(--font-code)', fontSize: 13 }}>
               /r/{site.slug}
             </span>
           </div>
         )}
 
         <div style={styles.infoGrid}>
-          <InfoRow label="Slug" value={site.slug} />
           <InfoRow label="Sottotitolo" value={site.subtitle} />
           <InfoRow label="Capacità" value={site.capacity != null ? String(site.capacity) : '—'} />
-          <InfoRow label="Waitlist" value={site.waitlist_enabled ? 'Attiva' : 'Disattiva'} />
+          <InfoRow label="Lista d'attesa" value={site.waitlist_enabled ? 'Attiva' : 'Disattiva'} />
           <InfoRow label="Apertura" value={site.opens_at ? new Date(site.opens_at).toLocaleString('it-IT') : '—'} />
           <InfoRow label="Chiusura" value={site.closes_at ? new Date(site.closes_at).toLocaleString('it-IT') : '—'} />
           <InfoRow label="Pubblicato il" value={site.published_at ? new Date(site.published_at).toLocaleString('it-IT') : '—'} />
@@ -379,42 +397,98 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
     )
   }
 
-  // Edit/create mode
+  // ─── Edit/create mode ──────────────────────────────────────────────
   return (
     <div style={styles.container}>
       <h3 style={styles.siteTitle}>{site ? 'Modifica Sito Registrazione' : 'Nuovo Sito Registrazione'}</h3>
 
-      <div style={styles.formGrid}>
+      {/* PRIMARY SECTION */}
+      <div style={styles.formSection}>
         <Field label="Titolo *" value={form.title} onChange={v => handleChange('title', v)} />
-        <Field label="Slug *" value={form.slug} onChange={handleSlugChange} hint="Min. 3 caratteri. Solo lettere, numeri, trattini." />
         <Field label="Sottotitolo" value={form.subtitle} onChange={v => handleChange('subtitle', v)} />
         <Field label="Descrizione" value={form.description} onChange={v => handleChange('description', v)} multiline />
-        <Field label="URL Privacy" value={form.privacy_url} onChange={v => handleChange('privacy_url', v)} placeholder="https://..." />
-        <Field label="Testo Privacy" value={form.privacy_text} onChange={v => handleChange('privacy_text', v)} multiline />
-        <Field label="Messaggio di Conferma" value={form.confirmation_message} onChange={v => handleChange('confirmation_message', v)} multiline />
-        <Field label="Capacità (posti)" value={form.capacity} onChange={v => handleChange('capacity', v)} type="number" />
-        <Field label="URL Logo" value={form.logo_url} onChange={v => handleChange('logo_url', v)} placeholder="https://..." />
-        <Field label="URL Immagine Hero" value={form.hero_image_url} onChange={v => handleChange('hero_image_url', v)} placeholder="https://..." />
-        <Field label="Apertura iscrizioni" value={form.opens_at} onChange={v => handleChange('opens_at', v)} type="datetime-local" />
-        <Field label="Chiusura iscrizioni" value={form.closes_at} onChange={v => handleChange('closes_at', v)} type="datetime-local" />
-
-        <div style={styles.checkRow}>
-          <input
-            type="checkbox"
-            checked={form.waitlist_enabled}
-            onChange={e => handleChange('waitlist_enabled', e.target.checked)}
-            id="waitlist_enabled"
-          />
-          <label htmlFor="waitlist_enabled" style={{ fontSize: '13px', color: 'var(--text)', cursor: 'pointer' }}>
-            Abilita lista d'attesa
-          </label>
-        </div>
+        <Field label="Messaggio dopo la registrazione" value={form.confirmation_message} onChange={v => handleChange('confirmation_message', v)} multiline />
       </div>
 
-      {site && (
-        <RegistrationFieldsManager siteId={site.id} readOnly={readOnly} />
-      )}
+      {/* SETTINGS SECTION */}
+      <CollapsibleSection
+        title="Impostazioni iscrizioni"
+        open={settingsOpen}
+        onToggle={() => setSettingsOpen(o => !o)}
+      >
+        <div style={styles.formSection}>
+          <Field label="Capacità (facoltativa)" value={form.capacity} onChange={v => handleChange('capacity', v)} type="number" placeholder="Nessun limite" />
+          <div style={styles.checkRow}>
+            <input
+              type="checkbox"
+              checked={form.waitlist_enabled}
+              onChange={e => handleChange('waitlist_enabled', e.target.checked)}
+              id="reg_waitlist"
+              style={{ width: 18, height: 18 }}
+            />
+            <label htmlFor="reg_waitlist" style={{ fontSize: 14, color: 'var(--text)', cursor: 'pointer' }}>
+              Abilita lista d'attesa
+            </label>
+          </div>
+          <Field label="Apertura iscrizioni" value={form.opens_at} onChange={v => handleChange('opens_at', v)} type="datetime-local" />
+          <Field label="Chiusura iscrizioni" value={form.closes_at} onChange={v => handleChange('closes_at', v)} type="datetime-local" />
+        </div>
+      </CollapsibleSection>
 
+      {/* PRIVACY SECTION */}
+      <CollapsibleSection
+        title="Privacy"
+        open={privacyOpen}
+        onToggle={() => setPrivacyOpen(o => !o)}
+      >
+        <p style={styles.sectionHint}>
+          Per pubblicare è necessario inserire almeno un'informativa privacy (URL o testo).
+        </p>
+        <div style={styles.formSection}>
+          <Field label="URL informativa privacy" value={form.privacy_url} onChange={v => handleChange('privacy_url', v)} placeholder="https://..." />
+          <Field label="Testo informativa privacy" value={form.privacy_text} onChange={v => handleChange('privacy_text', v)} multiline />
+        </div>
+      </CollapsibleSection>
+
+      {/* ADVANCED / APPEARANCE */}
+      <CollapsibleSection
+        title="Grafica e impostazioni avanzate"
+        open={advancedOpen}
+        onToggle={() => setAdvancedOpen(o => !o)}
+      >
+        <div style={styles.formSection}>
+          <Field label="URL Logo" value={form.logo_url} onChange={v => handleChange('logo_url', v)} placeholder="https://..." />
+          <Field label="URL Immagine Hero" value={form.hero_image_url} onChange={v => handleChange('hero_image_url', v)} placeholder="https://..." />
+          <Field
+            label="Slug"
+            value={form.slug}
+            onChange={handleSlugChange}
+            hint="Indirizzo breve della pagina. Min. 3 caratteri, solo lettere minuscole, numeri e trattini."
+          />
+        </div>
+      </CollapsibleSection>
+
+      {/* QUESTIONS / FIELDS SECTION */}
+      <CollapsibleSection
+        title="Domande del modulo"
+        open={fieldsOpen}
+        onToggle={() => setFieldsOpen(o => !o)}
+      >
+        {site ? (
+          <>
+            <p style={styles.sectionHint}>
+              Personalizza le domande che i partecipanti dovranno compilare durante la registrazione.
+            </p>
+            <RegistrationFieldsManager siteId={site.id} readOnly={readOnly} />
+          </>
+        ) : (
+          <p style={styles.sectionHint}>
+            Salva prima la bozza per personalizzare le domande.
+          </p>
+        )}
+      </CollapsibleSection>
+
+      {/* ACTIONS */}
       <div style={styles.footerActions}>
         <button style={styles.btnOutline} onClick={() => { setEditing(false); if (site) setForm(siteToForm(site)) }} disabled={saving}>
           Annulla
@@ -440,6 +514,29 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
+function CollapsibleSection({ title, open, onToggle, children }: {
+  title: string
+  open: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  const Icon = open ? ChevronDown : ChevronRight
+  return (
+    <div style={styles.collapsible}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        style={styles.collapsibleHeader}
+      >
+        <Icon size={16} style={{ flexShrink: 0, color: 'var(--muted)' }} />
+        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
+      </button>
+      {open && <div style={styles.collapsibleContent}>{children}</div>}
+    </div>
+  )
+}
+
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, { bg: string; color: string }> = {
     draft: { bg: 'var(--panel2)', color: 'var(--muted)' },
@@ -451,7 +548,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span style={{
       display: 'inline-block',
-      fontSize: '12px',
+      fontSize: 12,
       fontWeight: 600,
       padding: '2px 8px',
       borderRadius: 6,
@@ -466,7 +563,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function InfoRow({ label, value }: { label: string; value: string | null }) {
   return (
-    <div style={{ display: 'flex', gap: 8, fontSize: '13px', padding: '4px 0' }}>
+    <div style={{ display: 'flex', gap: 8, fontSize: 14, padding: '4px 0' }}>
       <span style={{ color: 'var(--muted)', minWidth: 120 }}>{label}:</span>
       <span style={{ color: 'var(--text)', wordBreak: 'break-word' }}>{value || '—'}</span>
     </div>
@@ -484,8 +581,8 @@ function Field({ label, value, onChange, multiline, type, placeholder, hint }: {
 }) {
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    padding: '8px 12px',
-    fontSize: '13px',
+    padding: '10px 12px',
+    fontSize: 14,
     fontFamily: 'var(--font-sans)',
     color: 'var(--text)',
     background: 'var(--panel)',
@@ -493,17 +590,18 @@ function Field({ label, value, onChange, multiline, type, placeholder, hint }: {
     borderRadius: 8,
     outline: 'none',
     resize: multiline ? 'vertical' : undefined,
-    minHeight: multiline ? 72 : undefined,
+    minHeight: multiline ? 80 : 44,
+    boxSizing: 'border-box' as const,
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>{label}</label>
+      <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--muted)' }}>{label}</label>
       {multiline ? (
         <textarea style={inputStyle} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
       ) : (
         <input style={inputStyle} type={type ?? 'text'} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
       )}
-      {hint && <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{hint}</span>}
+      {hint && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{hint}</span>}
     </div>
   )
 }
@@ -512,8 +610,8 @@ function DeleteConfirmDialog({ saving, onConfirm, onCancel }: { saving: boolean;
   return (
     <div style={styles.overlay}>
       <div style={styles.dialog}>
-        <h4 style={{ fontSize: '15px', color: 'var(--text)', marginBottom: 8 }}>Conferma Eliminazione</h4>
-        <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: 16 }}>
+        <h4 style={{ fontSize: 15, color: 'var(--text)', marginBottom: 8 }}>Conferma Eliminazione</h4>
+        <p style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 16 }}>
           Questa azione eliminerà definitivamente il sito di registrazione e tutti i dati associati. Continuare?
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -531,13 +629,13 @@ function DeleteConfirmDialog({ saving, onConfirm, onCancel }: { saving: boolean;
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    padding: 24,
+    padding: 20,
     background: 'var(--panel-solid)',
     borderRadius: 'var(--radius-md)',
     border: '1px solid var(--line)',
   },
   loadingText: {
-    fontSize: '13px',
+    fontSize: 14,
     color: 'var(--muted)',
     textAlign: 'center',
     padding: 32,
@@ -550,13 +648,13 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '32px 16px',
   },
   emptyTitle: {
-    fontSize: '16px',
+    fontSize: 16,
     fontWeight: 600,
     color: 'var(--text)',
     marginBottom: 8,
   },
   emptyDesc: {
-    fontSize: '13px',
+    fontSize: 14,
     color: 'var(--muted)',
     maxWidth: 360,
     marginBottom: 20,
@@ -575,7 +673,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap' as const,
   },
   siteTitle: {
-    fontSize: '16px',
+    fontSize: 16,
     fontWeight: 600,
     color: 'var(--text)',
     marginBottom: 4,
@@ -595,28 +693,27 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 4,
     marginBottom: 20,
   },
-  formGrid: {
+  formSection: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 16,
-    marginTop: 16,
-    marginBottom: 20,
+    gap: 14,
   },
   checkRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+    minHeight: 44,
   },
   footerActions: {
     display: 'flex',
     gap: 8,
     flexWrap: 'wrap' as const,
-    marginTop: 8,
+    marginTop: 16,
   },
   readOnlyNote: {
     display: 'flex',
     alignItems: 'center',
-    fontSize: '12px',
+    fontSize: 12,
     color: 'var(--muted)',
     marginTop: 16,
   },
@@ -624,40 +721,43 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 6,
-    padding: '8px 16px',
-    fontSize: '13px',
+    padding: '10px 18px',
+    fontSize: 14,
     fontWeight: 500,
     color: '#fff',
     background: 'var(--red)',
     border: 'none',
     borderRadius: 8,
     cursor: 'pointer',
+    minHeight: 44,
   },
   btnOutline: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 6,
-    padding: '8px 16px',
-    fontSize: '13px',
+    padding: '10px 16px',
+    fontSize: 14,
     fontWeight: 500,
     color: 'var(--text)',
     background: 'transparent',
     border: '1px solid var(--line)',
     borderRadius: 8,
     cursor: 'pointer',
+    minHeight: 44,
   },
   btnDanger: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 6,
-    padding: '8px 16px',
-    fontSize: '13px',
+    padding: '10px 16px',
+    fontSize: 14,
     fontWeight: 500,
     color: '#fff',
     background: 'var(--red)',
     border: 'none',
     borderRadius: 8,
     cursor: 'pointer',
+    minHeight: 44,
   },
   overlay: {
     position: 'fixed',
@@ -675,5 +775,32 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 400,
     width: '90%',
     border: '1px solid var(--line)',
+  },
+  collapsible: {
+    marginTop: 16,
+    border: '1px solid var(--line)',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  collapsibleHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    minHeight: 44,
+    padding: '10px 14px',
+    background: 'var(--panel)',
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'left' as const,
+  },
+  collapsibleContent: {
+    padding: '14px 14px 16px',
+  },
+  sectionHint: {
+    fontSize: 13,
+    color: 'var(--muted)',
+    margin: '0 0 12px 0',
+    lineHeight: 1.5,
   },
 }
