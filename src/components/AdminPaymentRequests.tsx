@@ -9,6 +9,9 @@ import {
   X,
   AlertTriangle,
   Clock,
+  Pencil,
+  CheckCircle2,
+  Ban,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { fmtDateShort } from '@/lib/format'
@@ -20,6 +23,7 @@ import {
   fetchLinkableInvoices,
   createSupplierInvoiceDraft,
   transitionPaymentRequest,
+  updatePaymentRequest,
   linkInvoiceToRequest,
   createPaymentExecution,
   transitionPaymentExecution,
@@ -252,10 +256,15 @@ function RequestDetail({ request, onReload, userId }: { request: AdminPaymentReq
   const [executions, setExecutions] = useState<PaymentExecution[]>([])
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
   const [noteInput, setNoteInput] = useState('')
   const [showLinkInvoice, setShowLinkInvoice] = useState(false)
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
   const [showCreateExecution, setShowCreateExecution] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
+  const [editDescription, setEditDescription] = useState(request.descrizione || '')
+  const [editDueDate, setEditDueDate] = useState(request.data_scadenza || '')
+  const [editAdminNote, setEditAdminNote] = useState(request.admin_note || '')
 
   const loadDetail = useCallback(async () => {
     const [lines, invoices, execs] = await Promise.all([
@@ -284,6 +293,7 @@ function RequestDetail({ request, onReload, userId }: { request: AdminPaymentReq
     }
     setBusy(true)
     setActionError(null)
+    setActionSuccess(null)
     const { error } = await transitionPaymentRequest({
       paymentRequestId: request.id,
       targetStatus,
@@ -293,6 +303,28 @@ function RequestDetail({ request, onReload, userId }: { request: AdminPaymentReq
       setActionError(error)
     } else {
       setNoteInput('')
+      setActionSuccess('Operazione completata.')
+      await onReload()
+      await loadDetail()
+    }
+    setBusy(false)
+  }
+
+  async function handleEditSave() {
+    setBusy(true)
+    setActionError(null)
+    setActionSuccess(null)
+    const { error } = await updatePaymentRequest({
+      paymentRequestId: request.id,
+      description: editDescription,
+      dueDate: editDueDate,
+      adminNote: editAdminNote || undefined,
+    })
+    if (error) {
+      setActionError(error)
+    } else {
+      setShowEdit(false)
+      setActionSuccess('Richiesta aggiornata.')
       await onReload()
       await loadDetail()
     }
@@ -379,37 +411,110 @@ function RequestDetail({ request, onReload, userId }: { request: AdminPaymentReq
 
       {/* Action error */}
       {actionError && (
-        <div className="flex items-center gap-2" style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'rgba(239,68,68,0.1)', color: 'var(--red2)', fontSize: 13 }}>
+        <div className="flex items-center gap-2" style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'rgba(239,68,68,0.1)', color: 'var(--red2)', fontSize: 14 }}>
           <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {actionError}
+        </div>
+      )}
+
+      {/* Action success */}
+      {actionSuccess && (
+        <div className="flex items-center gap-2" style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'rgba(34,197,94,0.1)', color: 'var(--green)', fontSize: 14 }}>
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> {actionSuccess}
+        </div>
+      )}
+
+      {/* Edit panel */}
+      {showEdit && (
+        <div style={{ marginBottom: 16, padding: 16, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2, var(--panel-solid))' }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Modifica richiesta</p>
+            <button onClick={() => setShowEdit(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+              <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" style={{ marginBottom: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Importo (sola lettura)</label>
+              <input type="text" readOnly value={formatEur(request.importo)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg3, var(--bg2))', color: 'var(--muted)', fontSize: 14, cursor: 'not-allowed' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Fornitore (sola lettura)</label>
+              <input type="text" readOnly value={request.supplier?.nome ?? '—'} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg3, var(--bg2))', color: 'var(--muted)', fontSize: 14, cursor: 'not-allowed' }} />
+            </div>
+            <div className="sm:col-span-2">
+              <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Descrizione *</label>
+              <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={2} disabled={busy} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontSize: 14, resize: 'vertical' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data scadenza *</label>
+              <input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} disabled={busy} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontSize: 14 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nota amministrativa</label>
+              <input type="text" value={editAdminNote} onChange={e => setEditAdminNote(e.target.value)} disabled={busy} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontSize: 14 }} />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ActionButton label="Salva modifiche" icon={<CheckCircle2 className="w-4 h-4" />} busy={busy} onClick={handleEditSave} />
+            <button onClick={() => setShowEdit(false)} disabled={busy} style={{ minHeight: 44, padding: '8px 14px', borderRadius: 8, background: 'var(--bg3, var(--bg2))', color: 'var(--text)', fontSize: 14, fontWeight: 600, border: '1px solid var(--line)', cursor: 'pointer' }}>Annulla</button>
+          </div>
         </div>
       )}
 
       {/* Actions by status */}
       <div className="space-y-3">
         {status === 'inviata' && (
-          <ActionButton label="Prendi in carico" icon={<ArrowRight className="w-4 h-4" />} busy={busy} onClick={() => handleTransition('in_verifica', false)} />
+          <>
+            <div>
+              <textarea
+                value={noteInput}
+                onChange={e => setNoteInput(e.target.value)}
+                placeholder="Nota amministrativa (min 5 caratteri per respingere)"
+                rows={2}
+                disabled={busy}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontSize: 14, resize: 'vertical' }}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton label="Approva richiesta" icon={<CheckCircle2 className="w-4 h-4" />} busy={busy} onClick={() => {
+                if (!confirm('Confermi di voler approvare questa richiesta?')) return
+                handleTransition('approvata', false)
+              }} />
+              <ActionButton label="Prendi in carico" icon={<ArrowRight className="w-4 h-4" />} busy={busy} onClick={() => handleTransition('in_verifica', false)} />
+              <ActionButton label="Modifica" icon={<Pencil className="w-4 h-4" />} busy={busy} onClick={() => setShowEdit(true)} variant="secondary" />
+              <ActionButton label="Respingi" variant="danger" icon={<Ban className="w-4 h-4" />} busy={busy} onClick={() => {
+                if (!confirm('Confermi di voler respingere questa richiesta?')) return
+                handleTransition('respinta', true)
+              }} />
+            </div>
+          </>
         )}
 
         {(status === 'in_verifica' || status === 'in_attesa_fattura') && (
           <>
-            {/* Note input for actions requiring it */}
             <div>
               <textarea
                 value={noteInput}
                 onChange={e => setNoteInput(e.target.value)}
                 placeholder="Nota amministrativa (min 5 caratteri per respingere o richiedere fattura)"
                 rows={2}
-                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontSize: 13, resize: 'vertical' }}
+                disabled={busy}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontSize: 14, resize: 'vertical' }}
               />
             </div>
             <div className="flex flex-wrap gap-2">
+              <ActionButton label="Approva richiesta" icon={<CheckCircle2 className="w-4 h-4" />} busy={busy} onClick={() => {
+                if (!confirm('Confermi di voler approvare questa richiesta?')) return
+                handleTransition('approvata', false)
+              }} />
               {status === 'in_verifica' && (
                 <ActionButton label="Richiedi fattura" icon={<Clock className="w-4 h-4" />} busy={busy} onClick={() => handleTransition('in_attesa_fattura', true)} />
               )}
               {status === 'in_attesa_fattura' && (
                 <ActionButton label="Riprendi verifica" icon={<ArrowRight className="w-4 h-4" />} busy={busy} onClick={() => handleTransition('in_verifica', false)} />
               )}
-              <ActionButton label="Respingi" variant="danger" icon={<X className="w-4 h-4" />} busy={busy} onClick={() => {
+              <ActionButton label="Modifica" icon={<Pencil className="w-4 h-4" />} busy={busy} onClick={() => setShowEdit(true)} variant="secondary" />
+              <ActionButton label="Respingi" variant="danger" icon={<Ban className="w-4 h-4" />} busy={busy} onClick={() => {
                 if (!confirm('Confermi di voler respingere questa richiesta?')) return
                 handleTransition('respinta', true)
               }} />
@@ -426,9 +531,25 @@ function RequestDetail({ request, onReload, userId }: { request: AdminPaymentReq
         )}
 
         {status === 'approvata' && (
-          <div className="flex flex-wrap gap-2">
-            <ActionButton label="Crea disposizione" icon={<Plus className="w-4 h-4" />} busy={busy} onClick={() => setShowCreateExecution(true)} />
-          </div>
+          <>
+            <div>
+              <textarea
+                value={noteInput}
+                onChange={e => setNoteInput(e.target.value)}
+                placeholder="Nota amministrativa (min 5 caratteri per annullare)"
+                rows={2}
+                disabled={busy}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontSize: 14, resize: 'vertical' }}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton label="Crea disposizione" icon={<Plus className="w-4 h-4" />} busy={busy} onClick={() => setShowCreateExecution(true)} />
+              <ActionButton label="Annulla richiesta" variant="danger" icon={<Ban className="w-4 h-4" />} busy={busy} onClick={() => {
+                if (!confirm('Confermi di voler annullare questa richiesta approvata?')) return
+                handleTransition('annullata', true)
+              }} />
+            </div>
+          </>
         )}
       </div>
 
@@ -477,14 +598,16 @@ function RequestDetail({ request, onReload, userId }: { request: AdminPaymentReq
 
 // ─── Action button ───────────────────────────────────────────────────────────
 
-function ActionButton({ label, icon, busy, onClick, variant }: { label: string; icon?: React.ReactNode; busy: boolean; onClick: () => void; variant?: 'danger' }) {
-  const bg = variant === 'danger' ? 'var(--red2)' : 'var(--accent)'
+function ActionButton({ label, icon, busy, onClick, variant }: { label: string; icon?: React.ReactNode; busy: boolean; onClick: () => void; variant?: 'danger' | 'secondary' }) {
+  const bg = variant === 'danger' ? 'var(--red2)' : variant === 'secondary' ? 'var(--bg3, var(--bg2))' : 'var(--accent)'
+  const color = variant === 'secondary' ? 'var(--text)' : '#fff'
+  const border = variant === 'secondary' ? '1px solid var(--line)' : 'none'
   return (
     <button
       disabled={busy}
       onClick={onClick}
       className="flex items-center gap-2 transition-opacity"
-      style={{ padding: '8px 14px', borderRadius: 8, background: bg, color: '#fff', fontSize: 13, fontWeight: 600, opacity: busy ? 0.5 : 1, cursor: busy ? 'not-allowed' : 'pointer', border: 'none' }}
+      style={{ minHeight: 44, padding: '8px 14px', borderRadius: 8, background: bg, color, fontSize: 14, fontWeight: 600, opacity: busy ? 0.5 : 1, cursor: busy ? 'not-allowed' : 'pointer', border }}
     >
       {icon} {label}
     </button>
@@ -719,7 +842,7 @@ function FieldInput({ label, value, onChange, type = 'text' }: { label: string; 
         value={value}
         onChange={e => onChange(e.target.value)}
         step={type === 'number' ? '0.01' : undefined}
-        style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontSize: 13 }}
+        style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontSize: 14 }}
       />
     </div>
   )
