@@ -182,3 +182,71 @@ export async function reorderRegistrationFields(fields: { id: string; sort_order
   const failed = results.find(r => r.error)
   if (failed?.error) throw new Error(failed.error.message)
 }
+
+// ─── Registration Modules ───────────────────────────────────────────────────
+
+export type RegistrationModule = 'transport' | 'accommodation' | 'program'
+
+export interface RegistrationModulesResult {
+  site_id: string
+  active_modules: RegistrationModule[]
+  active_preset_fields: number
+}
+
+const ALLOWED_MODULES: ReadonlySet<string> = new Set(['transport', 'accommodation', 'program'])
+
+const RPC_ERROR_MESSAGES: Record<string, string> = {
+  AUTH_REQUIRED: 'Autenticazione richiesta.',
+  SITE_NOT_FOUND: 'Sito di registrazione non trovato.',
+  NOT_AUTHORIZED: 'Non hai i permessi per configurare i moduli.',
+  INVALID_MODULES: 'Moduli non validi.',
+}
+
+export async function configureRegistrationModules(
+  siteId: string,
+  modules: RegistrationModule[]
+): Promise<RegistrationModulesResult> {
+  if (!siteId || typeof siteId !== 'string' || !siteId.trim()) {
+    throw new Error('ID sito mancante.')
+  }
+
+  for (const m of modules) {
+    if (!ALLOWED_MODULES.has(m)) {
+      throw new Error('Moduli non validi.')
+    }
+  }
+
+  const deduplicated = [...new Set(modules)]
+
+  const { data, error } = await supabase.rpc('configure_registration_modules', {
+    p_site_id: siteId,
+    p_modules: deduplicated,
+  })
+
+  if (error) {
+    const msg = RPC_ERROR_MESSAGES[error.message] ?? 'Errore nella configurazione dei moduli.'
+    throw new Error(msg)
+  }
+
+  const result = data as unknown
+  if (
+    !result ||
+    typeof result !== 'object' ||
+    typeof (result as Record<string, unknown>).site_id !== 'string' ||
+    !Array.isArray((result as Record<string, unknown>).active_modules) ||
+    typeof (result as Record<string, unknown>).active_preset_fields !== 'number' ||
+    !Number.isFinite((result as Record<string, unknown>).active_preset_fields) ||
+    (result as Record<string, unknown>).active_preset_fields as number < 0
+  ) {
+    throw new Error('Risposta non valida dal server.')
+  }
+
+  const obj = result as Record<string, unknown>
+  const activeModules = (obj.active_modules as string[]).filter(v => ALLOWED_MODULES.has(v)) as RegistrationModule[]
+
+  return {
+    site_id: obj.site_id as string,
+    active_modules: activeModules,
+    active_preset_fields: obj.active_preset_fields as number,
+  }
+}
