@@ -2100,8 +2100,8 @@ async function executeProposal(
             title: params.titolo,
             start_date: params.data,
             start_time: params.ora || null,
-            description: params.descrizione || null,
-            type: "memo",
+            description: params.descrizione || "",
+            item_type: "promemoria",
             user_id: userId,
           })
           .select("id, title")
@@ -2424,6 +2424,13 @@ Deno.serve(async (req: Request) => {
       .eq("user_id", user.id)
       .maybeSingle();
 
+    // ─── LOAD PERSISTENT ORGANIZATIONAL MEMORY ──────────────────────────
+    const { data: persistentMemories } = await userClient
+      .from("fly_persistent_memory")
+      .select("categoria, chiave, valore")
+      .order("categoria", { ascending: true })
+      .order("chiave", { ascending: true });
+
     let memorySection = "";
     if (memory) {
       const parts: string[] = [];
@@ -2440,6 +2447,20 @@ Deno.serve(async (req: Request) => {
       if (parts.length > 0) {
         memorySection = `\n\nMEMORIA UTENTE:\n${parts.join("\n")}`;
       }
+    }
+
+    // Build persistent organizational memory section
+    let persistentMemorySection = "";
+    if (persistentMemories && persistentMemories.length > 0) {
+      const grouped: Record<string, string[]> = {};
+      for (const m of persistentMemories) {
+        if (!grouped[m.categoria]) grouped[m.categoria] = [];
+        grouped[m.categoria].push(`- ${m.chiave}: ${m.valore}`);
+      }
+      const sections = Object.entries(grouped).map(
+        ([cat, items]) => `[${cat.toUpperCase()}]\n${items.join("\n")}`,
+      );
+      persistentMemorySection = `\n\nMEMORIA PERSISTENTE (conoscenza organizzativa):\n${sections.join("\n\n")}`;
     }
 
     const today = new Date().toLocaleDateString("it-IT", {
@@ -2511,7 +2532,7 @@ REGOLE PRESENTAZIONI CREATIVE:
 - Identifica chiaramente le informazioni mancanti invece di inventarle.
 - Restituisci sempre una bozza strutturata contenente: selected_template_id, selected_template_name, draft_values, missing_information, sources_used.
 - NON invocare mai creative-generate-pptx e NON dichiarare mai che un PPTX e stato generato.
-- La conferma umana resta OBBLIGATORIA prima di qualsiasi generazione.${memorySection}`;
+- La conferma umana resta OBBLIGATORIA prima di qualsiasi generazione.${memorySection}${persistentMemorySection}`;
 
     // ─── BUILD MESSAGES WITH CONTEXT MANAGEMENT ─────────────────────────
     const messages: AnthropicMessage[] = [];
