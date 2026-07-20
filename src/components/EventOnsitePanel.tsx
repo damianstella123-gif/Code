@@ -4,6 +4,7 @@ import OnsiteQrScanner from '@/components/OnsiteQrScanner'
 import OnsiteLiveProgram from '@/components/OnsiteLiveProgram'
 import OnsiteIncidentsManager from '@/components/OnsiteIncidentsManager'
 import OnsiteOperationsOverview from '@/components/OnsiteOperationsOverview'
+import TransportOperationsModule from '@/components/TransportOperationsModule'
 
 interface Props {
   eventId: string
@@ -16,11 +17,12 @@ type PermState =
   | { kind: 'denied' }
   | { kind: 'granted'; canOnsite: boolean; canRegistration: boolean }
 
-type Tab = 'panoramica' | 'checkin' | 'regia' | 'criticita'
+type Tab = 'panoramica' | 'checkin' | 'trasporti' | 'regia' | 'criticita'
 
 const TAB_LABELS: Record<Tab, string> = {
   panoramica: 'Panoramica',
   checkin: 'Check-in',
+  trasporti: 'Trasporti',
   regia: 'Regia Live',
   criticita: 'Criticità',
 }
@@ -79,7 +81,7 @@ export default function EventOnsitePanel({ eventId, eventName, isArchived }: Pro
   const checkinEnabled = !archived && (canOnsite || canRegistration)
   const editEnabled = !archived && canOnsite
 
-  const tabs: Tab[] = ['panoramica', 'checkin', 'regia', 'criticita']
+  const tabs: Tab[] = ['panoramica', 'checkin', 'trasporti', 'regia', 'criticita']
 
   return (
     <div className="flex flex-col w-full max-w-2xl mx-auto px-4 py-6 gap-5" style={{ fontSize: '14px' }}>
@@ -134,6 +136,10 @@ export default function EventOnsitePanel({ eventId, eventName, isArchived }: Pro
               Check-in non disponibile per eventi archiviati.
             </div>
           )
+        )}
+
+        {activeTab === 'trasporti' && (
+          <TransportOperationsModule eventId={eventId} disabled={archived} />
         )}
 
         {activeTab === 'regia' && (
