@@ -121,6 +121,8 @@ const RPC_ERROR_MAP: Record<string, string> = {
   PAYMENT_METHOD_REQUIRED: 'Il metodo di pagamento e obbligatorio.',
   CANNOT_CANCEL_WITH_EXECUTIONS: 'Non e possibile annullare: ci sono disposizioni autorizzate o eseguite.',
   INVALID_REQUEST_TYPE: 'La richiesta deve essere di tipo pagamento fornitore.',
+  DESCRIPTION_REQUIRED: 'La descrizione è obbligatoria.',
+  DUE_DATE_REQUIRED: 'La data di scadenza è obbligatoria.',
 }
 
 function translateRpcError(error: unknown): string {
@@ -354,6 +356,28 @@ export async function createPaymentExecution(params: {
     return { id: null, error: translateRpcError(error) }
   }
   return { id: data as string | null, error: null }
+}
+
+export async function updatePaymentRequest(params: {
+  paymentRequestId: string
+  description: string
+  dueDate: string
+  adminNote?: string
+}): Promise<{ error: string | null }> {
+  if (!params.paymentRequestId) return { error: 'ID richiesta mancante.' }
+  if (!params.description.trim()) return { error: 'La descrizione è obbligatoria.' }
+  if (!params.dueDate) return { error: 'La data di scadenza è obbligatoria.' }
+  const { error } = await supabase.rpc('admin_update_payment_request', {
+    p_payment_request_id: params.paymentRequestId,
+    p_description: params.description.trim(),
+    p_due_date: params.dueDate,
+    p_admin_note: params.adminNote?.trim() || null,
+  })
+  if (error) {
+    logError('payment-admin', 'updatePaymentRequest', error)
+    return { error: translateRpcError(error) }
+  }
+  return { error: null }
 }
 
 export async function transitionPaymentExecution(params: {
