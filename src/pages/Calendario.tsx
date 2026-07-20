@@ -33,10 +33,10 @@ import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Pratica } from '@/data/pratiche'
 import type { Uscita } from '@/data/amministrazione'
-import { fetchEvents, upsertEvent, moveEventWithTimelineShift, resizeEventOnly } from '@/lib/events-service'
+import { fetchEvents, moveEventWithTimelineShift, resizeEventOnly } from '@/lib/events-service'
 import { trackAction } from '@/lib/impact-tracker'
 import { fetchTasks, upsertTask, changeTaskStatus } from '@/lib/tasks-service'
-import { fetchDossiers as fetchPractices, upsertDossier as upsertPractice } from '@/lib/dossier-service'
+import { fetchDossiers as fetchPractices } from '@/lib/dossier-service'
 import { fetchBudgets } from '@/lib/budgets-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
 import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
@@ -1404,124 +1404,72 @@ function AgendaView({ items, onItemClick }: { items: CalItem[]; onItemClick: (it
 
 // ─── Quick Create Modal ───────────────────────────────────────────────────────
 
-type CreateType = 'event' | 'task' | 'pratica' | 'memo'
+type CreateType = 'promemoria' | 'task' | 'evento'
 
-function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
+function QuickCreateModal({ defaultDate, onClose, onCreate }: {
   defaultDate: string
-  events: Event[]
   onClose: () => void
-  onCreate: (type: CreateType, data: Event | Task | Pratica | CalendarItem) => void
+  onCreate: () => void
 }) {
-  const [type, setType] = useState<CreateType>('memo')
+  const [type, setType] = useState<CreateType>('promemoria')
   const [titolo, setTitolo] = useState('')
   const [desc, setDesc] = useState('')
   const [dataInizio, setDataInizio] = useState(defaultDate)
   const [dataFine, setDataFine] = useState(defaultDate)
-  const [eventoId, setEventoId] = useState('')
-  const [priorita, setPriorita] = useState<'alta' | 'media' | 'bassa'>('media')
-  const [location, setLocation] = useState('')
   const [alert, setAlert] = useState<'none' | '10min' | '1h' | '1d' | '1w'>('none')
-  const [memoType, setMemoType] = useState<'promemoria' | 'evento' | 'scadenza' | 'task'>('promemoria')
+  const [saving, setSaving] = useState(false)
 
-  function handleSubmit() {
-    if (!titolo.trim()) return
-    const id = `${type.slice(0, 3)}_${Date.now()}`
-    if (type === 'memo') {
-      const m: CalendarItem = {
-        id,
-        user_id: '',
-        title: titolo,
-        description: desc,
-        item_type: memoType,
-        start_date: dataInizio,
-        end_date: dataFine !== dataInizio ? dataFine : null,
-        alert,
-        created_at: new Date().toISOString(),
-      }
-      onCreate('memo', m)
-    } else if (type === 'event') {
-      const ev: Event = {
-        id,
-        nome: titolo,
-        descrizione: desc,
-        cliente: '',
-        dataInizio,
-        dataFine: dataFine || dataInizio,
-        location,
-        budget: 0,
-        ricavo_cliente: null,
-        fee_agenzia_pct: 6,
-        margine_target: 25,
-        stato: 'pianificazione',
-        partecipanti: 0,
-        responsabile: '',
-        team: [],
-      }
-      onCreate('event', ev)
-    } else if (type === 'task') {
-      const t: Task = {
-        id,
-        titolo,
-        descrizione: desc,
-        assegnatario: '',
-        evento: eventoId || null,
-        priorita,
-        stato: 'da_fare',
-        scadenza: dataInizio,
-        creatoIl: toISO(new Date()),
-      }
-      onCreate('task', t)
-    } else {
-      const p: Pratica = {
-        id,
-        titolo,
-        descrizione: desc,
-        eventoId: eventoId || null,
-        responsabileId: '',
-        categoria: 'documento',
-        stato: 'da_aprire',
-        priorita,
-        creatoIl: toISO(new Date()),
-        scadenza: dataInizio,
-        note: '',
-        importo: null,
-        controparte: '',
-      }
-      onCreate('pratica', p)
-    }
+  async function handleSubmit() {
+    if (!titolo.trim() || saving) return
+    setSaving(true)
+    const itemType: CalendarItem['item_type'] = type
+    const hasEndDate = type !== 'task' && dataFine && dataFine !== dataInizio
+    await upsertCalendarItem({
+      title: titolo,
+      description: desc,
+      item_type: itemType,
+      start_date: dataInizio,
+      end_date: hasEndDate ? dataFine : null,
+      alert,
+    })
+    setSaving(false)
+    onCreate()
   }
 
+  const typeLabel = type === 'promemoria' ? 'Promemoria' : type === 'task' ? 'Task' : 'Evento'
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="absolute inset-0 bg-black/60" />
-      <div className="relative w-full max-w-md rounded-2xl p-6 space-y-4"
-        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}>
+      <div className="relative w-full max-w-md rounded-2xl p-5 space-y-4"
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="flex items-center justify-between">
-          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', fontWeight: 600, color: 'var(--text)' }}>
-            {type === 'memo' ? 'Nuovo Promemoria' : type === 'event' ? 'Nuovo Evento' : type === 'task' ? 'Nuovo Task' : 'Nuova Pratica'}
+          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', fontWeight: 600, color: 'var(--text)' }}>
+            Nuovo {typeLabel}
           </h3>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10">
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10">
             <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
           </button>
         </div>
 
-        {/* Type selector */}
-        <div className="grid grid-cols-4 gap-1.5">
+        {/* Type selector - 3 columns */}
+        <div className="grid grid-cols-3 gap-2">
           {([
-            { id: 'memo' as CreateType, label: 'Promemoria', icon: Bell },
+            { id: 'promemoria' as CreateType, label: 'Promemoria', icon: Bell },
             { id: 'task' as CreateType, label: 'Task', icon: CheckSquare },
-            { id: 'event' as CreateType, label: 'Evento', icon: Calendar },
-            { id: 'pratica' as CreateType, label: 'Pratica', icon: FileText },
+            { id: 'evento' as CreateType, label: 'Evento', icon: Calendar },
           ]).map(t => (
             <button key={t.id} onClick={() => setType(t.id)}
-              className="flex flex-col items-center gap-1 px-2 py-2 rounded-lg text-[11px] font-medium transition-all"
+              className="flex flex-col items-center gap-1 py-3 rounded-xl font-medium transition-all"
               style={{
                 background: type === t.id ? 'var(--red)' : 'transparent',
                 color: type === t.id ? 'white' : 'var(--muted)',
                 border: type === t.id ? 'none' : '1px solid var(--line)',
+                fontSize: '14px',
+                minHeight: '44px',
               }}>
-              <t.icon className="w-3.5 h-3.5" />
+              <t.icon className="w-4 h-4" />
               {t.label}
             </button>
           ))}
@@ -1531,105 +1479,65 @@ function QuickCreateModal({ defaultDate, events, onClose, onCreate }: {
         <div className="space-y-3">
           <input
             value={titolo} onChange={e => setTitolo(e.target.value)}
-            placeholder={type === 'event' ? 'Nome evento' : type === 'memo' ? 'Titolo promemoria' : 'Titolo'}
-            className="w-full px-3 py-2.5 rounded-xl text-sm"
-            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+            placeholder={type === 'evento' ? 'Nome evento' : type === 'promemoria' ? 'Titolo promemoria' : 'Titolo task'}
+            className="w-full px-3 py-3 rounded-xl"
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontSize: '14px' }}
           />
           <textarea
             value={desc} onChange={e => setDesc(e.target.value)}
             placeholder="Descrizione (opzionale)"
             rows={2}
-            className="w-full px-3 py-2.5 rounded-xl text-sm resize-none"
-            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+            className="w-full px-3 py-3 rounded-xl resize-none"
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontSize: '14px' }}
           />
-          <div className="grid grid-cols-2 gap-3">
+
+          {/* Date fields */}
+          {type === 'task' ? (
             <div>
-              <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>
-                {type === 'event' || type === 'memo' ? 'Data inizio' : 'Scadenza'}
-              </label>
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Scadenza</label>
               <input type="date" value={dataInizio} onChange={e => setDataInizio(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm"
-                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+                className="w-full px-3 py-3 rounded-xl"
+                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontSize: '16px', minHeight: '44px' }}
               />
             </div>
-            {(type === 'event' || type === 'memo') && (
-              <div>
-                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Data fine</label>
-                <input type="date" value={dataFine} onChange={e => setDataFine(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
-                />
-              </div>
-            )}
-            {type !== 'event' && type !== 'memo' && (
-              <div>
-                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Priorita</label>
-                <select value={priorita} onChange={e => setPriorita(e.target.value as 'alta' | 'media' | 'bassa')}
-                  className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                  <option value="alta">Alta</option>
-                  <option value="media">Media</option>
-                  <option value="bassa">Bassa</option>
-                </select>
-              </div>
-            )}
-          </div>
-
-          {type === 'memo' && (
+          ) : (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Tipo</label>
-                <select value={memoType} onChange={e => setMemoType(e.target.value as typeof memoType)}
-                  className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                  <option value="promemoria">Promemoria</option>
-                  <option value="evento">Evento</option>
-                  <option value="scadenza">Scadenza</option>
-                  <option value="task">Task</option>
-                </select>
+                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Data inizio</label>
+                <input type="date" value={dataInizio} onChange={e => setDataInizio(e.target.value)}
+                  className="w-full px-3 py-3 rounded-xl"
+                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontSize: '16px', minHeight: '44px' }}
+                />
               </div>
               <div>
-                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Alert</label>
-                <select value={alert} onChange={e => setAlert(e.target.value as typeof alert)}
-                  className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                  <option value="none">Nessun alert</option>
-                  <option value="10min">10 minuti prima</option>
-                  <option value="1h">1 ora prima</option>
-                  <option value="1d">1 giorno prima</option>
-                  <option value="1w">1 settimana prima</option>
-                </select>
+                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Data fine (opz.)</label>
+                <input type="date" value={dataFine} onChange={e => setDataFine(e.target.value)}
+                  className="w-full px-3 py-3 rounded-xl"
+                  style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontSize: '16px', minHeight: '44px' }}
+                />
               </div>
             </div>
           )}
 
-          {type === 'event' && (
-            <input value={location} onChange={e => setLocation(e.target.value)}
-              placeholder="Location"
-              className="w-full px-3 py-2.5 rounded-xl text-sm"
-              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
-            />
-          )}
-
-          {(type === 'task' || type === 'pratica') && events.length > 0 && (
-            <div>
-              <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Evento collegato</label>
-              <select value={eventoId} onChange={e => setEventoId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm"
-                style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-                <option value="">Nessuno</option>
-                {events.map(ev => (
-                  <option key={ev.id} value={ev.id}>{ev.nome}</option>
-                ))}
-              </select>
-            </div>
-          )}
+          {/* Alert - available for all types */}
+          <div>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Alert</label>
+            <select value={alert} onChange={e => setAlert(e.target.value as typeof alert)}
+              className="w-full px-3 py-3 rounded-xl"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontSize: '14px', minHeight: '44px' }}>
+              <option value="none">Nessun alert</option>
+              <option value="10min">10 minuti prima</option>
+              <option value="1h">1 ora prima</option>
+              <option value="1d">1 giorno prima</option>
+              <option value="1w">1 settimana prima</option>
+            </select>
+          </div>
         </div>
 
-        <button onClick={handleSubmit} disabled={!titolo.trim()}
-          className="w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
-          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white' }}>
-          Crea {type === 'memo' ? 'Promemoria' : type === 'event' ? 'Evento' : type === 'task' ? 'Task' : 'Pratica'}
+        <button onClick={handleSubmit} disabled={!titolo.trim() || saving}
+          className="w-full py-3 rounded-xl font-semibold transition-all disabled:opacity-40"
+          style={{ background: 'linear-gradient(135deg, var(--red) 0%, var(--red2) 100%)', color: 'white', fontSize: '14px', minHeight: '44px' }}>
+          {saving ? 'Salvataggio...' : `Crea ${typeLabel}`}
         </button>
       </div>
     </div>
@@ -2465,14 +2373,7 @@ export default function Calendario() {
     await refresh()
   }
 
-  async function handleCreate(type: CreateType, data: Event | Task | Pratica | CalendarItem) {
-    if (type === 'event') await upsertEvent(data as Event)
-    else if (type === 'task') await upsertTask(data as Task)
-    else if (type === 'pratica') await upsertPractice(data as Pratica)
-    else if (type === 'memo') {
-      const m = data as CalendarItem
-      await upsertCalendarItem({ title: m.title, description: m.description, item_type: m.item_type, start_date: m.start_date, end_date: m.end_date, alert: m.alert })
-    }
+  async function handleCreate() {
     setShowCreate(false)
     await refresh()
   }
@@ -2775,7 +2676,6 @@ export default function Calendario() {
       {showCreate && (
         <QuickCreateModal
           defaultDate={toISO(cursor)}
-          events={allEvents}
           onClose={() => setShowCreate(false)}
           onCreate={handleCreate}
         />
