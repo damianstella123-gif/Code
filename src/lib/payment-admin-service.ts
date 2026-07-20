@@ -143,8 +143,8 @@ export async function fetchAdminPaymentRequests(): Promise<AdminPaymentRequest[]
     .from('event_payments')
     .select(`
       *,
-      event:events!event_payments_event_id_fkey(id, nome),
-      supplier:suppliers!event_payments_supplier_id_fkey(id, nome),
+      event:events!event_payments_event_id_fkey(id, title),
+      supplier:suppliers!event_payments_supplier_id_fkey(id, name),
       pm_profile:profiles!event_payments_created_by_fkey(id, first_name, last_name),
       reviewer_profile:profiles!event_payments_reviewed_by_fkey(id, first_name, last_name)
     `)
@@ -154,7 +154,7 @@ export async function fetchAdminPaymentRequests(): Promise<AdminPaymentRequest[]
 
   if (error) {
     logError('payment-admin', 'fetchAdminPaymentRequests', error)
-    throw new Error(error.message || 'Errore nel caricamento delle richieste.')
+    throw new Error('Errore nel caricamento delle richieste.')
   }
 
   return (data ?? []).map((r: any) => ({
@@ -178,8 +178,8 @@ export async function fetchAdminPaymentRequests(): Promise<AdminPaymentRequest[]
     admin_note: r.admin_note,
     reviewed_by: r.reviewed_by,
     reviewed_at: r.reviewed_at,
-    event: r.event ?? null,
-    supplier: r.supplier ?? null,
+    event: r.event ? { id: r.event.id, nome: r.event.title } : null,
+    supplier: r.supplier ? { id: r.supplier.id, nome: r.supplier.name } : null,
     pm_profile: r.pm_profile ?? null,
     reviewer_profile: r.reviewer_profile ?? null,
   }))
