@@ -90,6 +90,15 @@ function Sidebar({ open, setOpen }: SidebarProps) {
   const user = loadUser()
   const navItems = user ? getAllowedNavForRole(user.role) : []
 
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [open])
+
   const handleLogout = () => {
     void signOutEverywhere().then(() => {
       navigate('/login')
@@ -107,7 +116,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
 
       <aside
         className={cn(
-          'shell-sidebar fixed inset-y-0 left-0 z-50 w-[232px] transform transition-transform duration-300 ease-in-out flex flex-col',
+          'shell-sidebar fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out flex flex-col',
           open ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -453,7 +462,8 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
         <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
           <button
             onClick={() => setOpen(true)}
-            className="p-2 rounded-lg transition-all hover:bg-white/5 flex-shrink-0"
+            className="shell-header-icon-btn p-2 rounded-lg transition-all hover:bg-white/5 flex-shrink-0"
+            aria-label="Menu di navigazione"
           >
             <Menu className="w-5 h-5" style={{ color: 'var(--muted)' }} />
           </button>
@@ -462,7 +472,8 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
           </div>
           <button
             onClick={() => setMobileSearchOpen(true)}
-            className="md:hidden p-2 rounded-lg transition-all hover:bg-white/5 flex-shrink-0"
+            className="shell-header-icon-btn md:hidden p-2 rounded-lg transition-all hover:bg-white/5 flex-shrink-0"
+            aria-label="Cerca"
           >
             <Search className="w-5 h-5" style={{ color: 'var(--muted)' }} />
           </button>
@@ -470,16 +481,21 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
-          <div className="hidden sm:block">
+          <div className="hidden-phone">
             <OnlineUsers />
           </div>
-          <ThemeToggleButton />
-          <RadioPlayer />
+          <div className="hidden-phone">
+            <ThemeToggleButton />
+          </div>
+          <div className="hidden-phone">
+            <RadioPlayer />
+          </div>
           <div className="relative">
             <button
               id="notif-btn"
               onClick={() => { setNotifOpen(v => !v); setUserMenuOpen(false) }}
-              className="relative p-2 rounded-lg transition-all hover:bg-white/5"
+              className="shell-header-icon-btn relative p-2 rounded-lg transition-all hover:bg-white/5"
+              aria-label="Notifiche"
             >
               <Bell className="w-5 h-5" style={{ color: 'var(--muted)' }} />
               {unreadCount > 0 && (
@@ -551,18 +567,19 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
               <button
                 id="account-btn"
                 onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false) }}
-                className="shell-user-chip"
+                className="shell-user-chip shell-header-icon-btn"
+                aria-label="Account utente"
               >
                 <div className="shell-chip-avatar">
                   {(user.first_name || '').charAt(0)}{(user.last_name || '').charAt(0)}
                 </div>
-                <div className="hidden sm:block text-left">
+                <div className="hidden-phone text-left">
                   <p className="text-xs font-medium leading-none" style={{ color: 'var(--text)' }}>
                     {user.first_name}
                   </p>
                 </div>
                 <ChevronDown
-                  className={`w-3 h-3 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+                  className={`hidden-phone w-3 h-3 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
                   style={{ color: 'var(--muted)', opacity: 0.5 }}
                 />
               </button>
@@ -705,8 +722,8 @@ function SentinelBadge() {
   )
 }
 
-const PRIMARY_MOBILE_PATHS = ['/oggi', '/dashboard', '/eventi', '/crm', '/task', '/calendario', '/fornitori', '/amministrazione']
-const SECONDARY_MOBILE_PATHS = ['/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/wellness']
+const PRIMARY_MOBILE_PATHS = ['/oggi', '/dashboard', '/eventi', '/task']
+const OVERFLOW_MOBILE_PATHS = ['/crm', '/calendario', '/fornitori', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/wellness']
 
 const mobileLabels: Record<string, string> = {
   '/oggi': 'Oggi',
@@ -726,9 +743,9 @@ function BottomNav() {
   const navItems = user ? getAllowedNavForRole(user.role) : []
 
   const primaryItems = navItems.filter(item => PRIMARY_MOBILE_PATHS.includes(item.href))
-  const secondaryItems = navItems.filter(item => SECONDARY_MOBILE_PATHS.includes(item.href))
+  const overflowItems = navItems.filter(item => OVERFLOW_MOBILE_PATHS.includes(item.href))
 
-  const isSecondaryActive = secondaryItems.some(item => item.href === location.pathname)
+  const isOverflowActive = overflowItems.some(item => item.href === location.pathname)
 
   return (
     <>
@@ -740,19 +757,19 @@ function BottomNav() {
             onClick={e => e.stopPropagation()}
           >
             <div className="grid grid-cols-4 gap-1 p-3">
-              {secondaryItems.map(item => {
+              {overflowItems.map(item => {
                 const Icon = iconMap[item.href] ?? LayoutDashboard
                 const isActive = location.pathname === item.href
                 return (
                   <Link
                     key={item.href}
                     to={item.href}
-                    onClick={() => setMoreOpen(false)}
-                    className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl transition-colors"
+                    onClick={() => { setMoreOpen(false) }}
+                    className="mobile-touch-target flex flex-col items-center gap-1 py-3 px-1 rounded-xl transition-colors"
                     style={{ background: isActive ? 'rgba(208,0,58,0.08)' : 'transparent' }}
                   >
                     <Icon className="w-5 h-5" style={{ color: isActive ? 'var(--red2)' : 'var(--muted)' }} />
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: isActive ? 'var(--red2)' : 'var(--muted)', textAlign: 'center', lineHeight: 1.2 }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: isActive ? 'var(--red2)' : 'var(--muted)', textAlign: 'center', lineHeight: 1.2 }}>
                       {item.name}
                     </span>
                   </Link>
@@ -768,7 +785,7 @@ function BottomNav() {
         style={{ background: 'var(--panel-solid)', borderTop: '1px solid var(--line)' }}
       >
         <div className="flex items-center justify-around h-[56px] px-1">
-          {primaryItems.slice(0, 5).map(item => {
+          {primaryItems.slice(0, 4).map(item => {
             const Icon = iconMap[item.href] ?? LayoutDashboard
             const isActive = location.pathname === item.href
             return (
@@ -779,20 +796,20 @@ function BottomNav() {
                 style={{ minHeight: 44, minWidth: 44 }}
               >
                 <Icon className="w-[20px] h-[20px]" style={{ color: isActive ? 'var(--red2)' : 'var(--muted)' }} />
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.02em', color: isActive ? 'var(--red2)' : 'var(--muted)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '0.02em', color: isActive ? 'var(--red2)' : 'var(--muted)' }}>
                   {mobileLabels[item.href] || item.name}
                 </span>
               </Link>
             )
           })}
-          {secondaryItems.length > 0 && (
+          {overflowItems.length > 0 && (
             <button
               onClick={() => setMoreOpen(!moreOpen)}
               className="flex flex-col items-center justify-center gap-0.5 flex-1 py-1"
               style={{ minHeight: 44, minWidth: 44 }}
             >
-              <MoreHorizontal className="w-[20px] h-[20px]" style={{ color: isSecondaryActive ? 'var(--red2)' : 'var(--muted)' }} />
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.02em', color: isSecondaryActive ? 'var(--red2)' : 'var(--muted)' }}>
+              <MoreHorizontal className="w-[20px] h-[20px]" style={{ color: isOverflowActive ? 'var(--red2)' : 'var(--muted)' }} />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '0.02em', color: isOverflowActive ? 'var(--red2)' : 'var(--muted)' }}>
                 Altro
               </span>
             </button>

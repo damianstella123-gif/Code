@@ -408,22 +408,69 @@ html, body {
   background: var(--red);
 }
 
-/* ─── SHELL RESPONSIVE ─── */
+/* ─── SHELL RESPONSIVE (AUTHORITATIVE) ─── */
+
+/* Hide on phone: utility class for header elements */
+@media (max-width: 640px) {
+  .hidden-phone { display: none !important; }
+}
+
 @media (max-width: 768px) {
-  .shell-sidebar { width: 280px; }
+  .shell-sidebar { width: min(88vw, 320px); }
   .shell-header { height: 48px; padding-top: env(safe-area-inset-top, 0px); }
 }
 
 @media (max-width: 640px) {
+  .shell-sidebar {
+    width: min(88vw, 320px);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
   .shell-header {
     height: 52px;
     padding: 0 !important;
   }
-  .shell-header > * {
-    padding: 0 14px !important;
+  .shell-header-inner {
+    padding: 0 16px !important;
+  }
+  .shell-content {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .pb-mobile-nav {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .mobile-bottom-nav {
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    height: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
   }
   .shell-user-chip { padding: 4px 6px 4px 4px; gap: 4px; }
-  .shell-chip-avatar { width: 24px; height: 24px; font-size: 14px; }
+  .shell-chip-avatar { width: 28px; height: 28px; font-size: 12px; }
+}
+
+/* Narrow phone: tighter horizontal padding */
+@media (max-width: 360px) {
+  .shell-header-inner {
+    padding: 0 12px !important;
+  }
+  .shell-content {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+}
+
+@media (min-width: 361px) and (max-width: 640px) {
+  .shell-content {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}
+
+/* Prevent page horizontal overflow */
+@media (max-width: 640px) {
+  html, body, #root {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
 }
 
 /* ─── PANEL / CARD ─────────────────────────────────────────────────────────── */
@@ -2633,36 +2680,8 @@ textarea::placeholder {
 /* Show bottom nav on phone only */
 @media (max-width: 640px) {
   .mobile-bottom-nav {
-    display: block;
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
     display: flex !important;
-    justify-content: space-around !important;
-    align-items: center !important;
-    background: var(--panel-solid) !important;
-    border-top: 1px solid var(--line) !important;
-    z-index: 50 !important;
-    padding-bottom: env(safe-area-inset-bottom, 8px) !important;
-    height: calc(60px + env(safe-area-inset-bottom, 0px));
   }
-
-  .mobile-bottom-nav a,
-  .mobile-bottom-nav button {
-    min-width: 44px !important;
-    min-height: 44px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-
-  /* Extra bottom padding so content isn't hidden behind bottom nav */
-  .pb-mobile-nav { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
-
-  /* Hide the sidebar hamburger trigger — replaced by bottom nav */
-  .shell-header button[aria-label="menu"] { display: none; }
 }
 
 /* ─── TABLET (769-1024px): Collapsed sidebar ─── */
@@ -2922,11 +2941,12 @@ textarea::placeholder {
   }
 }
 
-/* 2. Prevent horizontal overflow on all child elements */
+/* 2. Shell content overflow containment */
 @media (max-width: 640px) {
+  .shell-content,
   .shell-content > * {
+    min-width: 0;
     max-width: 100%;
-    overflow-x: hidden;
   }
 
   /* Tables: scroll instead of overflow */
@@ -2943,16 +2963,7 @@ textarea::placeholder {
   }
 }
 
-/* LEGGIBILITA v3 — override inline font-size styles */
-[style*="font-size: 8px"]    { font-size: 12px !important; }
-[style*="font-size: 8.5px"]  { font-size: 12px !important; }
-[style*="font-size: 9px"]    { font-size: 13px !important; }
-[style*="font-size: 10px"]   { font-size: 13px !important; }
-[style*="font-size: 11px"]   { font-size: 14px !important; }
-[style*="font-size: 11.5px"] { font-size: 14px !important; }
-[style*="font-size: 12px"]   { font-size: 15px !important; }
-[style*="font-size: 12.5px"] { font-size: 15px !important; }
-[style*="font-size: 13px"]   { font-size: 15px !important; }
+
 
 /* ════════════════════════════════════════════════════════════════════════════════
    SYNERGY MOBILE — iPhone 14 mini+
@@ -2976,24 +2987,10 @@ html, body {
   }
 }
 
-/* ── 3. SAFE AREA NOTCH/DYNAMIC ISLAND ── */
-@media (max-width: 640px) {
-  .mobile-bottom-nav {
-    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
-    height: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
-  }
-  .pb-mobile-nav,
-  .shell-content {
-    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
-  }
-}
+/* ── 3. SAFE AREA (handled by authoritative shell rules) ── */
 
 /* ── 4. TOPBAR COMPATTA ── */
 @media (max-width: 640px) {
-  .shell-header {
-    height: 52px !important;
-    padding: 0 !important;
-  }
   .cmd-bar-trigger,
   [class*="cmd-bar"],
   [class*="search-bar"] {
@@ -3207,20 +3204,14 @@ html, body {
   }
 }
 
-/* ── 11. AREA DI TOCCO MINIMA ── */
+/* ── 11. AREA DI TOCCO — scoped to shell controls ── */
 @media (max-width: 640px) {
-  button,
-  [role="button"],
-  a,
-  input[type="checkbox"],
-  input[type="radio"],
-  select {
+  .mobile-bottom-nav a,
+  .mobile-bottom-nav button,
+  .mobile-touch-target,
+  .shell-header-icon-btn {
     min-height: 44px;
     min-width: 44px;
-  }
-  .btn-inline {
-    min-height: unset;
-    min-width: unset;
   }
 }
 
@@ -3267,12 +3258,7 @@ html, body {
   .text-xs { font-size: 13px !important; }
 }
 
-/* ── 15. SIDEBAR NASCOSTA SU MOBILE ── */
-@media (max-width: 640px) {
-  .shell-sidebar {
-    transform: translateX(-100%);
-  }
-}
+/* ── 15. SIDEBAR (transform managed by Layout.tsx) ── */
 
 /* ── 16. IMMAGINI E MEDIA ── */
 @media (max-width: 640px) {
