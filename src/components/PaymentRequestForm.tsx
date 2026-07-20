@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { X, ChevronDown, Loader2, Send, AlertCircle } from 'lucide-react'
+import { X, ChevronDown, Loader2, Send, AlertCircle, CheckCircle2, Circle } from 'lucide-react'
 import { useToast } from '@/lib/toast'
 import { loadUser } from '@/lib/auth'
 import { todayISO } from '@/lib/format'
@@ -25,6 +25,26 @@ interface Props {
 interface LineAllocation {
   line: BudgetLine
   amount: number
+}
+
+function getValidationError(
+  supplierId: string,
+  importoNum: number,
+  dataScadenza: string,
+  descrizione: string,
+  selectedVersionId: string,
+  allocations: LineAllocation[],
+  totalAllocated: number,
+): string | null {
+  if (!supplierId) return 'Seleziona un fornitore.'
+  if (importoNum <= 0) return 'Inserisci un importo maggiore di zero.'
+  if (!dataScadenza) return 'Inserisci la data di scadenza.'
+  if (!descrizione.trim()) return 'Inserisci una descrizione.'
+  if (!selectedVersionId) return 'Seleziona una versione budget.'
+  if (allocations.length === 0) return 'Seleziona almeno una voce economica.'
+  if (allocations.some(a => a.amount <= 0)) return 'Inserisci un importo maggiore di zero per ogni voce selezionata.'
+  if (Math.abs(importoNum - totalAllocated) > 0.01) return 'Il totale allocato deve coincidere con l\'importo della richiesta.'
+  return null
 }
 
 export default function PaymentRequestForm({ eventId, suppliers, onDone, onCancel }: Props) {
@@ -56,6 +76,12 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
   const totalAllocated = allocations.reduce((s, a) => s + a.amount, 0)
   const remaining = importoNum - totalAllocated
   const allocationValid = Math.abs(remaining) <= 0.01 && allocations.length > 0
+
+  // Checklist states
+  const checkDati = !!supplierId && importoNum > 0 && !!dataScadenza && !!descrizione.trim()
+  const checkVersion = !!selectedVersionId
+  const checkLines = allocations.length > 0 && allocations.every(a => a.amount > 0)
+  const checkAllocation = allocationValid
 
   // Filtered suppliers for search
   const filteredSuppliers = useMemo(() => {
@@ -102,7 +128,10 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
     if (exists) {
       setAllocations(allocations.filter(a => !(a.line.id === line.id && a.line.source_table === line.source_table)))
     } else {
-      setAllocations([...allocations, { line, amount: 0 }])
+      const currentAllocated = allocations.reduce((s, a) => s + a.amount, 0)
+      const rem = importoNum - currentAllocated
+      const defaultAmount = rem > 0 ? Math.round(rem * 100) / 100 : 0
+      setAllocations([...allocations, { line, amount: defaultAmount }])
     }
   }
 
@@ -112,15 +141,17 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
     ))
   }
 
-  function canSubmit(): boolean {
-    if (!supplierId || !descrizione.trim() || importoNum <= 0 || !dataScadenza) return false
-    if (!allocationValid) return false
-    if (allocations.some(a => a.amount <= 0)) return false
-    return true
-  }
-
   async function handleSubmit() {
-    if (!canSubmit() || saving) return
+    if (saving) return
+
+    const validationErr = getValidationError(
+      supplierId, importoNum, dataScadenza, descrizione, selectedVersionId, allocations, totalAllocated
+    )
+    if (validationErr) {
+      setErrorMsg(validationErr)
+      return
+    }
+
     setErrorMsg('')
     setSaving(true)
 
@@ -159,7 +190,7 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
           allocatedAmount: alloc.amount,
         })
         if (error) {
-          setErrorMsg(`Collegamento fallito: ${error}. La richiesta resta in bozza.`)
+          setErrorMsg('Collegamento fallito. La richiesta resta in bozza.')
           setSaving(false)
           return
         }
@@ -168,15 +199,15 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
       // 3. Submit via RPC
       const { error: submitErr } = await submitPaymentRequest(payment.id)
       if (submitErr) {
-        setErrorMsg(`Invio fallito: ${submitErr}. La richiesta resta in bozza.`)
+        setErrorMsg('Invio fallito. La richiesta resta in bozza.')
         setSaving(false)
         return
       }
 
       showToast('Richiesta inviata all\'Amministrazione', 'success')
       onDone()
-    } catch (e: any) {
-      setErrorMsg(e?.message || 'Errore imprevisto')
+    } catch {
+      setErrorMsg('Errore imprevisto. Riprova.')
     } finally {
       setSaving(false)
     }
@@ -241,7 +272,7 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
                       setSupplierSearch('')
                       setSupplierOpen(false)
                     }}
-                    style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--line)', fontSize: 13 }}
+                    style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--line)', fontSize: 14 }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--panel2, var(--bg3))')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
@@ -306,8 +337,8 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
               </div>
             )}
             {!loadingVersions && versions.length === 0 && supplierId && (
-              <p className="text-xs mt-1" style={{ color: 'var(--yellow)' }}>
-                Nessuna versione budget valida per questo evento.
+              <p style={{ fontSize: 14, color: 'var(--yellow)', marginTop: 4 }}>
+                Non esiste un preventivo approvato o un consuntivo in bozza per questo evento.
               </p>
             )}
           </div>
@@ -320,8 +351,8 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
                   <Loader2 className="w-3 h-3 animate-spin" /> Caricamento voci...
                 </div>
               ) : lines.length === 0 ? (
-                <p className="text-xs py-2" style={{ color: 'var(--muted)' }}>
-                  Nessuna voce economica trovata per questo fornitore nella versione selezionata.
+                <p style={{ fontSize: 14, color: 'var(--muted)', padding: '8px 0' }}>
+                  Nessuna voce di questo fornitore è disponibile nella versione selezionata.
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -347,21 +378,21 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
                               checked={isSelected}
                               onChange={() => toggleLine(line)}
                               disabled={saving}
-                              style={{ accentColor: 'var(--accent)' }}
+                              style={{ accentColor: 'var(--accent)', width: 20, height: 20, minWidth: 20, minHeight: 20 }}
                             />
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--bg)', color: 'var(--muted)', fontSize: 12 }}>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="px-1.5 py-0.5 rounded" style={{ background: 'var(--bg)', color: 'var(--muted)', fontSize: 12 }}>
                                   {line.categoria}
                                 </span>
-                                <span className="text-sm font-medium truncate">{line.description}</span>
+                                <span style={{ fontSize: 14, fontWeight: 500 }} className="truncate">{line.description}</span>
                               </div>
-                              <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                              <span style={{ fontSize: 12, color: 'var(--muted)' }}>
                                 Costo: {fmtEuro(line.costo_totale)}
                               </span>
                             </div>
                             {isSelected && (
-                              <div style={{ width: 120 }}>
+                              <div style={{ width: 120, flexShrink: 0 }}>
                                 <input
                                   type="number"
                                   min="0.01"
@@ -370,7 +401,7 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
                                   onChange={e => updateAllocation(line.id, line.source_table, Number(e.target.value) || 0)}
                                   placeholder="Importo"
                                   disabled={saving}
-                                  style={{ ...inputStyle, fontSize: 13, padding: '6px 8px', textAlign: 'right' }}
+                                  style={{ ...inputStyle, fontSize: 14, padding: '6px 8px', textAlign: 'right' }}
                                 />
                               </div>
                             )}
@@ -381,7 +412,7 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
                   </div>
 
                   {/* Allocation summary */}
-                  <div className="flex flex-wrap items-center gap-4 pt-2 text-xs" style={{ borderTop: '1px solid var(--line)' }}>
+                  <div className="flex flex-wrap items-center gap-4 pt-2" style={{ borderTop: '1px solid var(--line)', fontSize: 14 }}>
                     <span style={{ color: 'var(--muted)' }}>
                       Totale richiesta: <strong style={{ color: 'var(--text)' }}>{fmtEuro(importoNum)}</strong>
                     </span>
@@ -399,11 +430,19 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
         </div>
       )}
 
+      {/* Inline progress checklist */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
+        <ChecklistItem label="Dati richiesta" done={checkDati} />
+        <ChecklistItem label="Versione budget" done={checkVersion} />
+        <ChecklistItem label="Voci selezionate" done={checkLines} />
+        <ChecklistItem label="Importo completamente allocato" done={checkAllocation} />
+      </div>
+
       {/* Error */}
       {errorMsg && (
         <div className="flex items-start gap-2 p-3 rounded-lg" style={{ background: 'color-mix(in srgb, var(--red2) 10%, transparent)', border: '1px solid var(--red2)' }}>
           <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--red2)' }} />
-          <p className="text-xs" style={{ color: 'var(--red2)' }}>{errorMsg}</p>
+          <p style={{ fontSize: 14, color: 'var(--red2)' }}>{errorMsg}</p>
         </div>
       )}
 
@@ -414,20 +453,21 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
           onClick={onCancel}
           disabled={saving}
           className="px-4 py-2 rounded-lg text-sm"
-          style={{ color: 'var(--muted)' }}
+          style={{ color: 'var(--muted)', minHeight: 44 }}
         >
           Annulla
         </button>
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={saving || !canSubmit()}
+          disabled={saving}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
           style={{
-            background: canSubmit() ? 'var(--accent)' : 'var(--bg3, var(--bg2))',
-            color: canSubmit() ? '#fff' : 'var(--muted)',
+            background: 'var(--accent)',
+            color: '#fff',
             opacity: saving ? 0.6 : 1,
-            cursor: saving || !canSubmit() ? 'not-allowed' : 'pointer',
+            cursor: saving ? 'not-allowed' : 'pointer',
+            minHeight: 44,
           }}
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -435,6 +475,15 @@ export default function PaymentRequestForm({ eventId, suppliers, onDone, onCance
         </button>
       </div>
     </div>
+  )
+}
+
+function ChecklistItem({ label, done }: { label: string; done: boolean }) {
+  return (
+    <span className="flex items-center gap-1.5" style={{ fontSize: 12, color: done ? 'var(--green)' : 'var(--muted)' }}>
+      {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
+      {label}
+    </span>
   )
 }
 
