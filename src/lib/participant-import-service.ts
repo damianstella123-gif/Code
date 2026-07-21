@@ -326,3 +326,180 @@ export function buildParticipantPreview(
 
   return { rows: previewRows, errors }
 }
+
+// ---------------------------------------------------------------------------
+// Duplicate & Import Types
+// ---------------------------------------------------------------------------
+
+export type ParticipantDuplicateReason = 'email' | 'identity'
+
+export interface ParticipantDuplicate {
+  rowIndex: number
+  reason: ParticipantDuplicateReason
+  message: string
+}
+
+export interface ParticipantDuplicateCheck {
+  newRows: ParticipantPreviewRow[]
+  duplicates: ParticipantDuplicate[]
+}
+
+export interface ParticipantImportResult {
+  insertedCount: number
+  skippedDuplicateCount: number
+  insertedIds: string[]
+}
+
+// ---------------------------------------------------------------------------
+// Duplicate-detection helpers
+// ---------------------------------------------------------------------------
+
+function normalizeEmail(email: string): string {
+  return email.toLowerCase().trim()
+}
+
+function identityKey(firstName: string, lastName: string, company: string): string {
+  return `${normalize(firstName)}|${normalize(lastName)}|${normalize(company)}`
+}
+
+function detectDuplicates(
+  rows: ParticipantPreviewRow[],
+  existingEmails: Set<string>,
+  existingIdentities: Set<string>,
+): ParticipantDuplicateCheck {
+  const newRows: ParticipantPreviewRow[] = []
+  const duplicates: ParticipantDuplicate[] = []
+
+  const seenEmails = new Set<string>()
+  const seenIdentities = new Set<string>()
+
+  for (const row of rows) {
+    const email = row.email ? normalizeEmail(row.email) : ''
+    const idKey = identityKey(row.first_name, row.last_name, row.company)
+
+    if (email && (existingEmails.has(email) || seenEmails.has(email))) {
+      duplicates.push({
+        rowIndex: row.rowIndex,
+        reason: 'email',
+        message: `Riga ${row.rowIndex}: partecipante con lo stesso indirizzo email già presente.`,
+      })
+      continue
+    }
+
+    if (existingIdentities.has(idKey) || seenIdentities.has(idKey)) {
+      duplicates.push({
+        rowIndex: row.rowIndex,
+        reason: 'identity',
+        message: `Riga ${row.rowIndex}: partecipante con stesso nome, cognome e azienda già presente.`,
+      })
+      continue
+    }
+
+    if (email) seenEmails.add(email)
+    seenIdentities.add(idKey)
+    newRows.push(row)
+  }
+
+  return { newRows, duplicates }
+}
+
+// ---------------------------------------------------------------------------
+// 5. checkParticipantImportDuplicates
+// ---------------------------------------------------------------------------
+
+export async function checkParticipantImportDuplicates(
+  eventId: string,
+  rows: ParticipantPreviewRow[],
+): Promise<ParticipantDuplicateCheck> {
+  requireNonEmpty(eventId, 'ID evento')
+  if (rows.length === 0) return { newRows: [], duplicates: [] }
+  if (rows.length > MAX_ROWS) {
+    throw new Error(`Il numero massimo di righe importabili è ${MAX_ROWS}.`)
+  }
+
+  const allowed = await checkEventPermission(eventId, 'can_manage_registration')
+  if (!allowed) throw new Error('Non hai i permessi per importare partecipanti in questo evento.')
+
+  const { data, error } = await supabase
+    .from('event_registrations')
+    .select('id, first_name, last_name, email, company')
+    .eq('event_id', eventId)
+
+  if (error) throw new Error('Impossibile verificare i partecipanti esistenti.')
+
+  const existingEmails = new Set<string>()
+  const existingIdentities = new Set<string>()
+
+  for (const reg of data ?? []) {
+    if (reg.email) existingEmails.add(normalizeEmail(reg.email))
+    existingIdentities.add(identityKey(reg.first_name ?? '', reg.last_name ?? '', reg.company ?? ''))
+  }
+
+  return detectDuplicates(rows, existingEmails, existingIdentities)
+}
+
+// ---------------------------------------------------------------------------
+// 6. importParticipantRows
+// ---------------------------------------------------------------------------
+
+export async function importParticipantRows(
+  eventId: string,
+  rows: ParticipantPreviewRow[],
+): Promise<ParticipantImportResult> {
+  requireNonEmpty(eventId, 'ID evento')
+  if (!rows || rows.length === 0) {
+    throw new Error('Nessuna riga da importare.')
+  }
+  if (rows.length > MAX_ROWS) {
+    throw new Error(`Il numero massimo di righe importabili è ${MAX_ROWS}.`)
+  }
+
+  const allowed = await checkEventPermission(eventId, 'can_manage_registration')
+  if (!allowed) throw new Error('Non hai i permessi per importare partecipanti in questo evento.')
+
+  const { newRows, duplicates } = await checkParticipantImportDuplicates(eventId, rows)
+
+  if (newRows.length === 0) {
+    return {
+      insertedCount: 0,
+      skippedDuplicateCount: duplicates.length,
+      insertedIds: [],
+    }
+  }
+
+  const payload = newRows.map(row => ({
+    site_id: null,
+    event_id: eventId,
+    source: 'import',
+    registration_status: 'confirmed',
+    first_name: row.first_name,
+    last_name: row.last_name,
+    email: row.email || null,
+    phone: row.phone,
+    company: row.company,
+    job_title: row.job_title,
+    dietary_requirements: row.dietary_requirements,
+    accessibility_requirements: row.accessibility_requirements,
+    custom_answers: row.extraFields,
+    privacy_accepted: false,
+    marketing_consent: false,
+  }))
+
+  const { data, error } = await supabase
+    .from('event_registrations')
+    .insert(payload)
+    .select('id')
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('Importazione annullata: uno o più partecipanti risultano già registrati.')
+    }
+    throw new Error('Errore durante l\'inserimento dei partecipanti. Riprova.')
+  }
+
+  return {
+    insertedCount: data?.length ?? 0,
+    skippedDuplicateCount: duplicates.length,
+    insertedIds: (data ?? []).map(r => r.id),
+  }
+}
