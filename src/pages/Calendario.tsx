@@ -42,6 +42,7 @@ import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-serv
 import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
 import { supabase } from '@/lib/supabase'
 import { createLeaveRequest } from '@/lib/leave-requests-service'
+import LeaveRequestsManager from '@/components/LeaveRequestsManager'
 
 // ─── Calendar Item type ──────────────────────────────────────────────────────
 
@@ -2319,6 +2320,7 @@ export default function Calendario() {
   const [selectedItem, setSelectedItem] = useState<CalItem | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [showLeaveForm, setShowLeaveForm] = useState(false)
+  const [showLeaveManager, setShowLeaveManager] = useState(false)
   const [editingMemo, setEditingMemo] = useState<CalendarItem | null>(null)
   const [editingEventDates, setEditingEventDates] = useState<Event | null>(null)
   const [shiftToast, setShiftToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null)
@@ -2622,6 +2624,12 @@ export default function Calendario() {
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
               <HelpCircle className="w-3.5 h-3.5" />
             </button>
+            <button onClick={() => setShowLeaveManager(true)}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)' }}>
+              LE MIE RICHIESTE
+            </button>
             <button onClick={() => setShowLeaveForm(true)}
               style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.12s' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text)' }}
@@ -2785,6 +2793,11 @@ export default function Calendario() {
           onClose={() => setEditingMemo(null)}
           onSave={handleMemoSave}
         />
+      )}
+
+      {/* Leave requests manager */}
+      {showLeaveManager && (
+        <LeaveRequestsManager onClose={() => setShowLeaveManager(false)} />
       )}
 
       {/* Leave request form */}
