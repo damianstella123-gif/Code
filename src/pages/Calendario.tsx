@@ -2103,6 +2103,7 @@ function LeaveRequestForm({ userId, onClose, onSubmit }: {
   const [oraFine, setOraFine] = useState('')
   const [motivo, setMotivo] = useState('')
   const [saving, setSaving] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const durata = useMemo(() => {
     if (!dataInizio || !dataFine) return 0
@@ -2111,13 +2112,37 @@ function LeaveRequestForm({ userId, onClose, onSubmit }: {
   }, [dataInizio, dataFine])
 
   const handleSubmit = async () => {
-    if (!dataInizio || !dataFine || !userId) return
+    setSubmitError(null)
+    if (!dataInizio || !dataFine) {
+      setSubmitError('Inserisci la data di inizio e di fine.')
+      return
+    }
+    if (dataFine < dataInizio) {
+      setSubmitError('La data di fine non può essere precedente a quella di inizio.')
+      return
+    }
+    if (tipo === 'permesso') {
+      if (!oraInizio || !oraFine) {
+        setSubmitError('Per un permesso è necessario indicare ora inizio e ora fine.')
+        return
+      }
+      if (oraFine <= oraInizio) {
+        setSubmitError('L\'ora di fine deve essere successiva a quella di inizio.')
+        return
+      }
+    }
+    if (!userId) return
     setSaving(true)
     try {
       const result = await createLeaveRequest({ tipo, dataInizio, dataFine, oraInizio: oraInizio || undefined, oraFine: oraFine || undefined, motivo: motivo || undefined })
-      if (!result) throw new Error('failed')
+      if (result && result.error) {
+        setSubmitError('Impossibile inviare la richiesta. Riprova più tardi.')
+        return
+      }
       onSubmit()
-    } catch { /* handled */ } finally { setSaving(false) }
+    } catch {
+      setSubmitError('Impossibile inviare la richiesta. Riprova più tardi.')
+    } finally { setSaving(false) }
   }
 
   const TIPI = [
@@ -2130,59 +2155,63 @@ function LeaveRequestForm({ userId, onClose, onSubmit }: {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 28, width: 400, maxWidth: '90vw' }}>
-        <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text)', marginBottom: 18 }}>Richiesta Ferie / Permesso</h3>
+        <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text)', marginBottom: 18 }}>Richiesta Ferie / Permesso</h3>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           {TIPI.map(t => (
             <button key={t.value} onClick={() => setTipo(t.value)}
-              style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '5px 12px', borderRadius: 6, border: tipo === t.value ? '1.5px solid var(--red2)' : '1px solid var(--line)', background: tipo === t.value ? 'rgba(208,0,58,0.08)' : 'transparent', color: tipo === t.value ? 'var(--red2)' : 'var(--muted)', cursor: 'pointer' }}>
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 14, padding: '10px 14px', minHeight: 44, borderRadius: 6, border: tipo === t.value ? '1.5px solid var(--red2)' : '1px solid var(--line)', background: tipo === t.value ? 'rgba(208,0,58,0.08)' : 'transparent', color: tipo === t.value ? 'var(--red2)' : 'var(--muted)', cursor: 'pointer' }}>
               {t.label}
             </button>
           ))}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-          <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>
+          <label style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--muted)' }}>
             Dal
             <input type="date" value={dataInizio} onChange={e => { setDataInizio(e.target.value); if (!dataFine || e.target.value > dataFine) setDataFine(e.target.value) }}
-              style={{ display: 'block', width: '100%', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--text)' }} />
+              style={{ display: 'block', width: '100%', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 14, padding: '10px 8px', minHeight: 44, borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--text)' }} />
           </label>
-          <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>
+          <label style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--muted)' }}>
             Al
             <input type="date" value={dataFine} min={dataInizio} onChange={e => setDataFine(e.target.value)}
-              style={{ display: 'block', width: '100%', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--text)' }} />
+              style={{ display: 'block', width: '100%', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 14, padding: '10px 8px', minHeight: 44, borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--text)' }} />
           </label>
         </div>
 
         {tipo === 'permesso' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--muted)' }}>
               Dalle
               <input type="time" value={oraInizio} onChange={e => setOraInizio(e.target.value)}
-                style={{ display: 'block', width: '100%', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--text)' }} />
+                style={{ display: 'block', width: '100%', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 14, padding: '10px 8px', minHeight: 44, borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--text)' }} />
             </label>
-            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--muted)' }}>
               Alle
               <input type="time" value={oraFine} onChange={e => setOraFine(e.target.value)}
-                style={{ display: 'block', width: '100%', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--text)' }} />
+                style={{ display: 'block', width: '100%', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 14, padding: '10px 8px', minHeight: 44, borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--text)' }} />
             </label>
           </div>
         )}
 
         {durata > 0 && (
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)', marginBottom: 12, fontWeight: 600 }}>Durata: {durata} giorn{durata === 1 ? 'o' : 'i'}</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--text)', marginBottom: 12, fontWeight: 600 }}>Durata: {durata} giorn{durata === 1 ? 'o' : 'i'}</p>
         )}
 
-        <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 16 }}>
+        <label style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--muted)', display: 'block', marginBottom: 16 }}>
           Motivo (opzionale)
           <textarea value={motivo} onChange={e => setMotivo(e.target.value)} rows={2} placeholder="Opzionale..."
-            style={{ display: 'block', width: '100%', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--text)', resize: 'vertical' }} />
+            style={{ display: 'block', width: '100%', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 14, padding: '10px 8px', minHeight: 44, borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--text)', resize: 'vertical' }} />
         </label>
 
+        {submitError && (
+          <p role="alert" style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--red2)', marginBottom: 12, fontWeight: 500 }}>{submitError}</p>
+        )}
+
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 14px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--muted)', cursor: 'pointer' }}>Annulla</button>
-          <button onClick={handleSubmit} disabled={!dataInizio || !dataFine || saving}
-            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 14px', borderRadius: 6, border: 'none', background: 'var(--red2)', color: '#fff', cursor: 'pointer', opacity: (!dataInizio || !dataFine || saving) ? 0.5 : 1 }}>
+          <button onClick={onClose} style={{ fontFamily: 'var(--font-mono)', fontSize: 14, padding: '10px 14px', minHeight: 44, borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--muted)', cursor: 'pointer' }}>Annulla</button>
+          <button onClick={handleSubmit} disabled={saving}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 14, padding: '10px 14px', minHeight: 44, borderRadius: 6, border: 'none', background: 'var(--red2)', color: '#fff', cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
             {saving ? 'Invio...' : 'Invia richiesta'}
           </button>
         </div>
