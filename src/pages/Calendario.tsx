@@ -118,7 +118,8 @@ const MONTHS_IT = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
 function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
-function isoToLocalMidnight(iso: string): Date {
+function isoToLocalMidnight(iso?: string | null): Date {
+  if (!iso) return new Date(NaN)
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(y, m - 1, d)
 }
@@ -909,6 +910,11 @@ function MonthView({ current, items, today, onItemClick, onDayClick, onMoveItem,
         }
         return sameDay(day, isoToLocalMidnight(m.start_date))
       }
+      if (item.type === 'leave') {
+        const leave = item.data as LeaveRequest
+        if (!leave.data_inizio || !leave.data_fine) return false
+        return day >= isoToLocalMidnight(leave.data_inizio) && day <= isoToLocalMidnight(leave.data_fine)
+      }
       return sameDay(day, isoToLocalMidnight((item.data as Task).scadenza))
     })
   }
@@ -1083,6 +1089,11 @@ function WeekView({ weekStart, items, today, onItemClick, onMoveItem, onResizeEv
         if (m.end_date) return day >= isoToLocalMidnight(m.start_date) && day <= isoToLocalMidnight(m.end_date)
         return sameDay(day, isoToLocalMidnight(m.start_date))
       }
+      if (item.type === 'leave') {
+        const leave = item.data as LeaveRequest
+        if (!leave.data_inizio || !leave.data_fine) return false
+        return day >= isoToLocalMidnight(leave.data_inizio) && day <= isoToLocalMidnight(leave.data_fine)
+      }
       return sameDay(day, isoToLocalMidnight((item.data as Task).scadenza))
     })
   }
@@ -1200,6 +1211,11 @@ function DayView(props: {
       const m = item.data as CalendarItem
       if (m.end_date) return day >= isoToLocalMidnight(m.start_date) && day <= isoToLocalMidnight(m.end_date)
       return sameDay(day, isoToLocalMidnight(m.start_date))
+    }
+    if (item.type === 'leave') {
+      const leave = item.data as LeaveRequest
+      if (!leave.data_inizio || !leave.data_fine) return false
+      return day >= isoToLocalMidnight(leave.data_inizio) && day <= isoToLocalMidnight(leave.data_fine)
     }
     return sameDay(day, isoToLocalMidnight((item.data as Task).scadenza))
   })
