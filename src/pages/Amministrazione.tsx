@@ -1984,6 +1984,7 @@ function DocFormModal({ doc, events, clients, suppliers, onClose, onSave }: {
 
 interface LeaveRow {
   id: string; user_id: string; tipo: string; data_inizio: string; data_fine: string
+  ora_inizio: string | null; ora_fine: string | null
   stato: string; motivo: string | null; note_admin: string | null
   approvato_da: string | null; approvato_at: string | null; created_at: string
   profiles?: { first_name: string; last_name: string; avatar_url: string | null; role: string }
@@ -1998,10 +1999,12 @@ function FeriePermessiTab() {
   const [denyNote, setDenyNote] = useState('')
   const [showAnnual, setShowAnnual] = useState(false)
   const [annualData, setAnnualData] = useState<{ user_id: string; tipo: string; giorni: number }[]>([])
+  const [saving, setSaving] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   const loadLeaves = useCallback(async () => {
     const { data } = await supabase.from('leave_requests')
-      .select('*, profiles(first_name, last_name, avatar_url, role)')
+      .select('*, profiles!leave_requests_user_id_fkey(first_name, last_name, avatar_url, role)')
       .order('created_at', { ascending: false })
     setLeaves((data ?? []) as LeaveRow[])
   }, [])
@@ -2025,16 +2028,21 @@ function FeriePermessiTab() {
     return s + d
   }, 0)
 
-  const approve = async (id: string, _row: LeaveRow) => {
-    await approveLeaveRequest(id)
-    loadLeaves()
+  const approve = async (id: string) => {
+    setSaving(id); setFeedback(null)
+    const { error } = await approveLeaveRequest(id)
+    if (error) { setFeedback({ type: 'error', msg: error }) }
+    else { setFeedback({ type: 'success', msg: 'Richiesta approvata.' }) }
+    setSaving(null); loadLeaves()
   }
 
-  const deny = async (id: string, _row: LeaveRow) => {
+  const deny = async (id: string) => {
     if (denyNote.length < 10) return
-    await rejectLeaveRequest(id, denyNote)
-    setDenyingId(null); setDenyNote('')
-    loadLeaves()
+    setSaving(id); setFeedback(null)
+    const { error } = await rejectLeaveRequest(id, denyNote)
+    if (error) { setFeedback({ type: 'error', msg: error }) }
+    else { setFeedback({ type: 'success', msg: 'Richiesta negata.' }) }
+    setDenyingId(null); setDenyNote(''); setSaving(null); loadLeaves()
   }
 
   const loadAnnual = async () => {
@@ -2091,7 +2099,7 @@ function FeriePermessiTab() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--line)' }}>
-              {['Utente', 'Tipo', 'Dal', 'Al', 'Giorni', 'Stato', 'Azioni'].map(h => (
+              {['Utente', 'Tipo', 'Dal', 'Al', 'Orario', 'Giorni', 'Stato', 'Azioni'].map(h => (
                 <th key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', padding: '8px 10px', textAlign: 'left' }}>{h}</th>
               ))}
             </tr>
@@ -2099,34 +2107,46 @@ function FeriePermessiTab() {
           <tbody>
             {filtered.map(row => (
               <tr key={row.id} style={{ borderBottom: '1px solid var(--line)' }}>
-                <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }}>
+                <td style={{ padding: '8px 10px', fontSize: 14, color: 'var(--text)' }}>
                   {row.profiles?.first_name} {row.profiles?.last_name}
                 </td>
                 <td style={{ padding: '8px 10px' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 8px', borderRadius: 4, background: `${TIPO_COLORS[row.tipo] || '#888'}20`, color: TIPO_COLORS[row.tipo] || '#888' }}>{row.tipo}</span>
+                  <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 4, background: `${TIPO_COLORS[row.tipo] || '#888'}20`, color: TIPO_COLORS[row.tipo] || '#888' }}>{row.tipo}</span>
                 </td>
-                <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{row.data_inizio}</td>
-                <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{row.data_fine}</td>
-                <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)', fontWeight: 600 }}>{calcDays(row.data_inizio, row.data_fine)}</td>
+                <td style={{ padding: '8px 10px', fontSize: 14, color: 'var(--text)' }}>{row.data_inizio}</td>
+                <td style={{ padding: '8px 10px', fontSize: 14, color: 'var(--text)' }}>{row.data_fine}</td>
+                <td style={{ padding: '8px 10px', fontSize: 14, color: 'var(--text)' }}>
+                  {row.tipo === 'permesso' && row.ora_inizio && row.ora_fine
+                    ? `${row.ora_inizio.slice(0, 5)}–${row.ora_fine.slice(0, 5)}`
+                    : '—'}
+                </td>
+                <td style={{ padding: '8px 10px', fontSize: 14, color: 'var(--text)', fontWeight: 600 }}>{calcDays(row.data_inizio, row.data_fine)}</td>
                 <td style={{ padding: '8px 10px' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 8px', borderRadius: 4, background: `${STATO_COLORS[row.stato] || '#888'}20`, color: STATO_COLORS[row.stato] || '#888' }}>{row.stato.replace('_', ' ')}</span>
+                  <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 4, background: `${STATO_COLORS[row.stato] || '#888'}20`, color: STATO_COLORS[row.stato] || '#888' }}>{row.stato.replace('_', ' ')}</span>
                 </td>
                 <td style={{ padding: '8px 10px' }}>
                   {row.stato === 'in_attesa' && (
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={() => approve(row.id, row)} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 8px', borderRadius: 4, border: 'none', background: '#22c55e20', color: '#22c55e', cursor: 'pointer' }}>Approva</button>
-                      <button onClick={() => { setDenyingId(row.id); setDenyNote('') }} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 8px', borderRadius: 4, border: 'none', background: 'rgba(208,0,58,0.1)', color: 'var(--red2)', cursor: 'pointer' }}>Nega</button>
+                      <button disabled={saving === row.id} onClick={() => approve(row.id)} style={{ fontSize: 14, padding: '8px 14px', minHeight: 44, borderRadius: 6, border: 'none', background: '#22c55e20', color: '#22c55e', cursor: saving === row.id ? 'not-allowed' : 'pointer', opacity: saving === row.id ? 0.5 : 1 }}>Approva</button>
+                      <button disabled={saving === row.id} onClick={() => { setDenyingId(row.id); setDenyNote('') }} style={{ fontSize: 14, padding: '8px 14px', minHeight: 44, borderRadius: 6, border: 'none', background: 'rgba(208,0,58,0.1)', color: 'var(--red2)', cursor: saving === row.id ? 'not-allowed' : 'pointer', opacity: saving === row.id ? 0.5 : 1 }}>Nega</button>
                     </div>
                   )}
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: 20, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>Nessuna richiesta trovata</td></tr>
+              <tr><td colSpan={8} style={{ padding: 20, textAlign: 'center', fontSize: 14, color: 'var(--muted)' }}>Nessuna richiesta trovata</td></tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {/* Feedback */}
+      {feedback && (
+        <div style={{ margin: '12px 0', padding: 10, borderRadius: 8, background: feedback.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: feedback.type === 'success' ? '#22c55e' : 'var(--red2)', fontSize: 14 }}>
+          {feedback.msg}
+        </div>
+      )}
 
       {/* Deny form inline */}
       {denyingId && (
@@ -2135,9 +2155,9 @@ function FeriePermessiTab() {
           <textarea value={denyNote} onChange={e => setDenyNote(e.target.value)} rows={2} placeholder="Motivazione obbligatoria..."
             style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', resize: 'vertical', marginBottom: 8 }} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => { const row = leaves.find(l => l.id === denyingId); if (row) deny(denyingId, row) }} disabled={denyNote.length < 10}
-              style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '5px 12px', borderRadius: 6, border: 'none', background: 'var(--red2)', color: '#fff', cursor: 'pointer', opacity: denyNote.length < 10 ? 0.4 : 1 }}>Conferma negazione</button>
-            <button onClick={() => setDenyingId(null)} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '5px 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--muted)', cursor: 'pointer' }}>Annulla</button>
+            <button onClick={() => deny(denyingId)} disabled={denyNote.length < 10 || saving === denyingId}
+              style={{ fontSize: 14, padding: '8px 14px', minHeight: 44, borderRadius: 6, border: 'none', background: 'var(--red2)', color: '#fff', cursor: denyNote.length < 10 ? 'not-allowed' : 'pointer', opacity: denyNote.length < 10 || saving === denyingId ? 0.4 : 1 }}>Conferma negazione</button>
+            <button onClick={() => setDenyingId(null)} style={{ fontSize: 14, padding: '8px 14px', minHeight: 44, borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--muted)', cursor: 'pointer' }}>Annulla</button>
           </div>
         </div>
       )}

@@ -19,10 +19,6 @@ export interface LeaveRequest {
   profiles?: { first_name: string; last_name: string; avatar_url: string | null; role: string }
 }
 
-function calcDays(d1: string, d2: string): number {
-  return Math.max(1, Math.round((new Date(d2).getTime() - new Date(d1).getTime()) / 86400000) + 1)
-}
-
 export async function createLeaveRequest(params: {
   tipo: 'ferie' | 'permesso' | 'malattia' | 'recupero'
   dataInizio: string
@@ -30,167 +26,76 @@ export async function createLeaveRequest(params: {
   oraInizio?: string
   oraFine?: string
   motivo?: string
-}): Promise<LeaveRequest | null> {
+}): Promise<{ data: LeaveRequest | null; error: string | null }> {
   const user = loadUser()
-  if (!user) return null
+  if (!user) return { data: null, error: 'Sessione scaduta. Effettua nuovamente il login.' }
 
-  const giorni = calcDays(params.dataInizio, params.dataFine)
-
-  const { data, error } = await supabase.from('leave_requests')
-    .insert({
-      user_id: user.id,
-      tipo: params.tipo,
-      data_inizio: params.dataInizio,
-      data_fine: params.dataFine,
-      ora_inizio: params.tipo === 'permesso' && params.oraInizio ? params.oraInizio : null,
-      ora_fine: params.tipo === 'permesso' && params.oraFine ? params.oraFine : null,
-      giorni_richiesti: giorni,
-      motivo: params.motivo || null,
-    })
-    .select()
-    .maybeSingle()
+  const { data, error } = await supabase.rpc('submit_leave_request', {
+    p_tipo: params.tipo,
+    p_data_inizio: params.dataInizio,
+    p_data_fine: params.dataFine,
+    p_ora_inizio: params.tipo === 'permesso' && params.oraInizio ? params.oraInizio : null,
+    p_ora_fine: params.tipo === 'permesso' && params.oraFine ? params.oraFine : null,
+    p_motivo: params.motivo || null,
+  })
 
   if (error) {
-    console.error('createLeaveRequest:', error.message)
-    return null
+    const msg = translateRpcError(error.message)
+    return { data: null, error: msg }
   }
 
-  if (data) {
-    await notifyAdminsNewRequest(data as LeaveRequest, user.nome || `${user.first_name} ${user.last_name}`)
+  return { data: data as LeaveRequest | null, error: null }
+}
+
+export async function approveLeaveRequest(requestId: string): Promise<{ success: boolean; error: string | null }> {
+  const user = loadUser()
+  if (!user) return { success: false, error: 'Sessione scaduta. Effettua nuovamente il login.' }
+
+  const { error } = await supabase.rpc('review_leave_request', {
+    p_request_id: requestId,
+    p_decision: 'approvata',
+    p_note_admin: null,
+  })
+
+  if (error) {
+    return { success: false, error: translateRpcError(error.message) }
   }
-
-  return data as LeaveRequest | null
+  return { success: true, error: null }
 }
 
-async function notifyAdminsNewRequest(request: LeaveRequest, userName: string): Promise<void> {
-  const { data: admins } = await supabase.from('profiles')
-    .select('id')
-    .in('role', ['Admin', 'Super Admin', 'Amministrazione'])
-
-  if (!admins?.length) return
-
-  const days = request.giorni_richiesti || calcDays(request.data_inizio, request.data_fine)
-  const notifications = admins.map(a => ({
-    user_id: a.id,
-    is_read: false,
-    title: `Nuova richiesta ${request.tipo}`,
-    message: `${userName} ha richiesto ${request.tipo} dal ${request.data_inizio} al ${request.data_fine} (${days} giorni)`,
-    type: 'leave_request_new',
-    related_entity_type: 'leave_request',
-    related_entity_id: request.id,
-  }))
-
-  await supabase.from('notifications').insert(notifications)
-}
-
-export async function approveLeaveRequest(requestId: string): Promise<boolean> {
+export async function rejectLeaveRequest(requestId: string, noteAdmin: string): Promise<{ success: boolean; error: string | null }> {
   const user = loadUser()
-  if (!user) return false
+  if (!user) return { success: false, error: 'Sessione scaduta. Effettua nuovamente il login.' }
 
-  const { data: request } = await supabase.from('leave_requests')
-    .select('*')
-    .eq('id', requestId)
-    .maybeSingle()
-  if (!request) return false
-
-  const { error } = await supabase.from('leave_requests')
-    .update({
-      stato: 'approvata',
-      approvato_da: user.id,
-      approvato_at: new Date().toISOString(),
-    })
-    .eq('id', requestId)
-
-  if (error) return false
-
-  await supabase.from('notifications').insert({
-    user_id: request.user_id,
-    is_read: false,
-    title: `${request.tipo.charAt(0).toUpperCase() + request.tipo.slice(1)} approvate`,
-    message: `La tua richiesta di ${request.tipo} dal ${request.data_inizio} al ${request.data_fine} e stata approvata!`,
-    type: 'leave_approved',
-    related_entity_type: 'leave_request',
-    related_entity_id: requestId,
+  const { error } = await supabase.rpc('review_leave_request', {
+    p_request_id: requestId,
+    p_decision: 'negata',
+    p_note_admin: noteAdmin || null,
   })
 
-  return true
+  if (error) {
+    return { success: false, error: translateRpcError(error.message) }
+  }
+  return { success: true, error: null }
 }
 
-export async function rejectLeaveRequest(requestId: string, noteAdmin: string): Promise<boolean> {
+export async function cancelLeaveRequest(requestId: string): Promise<{ success: boolean; error: string | null }> {
   const user = loadUser()
-  if (!user) return false
-
-  const { data: request } = await supabase.from('leave_requests')
-    .select('*')
-    .eq('id', requestId)
-    .maybeSingle()
-  if (!request) return false
-
-  const { error } = await supabase.from('leave_requests')
-    .update({
-      stato: 'negata',
-      approvato_da: user.id,
-      approvato_at: new Date().toISOString(),
-      note_admin: noteAdmin,
-    })
-    .eq('id', requestId)
-
-  if (error) return false
-
-  await supabase.from('notifications').insert({
-    user_id: request.user_id,
-    is_read: false,
-    title: 'Richiesta ferie negata',
-    message: `La tua richiesta di ${request.tipo} e stata negata. Motivazione: ${noteAdmin}`,
-    type: 'leave_denied',
-    related_entity_type: 'leave_request',
-    related_entity_id: requestId,
-  })
-
-  return true
-}
-
-export async function cancelLeaveRequest(requestId: string): Promise<boolean> {
-  const user = loadUser()
-  if (!user) return false
-
-  const { data: request } = await supabase.from('leave_requests')
-    .select('*')
-    .eq('id', requestId)
-    .maybeSingle()
-  if (!request) return false
+  if (!user) return { success: false, error: 'Sessione scaduta. Effettua nuovamente il login.' }
 
   const { error } = await supabase.from('leave_requests')
     .update({ stato: 'annullata' })
     .eq('id', requestId)
 
-  if (error) return false
-
-  const { data: admins } = await supabase.from('profiles')
-    .select('id')
-    .in('role', ['Admin', 'Super Admin', 'Amministrazione'])
-
-  if (admins?.length) {
-    const userName = user.nome || `${user.first_name} ${user.last_name}`
-    await supabase.from('notifications').insert(
-      admins.map(a => ({
-        user_id: a.id,
-        is_read: false,
-        title: 'Richiesta annullata',
-        message: `${userName} ha annullato la richiesta di ${request.tipo} dal ${request.data_inizio}`,
-        type: 'leave_cancelled',
-        related_entity_type: 'leave_request',
-        related_entity_id: requestId,
-      }))
-    )
+  if (error) {
+    return { success: false, error: 'Impossibile annullare la richiesta. Riprova.' }
   }
-
-  return true
+  return { success: true, error: null }
 }
 
 export async function getPendingLeaveRequests(): Promise<LeaveRequest[]> {
   const { data } = await supabase.from('leave_requests')
-    .select('*, profiles(first_name, last_name, avatar_url, role)')
+    .select('*, profiles!leave_requests_user_id_fkey(first_name, last_name, avatar_url, role)')
     .eq('stato', 'in_attesa')
     .order('created_at', { ascending: false })
 
@@ -212,8 +117,17 @@ export async function getUserLeaveRequests(userId?: string): Promise<LeaveReques
 
 export async function getAllLeaveRequests(): Promise<LeaveRequest[]> {
   const { data } = await supabase.from('leave_requests')
-    .select('*, profiles(first_name, last_name, avatar_url, role)')
+    .select('*, profiles!leave_requests_user_id_fkey(first_name, last_name, avatar_url, role)')
     .order('created_at', { ascending: false })
 
   return (data ?? []) as LeaveRequest[]
+}
+
+function translateRpcError(raw: string): string {
+  if (raw.includes('overlap') || raw.includes('sovrapposizione')) return 'Esiste gia una richiesta per le stesse date.'
+  if (raw.includes('permission') || raw.includes('autorizzat')) return 'Non hai i permessi per questa operazione.'
+  if (raw.includes('not found') || raw.includes('non trovata')) return 'Richiesta non trovata.'
+  if (raw.includes('already') || raw.includes('gia')) return 'Questa richiesta e gia stata gestita.'
+  if (raw.includes('invalid') || raw.includes('non valido')) return 'I dati inseriti non sono validi.'
+  return 'Si e verificato un errore. Riprova tra qualche istante.'
 }

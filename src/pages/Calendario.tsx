@@ -197,6 +197,8 @@ interface LeaveRequest {
   tipo: string
   data_inizio: string
   data_fine: string
+  ora_inizio: string | null
+  ora_fine: string | null
   stato: string
   profiles?: { first_name: string; last_name: string; avatar_url?: string }
 }
@@ -578,6 +580,58 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
     )
   }
 
+  if (item.type === 'leave') {
+    const l = item.data as LeaveRequest
+    const timeStr = l.tipo === 'permesso' && l.ora_inizio && l.ora_fine
+      ? `${l.ora_inizio.slice(0, 5)}\u2013${l.ora_fine.slice(0, 5)}`
+      : null
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: 'rgba(0,0,0,0.6)' }}
+        onClick={onClose}>
+        <div className="w-full max-w-sm rounded-2xl overflow-hidden animate-fade-in"
+          style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-sm)' }}
+          onClick={e => e.stopPropagation()}>
+          <div className="p-5" style={{ borderBottom: '1px solid var(--line)', borderLeft: '3px solid #3b82f6', paddingLeft: '17px' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <span style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)' }}>Assenza</span>
+                <h3 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text)', marginTop: 4 }}>{l.tipo}</h3>
+              </div>
+              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 flex-shrink-0">
+                <X className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+              </button>
+            </div>
+            <span className="text-xs px-2 py-0.5 rounded mt-2 inline-block"
+              style={{ background: l.stato === 'approvata' ? 'rgba(34,197,94,0.12)' : 'rgba(234,179,8,0.12)', color: l.stato === 'approvata' ? '#22c55e' : '#eab308' }}>
+              {l.stato.replace('_', ' ')}
+            </span>
+          </div>
+          <div className="p-5 space-y-3">
+            <div className="flex items-center gap-3">
+              <Clock className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+              <span style={{ fontSize: 14, color: 'var(--text)' }}>
+                {fmtLong(l.data_inizio)}{l.data_fine !== l.data_inizio ? ` \u2192 ${fmtLong(l.data_fine)}` : ''}
+              </span>
+            </div>
+            {timeStr && (
+              <div className="flex items-center gap-3">
+                <Clock className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                <span style={{ fontSize: 14, color: 'var(--text)' }}>{timeStr}</span>
+              </div>
+            )}
+            {l.profiles && (
+              <div className="flex items-center gap-3">
+                <User className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                <span style={{ fontSize: 14, color: 'var(--text)' }}>{l.profiles.first_name} {l.profiles.last_name}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Task detail
   const t = item.data as Task
   const color = taskColor(t)
@@ -683,7 +737,9 @@ function CalPill({ item, onClick, onDragStart, isLastDay, isFirstDay, isContinua
           ? socialColor(item.data as SocialContent)
           : item.type === 'memo'
             ? memoColor(item.data as CalendarItem)
-            : praticaColor(item.data as Pratica)
+            : item.type === 'leave'
+              ? '#3b82f6'
+              : praticaColor(item.data as Pratica)
   const label = item.type === 'event'
     ? (item.data as Event).nome
     : item.type === 'task'
@@ -694,7 +750,9 @@ function CalPill({ item, onClick, onDragStart, isLastDay, isFirstDay, isContinua
           ? (item.data as SocialContent).title
           : item.type === 'memo'
             ? (item.data as CalendarItem).title
-            : (item.data as Pratica).titolo
+            : item.type === 'leave'
+              ? ((item.data as LeaveRequest).tipo + ((item.data as LeaveRequest).tipo === 'permesso' && (item.data as LeaveRequest).ora_inizio && (item.data as LeaveRequest).ora_fine ? ` ${(item.data as LeaveRequest).ora_inizio!.slice(0, 5)}–${(item.data as LeaveRequest).ora_fine!.slice(0, 5)}` : ''))
+              : (item.data as Pratica).titolo
   const urgent = item.type === 'task' && (item.data as Task).priorita === 'alta' && (item.data as Task).stato !== 'completato'
   const dl = item.type === 'event'
     ? daysLeft((item.data as Event).dataInizio)
@@ -706,7 +764,9 @@ function CalPill({ item, onClick, onDragStart, isLastDay, isFirstDay, isContinua
           ? daysLeft((item.data as SocialContent).publish_date!)
           : item.type === 'memo'
             ? daysLeft((item.data as CalendarItem).start_date)
-            : daysLeft((item.data as Pratica).scadenza)
+            : item.type === 'leave'
+              ? daysLeft((item.data as LeaveRequest).data_inizio)
+              : daysLeft((item.data as Pratica).scadenza)
   const isDone = item.type === 'event'
     ? (item.data as Event).stato === 'completato'
     : item.type === 'task'
@@ -717,7 +777,9 @@ function CalPill({ item, onClick, onDragStart, isLastDay, isFirstDay, isContinua
           ? (item.data as SocialContent).status === 'pubblicato'
           : item.type === 'memo'
             ? false
-            : (item.data as Pratica).stato === 'completata'
+            : item.type === 'leave'
+              ? false
+              : (item.data as Pratica).stato === 'completata'
   const isOverdue = dl < 0 && !isDone
 
   const isMultiDay = item.type === 'event' && (isFirstDay !== undefined || isContinuation)
@@ -1930,7 +1992,7 @@ function TeamView({ weekStart, items, profiles, onItemClick }: {
                     <div key={p.id} className="p-1 min-h-[44px] space-y-0.5" style={{ borderRight: '1px solid var(--line)', background: leaveBg, opacity: isInAttesa ? 0.5 : 1, borderStyle: isInAttesa ? 'dashed' : 'solid', borderWidth: isInAttesa ? '1px' : undefined }}>
                       {leave && (
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--blue)' }}>
-                          {leaveData!.tipo}{isInAttesa ? ' (attesa)' : ''}
+                          {leaveData!.tipo}{leaveData!.tipo === 'permesso' && leaveData!.ora_inizio && leaveData!.ora_fine ? ` ${leaveData!.ora_inizio.slice(0, 5)}–${leaveData!.ora_fine.slice(0, 5)}` : ''}{isInAttesa ? ' (attesa)' : ''}
                         </span>
                       )}
                       {userItems.filter(i => i.type !== 'leave').slice(0, 2).map(item => (
@@ -2239,7 +2301,7 @@ export default function Calendario() {
       setAllMemos(memos)
       // Fetch leaves: approved for everyone + pending for current user (admins see all)
       const isAdm = ['Admin', 'Super Admin', 'Amministrazione'].includes(ruolo)
-      let leaveQuery = supabase.from('leave_requests').select('id, user_id, tipo, data_inizio, data_fine, stato, profiles(first_name, last_name, avatar_url)')
+      let leaveQuery = supabase.from('leave_requests').select('id, user_id, tipo, data_inizio, data_fine, ora_inizio, ora_fine, stato, profiles!leave_requests_user_id_fkey(first_name, last_name, avatar_url)')
       if (isAdm) {
         leaveQuery = leaveQuery.in('stato', ['approvata', 'in_attesa'])
       } else {
