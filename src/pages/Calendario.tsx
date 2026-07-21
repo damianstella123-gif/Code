@@ -2315,15 +2315,10 @@ export default function Calendario() {
       setAllCreative(cr)
       setAllSocial(so)
       setAllMemos(memos)
-      // Fetch leaves: approved for everyone + pending for current user (admins see all)
-      const isAdm = ['Admin', 'Super Admin', 'Amministrazione'].includes(ruolo)
-      let leaveQuery = supabase.from('leave_requests').select('id, user_id, tipo, data_inizio, data_fine, ora_inizio, ora_fine, stato, profiles!leave_requests_user_id_fkey(first_name, last_name, avatar_url)')
-      if (isAdm) {
-        leaveQuery = leaveQuery.in('stato', ['approvata', 'in_attesa'])
-      } else {
-        leaveQuery = leaveQuery.or(`stato.eq.approvata,and(stato.eq.in_attesa,user_id.eq.${currentUser?.id})`)
-      }
-      const { data: leaves } = await leaveQuery
+      // Fetch only approved leave requests (all roles, all users)
+      const { data: leaves } = await supabase.from('leave_requests')
+        .select('id, user_id, tipo, data_inizio, data_fine, ora_inizio, ora_fine, stato, profiles!leave_requests_user_id_fkey(first_name, last_name, avatar_url)')
+        .eq('stato', 'approvata')
       setAllLeaves((leaves ?? []) as unknown as LeaveRequest[])
       // Fetch active profiles for team view
       const { data: profs } = await supabase.from('profiles').select('id, first_name, last_name, avatar_url').eq('stato', 'attivo').order('first_name')
