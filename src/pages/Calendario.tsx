@@ -2359,7 +2359,10 @@ export default function Calendario() {
   const ruolo = currentUser?.ruolo ?? 'Admin'
 
   const mountedRef = useRef(true)
-  useEffect(() => () => { mountedRef.current = false }, [])
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   const refresh = useCallback(async () => {
     try {
@@ -2371,21 +2374,41 @@ export default function Calendario() {
       setAllCreative(cr)
       setAllSocial(so)
       setAllMemos(memos)
-      // Fetch only approved leave requests (all roles, all users)
-      const { data: leaves } = await supabase.from('leave_requests')
-        .select('id, user_id, tipo, data_inizio, data_fine, ora_inizio, ora_fine, stato, profiles!leave_requests_user_id_fkey(first_name, last_name, avatar_url)')
-        .eq('stato', 'approvata')
+      // Load profiles, approved leaves (via RPC) and pending changes together
+      const [profsRes, leavesRes, lrcRes] = await Promise.all([
+        supabase.from('profiles').select('id, first_name, last_name, avatar_url').eq('stato', 'attivo').order('first_name'),
+        supabase.rpc('get_approved_leave_calendar', { p_from: null, p_to: null }),
+        supabase.from('leave_request_changes').select('id, leave_request_id, change_type, change_status').eq('change_status', 'in_attesa'),
+      ])
       if (!mountedRef.current) return
-      setAllLeaves((leaves ?? []) as unknown as LeaveRequest[])
-      // Fetch pending leave_request_changes for approved requests
-      const { data: lrc } = await supabase.from('leave_request_changes')
-        .select('id, leave_request_id, change_type, change_status')
-        .eq('change_status', 'in_attesa')
+      const profs = (profsRes.data ?? []) as ProfileInfo[]
+      setTeamProfiles(profs)
+      if (leavesRes.error) {
+        showToast('Errore caricamento ferie')
+      } else {
+        const profMap = new Map(profs.map(p => [p.id, p]))
+        const mapped: LeaveRequest[] = ((leavesRes.data ?? []) as Array<{
+          id: string; user_id: string; tipo: string;
+          data_inizio: string; data_fine: string;
+          ora_inizio: string | null; ora_fine: string | null
+        }>).map(r => ({
+          id: r.id,
+          user_id: r.user_id,
+          tipo: r.tipo,
+          data_inizio: r.data_inizio,
+          data_fine: r.data_fine,
+          ora_inizio: r.ora_inizio,
+          ora_fine: r.ora_fine,
+          stato: 'approvata',
+          profiles: profMap.has(r.user_id)
+            ? { first_name: profMap.get(r.user_id)!.first_name, last_name: profMap.get(r.user_id)!.last_name, avatar_url: profMap.get(r.user_id)!.avatar_url ?? undefined }
+            : undefined,
+        }))
+        if (!mountedRef.current) return
+        setAllLeaves(mapped)
+      }
       if (!mountedRef.current) return
-      setLeaveChanges((lrc ?? []) as CalLeaveChange[])
-      // Fetch active profiles for team view
-      const { data: profs } = await supabase.from('profiles').select('id, first_name, last_name, avatar_url').eq('stato', 'attivo').order('first_name')
-      setTeamProfiles((profs ?? []) as ProfileInfo[])
+      setLeaveChanges((lrcRes.data ?? []) as CalLeaveChange[])
       setLastRefresh(new Date())
     } catch (err) {
       showToast('Errore caricamento calendario')
