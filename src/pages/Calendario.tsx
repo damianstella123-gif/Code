@@ -205,6 +205,13 @@ interface LeaveRequest {
   profiles?: { first_name: string; last_name: string; avatar_url?: string }
 }
 
+interface CalLeaveChange {
+  id: string
+  leave_request_id: string
+  change_type: 'modifica' | 'annullamento'
+  change_status: string
+}
+
 interface ProfileInfo {
   id: string
   first_name: string
@@ -251,7 +258,7 @@ function generateICS(items: CalItem[]): string {
 
 // ─── Detail popup ─────────────────────────────────────────────────────────────
 
-function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, onMemoEdit, onMemoDelete, onEventEditDates, onOpenTimeline }: {
+function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, onMemoEdit, onMemoDelete, onEventEditDates, onOpenTimeline, pendingChanges }: {
   item: CalItem
   allTasks: Task[]
   allUscite: Uscita[]
@@ -261,6 +268,7 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
   onMemoDelete: (id: string) => void
   onEventEditDates: (ev: Event) => void
   onOpenTimeline: (ev: Event) => void
+  pendingChanges?: CalLeaveChange[]
 }) {
   if (item.type === 'memo') {
     const m = item.data as CalendarItem
@@ -608,6 +616,12 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
               style={{ background: l.stato === 'approvata' ? 'rgba(34,197,94,0.12)' : 'rgba(234,179,8,0.12)', color: l.stato === 'approvata' ? '#22c55e' : '#eab308' }}>
               {l.stato.replace('_', ' ')}
             </span>
+            {(() => { const pc = (pendingChanges ?? []).find(c => c.leave_request_id === l.id); return pc ? (
+              <span className="text-xs px-2 py-0.5 rounded mt-2 ml-1 inline-block"
+                style={{ background: 'rgba(147,51,234,0.12)', color: '#9333ea', fontSize: 12 }}>
+                {pc.change_type === 'modifica' ? 'Modifica richiesta' : 'Annullamento richiesto'}
+              </span>
+            ) : null })()}
           </div>
           <div className="p-5 space-y-3">
             <div className="flex items-center gap-3">
@@ -1924,8 +1938,8 @@ function MemoEditModal({ item, onClose, onSave }: {
 
 // ─── Team View ───────────────────────────────────────────────────────────────
 
-function TeamView({ weekStart, items, profiles, onItemClick }: {
-  weekStart: Date; items: CalItem[]; profiles: ProfileInfo[]; onItemClick: (item: CalItem) => void
+function TeamView({ weekStart, items, profiles, onItemClick, pendingChanges }: {
+  weekStart: Date; items: CalItem[]; profiles: ProfileInfo[]; onItemClick: (item: CalItem) => void; pendingChanges?: CalLeaveChange[]
 }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
@@ -2008,9 +2022,16 @@ function TeamView({ weekStart, items, profiles, onItemClick }: {
                   return (
                     <div key={p.id} className="p-1 min-h-[44px] space-y-0.5" style={{ borderRight: '1px solid var(--line)', background: leaveBg, opacity: isInAttesa ? 0.5 : 1, borderStyle: isInAttesa ? 'dashed' : 'solid', borderWidth: isInAttesa ? '1px' : undefined }}>
                       {leave && (
+                        <>
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--blue)' }}>
                           {leaveData!.tipo}{leaveData!.tipo === 'permesso' && leaveData!.ora_inizio && leaveData!.ora_fine ? ` ${leaveData!.ora_inizio.slice(0, 5)}–${leaveData!.ora_fine.slice(0, 5)}` : ''}{isInAttesa ? ' (attesa)' : ''}
                         </span>
+                        {(() => { const pc = (pendingChanges ?? []).find(c => c.leave_request_id === leaveData!.id); return pc ? (
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, display: 'block', color: '#9333ea', background: 'rgba(147,51,234,0.10)', borderRadius: 4, padding: '1px 4px', marginTop: 1 }}>
+                            {pc.change_type === 'modifica' ? 'Modifica richiesta' : 'Annullamento richiesto'}
+                          </span>
+                        ) : null })()}
+                        </>
                       )}
                       {userItems.filter(i => i.type !== 'leave').slice(0, 2).map(item => (
                         <CalPill key={item.type === 'event' ? (item.data as Event).id : (item.data as Task).id} item={item} onClick={() => onItemClick(item)} />
@@ -2312,6 +2333,7 @@ export default function Calendario() {
   const [allSocial, setAllSocial] = useState<SocialContent[]>([])
   const [allMemos, setAllMemos] = useState<CalendarItem[]>([])
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([])
+  const [leaveChanges, setLeaveChanges] = useState<CalLeaveChange[]>([])
   const [teamProfiles, setTeamProfiles] = useState<ProfileInfo[]>([])
   const [view, setView] = useState<ViewMode>('month')
   const [cursor, setCursor] = useState(() => {
@@ -2336,6 +2358,9 @@ export default function Calendario() {
   const currentUser = loadUser()
   const ruolo = currentUser?.ruolo ?? 'Admin'
 
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
+
   const refresh = useCallback(async () => {
     try {
       const [t, e, p, u, cr, so, memos] = await Promise.all([fetchTasks(), fetchEvents(), fetchPractices(), fetchBudgets(), fetchCreativeProjects(), fetchSocialContents(), fetchCalendarItems()])
@@ -2350,7 +2375,14 @@ export default function Calendario() {
       const { data: leaves } = await supabase.from('leave_requests')
         .select('id, user_id, tipo, data_inizio, data_fine, ora_inizio, ora_fine, stato, profiles!leave_requests_user_id_fkey(first_name, last_name, avatar_url)')
         .eq('stato', 'approvata')
+      if (!mountedRef.current) return
       setAllLeaves((leaves ?? []) as unknown as LeaveRequest[])
+      // Fetch pending leave_request_changes for approved requests
+      const { data: lrc } = await supabase.from('leave_request_changes')
+        .select('id, leave_request_id, change_type, change_status')
+        .eq('change_status', 'in_attesa')
+      if (!mountedRef.current) return
+      setLeaveChanges((lrc ?? []) as CalLeaveChange[])
       // Fetch active profiles for team view
       const { data: profs } = await supabase.from('profiles').select('id, first_name, last_name, avatar_url').eq('stato', 'attivo').order('first_name')
       setTeamProfiles((profs ?? []) as ProfileInfo[])
@@ -2754,6 +2786,7 @@ export default function Calendario() {
               items={visibleItems}
               profiles={teamProfiles}
               onItemClick={setSelectedItem}
+              pendingChanges={leaveChanges}
             />
           )}
           {view === 'agenda' && (
@@ -2774,6 +2807,7 @@ export default function Calendario() {
           onMemoDelete={id => { setSelectedItem(null); handleMemoDelete(id) }}
           onEventEditDates={ev => { setSelectedItem(null); setEditingEventDates(ev) }}
           onOpenTimeline={ev => { setSelectedItem(null); nav(`/timeline/${ev.id}`) }}
+          pendingChanges={leaveChanges}
         />
       )}
 
