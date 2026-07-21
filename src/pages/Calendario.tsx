@@ -53,6 +53,7 @@ export interface CalendarItem {
   item_type: 'promemoria' | 'evento' | 'scadenza' | 'task'
   start_date: string
   end_date: string | null
+  start_time: string | null
   alert: 'none' | '10min' | '1h' | '1d' | '1w'
   created_at: string
 }
@@ -295,7 +296,7 @@ function DetailPopup({ item, allTasks, allUscite, onClose, onTaskStateChange, on
             <div className="flex items-center gap-3">
               <Clock className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
               <span className="text-sm" style={{ color: 'var(--text)' }}>
-                {fmtLong(m.start_date)}{m.end_date ? ` \u2192 ${fmtLong(m.end_date)}` : ''}
+                {m.start_time ? `${m.start_time.slice(0, 5)} · ` : ''}{fmtLong(m.start_date)}{m.end_date ? ` \u2192 ${fmtLong(m.end_date)}` : ''}
               </span>
             </div>
             {m.alert !== 'none' && (
@@ -759,6 +760,7 @@ function CalPill({ item, onClick, onDragStart, isLastDay, isFirstDay, isContinua
       }}>
       {urgent && <Zap style={{ display: 'inline', width: 9, height: 9, marginRight: 2, marginBottom: 1 }} />}
       {item.type === 'memo' && <Bell style={{ display: 'inline', width: 9, height: 9, marginRight: 2, marginBottom: 1 }} />}
+      {item.type === 'memo' && (item.data as CalendarItem).start_time && <span style={{ opacity: 0.7 }}>{(item.data as CalendarItem).start_time!.slice(0, 5)} </span>}
       {showLabel ? (isContinuation && !isFirstDay ? `\u2190 ${label}` : label) : '\u00A0'}
       {isLastDay && item.type === 'event' && onResizeStart && (
         <div
@@ -1416,6 +1418,7 @@ function QuickCreateModal({ defaultDate, onClose, onCreate }: {
   const [desc, setDesc] = useState('')
   const [dataInizio, setDataInizio] = useState(defaultDate)
   const [dataFine, setDataFine] = useState(defaultDate)
+  const [selectedTime, setSelectedTime] = useState('')
   const [alert, setAlert] = useState<'none' | '10min' | '1h' | '1d' | '1w'>('none')
   const [saving, setSaving] = useState(false)
 
@@ -1430,6 +1433,7 @@ function QuickCreateModal({ defaultDate, onClose, onCreate }: {
       item_type: itemType,
       start_date: dataInizio,
       end_date: hasEndDate ? dataFine : null,
+      start_time: selectedTime || null,
       alert,
     })
     setSaving(false)
@@ -1518,6 +1522,15 @@ function QuickCreateModal({ defaultDate, onClose, onCreate }: {
               </div>
             </div>
           )}
+
+          {/* Time field */}
+          <div>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Orario</label>
+            <input type="time" value={selectedTime} onChange={e => setSelectedTime(e.target.value)}
+              className="w-full px-3 py-3 rounded-xl"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontSize: '16px', minHeight: '44px' }}
+            />
+          </div>
 
           {/* Alert - available for all types */}
           <div>
@@ -1731,6 +1744,7 @@ function MemoEditModal({ item, onClose, onSave }: {
   const [description, setDescription] = useState(item.description || '')
   const [startDate, setStartDate] = useState(item.start_date)
   const [endDate, setEndDate] = useState(item.end_date || item.start_date)
+  const [editTime, setEditTime] = useState(item.start_time ? item.start_time.slice(0, 5) : '')
   const [itemType, setItemType] = useState(item.item_type)
   const [alertVal, setAlertVal] = useState(item.alert)
   const [saving, setSaving] = useState(false)
@@ -1745,6 +1759,7 @@ function MemoEditModal({ item, onClose, onSave }: {
       item_type: itemType,
       start_date: startDate,
       end_date: endDate !== startDate ? endDate : null,
+      start_time: editTime || null,
       alert: alertVal,
     })
     setSaving(false)
@@ -1784,6 +1799,13 @@ function MemoEditModal({ item, onClose, onSave }: {
                 className="w-full px-3 py-2 rounded-xl text-sm"
                 style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }} />
             </div>
+          </div>
+          <div>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', display: 'block', color: 'var(--muted)' }}>Orario</label>
+            <input type="time" value={editTime} onChange={e => setEditTime(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm"
+              style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontSize: '16px', minHeight: '44px' }}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -2346,7 +2368,7 @@ export default function Calendario() {
         if (memo) {
           const updated = { ...memo, start_date: newDate }
           setAllMemos(prev => prev.map(m => m.id === id ? updated : m))
-          await upsertCalendarItem({ id, title: memo.title, start_date: newDate, end_date: memo.end_date, alert: memo.alert, item_type: memo.item_type, description: memo.description })
+          await upsertCalendarItem({ id, title: memo.title, start_date: newDate, end_date: memo.end_date, start_time: memo.start_time, alert: memo.alert, item_type: memo.item_type, description: memo.description })
           await refresh()
         }
         return
