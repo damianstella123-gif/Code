@@ -64,7 +64,6 @@ export default function TransportLiveManifest({ movementId, disabled }: Props) {
 
   const mountedRef = useRef(true)
   const requestRef = useRef(0)
-  const refreshingRef = useRef(false)
 
   useEffect(() => {
     mountedRef.current = true
@@ -72,8 +71,6 @@ export default function TransportLiveManifest({ movementId, disabled }: Props) {
   }, [])
 
   const loadManifest = useCallback(async () => {
-    if (refreshingRef.current) return
-    refreshingRef.current = true
     const reqId = ++requestRef.current
     try {
       const data = await fetchTransportManifest(movementId)
@@ -85,7 +82,6 @@ export default function TransportLiveManifest({ movementId, disabled }: Props) {
       setLoadError(err instanceof Error ? err.message : 'Errore durante il caricamento.')
     } finally {
       if (mountedRef.current && reqId === requestRef.current) setLoading(false)
-      refreshingRef.current = false
     }
   }, [movementId])
 
@@ -93,7 +89,6 @@ export default function TransportLiveManifest({ movementId, disabled }: Props) {
     setLoading(true)
     setManifest(null)
     setLoadError(null)
-    requestRef.current++
     loadManifest()
   }, [loadManifest])
 
