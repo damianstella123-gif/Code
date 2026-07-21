@@ -236,6 +236,7 @@ export function autoMapParticipantHeaders(headers: string[]): ParticipantColumnM
 export function buildParticipantPreview(
   sheet: ParticipantImportSheet,
   mapping: ParticipantColumnMapping[],
+  preserveUnmappedColumns = false,
 ): { rows: ParticipantPreviewRow[]; errors: ParticipantPreviewError[] } {
   const hasFirstName = mapping.some(m => m.target === 'first_name')
   const hasLastName = mapping.some(m => m.target === 'last_name')
@@ -303,10 +304,12 @@ export function buildParticipantPreview(
     }
 
     const extraFields: Record<string, string> = {}
-    for (const m of ignoredMappings) {
-      const val = (rawRow[m.sourceIndex] ?? '').trim()
-      if (val && m.sourceHeader) {
-        extraFields[m.sourceHeader] = val
+    if (preserveUnmappedColumns) {
+      for (const m of ignoredMappings) {
+        const val = (rawRow[m.sourceIndex] ?? '').trim()
+        if (val && m.sourceHeader) {
+          extraFields[m.sourceHeader] = val
+        }
       }
     }
 
