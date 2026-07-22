@@ -89,6 +89,20 @@ export interface TransportManifest {
   }
 }
 
+export interface TransportBoardingParticipant {
+  registration_id: string
+  first_name: string
+  last_name: string
+  company: string
+  phone: string
+  registration_status: string
+  assignment_id: string | null
+  vehicle_id: string | null
+  vehicle_label: string | null
+  assignment_status: string | null
+  boarded_at: string | null
+}
+
 export interface TransportOperationResult {
   assignment_id: string
   first_name: string | null
@@ -110,6 +124,23 @@ export interface TransportOperationResult {
     no_show: number
   }>
 }
+
+export interface TransportBoardDirectResult {
+  success: true
+  first_name: string
+  last_name: string
+  company: string
+  phone: string
+  vehicle_label: string
+  boarded_at: string
+}
+
+export interface TransportBoardDirectError {
+  success: false
+  error: string
+}
+
+export type TransportBoardDirectOutcome = TransportBoardDirectResult | TransportBoardDirectError
 
 // ─── Error Handling ──────────────────────────────────────────────────────────
 
@@ -142,11 +173,25 @@ const ERROR_MESSAGES: Record<string, string> = {
   INVALID_INPUT: 'Dati non validi.',
 }
 
+const BOARDING_DIRECT_MESSAGES: Record<string, string> = {
+  'Autenticazione richiesta.': ERROR_MESSAGES.AUTH_REQUIRED,
+  'Movimento non trovato.': ERROR_MESSAGES.MOVEMENT_NOT_FOUND,
+  'Permessi insufficienti per questa operazione.': ERROR_MESSAGES.NOT_AUTHORIZED,
+  'Il movimento non è aperto per imbarco.': ERROR_MESSAGES.MOVEMENT_NOT_OPEN,
+  'Veicolo non valido per questo movimento.': ERROR_MESSAGES.VEHICLE_NOT_FOUND,
+  'Partecipante non trovato o non confermato.': ERROR_MESSAGES.PARTICIPANT_NOT_FOUND,
+  'Partecipante già imbarcato.': ERROR_MESSAGES.ALREADY_BOARDED,
+  'Capienza veicolo raggiunta.': ERROR_MESSAGES.VEHICLE_FULL,
+}
+
 function translateError(err: unknown): string {
   if (err && typeof err === 'object' && 'message' in err) {
     const msg = (err as { message: string }).message
     for (const code of Object.keys(ERROR_MESSAGES)) {
       if (msg.includes(code)) return ERROR_MESSAGES[code]
+    }
+    for (const key of Object.keys(BOARDING_DIRECT_MESSAGES)) {
+      if (msg.includes(key)) return BOARDING_DIRECT_MESSAGES[key]
     }
   }
   return 'Errore imprevisto.'
@@ -417,5 +462,71 @@ export function subscribeTransportMovement(
     if (removed) return
     removed = true
     supabase.removeChannel(channel)
+  }
+}
+
+// ─── Boarding Pool & Direct Board ────────────────────────────────────────────
+
+export async function fetchTransportBoardingPool(
+  movementId: string
+): Promise<TransportBoardingParticipant[]> {
+  if (!movementId || typeof movementId !== 'string' || movementId.trim() === '') {
+    throw new Error(ERROR_MESSAGES.INVALID_INPUT)
+  }
+
+  const { data, error } = await supabase.rpc('get_transport_boarding_pool', {
+    p_movement_id: movementId,
+  })
+
+  if (error) throw new Error(translateError(error))
+  if (!Array.isArray(data)) throw new Error(ERROR_MESSAGES.INVALID_INPUT)
+
+  return (data as unknown[]).filter(
+    (row): row is TransportBoardingParticipant =>
+      row !== null &&
+      typeof row === 'object' &&
+      'registration_id' in row &&
+      'first_name' in row &&
+      'last_name' in row
+  )
+}
+
+export async function boardTransportParticipantDirect(
+  movementId: string,
+  vehicleId: string,
+  registrationId: string
+): Promise<TransportBoardDirectOutcome> {
+  if (
+    !movementId || typeof movementId !== 'string' || movementId.trim() === '' ||
+    !vehicleId || typeof vehicleId !== 'string' || vehicleId.trim() === '' ||
+    !registrationId || typeof registrationId !== 'string' || registrationId.trim() === ''
+  ) {
+    return { success: false, error: ERROR_MESSAGES.INVALID_INPUT }
+  }
+
+  const { data, error } = await supabase.rpc('board_transport_participant_direct', {
+    p_movement_id: movementId,
+    p_vehicle_id: vehicleId,
+    p_registration_id: registrationId,
+  })
+
+  if (error) {
+    return { success: false, error: translateError(error) }
+  }
+
+  const rows = Array.isArray(data) ? data : [data]
+  const row = rows[0] as Record<string, unknown> | undefined
+  if (!row || typeof row !== 'object' || !('first_name' in row) || !('boarded_at' in row)) {
+    return { success: false, error: 'Errore imprevisto.' }
+  }
+
+  return {
+    success: true,
+    first_name: String(row.first_name ?? ''),
+    last_name: String(row.last_name ?? ''),
+    company: String(row.company ?? ''),
+    phone: String(row.phone ?? ''),
+    vehicle_label: String(row.vehicle_label ?? ''),
+    boarded_at: String(row.boarded_at ?? ''),
   }
 }
