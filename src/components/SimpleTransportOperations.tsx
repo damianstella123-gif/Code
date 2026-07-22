@@ -36,6 +36,11 @@ interface VehicleRow {
   boarded_count: number
 }
 
+const VEHICLE_TYPE_LABELS: Record<string, string> = {
+  van: 'Minivan', minibus: 'Minibus', bus: 'Pullman', car: 'Auto', other: 'Altro'
+}
+function vehicleTypeLabel(t: string) { return VEHICLE_TYPE_LABELS[t] || t }
+
 export default function SimpleTransportOperations({ eventId, disabled }: Props) {
   const { showToast } = useToast()
 
@@ -400,13 +405,18 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
               onChange={e => { setVfLabel(e.target.value); setVfError('') }}
               maxLength={100}
             />
-            <input
+            <select
               style={inputStyle}
-              placeholder="Tipologia (es. bus, van, auto)"
               value={vfType}
               onChange={e => { setVfType(e.target.value); setVfError('') }}
-              maxLength={50}
-            />
+            >
+              <option value="">Seleziona tipologia...</option>
+              <option value="van">Minivan</option>
+              <option value="minibus">Minibus</option>
+              <option value="bus">Pullman</option>
+              <option value="car">Auto</option>
+              <option value="other">Altro</option>
+            </select>
             <input
               style={inputStyle}
               placeholder="Capienza (numero posti)"
@@ -424,6 +434,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                   if (savingVehicle) return
                   if (!selectedMovement) { setVfError('Nessun transfer selezionato.'); return }
                   if (!vfLabel.trim()) { setVfError('Il nome del mezzo è obbligatorio.'); return }
+                  if (!vfType) { setVfError('Selezionare una tipologia.'); return }
                   const parsed = Number.parseInt(vfCapacity, 10)
                   if (!vfCapacity || Number.isNaN(parsed) || parsed <= 0) {
                     setVfError('La capienza deve essere un numero intero maggiore di zero.')
@@ -436,7 +447,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                       vehicleId: editingVehicleId ?? null,
                       movementId: selectedMovement.id,
                       label: vfLabel.trim(),
-                      vehicleType: vfType.trim() || 'bus',
+                      vehicleType: vfType,
                       capacity: parsed,
                       plate: '',
                       driverName: '',
@@ -492,7 +503,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                       </span>
                     </div>
                     <div style={cardMetaStyle}>
-                      <span style={{ fontSize: 13 }}>{v.vehicle_type}</span>
+                      <span style={{ fontSize: 13 }}>{vehicleTypeLabel(v.vehicle_type)}</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <Users size={13} />
                         {v.boarded_count}/{v.capacity ?? '∞'}
