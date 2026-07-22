@@ -64,7 +64,12 @@ function isRowEmpty(row: string[]): boolean {
   return row.every((cell) => !cell || !cell.trim());
 }
 
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+
 export function parseParticipantWorkbook(buffer: Uint8Array): Workbook {
+  if (buffer.byteLength > MAX_FILE_SIZE) {
+    throw new Error("Il file supera la dimensione massima consentita (25 MB).");
+  }
   const wb = XLSX.read(buffer, { type: "array" });
   const sheets: SheetData[] = [];
 
@@ -118,6 +123,135 @@ export function autoMapParticipantHeaders(headers: string[]): ColumnMapping[] {
 
   return mappings;
 }
+
+// ---------------------------------------------------------------------------
+// parseParticipantSheet
+// ---------------------------------------------------------------------------
+
+export interface ParsedParticipantRow {
+  rowIndex: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  company: string;
+  job_title: string;
+  dietary_requirements: string;
+  accessibility_requirements: string;
+  extraFields: Record<string, string>;
+}
+
+export interface ParsedParticipantError {
+  rowIndex: number;
+  message: string;
+}
+
+export interface ParsedSheetResult {
+  rows: ParsedParticipantRow[];
+  errors: ParsedParticipantError[];
+}
+
+export function parseParticipantSheet(
+  sheet: SheetData,
+  mapping: ColumnMapping[],
+  preserveUnmapped = false,
+): ParsedSheetResult {
+  const hasFirstName = mapping.some((m) => m.target === "first_name");
+  const hasLastName = mapping.some((m) => m.target === "last_name");
+
+  if (!hasFirstName || !hasLastName) {
+    throw new Error('Le colonne "Nome" e "Cognome" sono obbligatorie.');
+  }
+
+  type MappedKey = Exclude<ParticipantColumnKey, "ignore">;
+  const fieldIndices: Record<MappedKey, number | null> = {
+    first_name: null,
+    last_name: null,
+    email: null,
+    phone: null,
+    company: null,
+    job_title: null,
+    dietary_requirements: null,
+    accessibility_requirements: null,
+  };
+
+  const ignoredMappings: ColumnMapping[] = [];
+
+  for (const m of mapping) {
+    if (m.target === "ignore") {
+      ignoredMappings.push(m);
+    } else {
+      fieldIndices[m.target] = m.sourceIndex;
+    }
+  }
+
+  const rows: ParsedParticipantRow[] = [];
+  const errors: ParsedParticipantError[] = [];
+
+  for (let i = 0; i < sheet.rows.length; i++) {
+    const rawRow = sheet.rows[i];
+    const rowIndex = i + 2;
+
+    const get = (key: MappedKey): string => {
+      const idx = fieldIndices[key];
+      if (idx === null || idx >= rawRow.length) return "";
+      return (rawRow[idx] ?? "").trim();
+    };
+
+    const firstName = get("first_name");
+    const lastName = get("last_name");
+
+    if (!firstName && !lastName) continue;
+
+    if (!firstName) {
+      errors.push({ rowIndex, message: `Riga ${rowIndex}: il campo "Nome" è obbligatorio.` });
+      continue;
+    }
+
+    if (!lastName) {
+      errors.push({ rowIndex, message: `Riga ${rowIndex}: il campo "Cognome" è obbligatorio.` });
+      continue;
+    }
+
+    let email = get("email");
+    if (email) {
+      email = email.toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errors.push({ rowIndex, message: `Riga ${rowIndex}: indirizzo email non valido.` });
+        continue;
+      }
+    }
+
+    const extraFields: Record<string, string> = {};
+    if (preserveUnmapped) {
+      for (const m of ignoredMappings) {
+        const val = (rawRow[m.sourceIndex] ?? "").trim();
+        if (val && m.sourceHeader) {
+          extraFields[m.sourceHeader] = val;
+        }
+      }
+    }
+
+    rows.push({
+      rowIndex,
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      phone: get("phone"),
+      company: get("company"),
+      job_title: get("job_title"),
+      dietary_requirements: get("dietary_requirements"),
+      accessibility_requirements: get("accessibility_requirements"),
+      extraFields,
+    });
+  }
+
+  return { rows, errors };
+}
+
+// ---------------------------------------------------------------------------
+// summarizeParticipantImport
+// ---------------------------------------------------------------------------
 
 export interface ImportSummary {
   sheet_index: number;
