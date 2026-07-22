@@ -42,8 +42,25 @@ export interface TransportVehicle {
   driver_name: string
   driver_phone: string
   sort_order: number
+  operational_status: 'boarding' | 'departed' | 'cancelled'
+  departed_at: string | null
+  departed_by: string | null
+  cancelled_at: string | null
+  cancelled_by: string | null
+  cancellation_reason: string | null
   created_at: string
   updated_at: string
+}
+
+export type TransportVehicleAction = 'depart' | 'cancel' | 'reopen'
+
+export interface TransportVehicleTransitionResult {
+  vehicle_label: string
+  action: TransportVehicleAction
+  operational_status: 'boarding' | 'departed' | 'cancelled'
+  departed_at: string | null
+  occupants: number
+  capacity: number | null
 }
 
 export interface TransportManifestParticipant {
@@ -182,6 +199,12 @@ const BOARDING_DIRECT_MESSAGES: Record<string, string> = {
   'Partecipante non trovato o non confermato.': ERROR_MESSAGES.PARTICIPANT_NOT_FOUND,
   'Partecipante già imbarcato.': ERROR_MESSAGES.ALREADY_BOARDED,
   'Capienza veicolo raggiunta.': ERROR_MESSAGES.VEHICLE_FULL,
+  'Azione non valida.': ERROR_MESSAGES.INVALID_INPUT,
+  'Veicolo non trovato.': ERROR_MESSAGES.VEHICLE_NOT_FOUND,
+  'Il mezzo non è in fase di imbarco.': 'Il mezzo non è in fase di imbarco.',
+  'Il mezzo è già annullato.': 'Il mezzo è già annullato.',
+  'Motivo annullamento obbligatorio (min 5 caratteri).': 'Motivo annullamento obbligatorio (min 5 caratteri).',
+  'Il mezzo è già in imbarco.': 'Il mezzo è già in imbarco.',
 }
 
 function translateError(err: unknown): string {
@@ -528,5 +551,56 @@ export async function boardTransportParticipantDirect(
     phone: String(row.phone ?? ''),
     vehicle_label: String(row.vehicle_label ?? ''),
     boarded_at: String(row.boarded_at ?? ''),
+  }
+}
+
+// ─── Vehicle Transition ──────────────────────────────────────────────────────
+
+const VALID_VEHICLE_ACTIONS: TransportVehicleAction[] = ['depart', 'cancel', 'reopen']
+
+export async function transitionTransportVehicle(
+  vehicleId: string,
+  action: TransportVehicleAction,
+  reason?: string
+): Promise<TransportVehicleTransitionResult> {
+  if (!vehicleId || typeof vehicleId !== 'string' || vehicleId.trim() === '') {
+    throw new Error(ERROR_MESSAGES.INVALID_INPUT)
+  }
+  if (!action || !VALID_VEHICLE_ACTIONS.includes(action)) {
+    throw new Error(ERROR_MESSAGES.INVALID_INPUT)
+  }
+  if (action === 'cancel') {
+    const trimmed = (reason ?? '').trim()
+    if (trimmed.length < 5) {
+      throw new Error('Motivo annullamento obbligatorio (min 5 caratteri).')
+    }
+  }
+
+  const { data, error } = await supabase.rpc('transition_transport_vehicle', {
+    p_vehicle_id: vehicleId,
+    p_action: action,
+    p_reason: reason ?? null,
+  })
+
+  if (error) throw new Error(translateError(error))
+
+  const result = data as Record<string, unknown> | null
+  if (
+    !result ||
+    typeof result !== 'object' ||
+    typeof result.vehicle_label !== 'string' ||
+    typeof result.action !== 'string' ||
+    typeof result.operational_status !== 'string'
+  ) {
+    throw new Error('Errore imprevisto.')
+  }
+
+  return {
+    vehicle_label: result.vehicle_label,
+    action: result.action as TransportVehicleAction,
+    operational_status: result.operational_status as 'boarding' | 'departed' | 'cancelled',
+    departed_at: result.departed_at as string | null,
+    occupants: Number(result.occupants ?? 0),
+    capacity: result.capacity != null ? Number(result.capacity) : null,
   }
 }
