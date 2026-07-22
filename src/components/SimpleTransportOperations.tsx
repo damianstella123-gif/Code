@@ -656,6 +656,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                               await transitionTransportVehicle(v.id, 'cancel', trimmedReason)
                               showToast(`Mezzo "${v.label}" eliminato.`, 'success')
                               setDeleteVehicleId(null)
+                              setSelectedVehicle(null)
                               if (selectedMovement) await loadVehicles(selectedMovement.id)
                             } catch (err: any) {
                               showToast(err?.message ?? 'Errore nell\'eliminazione.', 'error')
@@ -751,7 +752,9 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
               const isBoarded = p.assignment_status === 'boarded'
               const isBoardedOnThis = isBoarded && p.vehicle_id === selectedVehicle.id
               const isBoardedElsewhere = isBoarded && p.vehicle_id !== selectedVehicle.id
-              const isLoading = boardingId === p.registration_id || unboardingId === p.assignment_id
+              const isLoading = boardingId === p.registration_id || (unboardingId !== null &&
+                p.assignment_id !== null &&
+                unboardingId === p.assignment_id)
               const participantName = `${p.last_name} ${p.first_name}`
 
               const handleCardClick = () => {
