@@ -10,6 +10,7 @@ import {
   transitionTransportVehicle,
   transitionTransportMovement,
   saveTransportVehicle,
+  saveTransportMovement,
   subscribeTransportMovement,
   type TransportMovement,
   type TransportBoardingParticipant,
@@ -81,6 +82,15 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
   // Delete transfer confirmation state
   const [deleteMovementId, setDeleteMovementId] = useState<string | null>(null)
   const [deletingMovement, setDeletingMovement] = useState(false)
+
+  // New transfer form state
+  const [showTransferForm, setShowTransferForm] = useState(false)
+  const [tfLabel, setTfLabel] = useState('')
+  const [tfOrigin, setTfOrigin] = useState('')
+  const [tfDestination, setTfDestination] = useState('')
+  const [tfDepartureAt, setTfDepartureAt] = useState('')
+  const [tfError, setTfError] = useState('')
+  const [savingTransfer, setSavingTransfer] = useState(false)
 
 
   const unsubRef = useRef<(() => void) | null>(null)
@@ -291,16 +301,73 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
   // ─── Render: transfer list ───────────────────────────────────────────────────
 
   if (view === 'list') {
+    const activeMovements = movements.filter(m => m.movement_status !== 'cancelled')
     return (
       <div style={containerStyle}>
-        <h3 style={titleStyle}>Trasporti</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3 style={{ ...titleStyle, margin: 0 }}>Trasporti</h3>
+          <button
+            style={primaryActionBtnStyle}
+            onClick={() => { setShowTransferForm(true); setTfLabel(''); setTfOrigin(''); setTfDestination(''); setTfDepartureAt(''); setTfError('') }}
+            disabled={disabled}
+          >
+            + Nuovo transfer
+          </button>
+        </div>
+
+        {showTransferForm && (
+          <div style={inlineFormStyle}>
+            <h4 style={{ margin: '0 0 12px' }}>Nuovo Transfer</h4>
+            <input style={inputStyle} placeholder="Nome transfer *" value={tfLabel} onChange={e => { setTfLabel(e.target.value); setTfError('') }} maxLength={100} />
+            <input style={inputStyle} placeholder="Origine" value={tfOrigin} onChange={e => setTfOrigin(e.target.value)} maxLength={100} />
+            <input style={inputStyle} placeholder="Destinazione" value={tfDestination} onChange={e => setTfDestination(e.target.value)} maxLength={100} />
+            <input style={inputStyle} type="datetime-local" value={tfDepartureAt} onChange={e => setTfDepartureAt(e.target.value)} />
+            {tfError && <p style={formErrorStyle}>{tfError}</p>}
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button
+                style={primaryActionBtnStyle}
+                disabled={savingTransfer}
+                onClick={async () => {
+                  if (!tfLabel.trim()) { setTfError('Il nome del transfer è obbligatorio.'); return }
+                  setSavingTransfer(true)
+                  try {
+                    const newId = await saveTransportMovement({
+                      movementId: null,
+                      eventId,
+                      label: tfLabel.trim(),
+                      movementType: 'transfer',
+                      departureAt: tfDepartureAt || null,
+                      origin: tfOrigin.trim(),
+                      destination: tfDestination.trim()
+                    })
+                    showToast('Transfer creato correttamente', 'success')
+                    setShowTransferForm(false)
+                    setTfLabel(''); setTfOrigin(''); setTfDestination(''); setTfDepartureAt(''); setTfError('')
+                    await loadMovements()
+                    const fresh = await fetchTransportMovements(eventId)
+                    const created = fresh.find(m => m.id === newId)
+                    if (created) selectMovement(created)
+                  } catch (err: any) {
+                    showToast(err?.message ?? 'Errore nella creazione.', 'error')
+                  } finally {
+                    setSavingTransfer(false)
+                  }
+                }}
+              >
+                {savingTransfer ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : 'Salva'}
+              </button>
+              <button style={secondaryActionBtnStyle} onClick={() => setShowTransferForm(false)} disabled={savingTransfer}>Annulla</button>
+            </div>
+          </div>
+        )}
+
         {loadingMovements ? (
           <div style={centerStyle}><Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} /></div>
-        ) : movements.length === 0 ? (
-          <p style={emptyStyle}>Nessun trasferimento configurato.</p>
+        ) : activeMovements.length === 0 ? (
+          <p style={emptyStyle}>Nessun transfer presente. Crea il primo transfer per iniziare.</p>
         ) : (
           <div style={cardListStyle}>
-            {movements.filter(m => m.movement_status !== 'cancelled').map(m => (
+            {activeMovements.map(m => (
               <div key={m.id} style={{ position: 'relative' }}>
                 <button
                   style={transferCardStyle}
