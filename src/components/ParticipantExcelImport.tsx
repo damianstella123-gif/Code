@@ -424,17 +424,31 @@ export default function ParticipantExcelImport({ eventId, disabled, onImported }
             Conserva colonne non mappate come campi aggiuntivi
           </label>
 
+          {hasRequiredFields() && (
+            <div style={{ marginTop: 12, fontSize: 13, color: '#16a34a', fontWeight: 500 }}>
+              Nome e Cognome riconosciuti. Puoi continuare.
+            </div>
+          )}
+
           <button
+            type="button"
             onClick={handleBuildPreview}
             disabled={hasDuplicateTargets() || !hasRequiredFields()}
             style={{
-              ...btnStyle,
+              width: '100%',
+              minHeight: 44,
               marginTop: 16,
-              opacity: hasDuplicateTargets() || !hasRequiredFields() ? 0.5 : 1,
+              background: '#d7193f',
+              color: '#ffffff',
+              fontSize: 14,
+              fontWeight: 600,
+              border: 'none',
+              borderRadius: 6,
               cursor: hasDuplicateTargets() || !hasRequiredFields() ? 'not-allowed' : 'pointer',
+              opacity: hasDuplicateTargets() || !hasRequiredFields() ? 0.5 : 1,
             }}
           >
-            Genera anteprima
+            Continua e genera anteprima
           </button>
         </div>
       )}
