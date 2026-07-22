@@ -57,6 +57,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
   const [vfType, setVfType] = useState('')
   const [vfCapacity, setVfCapacity] = useState('')
   const [savingVehicle, setSavingVehicle] = useState(false)
+  const [vfError, setVfError] = useState('')
 
   // Delete transfer confirmation state
   const [deleteMovementId, setDeleteMovementId] = useState<string | null>(null)
@@ -356,14 +357,14 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
               style={inputStyle}
               placeholder="Nome del mezzo"
               value={vfLabel}
-              onChange={e => setVfLabel(e.target.value)}
+              onChange={e => { setVfLabel(e.target.value); setVfError('') }}
               maxLength={100}
             />
             <input
               style={inputStyle}
               placeholder="Tipologia (es. bus, van, auto)"
               value={vfType}
-              onChange={e => setVfType(e.target.value)}
+              onChange={e => { setVfType(e.target.value); setVfError('') }}
               maxLength={50}
             />
             <input
@@ -372,25 +373,39 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
               type="number"
               min={1}
               value={vfCapacity}
-              onChange={e => setVfCapacity(e.target.value)}
+              onChange={e => { setVfCapacity(e.target.value); setVfError('') }}
             />
+            {vfError && <p style={formErrorStyle}>{vfError}</p>}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 style={primaryActionBtnStyle}
-                disabled={savingVehicle || !vfLabel.trim()}
+                disabled={savingVehicle}
                 onClick={async () => {
-                  if (!vfLabel.trim() || !selectedMovement) return
+                  if (savingVehicle) return
+                  if (!selectedMovement) { setVfError('Nessun transfer selezionato.'); return }
+                  if (!vfLabel.trim()) { setVfError('Il nome del mezzo è obbligatorio.'); return }
+                  const parsed = Number.parseInt(vfCapacity, 10)
+                  if (!vfCapacity || Number.isNaN(parsed) || parsed <= 0) {
+                    setVfError('La capienza deve essere un numero intero maggiore di zero.')
+                    return
+                  }
                   setSavingVehicle(true)
+                  setVfError('')
                   try {
                     await saveTransportVehicle({
+                      vehicleId: null,
                       movementId: selectedMovement.id,
                       label: vfLabel.trim(),
                       vehicleType: vfType.trim() || 'bus',
-                      capacity: vfCapacity ? parseInt(vfCapacity, 10) || null : null,
+                      capacity: parsed,
+                      plate: '',
+                      driverName: '',
+                      driverPhone: '',
+                      sortOrder: vehicles.length,
                     })
-                    showToast('Mezzo aggiunto con successo.', 'success')
+                    showToast('Mezzo aggiunto correttamente', 'success')
                     setShowVehicleForm(false)
-                    setVfLabel(''); setVfType(''); setVfCapacity('')
+                    setVfLabel(''); setVfType(''); setVfCapacity(''); setVfError('')
                     await loadVehicles(selectedMovement.id)
                   } catch (err: any) {
                     showToast(err?.message ?? 'Errore nel salvataggio del mezzo.', 'error')
@@ -403,7 +418,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
               </button>
               <button
                 style={secondaryActionBtnStyle}
-                onClick={() => setShowVehicleForm(false)}
+                onClick={() => { setShowVehicleForm(false); setVfError('') }}
                 disabled={savingVehicle}
               >
                 Annulla
@@ -946,4 +961,11 @@ const confirmOverlayStyle: React.CSSProperties = {
   justifyContent: 'center',
   padding: 16,
   zIndex: 2,
+}
+
+const formErrorStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 13,
+  color: '#dc2626',
+  lineHeight: 1.4,
 }
