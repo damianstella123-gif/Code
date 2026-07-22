@@ -1,7 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import { calcRowEconomics, calcRowCommission, calcRowNetto, type RawRow } from "../_shared/event-economics.ts";
-import { parseParticipantWorkbook, autoMapParticipantHeaders, summarizeParticipantImport } from "../_shared/participant-import.ts";
+import { parseParticipantWorkbook, autoMapParticipantHeaders, summarizeParticipantImport, parseParticipantSheet } from "../_shared/participant-import.ts";
+import type { ColumnMapping, ParticipantColumnKey } from "../_shared/participant-import.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1842,13 +1843,19 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
       const mapping = autoMapParticipantHeaders(sheet.headers);
       const summary = summarizeParticipantImport(sheet, mapping);
 
-      return JSON.stringify({
-        mode: "preview",
-        event_id: eventId,
-        document_id: documentId,
-        file_name: doc.file_name,
-        ...summary,
-      });
+      const proposal = {
+        action: "import_participants",
+        params: {
+          event_id: eventId,
+          document_id: documentId,
+          sheet_index: sheet.index,
+          suggested_mapping: mapping,
+          preserve_unmapped: false,
+          valid_count: summary.valid_count,
+          invalid_count: summary.invalid_count,
+        },
+      };
+      return `__PROPOSAL__${JSON.stringify(proposal)}`;
     }
 
     default:
@@ -2099,6 +2106,42 @@ function validateProposalParams(action: string, params: Record<string, unknown>)
       if (ne) errors.push(ne);
       break;
     }
+    case "import_participants": {
+      const eid = validateText(params.event_id, "event_id", 100, true);
+      if (eid) errors.push(eid);
+      const did = validateUuid(params.document_id, "document_id", true);
+      if (did) errors.push(did);
+      if (typeof params.sheet_index !== "number" || !Number.isInteger(params.sheet_index) || params.sheet_index < 0) {
+        errors.push({ campo: "sheet_index", motivo: "deve essere un intero >= 0" });
+      }
+      if (!Array.isArray(params.mapping) || params.mapping.length === 0) {
+        errors.push({ campo: "mapping", motivo: "mapping obbligatorio e non vuoto" });
+      } else {
+        const ALLOWED_TARGETS: string[] = ["first_name", "last_name", "email", "phone", "company", "job_title", "dietary_requirements", "accessibility_requirements", "ignore"];
+        const usedTargets = new Set<string>();
+        for (const m of params.mapping as Record<string, unknown>[]) {
+          if (typeof m.sourceIndex !== "number" || !Number.isInteger(m.sourceIndex) || m.sourceIndex < 0) {
+            errors.push({ campo: "mapping.sourceIndex", motivo: "sourceIndex deve essere un intero >= 0" });
+            break;
+          }
+          if (typeof m.target !== "string" || !ALLOWED_TARGETS.includes(m.target)) {
+            errors.push({ campo: "mapping.target", motivo: `target non valido: ${m.target}` });
+            break;
+          }
+          if (m.target !== "ignore") {
+            if (usedTargets.has(m.target)) {
+              errors.push({ campo: "mapping", motivo: `target duplicato: ${m.target}` });
+              break;
+            }
+            usedTargets.add(m.target);
+          }
+        }
+      }
+      if (typeof params.preserve_unmapped !== "boolean") {
+        errors.push({ campo: "preserve_unmapped", motivo: "deve essere un booleano" });
+      }
+      break;
+    }
     default:
       errors.push({ campo: "action", motivo: `azione sconosciuta: ${action}` });
   }
@@ -2269,6 +2312,123 @@ async function executeProposal(
 
         result = { event_id: evData.id, nome: evData.title, fornitori_collegati: linkedCount };
         break;
+      }
+
+      case "import_participants": {
+        const eventId = sanitizeString(params.event_id);
+        const documentId = sanitizeString(params.document_id);
+        const sheetIndex = params.sheet_index as number;
+        const confirmedMapping = params.mapping as ColumnMapping[];
+        const preserveUnmapped = params.preserve_unmapped === true;
+
+        // Re-check permission with authenticated client
+        const { data: permOk } = await supabaseClient.rpc("has_event_permission", {
+          _event_id: eventId,
+          _permission: "can_manage_registration",
+        });
+        if (!permOk) throw new Error("Non hai i permessi per importare partecipanti in questo evento.");
+
+        // Re-fetch document scoped to event_id
+        const { data: docRow, error: docErr } = await supabaseClient
+          .from("event_documents")
+          .select("id, file_name, storage_path")
+          .eq("id", documentId)
+          .eq("event_id", eventId)
+          .maybeSingle();
+        if (docErr || !docRow) throw new Error("Documento non trovato o non accessibile.");
+
+        // Download from private storage
+        const { data: fileBlob, error: dlErr } = await supabaseClient.storage
+          .from("documents")
+          .download(docRow.storage_path);
+        if (dlErr || !fileBlob) throw new Error("Impossibile scaricare il documento.");
+
+        const buffer = new Uint8Array(await fileBlob.arrayBuffer());
+        const workbook = parseParticipantWorkbook(buffer);
+        const sheet = workbook.sheets.find((s) => s.index === sheetIndex);
+        if (!sheet) throw new Error("Foglio non trovato nel documento.");
+
+        // Parse with confirmed mapping
+        const { rows: validRows, errors: parseErrors } = parseParticipantSheet(sheet, confirmedMapping, preserveUnmapped);
+        if (validRows.length === 0) throw new Error("Nessuna riga valida trovata nel foglio selezionato.");
+
+        // Re-check duplicates against DB immediately before insert
+        const { data: existing } = await supabaseClient
+          .from("event_registrations")
+          .select("first_name, last_name, email, company")
+          .eq("event_id", eventId);
+
+        const existingEmails = new Set<string>();
+        const existingIdentities = new Set<string>();
+        for (const reg of existing ?? []) {
+          if (reg.email) existingEmails.add(reg.email.toLowerCase().trim());
+          const key = `${(reg.first_name || "").toLowerCase().trim()}|${(reg.last_name || "").toLowerCase().trim()}|${(reg.company || "").toLowerCase().trim()}`;
+          existingIdentities.add(key);
+        }
+
+        // Deduplicate within file as well
+        const seenEmails = new Set<string>();
+        const seenIdentities = new Set<string>();
+        const newRows: typeof validRows = [];
+        let duplicateCount = 0;
+
+        for (const row of validRows) {
+          const email = row.email ? row.email.toLowerCase().trim() : "";
+          const idKey = `${row.first_name.toLowerCase().trim()}|${row.last_name.toLowerCase().trim()}|${(row.company || "").toLowerCase().trim()}`;
+
+          if (email && (existingEmails.has(email) || seenEmails.has(email))) {
+            duplicateCount++;
+            continue;
+          }
+          if (existingIdentities.has(idKey) || seenIdentities.has(idKey)) {
+            duplicateCount++;
+            continue;
+          }
+          if (email) seenEmails.add(email);
+          seenIdentities.add(idKey);
+          newRows.push(row);
+        }
+
+        if (newRows.length === 0) throw new Error("Tutti i partecipanti risultano già presenti.");
+
+        // Insert in one atomic batch
+        const payload = newRows.map((row) => ({
+          site_id: null,
+          event_id: eventId,
+          source: "import",
+          registration_status: "confirmed",
+          first_name: row.first_name,
+          last_name: row.last_name,
+          email: row.email || null,
+          phone: row.phone || null,
+          company: row.company || null,
+          job_title: row.job_title || null,
+          dietary_requirements: row.dietary_requirements || null,
+          accessibility_requirements: row.accessibility_requirements || null,
+          custom_answers: row.extraFields,
+          privacy_accepted: false,
+          marketing_consent: false,
+        }));
+
+        const { error: insErr } = await supabaseClient
+          .from("event_registrations")
+          .insert(payload);
+        if (insErr) throw new Error("Errore durante l'inserimento dei partecipanti.");
+
+        result = {
+          inserted_count: newRows.length,
+          duplicate_count: duplicateCount,
+          invalid_count: parseErrors.length,
+        };
+
+        // Safe audit log: only counts, no PII
+        await supabaseClient.from("fly_actions_log").insert({
+          user_id: userId,
+          action_type: "import_participants",
+          payload: { event_id: eventId, inserted_count: newRows.length, duplicate_count: duplicateCount, invalid_count: parseErrors.length },
+          status: "executed",
+        });
+        return { success: true, message: "Azione eseguita.", data: result };
       }
 
       default:
@@ -2633,7 +2793,14 @@ REGOLE PRESENTAZIONI CREATIVE:
 - Identifica chiaramente le informazioni mancanti invece di inventarle.
 - Restituisci sempre una bozza strutturata contenente: selected_template_id, selected_template_name, draft_values, missing_information, sources_used.
 - NON invocare mai creative-generate-pptx e NON dichiarare mai che un PPTX e stato generato.
-- La conferma umana resta OBBLIGATORIA prima di qualsiasi generazione.${memorySection}${persistentMemorySection}`;
+- La conferma umana resta OBBLIGATORIA prima di qualsiasi generazione.
+
+REGOLE IMPORTAZIONE PARTECIPANTI:
+- Usa prepare_participant_import quando l'utente chiede di importare partecipanti di un evento da Excel/CSV.
+- Identifica evento, file e foglio prima di proporre l'importazione.
+- La conferma esplicita dell'utente e OBBLIGATORIA prima di eseguire l'importazione.
+- Non menzionare mai nomi, cognomi, email o altri dati identificativi dei partecipanti dal contenuto del foglio.
+- Comunica solo conteggi aggregati (nuovi, duplicati, non validi).${memorySection}${persistentMemorySection}`;
 
     // ─── BUILD MESSAGES WITH CONTEXT MANAGEMENT ─────────────────────────
     const messages: AnthropicMessage[] = [];
