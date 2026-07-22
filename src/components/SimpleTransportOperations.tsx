@@ -6,6 +6,7 @@ import {
   fetchTransportMovements,
   fetchTransportBoardingPool,
   boardTransportParticipantDirect,
+  unboardTransportAssignment,
   transitionTransportVehicle,
   transitionTransportMovement,
   saveTransportVehicle,
@@ -51,6 +52,8 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
   const [loadingPool, setLoadingPool] = useState(false)
 
   const [boardingId, setBoardingId] = useState<string | null>(null)
+  const [unboardConfirmId, setUnboardConfirmId] = useState<string | null>(null)
+  const [unboardingId, setUnboardingId] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ type: 'depart' | 'reopen' | 'cancel'; vehicleId: string } | null>(null)
   const [cancelReason, setCancelReason] = useState('')
@@ -226,6 +229,28 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
       showToast('Errore durante l\'imbarco.', 'error')
     } finally {
       setBoardingId(null)
+    }
+  }
+
+  const handleUnboard = async (assignmentId: string, participantName: string) => {
+    if (!selectedMovement || disabled) return
+    if (unboardingId) return
+
+    setUnboardingId(assignmentId)
+    try {
+      const result = await unboardTransportAssignment(assignmentId)
+      if (result.success) {
+        showToast(`Spunta di ${participantName} rimossa.`, 'success')
+      } else {
+        showToast(result.error ?? 'Errore nella rimozione.', 'error')
+      }
+      await loadPool(selectedMovement.id)
+      await loadVehicles(selectedMovement.id)
+    } catch {
+      showToast('Errore nella rimozione della spunta.', 'error')
+    } finally {
+      setUnboardingId(null)
+      setUnboardConfirmId(null)
     }
   }
 
@@ -648,49 +673,99 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
               const isBoarded = p.assignment_status === 'boarded'
               const isBoardedOnThis = isBoarded && p.vehicle_id === selectedVehicle.id
               const isBoardedElsewhere = isBoarded && p.vehicle_id !== selectedVehicle.id
-              const isLoading = boardingId === p.registration_id
+              const isLoading = boardingId === p.registration_id || unboardingId === p.assignment_id
+              const participantName = `${p.last_name} ${p.first_name}`
+
+              const handleCardClick = () => {
+                if (disabled || isLoading || !!boardingId || !!unboardingId) return
+                if (isBoardedElsewhere) return
+                if (!isBoardedOnThis) {
+                  handleBoard(p.registration_id)
+                } else {
+                  setUnboardConfirmId(p.assignment_id)
+                }
+              }
 
               return (
-                <div key={p.registration_id} style={{
-                  ...participantRowStyle,
-                  opacity: isBoardedElsewhere ? 0.6 : 1,
-                  background: isBoardedOnThis ? 'rgba(47, 158, 104, 0.06)' : 'var(--panel)',
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>
-                      {p.last_name} {p.first_name}
+                <div key={p.registration_id} style={{ position: 'relative' }}>
+                  <button
+                    style={{
+                      ...participantToggleStyle,
+                      opacity: isBoardedElsewhere ? 0.6 : 1,
+                      background: isBoardedOnThis ? 'rgba(47, 158, 104, 0.1)' : 'var(--panel)',
+                      borderColor: isBoardedOnThis ? 'var(--green, #2f9e68)' : 'var(--line)',
+                      cursor: isBoardedElsewhere ? 'not-allowed' : 'pointer',
+                    }}
+                    onClick={handleCardClick}
+                    disabled={disabled || isLoading || !!boardingId || !!unboardingId}
+                  >
+                    <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>
+                        {p.last_name} {p.first_name}
+                      </div>
+                      {p.company && (
+                        <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{p.company}</div>
+                      )}
+                      {p.phone && (
+                        <a
+                          href={`tel:${p.phone}`}
+                          style={phoneLinkStyle}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <Phone size={12} /> {p.phone}
+                        </a>
+                      )}
+                      {isBoardedElsewhere && p.vehicle_label && (
+                        <div style={{ fontSize: 12, color: 'var(--orange, #e67e22)', marginTop: 4 }}>
+                          Già su: {p.vehicle_label}
+                        </div>
+                      )}
+                      {isBoardedOnThis && (
+                        <div style={{ fontSize: 12, color: 'var(--green)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <CheckCircle2 size={12} /> Salito
+                        </div>
+                      )}
                     </div>
-                    {p.company && (
-                      <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{p.company}</div>
-                    )}
-                    {p.phone && (
-                      <a href={`tel:${p.phone}`} style={phoneLinkStyle}>
-                        <Phone size={12} /> {p.phone}
-                      </a>
-                    )}
-                    {isBoardedElsewhere && p.vehicle_label && (
-                      <div style={{ fontSize: 12, color: 'var(--orange, #e67e22)', marginTop: 4 }}>
-                        Già su: {p.vehicle_label}
-                      </div>
-                    )}
-                    {isBoardedOnThis && (
-                      <div style={{ fontSize: 12, color: 'var(--green)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <CheckCircle2 size={12} /> Imbarcato
-                      </div>
-                    )}
-                  </div>
 
-                  {!isBoarded && (
-                    <button
-                      style={boardBtnStyle}
-                      onClick={() => handleBoard(p.registration_id)}
-                      disabled={disabled || isLoading || !!boardingId}
-                    >
+                    <div style={toggleIndicatorStyle}>
                       {isLoading
                         ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-                        : <><CheckCircle2 size={18} /> Salito</>
+                        : isBoardedOnThis
+                          ? <CheckCircle2 size={20} color="var(--green, #2f9e68)" />
+                          : !isBoardedElsewhere
+                            ? <div style={emptyCircleStyle} />
+                            : null
                       }
-                    </button>
+                    </div>
+                  </button>
+
+                  {unboardConfirmId === p.assignment_id && (
+                    <div style={confirmOverlayStyle}>
+                      <p style={{ margin: 0, fontSize: 14, color: 'var(--text)' }}>
+                        Rimuovere la spunta di <strong>{participantName}</strong>?
+                      </p>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                        <button
+                          style={dangerActionBtnStyle}
+                          disabled={!!unboardingId}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleUnboard(p.assignment_id!, participantName)
+                          }}
+                        >
+                          {unboardingId === p.assignment_id
+                            ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                            : 'Conferma'}
+                        </button>
+                        <button
+                          style={secondaryActionBtnStyle}
+                          onClick={(e) => { e.stopPropagation(); setUnboardConfirmId(null) }}
+                          disabled={!!unboardingId}
+                        >
+                          Annulla
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               )
@@ -935,30 +1010,6 @@ const backBtnStyle: React.CSSProperties = {
   alignSelf: 'flex-start',
 }
 
-const participantRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 12,
-  padding: 14,
-  border: '1px solid var(--line)',
-  borderRadius: 10,
-}
-
-const boardBtnStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-  minHeight: 44,
-  padding: '10px 16px',
-  fontSize: 14,
-  fontWeight: 600,
-  color: '#fff',
-  background: 'var(--green, #2f9e68)',
-  border: 'none',
-  borderRadius: 8,
-  cursor: 'pointer',
-  flexShrink: 0,
-}
 
 const phoneLinkStyle: React.CSSProperties = {
   display: 'inline-flex',
@@ -1048,4 +1099,34 @@ const formErrorStyle: React.CSSProperties = {
   fontSize: 13,
   color: '#dc2626',
   lineHeight: 1.4,
+}
+
+const participantToggleStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  width: '100%',
+  padding: '12px 16px',
+  border: '1px solid var(--line)',
+  borderRadius: 10,
+  cursor: 'pointer',
+  background: 'var(--panel)',
+  transition: 'background 0.15s, border-color 0.15s',
+  minHeight: 44,
+}
+
+const toggleIndicatorStyle: React.CSSProperties = {
+  flexShrink: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 28,
+  height: 28,
+}
+
+const emptyCircleStyle: React.CSSProperties = {
+  width: 20,
+  height: 20,
+  borderRadius: '50%',
+  border: '2px solid var(--muted)',
 }

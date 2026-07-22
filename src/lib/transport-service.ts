@@ -189,6 +189,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   MANIFEST_INCOMPLETE: 'Tutti i partecipanti devono essere imbarcati o segnati come no-show.',
   INVALID_INPUT: 'Dati non validi.',
   CAPACITY_BELOW_BOARDED: 'La capienza non può essere inferiore ai passeggeri già imbarcati.',
+  ASSIGNMENT_NOT_BOARDED: 'Il partecipante non risulta imbarcato.',
 }
 
 const BOARDING_DIRECT_MESSAGES: Record<string, string> = {
@@ -553,6 +554,24 @@ export async function boardTransportParticipantDirect(
     vehicle_label: String(row.vehicle_label ?? ''),
     boarded_at: String(row.boarded_at ?? ''),
   }
+}
+
+// ─── Unboard Assignment ──────────────────────────────────────────────────────
+
+export async function unboardTransportAssignment(assignmentId: string): Promise<{ success: boolean; error?: string }> {
+  if (!assignmentId || typeof assignmentId !== 'string' || assignmentId.trim() === '') {
+    return { success: false, error: ERROR_MESSAGES.INVALID_INPUT }
+  }
+
+  const { error } = await supabase.rpc('unboard_transport_assignment', {
+    p_assignment_id: assignmentId,
+  })
+
+  if (error) {
+    return { success: false, error: translateError(error) }
+  }
+
+  return { success: true }
 }
 
 // ─── Vehicle Transition ──────────────────────────────────────────────────────
