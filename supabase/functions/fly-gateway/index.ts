@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import { calcRowEconomics, calcRowCommission, calcRowNetto, type RawRow } from "../_shared/event-economics.ts";
+import { parseParticipantWorkbook, autoMapParticipantHeaders, summarizeParticipantImport } from "../_shared/participant-import.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -299,6 +300,22 @@ const TOOLS = [
         },
       },
       required: ["query"] as string[],
+    },
+  },
+  {
+    name: "prepare_participant_import",
+    description:
+      "Analizza un documento Excel/CSV di partecipanti associato a un evento. " +
+      "Se document_id e sheet_index non sono forniti restituisce la lista di file candidati. " +
+      "Se forniti restituisce anteprima aggregata e mappatura suggerita. Solo lettura, nessun dato personale.",
+    input_schema: {
+      type: "object",
+      properties: {
+        event_id: { type: "string", description: "UUID dell'evento (obbligatorio)." },
+        document_id: { type: "string", description: "UUID del documento da analizzare (opzionale)." },
+        sheet_index: { type: "number", description: "Indice del foglio da analizzare (opzionale, default 0)." },
+      },
+      required: ["event_id"] as string[],
     },
   },
 ];
@@ -1750,6 +1767,90 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
       return JSON.stringify({ found: true, result_count: sources.length, sources });
     }
 
+    case "prepare_participant_import": {
+      const eventId = input.event_id as string;
+      if (!eventId) return JSON.stringify({ error: "event_id obbligatorio." });
+
+      const { data: permOk } = await userClient.rpc("has_event_permission", {
+        p_event_id: eventId,
+        p_permission: "can_manage_registration",
+      });
+      if (!permOk) return JSON.stringify({ error: "Non hai i permessi per importare partecipanti in questo evento." });
+
+      const ALLOWED_EXTENSIONS = [".xlsx", ".xls", ".csv"];
+      const ALLOWED_TYPES = new Set([
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+        "text/csv",
+      ]);
+
+      const { data: docs, error: docsErr } = await userClient
+        .from("documents")
+        .select("id, file_name, file_path, file_type")
+        .eq("event_id", eventId)
+        .order("created_at", { ascending: false });
+
+      if (docsErr || !docs) return JSON.stringify({ error: "Impossibile caricare i documenti dell'evento." });
+
+      const candidates = docs.filter(
+        (d: any) =>
+          ALLOWED_TYPES.has(d.file_type) ||
+          ALLOWED_EXTENSIONS.some((ext: string) => (d.file_name || "").toLowerCase().endsWith(ext)),
+      );
+
+      const documentId = input.document_id as string | undefined;
+
+      if (!documentId) {
+        return JSON.stringify({
+          mode: "candidate_list",
+          event_id: eventId,
+          candidates: candidates.map((d: any) => ({ id: d.id, file_name: d.file_name })),
+        });
+      }
+
+      const doc = candidates.find((d: any) => d.id === documentId);
+      if (!doc) return JSON.stringify({ error: "Documento non trovato o non supportato." });
+
+      const { data: blob, error: dlErr } = await userClient.storage
+        .from("documents")
+        .download(doc.file_path);
+
+      if (dlErr || !blob) return JSON.stringify({ error: "Impossibile scaricare il documento." });
+
+      const buffer = new Uint8Array(await blob.arrayBuffer());
+      const workbook = parseParticipantWorkbook(buffer);
+
+      const sheetIdx = typeof input.sheet_index === "number" ? input.sheet_index : undefined;
+
+      if (sheetIdx === undefined && workbook.sheets.length > 1) {
+        return JSON.stringify({
+          mode: "sheet_list",
+          event_id: eventId,
+          document_id: documentId,
+          file_name: doc.file_name,
+          sheets: workbook.sheets.map((s) => ({
+            index: s.index,
+            name: s.name,
+            row_count: s.rows.length,
+            headers: s.headers.map((h: string) => h.replace(/[<>"'&]/g, "").slice(0, 100)),
+          })),
+        });
+      }
+
+      const targetIdx = sheetIdx ?? 0;
+      const sheet = workbook.sheets.find((s) => s.index === targetIdx) || workbook.sheets[0];
+      const mapping = autoMapParticipantHeaders(sheet.headers);
+      const summary = summarizeParticipantImport(sheet, mapping);
+
+      return JSON.stringify({
+        mode: "preview",
+        event_id: eventId,
+        document_id: documentId,
+        file_name: doc.file_name,
+        ...summary,
+      });
+    }
+
     default:
       return `Tool sconosciuto: ${name}`;
   }
@@ -2553,6 +2654,8 @@ REGOLE PRESENTAZIONI CREATIVE:
     const messageLower = message.toLowerCase();
     const isDocumentQuery = DOC_QUERY_KEYWORDS.some(kw => messageLower.includes(kw));
     const isCreativePresentationQuery = CREATIVE_PRES_KEYWORDS.some(kw => messageLower.includes(kw));
+    const PARTICIPANT_IMPORT_KEYWORDS = ["importa partecipanti", "lista partecipanti", "import participant", "importazione partecipanti", "carica partecipanti"];
+    const isParticipantImportQuery = PARTICIPANT_IMPORT_KEYWORDS.some(kw => messageLower.includes(kw));
 
     const queryHash = btoa(unescape(encodeURIComponent(message.slice(0, 100))));
     const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
@@ -2566,7 +2669,7 @@ REGOLE PRESENTAZIONI CREATIVE:
       .then(() => {});
 
     let cached: { response: string } | null = null;
-    if (!isDocumentQuery && !isCreativePresentationQuery) {
+    if (!isDocumentQuery && !isCreativePresentationQuery && !isParticipantImportQuery) {
       const { data } = await userClient
         .from("fly_cache")
         .select("response")
@@ -2638,7 +2741,7 @@ REGOLE PRESENTAZIONI CREATIVE:
     // ─── SAVE TO CACHE (fire-and-forget) ─────────────────────────────────
     const usedDocSearch = logToolsCalled.includes("search_documents");
     const usedCreativePresContext = logToolsCalled.includes("get_creative_presentation_context");
-    if (textReply && !proposal && !isDocumentQuery && !usedDocSearch && !isCreativePresentationQuery && !usedCreativePresContext) {
+    if (textReply && !proposal && !isDocumentQuery && !usedDocSearch && !isCreativePresentationQuery && !usedCreativePresContext && !isParticipantImportQuery) {
       userClient
         .from("fly_cache")
         .insert({ user_id: user.id, query_hash: queryHash, response: textReply })

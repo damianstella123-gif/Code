@@ -11,6 +11,8 @@ import {
   type TransportMovementStatus,
 } from '@/lib/transport-service'
 import { fetchEventRegistrations, type EventRegistration } from '@/lib/registration-participants-service'
+import ParticipantExcelImport from './ParticipantExcelImport'
+import type { ParticipantImportResult } from '@/lib/participant-import-service'
 
 interface Props {
   eventId: string
@@ -111,6 +113,12 @@ export default function TransportParticipantAssignment({ eventId, movementId, di
     return v.expected_count >= v.capacity
   }, [])
 
+  const handleImported = useCallback(async (_result: ParticipantImportResult) => {
+    setSearch('')
+    setSelectedRegId(null)
+    await loadData()
+  }, [loadData])
+
   const handleAssign = async () => {
     if (!selectedRegId || !selectedVehicleId) return
     setAssigning(true)
@@ -200,6 +208,12 @@ export default function TransportParticipantAssignment({ eventId, movementId, di
       {/* ─── ASSIGNMENT SECTION ─── */}
       {canEdit && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <ParticipantExcelImport
+            eventId={eventId}
+            disabled={!canEdit}
+            onImported={handleImported}
+          />
+
           <h4 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', margin: 0 }}>
             Assegna partecipanti
           </h4>
