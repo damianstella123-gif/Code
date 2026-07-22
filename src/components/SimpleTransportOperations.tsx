@@ -75,9 +75,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
 
   // Delete vehicle state
   const [deleteVehicleId, setDeleteVehicleId] = useState<string | null>(null)
-  const [deleteVehicleReason, setDeleteVehicleReason] = useState('')
   const [deletingVehicle, setDeletingVehicle] = useState(false)
-  const [deleteVehicleError, setDeleteVehicleError] = useState('')
 
   // Delete transfer confirmation state
   const [deleteMovementId, setDeleteMovementId] = useState<string | null>(null)
@@ -620,7 +618,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                     </button>
                     <button
                       style={dangerActionBtnStyle}
-                      onClick={() => { setDeleteVehicleId(v.id); setDeleteVehicleReason(''); setDeleteVehicleError('') }}
+                      onClick={() => { setDeleteVehicleId(v.id) }}
                       disabled={disabled}
                     >
                       <Trash2 size={14} /> Elimina
@@ -631,29 +629,17 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                   {deleteVehicleId === v.id && (
                     <div style={confirmOverlayStyle}>
                       <p style={{ margin: '0 0 8px', fontSize: 14, color: 'var(--text)' }}>
-                        Eliminare il mezzo <strong>{v.label}</strong>?
+                        Eliminare questo mezzo?
                       </p>
-                      <input
-                        style={{ ...inputStyle, marginBottom: 6 }}
-                        placeholder="Motivo (min. 5 caratteri)"
-                        value={deleteVehicleReason}
-                        onChange={e => { setDeleteVehicleReason(e.target.value); setDeleteVehicleError('') }}
-                      />
-                      {deleteVehicleError && <p style={formErrorStyle}>{deleteVehicleError}</p>}
                       <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                         <button
                           style={dangerActionBtnStyle}
                           disabled={deletingVehicle}
                           onClick={async () => {
                             if (deletingVehicle) return
-                            const trimmedReason = deleteVehicleReason.trim()
-                            if (trimmedReason.length < 5) {
-                              setDeleteVehicleError('Il motivo deve avere almeno 5 caratteri.')
-                              return
-                            }
                             setDeletingVehicle(true)
                             try {
-                              await transitionTransportVehicle(v.id, 'cancel', trimmedReason)
+                              await transitionTransportVehicle(v.id, 'cancel', 'Annullato manualmente')
                               showToast(`Mezzo "${v.label}" eliminato.`, 'success')
                               setDeleteVehicleId(null)
                               setSelectedVehicle(null)
