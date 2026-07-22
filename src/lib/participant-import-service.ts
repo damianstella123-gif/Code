@@ -19,6 +19,7 @@ export interface ParticipantImportSheet {
   name: string
   headers: string[]
   rows: string[][]
+  headerRowNumber: number
 }
 
 export interface ParticipantImportWorkbook {
@@ -117,6 +118,46 @@ function isRowEmpty(row: string[]): boolean {
   return row.every(cell => !cell || !cell.trim())
 }
 
+const HEADER_SCAN_DEPTH = 20
+
+function scoreHeaderRow(cells: string[]): { score: number; hasFirst: boolean; hasLast: boolean } {
+  let score = 0
+  let hasFirst = false
+  let hasLast = false
+  const seen = new Set<string>()
+  for (const cell of cells) {
+    const matched = matchHeader(cell)
+    if (matched && !seen.has(matched)) {
+      seen.add(matched)
+      score++
+      if (matched === 'first_name') hasFirst = true
+      if (matched === 'last_name') hasLast = true
+    }
+  }
+  return { score, hasFirst, hasLast }
+}
+
+function detectHeaderRow(raw: string[][]): { headerIndex: number; headerCells: string[] } | null {
+  const limit = Math.min(raw.length, HEADER_SCAN_DEPTH)
+  let bestIndex = -1
+  let bestScore = 0
+  let bestCells: string[] = []
+
+  for (let i = 0; i < limit; i++) {
+    const cells = raw[i].slice(0, MAX_COLS).map(cell => String(cell ?? ''))
+    if (isRowEmpty(cells)) continue
+    const { score, hasFirst, hasLast } = scoreHeaderRow(cells)
+    if (hasFirst && hasLast && score > bestScore) {
+      bestScore = score
+      bestIndex = i
+      bestCells = cells
+    }
+  }
+
+  if (bestIndex === -1) return null
+  return { headerIndex: bestIndex, headerCells: bestCells }
+}
+
 function hasAllowedExtension(fileName: string): boolean {
   const lower = fileName.toLowerCase()
   return ALLOWED_EXTENSIONS.some(ext => lower.endsWith(ext))
@@ -186,16 +227,19 @@ export async function parseParticipantDocument(
 
     if (raw.length === 0) continue
 
-    const headerRow = raw[0].slice(0, MAX_COLS).map(cell => String(cell ?? ''))
+    const headerInfo = detectHeaderRow(raw)
+    if (!headerInfo) continue
+
+    const { headerIndex, headerCells } = headerInfo
     const dataRows: string[][] = []
 
-    for (let i = 1; i < raw.length && dataRows.length < MAX_ROWS; i++) {
+    for (let i = headerIndex + 1; i < raw.length && dataRows.length < MAX_ROWS; i++) {
       const row = raw[i].slice(0, MAX_COLS).map(cell => String(cell ?? ''))
       if (!isRowEmpty(row)) dataRows.push(row)
     }
 
     if (dataRows.length > 0) {
-      sheets.push({ name: sheetName, headers: headerRow, rows: dataRows })
+      sheets.push({ name: sheetName, headers: headerCells, rows: dataRows, headerRowNumber: headerIndex + 1 })
     }
   }
 
@@ -271,7 +315,7 @@ export function buildParticipantPreview(
 
   for (let i = 0; i < sheet.rows.length; i++) {
     const rawRow = sheet.rows[i]
-    const rowIndex = i + 2 // 1-indexed, header is row 1
+    const rowIndex = sheet.headerRowNumber + 1 + i
 
     const get = (key: Exclude<ParticipantColumnKey, 'ignore'>): string => {
       const idx = fieldIndices[key]
