@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ArrowLeft, Users, CheckCircle2, Clock, XCircle, Loader2, Phone } from 'lucide-react'
+import { ArrowLeft, Users, CheckCircle2, Clock, XCircle, Loader2, Phone, Pencil, Trash2 } from 'lucide-react'
 import { useToast } from '@/lib/toast'
 import { supabase } from '@/lib/supabase'
 import {
@@ -26,6 +26,10 @@ interface VehicleRow {
   label: string
   vehicle_type: string
   capacity: number | null
+  plate: string
+  driver_name: string
+  driver_phone: string
+  sort_order: number
   operational_status: 'boarding' | 'departed' | 'cancelled'
   departed_at: string | null
   boarded_count: number
@@ -53,11 +57,18 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
 
   // Vehicle form state
   const [showVehicleForm, setShowVehicleForm] = useState(false)
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null)
   const [vfLabel, setVfLabel] = useState('')
   const [vfType, setVfType] = useState('')
   const [vfCapacity, setVfCapacity] = useState('')
   const [savingVehicle, setSavingVehicle] = useState(false)
   const [vfError, setVfError] = useState('')
+
+  // Delete vehicle state
+  const [deleteVehicleId, setDeleteVehicleId] = useState<string | null>(null)
+  const [deleteVehicleReason, setDeleteVehicleReason] = useState('')
+  const [deletingVehicle, setDeletingVehicle] = useState(false)
+  const [deleteVehicleError, setDeleteVehicleError] = useState('')
 
   // Delete transfer confirmation state
   const [deleteMovementId, setDeleteMovementId] = useState<string | null>(null)
@@ -89,7 +100,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
     try {
       const { data, error } = await supabase
         .from('transport_vehicles')
-        .select('id, label, vehicle_type, capacity, operational_status, departed_at')
+        .select('id, label, vehicle_type, capacity, plate, driver_name, driver_phone, sort_order, operational_status, departed_at')
         .eq('movement_id', movementId)
         .order('sort_order', { ascending: true })
 
@@ -108,6 +119,10 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
         label: v.label,
         vehicle_type: v.vehicle_type,
         capacity: v.capacity,
+        plate: v.plate ?? '',
+        driver_name: v.driver_name ?? '',
+        driver_phone: v.driver_phone ?? '',
+        sort_order: v.sort_order ?? 0,
         operational_status: v.operational_status ?? 'boarding',
         departed_at: v.departed_at,
         boarded_count: countByVehicle[v.id] ?? 0,
@@ -344,7 +359,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
         {/* Add vehicle button */}
         <button
           style={primaryActionBtnStyle}
-          onClick={() => { setShowVehicleForm(true); setVfLabel(''); setVfType(''); setVfCapacity('') }}
+          onClick={() => { setShowVehicleForm(true); setEditingVehicleId(null); setVfLabel(''); setVfType(''); setVfCapacity(''); setVfError('') }}
           disabled={disabled || showVehicleForm}
         >
           + Aggiungi mezzo
@@ -393,7 +408,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                   setVfError('')
                   try {
                     await saveTransportVehicle({
-                      vehicleId: null,
+                      vehicleId: editingVehicleId ?? null,
                       movementId: selectedMovement.id,
                       label: vfLabel.trim(),
                       vehicleType: vfType.trim() || 'bus',
@@ -401,10 +416,13 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                       plate: '',
                       driverName: '',
                       driverPhone: '',
-                      sortOrder: vehicles.length,
+                      sortOrder: editingVehicleId
+                        ? (vehicles.find(v => v.id === editingVehicleId)?.sort_order ?? vehicles.length)
+                        : vehicles.length,
                     })
-                    showToast('Mezzo aggiunto correttamente', 'success')
+                    showToast(editingVehicleId ? 'Mezzo modificato correttamente' : 'Mezzo aggiunto correttamente', 'success')
                     setShowVehicleForm(false)
+                    setEditingVehicleId(null)
                     setVfLabel(''); setVfType(''); setVfCapacity(''); setVfError('')
                     await loadVehicles(selectedMovement.id)
                   } catch (err: any) {
@@ -418,7 +436,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
               </button>
               <button
                 style={secondaryActionBtnStyle}
-                onClick={() => { setShowVehicleForm(false); setVfError('') }}
+                onClick={() => { setShowVehicleForm(false); setEditingVehicleId(null); setVfError('') }}
                 disabled={savingVehicle}
               >
                 Annulla
@@ -433,7 +451,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
           <p style={emptyStyle}>Nessun mezzo configurato.</p>
         ) : (
           <div style={cardListStyle}>
-            {vehicles.map(v => {
+            {vehicles.filter(v => v.operational_status !== 'cancelled').map(v => {
               const available = v.capacity != null ? v.capacity - v.boarded_count : null
               return (
                 <div key={v.id} style={vehicleCardStyle}>
@@ -463,7 +481,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                     )}
                   </button>
 
-                  {/* Vehicle actions */}
+                  {/* Vehicle actions - always visible regardless of status */}
                   <div style={vehicleActionsStyle}>
                     {v.operational_status === 'boarding' && (
                       <button
@@ -483,16 +501,78 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                         Riapri imbarco
                       </button>
                     )}
-                    {v.operational_status !== 'cancelled' && (
-                      <button
-                        style={dangerActionBtnStyle}
-                        onClick={() => setConfirmAction({ type: 'cancel', vehicleId: v.id })}
-                        disabled={disabled || actionLoading}
-                      >
-                        <XCircle size={14} /> Annulla mezzo
-                      </button>
-                    )}
+                    <button
+                      style={secondaryActionBtnStyle}
+                      onClick={() => {
+                        setEditingVehicleId(v.id)
+                        setVfLabel(v.label)
+                        setVfType(v.vehicle_type)
+                        setVfCapacity(v.capacity != null ? String(v.capacity) : '')
+                        setVfError('')
+                        setShowVehicleForm(true)
+                      }}
+                      disabled={disabled}
+                    >
+                      <Pencil size={14} /> Modifica
+                    </button>
+                    <button
+                      style={dangerActionBtnStyle}
+                      onClick={() => { setDeleteVehicleId(v.id); setDeleteVehicleReason(''); setDeleteVehicleError('') }}
+                      disabled={disabled}
+                    >
+                      <Trash2 size={14} /> Elimina
+                    </button>
                   </div>
+
+                  {/* Delete vehicle confirmation */}
+                  {deleteVehicleId === v.id && (
+                    <div style={confirmOverlayStyle}>
+                      <p style={{ margin: '0 0 8px', fontSize: 14, color: 'var(--text)' }}>
+                        Eliminare il mezzo <strong>{v.label}</strong>?
+                      </p>
+                      <input
+                        style={{ ...inputStyle, marginBottom: 6 }}
+                        placeholder="Motivo (min. 5 caratteri)"
+                        value={deleteVehicleReason}
+                        onChange={e => { setDeleteVehicleReason(e.target.value); setDeleteVehicleError('') }}
+                      />
+                      {deleteVehicleError && <p style={formErrorStyle}>{deleteVehicleError}</p>}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                        <button
+                          style={dangerActionBtnStyle}
+                          disabled={deletingVehicle}
+                          onClick={async () => {
+                            if (deletingVehicle) return
+                            const trimmedReason = deleteVehicleReason.trim()
+                            if (trimmedReason.length < 5) {
+                              setDeleteVehicleError('Il motivo deve avere almeno 5 caratteri.')
+                              return
+                            }
+                            setDeletingVehicle(true)
+                            try {
+                              await transitionTransportVehicle(v.id, 'cancel', trimmedReason)
+                              showToast(`Mezzo "${v.label}" eliminato.`, 'success')
+                              setDeleteVehicleId(null)
+                              if (selectedMovement) await loadVehicles(selectedMovement.id)
+                            } catch (err: any) {
+                              showToast(err?.message ?? 'Errore nell\'eliminazione.', 'error')
+                            } finally {
+                              setDeletingVehicle(false)
+                            }
+                          }}
+                        >
+                          {deletingVehicle ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : 'Conferma'}
+                        </button>
+                        <button
+                          style={secondaryActionBtnStyle}
+                          onClick={() => setDeleteVehicleId(null)}
+                          disabled={deletingVehicle}
+                        >
+                          Annulla
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}

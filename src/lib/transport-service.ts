@@ -188,6 +188,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   NO_PARTICIPANTS: 'Nessun partecipante assegnato al movimento.',
   MANIFEST_INCOMPLETE: 'Tutti i partecipanti devono essere imbarcati o segnati come no-show.',
   INVALID_INPUT: 'Dati non validi.',
+  CAPACITY_BELOW_BOARDED: 'La capienza non può essere inferiore ai passeggeri già imbarcati.',
 }
 
 const BOARDING_DIRECT_MESSAGES: Record<string, string> = {
