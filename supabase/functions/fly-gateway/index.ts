@@ -2323,15 +2323,15 @@ async function executeProposal(
 
         // Re-check permission with authenticated client
         const { data: permOk } = await supabaseClient.rpc("has_event_permission", {
-          _event_id: eventId,
-          _permission: "can_manage_registration",
+          p_event_id: eventId,
+          p_permission: "can_manage_registration",
         });
         if (!permOk) throw new Error("Non hai i permessi per importare partecipanti in questo evento.");
 
         // Re-fetch document scoped to event_id
         const { data: docRow, error: docErr } = await supabaseClient
-          .from("event_documents")
-          .select("id, file_name, storage_path")
+          .from("documents")
+          .select("id, file_name, file_path")
           .eq("id", documentId)
           .eq("event_id", eventId)
           .maybeSingle();
@@ -2340,7 +2340,7 @@ async function executeProposal(
         // Download from private storage
         const { data: fileBlob, error: dlErr } = await supabaseClient.storage
           .from("documents")
-          .download(docRow.storage_path);
+          .download(docRow.file_path);
         if (dlErr || !fileBlob) throw new Error("Impossibile scaricare il documento.");
 
         const buffer = new Uint8Array(await fileBlob.arrayBuffer());
@@ -2348,15 +2348,34 @@ async function executeProposal(
         const sheet = workbook.sheets.find((s) => s.index === sheetIndex);
         if (!sheet) throw new Error("Foglio non trovato nel documento.");
 
-        // Parse with confirmed mapping
-        const { rows: validRows, errors: parseErrors } = parseParticipantSheet(sheet, confirmedMapping, preserveUnmapped);
+        // Rebuild safe mapping from confirmed params - never trust sourceHeader from proposal
+        const seenSourceIndexes = new Set<number>();
+        const safeMapping: ColumnMapping[] = [];
+        for (const m of confirmedMapping) {
+          if (m.sourceIndex < 0 || m.sourceIndex >= sheet.headers.length) {
+            throw new Error(`Indice colonna ${m.sourceIndex} fuori intervallo (max ${sheet.headers.length - 1}).`);
+          }
+          if (seenSourceIndexes.has(m.sourceIndex)) {
+            throw new Error(`Indice colonna ${m.sourceIndex} duplicato nella mappatura.`);
+          }
+          seenSourceIndexes.add(m.sourceIndex);
+          safeMapping.push({
+            sourceIndex: m.sourceIndex,
+            sourceHeader: sheet.headers[m.sourceIndex],
+            target: m.target,
+          });
+        }
+
+        // Parse with safe mapping
+        const { rows: validRows, errors: parseErrors } = parseParticipantSheet(sheet, safeMapping, preserveUnmapped);
         if (validRows.length === 0) throw new Error("Nessuna riga valida trovata nel foglio selezionato.");
 
         // Re-check duplicates against DB immediately before insert
-        const { data: existing } = await supabaseClient
+        const { data: existing, error: existErr } = await supabaseClient
           .from("event_registrations")
           .select("first_name, last_name, email, company")
           .eq("event_id", eventId);
+        if (existErr) throw new Error("Impossibile verificare i partecipanti esistenti.");
 
         const existingEmails = new Set<string>();
         const existingIdentities = new Set<string>();
@@ -2380,7 +2399,7 @@ async function executeProposal(
             duplicateCount++;
             continue;
           }
-          if (existingIdentities.has(idKey) || seenIdentities.has(idKey)) {
+          if (!email && (existingIdentities.has(idKey) || seenIdentities.has(idKey))) {
             duplicateCount++;
             continue;
           }
@@ -2400,11 +2419,11 @@ async function executeProposal(
           first_name: row.first_name,
           last_name: row.last_name,
           email: row.email || null,
-          phone: row.phone || null,
-          company: row.company || null,
-          job_title: row.job_title || null,
-          dietary_requirements: row.dietary_requirements || null,
-          accessibility_requirements: row.accessibility_requirements || null,
+          phone: row.phone || "",
+          company: row.company || "",
+          job_title: row.job_title || "",
+          dietary_requirements: row.dietary_requirements || "",
+          accessibility_requirements: row.accessibility_requirements || "",
           custom_answers: row.extraFields,
           privacy_accepted: false,
           marketing_consent: false,
