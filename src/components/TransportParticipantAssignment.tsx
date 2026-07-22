@@ -103,6 +103,13 @@ export default function TransportParticipantAssignment({ eventId, movementId, di
     )
   }, [activeRegistrations, search])
 
+  const VISIBLE_LIMIT = 200
+  const visibleRegistrations = useMemo(() => filteredRegistrations.slice(0, VISIBLE_LIMIT), [filteredRegistrations])
+  const hasOverflow = filteredRegistrations.length > VISIBLE_LIMIT
+
+  const availableCount = activeRegistrations.filter(r => !assignedRegIds.has(r.id)).length
+  const assignedCount = assignedRegIds.size
+
   const vehicleRemaining = useCallback((v: TransportManifestVehicle): number | null => {
     if (v.capacity == null) return null
     return v.capacity - v.expected_count
@@ -214,9 +221,16 @@ export default function TransportParticipantAssignment({ eventId, movementId, di
             onImported={handleImported}
           />
 
-          <h4 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', margin: 0 }}>
-            Assegna partecipanti
-          </h4>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <h4 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', margin: 0 }}>
+              Assegna partecipanti
+            </h4>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13, color: 'var(--muted)' }}>
+              <span>Partecipanti disponibili: {availableCount}</span>
+              <span>Assegnati: {assignedCount}</span>
+              <button onClick={loadData} style={refreshBtnStyle}>Aggiorna elenco</button>
+            </div>
+          </div>
 
           {/* Search */}
           <div style={{ position: 'relative' }}>
@@ -230,15 +244,19 @@ export default function TransportParticipantAssignment({ eventId, movementId, di
             />
           </div>
 
-          {/* Participant list */}
-          {search.trim() && (
-            <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', background: 'var(--panel-solid)' }}>
-              {filteredRegistrations.length === 0 ? (
-                <div style={{ padding: 16, fontSize: 14, color: 'var(--muted)', textAlign: 'center' }}>
-                  Nessun partecipante trovato.
-                </div>
-              ) : (
-                filteredRegistrations.map(r => {
+          {/* Participant list - always visible */}
+          <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', background: 'var(--panel-solid)' }}>
+            {activeRegistrations.length === 0 ? (
+              <div style={{ padding: 16, fontSize: 14, color: 'var(--muted)', textAlign: 'center' }}>
+                Nessun partecipante disponibile. Importa un file Excel oppure verifica l'evento selezionato.
+              </div>
+            ) : filteredRegistrations.length === 0 ? (
+              <div style={{ padding: 16, fontSize: 14, color: 'var(--muted)', textAlign: 'center' }}>
+                Nessun partecipante trovato.
+              </div>
+            ) : (
+              <>
+                {visibleRegistrations.map(r => {
                   const isAssigned = assignedRegIds.has(r.id)
                   const isSelected = selectedRegId === r.id
                   return (
@@ -274,10 +292,15 @@ export default function TransportParticipantAssignment({ eventId, movementId, di
                       )}
                     </button>
                   )
-                })
-              )}
-            </div>
-          )}
+                })}
+                {hasOverflow && (
+                  <div style={{ padding: '10px 12px', fontSize: 13, color: 'var(--muted)', textAlign: 'center', borderTop: '1px solid var(--line)' }}>
+                    Mostrati {VISIBLE_LIMIT} di {filteredRegistrations.length} partecipanti. Usa la ricerca per filtrare.
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Vehicle selector + assign button */}
           {selectedRegId && (
@@ -484,6 +507,18 @@ const retryBtnStyle: React.CSSProperties = {
   minHeight: 44,
   padding: '10px 20px',
   fontSize: 14,
+  border: '1px solid var(--line)',
+  borderRadius: 'var(--radius-sm)',
+  background: 'var(--panel-solid)',
+  color: 'var(--text)',
+  cursor: 'pointer',
+}
+
+const refreshBtnStyle: React.CSSProperties = {
+  height: 44,
+  padding: '0 14px',
+  fontSize: 13,
+  fontWeight: 500,
   border: '1px solid var(--line)',
   borderRadius: 'var(--radius-sm)',
   background: 'var(--panel-solid)',

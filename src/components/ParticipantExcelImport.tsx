@@ -59,6 +59,7 @@ export default function ParticipantExcelImport({ eventId, disabled, onImported }
     return () => { mountedRef.current = false }
   }, [])
 
+  const [isOpen, setIsOpen] = useState(false)
   const [step, setStep] = useState<Step>('select')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -109,8 +110,8 @@ export default function ParticipantExcelImport({ eventId, disabled, onImported }
   }, [eventId])
 
   useEffect(() => {
-    if (!disabled) loadDocs()
-  }, [disabled, loadDocs])
+    if (!disabled && isOpen) loadDocs()
+  }, [disabled, isOpen, loadDocs])
 
   const handleSelectDoc = useCallback(async (doc: ParticipantImportDocument) => {
     const rid = ++requestIdRef.current
@@ -207,6 +208,33 @@ export default function ParticipantExcelImport({ eventId, disabled, onImported }
 
   if (disabled) return null
 
+  const toggleBtnStyle: React.CSSProperties = {
+    height: 44,
+    minWidth: 44,
+    padding: '0 16px',
+    borderRadius: 6,
+    border: '1px solid var(--border, #e2e8f0)',
+    background: 'var(--surface, #fff)',
+    color: 'var(--text, #1e293b)',
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: 'pointer',
+    width: '100%',
+    textAlign: 'left',
+  }
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        aria-expanded={false}
+        style={toggleBtnStyle}
+      >
+        Importa partecipanti da Excel/CSV
+      </button>
+    )
+  }
+
   const containerStyle: React.CSSProperties = {
     fontSize: 14,
     border: '1px solid var(--border, #e2e8f0)',
@@ -248,9 +276,14 @@ export default function ParticipantExcelImport({ eventId, disabled, onImported }
         <p style={{ margin: 0, color: 'var(--success, #16a34a)', fontWeight: 600 }}>
           Importazione completata con successo.
         </p>
-        <button onClick={reset} style={{ ...btnSecondary, marginTop: 12 }}>
-          Nuova importazione
-        </button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button onClick={reset} style={btnSecondary}>
+            Nuova importazione
+          </button>
+          <button onClick={() => setIsOpen(false)} style={btnSecondary}>
+            Chiudi
+          </button>
+        </div>
       </div>
     )
   }
@@ -259,11 +292,16 @@ export default function ParticipantExcelImport({ eventId, disabled, onImported }
     <div style={containerStyle}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <strong style={{ fontSize: 14 }}>Importa partecipanti da Excel/CSV</strong>
-        {step !== 'select' && (
-          <button onClick={reset} style={{ ...btnSecondary, height: 32, fontSize: 12, padding: '0 10px' }}>
-            Ricomincia
+        <div style={{ display: 'flex', gap: 6 }}>
+          {step !== 'select' && (
+            <button onClick={reset} style={{ ...btnSecondary, height: 32, fontSize: 12, padding: '0 10px' }}>
+              Ricomincia
+            </button>
+          )}
+          <button onClick={() => setIsOpen(false)} aria-expanded={true} style={{ ...btnSecondary, height: 32, fontSize: 12, padding: '0 10px' }}>
+            Chiudi
           </button>
-        )}
+        </div>
       </div>
 
       {error && (
