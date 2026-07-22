@@ -7,6 +7,7 @@ import {
   fetchTransportBoardingPool,
   boardTransportParticipantDirect,
   transitionTransportVehicle,
+  transitionTransportMovement,
   saveTransportVehicle,
   subscribeTransportMovement,
   type TransportMovement,
@@ -56,6 +57,10 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
   const [vfType, setVfType] = useState('')
   const [vfCapacity, setVfCapacity] = useState('')
   const [savingVehicle, setSavingVehicle] = useState(false)
+
+  // Delete transfer confirmation state
+  const [deleteMovementId, setDeleteMovementId] = useState<string | null>(null)
+  const [deletingMovement, setDeletingMovement] = useState(false)
 
 
   const unsubRef = useRef<(() => void) | null>(null)
@@ -249,26 +254,72 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
           <p style={emptyStyle}>Nessun trasferimento configurato.</p>
         ) : (
           <div style={cardListStyle}>
-            {movements.map(m => (
-              <button
-                key={m.id}
-                style={transferCardStyle}
-                onClick={() => selectMovement(m)}
-                disabled={disabled}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span style={cardTitleStyle}>{m.label}</span>
-                  <span style={statusBadgeStyle(m.movement_status)}>{statusLabel(m.movement_status)}</span>
-                </div>
-                <div style={cardMetaStyle}>
-                  {m.origin && m.destination && (
-                    <span>{m.origin} → {m.destination}</span>
-                  )}
-                  {m.departure_at && (
-                    <span><Clock size={12} style={{ marginRight: 4 }} />{formatTime(m.departure_at)}</span>
-                  )}
-                </div>
-              </button>
+            {movements.filter(m => m.movement_status !== 'cancelled').map(m => (
+              <div key={m.id} style={{ position: 'relative' }}>
+                <button
+                  style={transferCardStyle}
+                  onClick={() => selectMovement(m)}
+                  disabled={disabled}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span style={cardTitleStyle}>{m.label}</span>
+                    <span style={statusBadgeStyle(m.movement_status)}>{statusLabel(m.movement_status)}</span>
+                  </div>
+                  <div style={cardMetaStyle}>
+                    {m.origin && m.destination && (
+                      <span>{m.origin} → {m.destination}</span>
+                    )}
+                    {m.departure_at && (
+                      <span><Clock size={12} style={{ marginRight: 4 }} />{formatTime(m.departure_at)}</span>
+                    )}
+                  </div>
+                </button>
+                <button
+                  style={deleteTransferBtnStyle}
+                  title="Elimina transfer"
+                  onClick={(e) => { e.stopPropagation(); setDeleteMovementId(m.id) }}
+                  disabled={disabled}
+                >
+                  <XCircle size={16} />
+                </button>
+
+                {deleteMovementId === m.id && (
+                  <div style={confirmOverlayStyle}>
+                    <p style={{ margin: 0, fontSize: 14, color: 'var(--text)' }}>
+                      Annullare il transfer <strong>{m.label}</strong>?
+                    </p>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <button
+                        style={dangerActionBtnStyle}
+                        disabled={deletingMovement}
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          setDeletingMovement(true)
+                          try {
+                            await transitionTransportMovement(m.id, 'cancelled')
+                            showToast(`Transfer "${m.label}" annullato.`, 'success')
+                            setDeleteMovementId(null)
+                            await loadMovements()
+                          } catch (err: any) {
+                            showToast(err?.message ?? 'Errore nell\'annullamento.', 'error')
+                          } finally {
+                            setDeletingMovement(false)
+                          }
+                        }}
+                      >
+                        {deletingMovement ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : 'Conferma'}
+                      </button>
+                      <button
+                        style={secondaryActionBtnStyle}
+                        onClick={(e) => { e.stopPropagation(); setDeleteMovementId(null) }}
+                        disabled={deletingMovement}
+                      >
+                        Annulla
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -864,4 +915,35 @@ const inlineFormStyle: React.CSSProperties = {
   background: 'var(--panel)',
   border: '1px solid var(--line)',
   borderRadius: 10,
+}
+
+const deleteTransferBtnStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 10,
+  right: 10,
+  background: 'none',
+  border: 'none',
+  color: 'var(--muted)',
+  cursor: 'pointer',
+  padding: 4,
+  borderRadius: 6,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: 44,
+  minWidth: 44,
+}
+
+const confirmOverlayStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  background: 'var(--panel)',
+  border: '1px solid var(--line)',
+  borderRadius: 10,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 16,
+  zIndex: 2,
 }
