@@ -7,6 +7,7 @@ import {
   fetchTransportBoardingPool,
   boardTransportParticipantDirect,
   transitionTransportVehicle,
+  saveTransportVehicle,
   subscribeTransportMovement,
   type TransportMovement,
   type TransportBoardingParticipant,
@@ -48,6 +49,13 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
   const [actionLoading, setActionLoading] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ type: 'depart' | 'reopen' | 'cancel'; vehicleId: string } | null>(null)
   const [cancelReason, setCancelReason] = useState('')
+
+  // Vehicle form state
+  const [showVehicleForm, setShowVehicleForm] = useState(false)
+  const [vfLabel, setVfLabel] = useState('')
+  const [vfType, setVfType] = useState('')
+  const [vfCapacity, setVfCapacity] = useState('')
+  const [savingVehicle, setSavingVehicle] = useState(false)
 
 
   const unsubRef = useRef<(() => void) | null>(null)
@@ -279,6 +287,78 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
         <h3 style={titleStyle}>{selectedMovement.label}</h3>
         {selectedMovement.origin && selectedMovement.destination && (
           <p style={subtitleStyle}>{selectedMovement.origin} → {selectedMovement.destination}</p>
+        )}
+
+        {/* Add vehicle button */}
+        <button
+          style={primaryActionBtnStyle}
+          onClick={() => { setShowVehicleForm(true); setVfLabel(''); setVfType(''); setVfCapacity('') }}
+          disabled={disabled || showVehicleForm}
+        >
+          + Aggiungi mezzo
+        </button>
+
+        {/* Vehicle creation form */}
+        {showVehicleForm && (
+          <div style={inlineFormStyle}>
+            <input
+              style={inputStyle}
+              placeholder="Nome del mezzo"
+              value={vfLabel}
+              onChange={e => setVfLabel(e.target.value)}
+              maxLength={100}
+            />
+            <input
+              style={inputStyle}
+              placeholder="Tipologia (es. bus, van, auto)"
+              value={vfType}
+              onChange={e => setVfType(e.target.value)}
+              maxLength={50}
+            />
+            <input
+              style={inputStyle}
+              placeholder="Capienza (numero posti)"
+              type="number"
+              min={1}
+              value={vfCapacity}
+              onChange={e => setVfCapacity(e.target.value)}
+            />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                style={primaryActionBtnStyle}
+                disabled={savingVehicle || !vfLabel.trim()}
+                onClick={async () => {
+                  if (!vfLabel.trim() || !selectedMovement) return
+                  setSavingVehicle(true)
+                  try {
+                    await saveTransportVehicle({
+                      movementId: selectedMovement.id,
+                      label: vfLabel.trim(),
+                      vehicleType: vfType.trim() || 'bus',
+                      capacity: vfCapacity ? parseInt(vfCapacity, 10) || null : null,
+                    })
+                    showToast('Mezzo aggiunto con successo.', 'success')
+                    setShowVehicleForm(false)
+                    setVfLabel(''); setVfType(''); setVfCapacity('')
+                    await loadVehicles(selectedMovement.id)
+                  } catch (err: any) {
+                    showToast(err?.message ?? 'Errore nel salvataggio del mezzo.', 'error')
+                  } finally {
+                    setSavingVehicle(false)
+                  }
+                }}
+              >
+                {savingVehicle ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : 'Salva'}
+              </button>
+              <button
+                style={secondaryActionBtnStyle}
+                onClick={() => setShowVehicleForm(false)}
+                disabled={savingVehicle}
+              >
+                Annulla
+              </button>
+            </div>
+          </div>
         )}
 
         {loadingVehicles ? (
@@ -774,4 +854,14 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--bg)',
   color: 'var(--text)',
   outline: 'none',
+}
+
+const inlineFormStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+  padding: 16,
+  background: 'var(--panel)',
+  border: '1px solid var(--line)',
+  borderRadius: 10,
 }
