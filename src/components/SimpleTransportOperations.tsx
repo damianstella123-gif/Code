@@ -817,7 +817,9 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                     </div>
                   </button>
 
-                  {unboardConfirmId === p.assignment_id && (
+                  {unboardConfirmId !== null &&
+                          p.assignment_id !== null &&
+                          unboardConfirmId === p.assignment_id && (
                     <div style={confirmOverlayStyle}>
                       <p style={{ margin: 0, fontSize: 14, color: 'var(--text)' }}>
                         Rimuovere la spunta di <strong>{participantName}</strong>?
