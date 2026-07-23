@@ -70,6 +70,8 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
   const [vfLabel, setVfLabel] = useState('')
   const [vfType, setVfType] = useState('')
   const [vfCapacity, setVfCapacity] = useState('')
+  const [vfDriverName, setVfDriverName] = useState('')
+  const [vfDriverPhone, setVfDriverPhone] = useState('')
   const [savingVehicle, setSavingVehicle] = useState(false)
   const [vfError, setVfError] = useState('')
 
@@ -83,11 +85,11 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
 
   // New transfer form state (unified: movement + first vehicle)
   const [showTransferForm, setShowTransferForm] = useState(false)
-  const [tfLabel, setTfLabel] = useState('')
   const [tfOrigin, setTfOrigin] = useState('')
   const [tfDestination, setTfDestination] = useState('')
   const [tfDepartureAt, setTfDepartureAt] = useState('')
-
+  const [tfDriverName, setTfDriverName] = useState('')
+  const [tfDriverPhone, setTfDriverPhone] = useState('')
   const [tfVehicleType, setTfVehicleType] = useState('')
   const [tfVehicleCapacity, setTfVehicleCapacity] = useState('')
   const [tfError, setTfError] = useState('')
@@ -147,6 +149,11 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
         boarded_count: countByVehicle[v.id] ?? 0,
       }))
       setVehicles(rows)
+      setSelectedVehicle(prev => {
+        if (!prev) return null
+        const updated = rows.find(r => r.id === prev.id)
+        return updated ?? null
+      })
     } catch {
       showToast('Errore nel caricamento dei mezzi.', 'error')
     } finally {
@@ -184,6 +191,11 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
         boarded_count: countByVehicle[v.id] ?? 0,
       }))
       setVehicles(rows)
+      setSelectedVehicle(prev => {
+        if (!prev) return null
+        const updated = rows.find(r => r.id === prev.id)
+        return updated ?? null
+      })
       return rows
     } catch {
       showToast('Errore nel caricamento dei mezzi.', 'error')
@@ -360,7 +372,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
           <h3 style={{ ...titleStyle, margin: 0 }}>Trasporti</h3>
           <button
             style={primaryActionBtnStyle}
-            onClick={() => { setShowTransferForm(true); setTfLabel(''); setTfOrigin(''); setTfDestination(''); setTfDepartureAt(''); setTfError('') }}
+            onClick={() => { setShowTransferForm(true); setTfOrigin(''); setTfDestination(''); setTfDepartureAt(''); setTfDriverName(''); setTfDriverPhone(''); setTfVehicleType(''); setTfVehicleCapacity(''); setTfError('') }}
             disabled={disabled}
           >
             + Nuovo transfer
@@ -370,13 +382,13 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
         {showTransferForm && (
           <div style={inlineFormStyle}>
             <h4 style={{ margin: '0 0 12px' }}>Nuovo Transfer</h4>
-            <input style={inputStyle} placeholder="Nome transfer *" value={tfLabel} onChange={e => { setTfLabel(e.target.value); setTfError('') }} maxLength={100} />
             <input style={inputStyle} placeholder="Origine" value={tfOrigin} onChange={e => setTfOrigin(e.target.value)} maxLength={100} />
             <input style={inputStyle} placeholder="Destinazione" value={tfDestination} onChange={e => setTfDestination(e.target.value)} maxLength={100} />
             <input style={inputStyle} type="datetime-local" value={tfDepartureAt} onChange={e => setTfDepartureAt(e.target.value)} />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '12px 0' }} />
-            <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Primo mezzo</p>
-
+            <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Mezzo e autista</p>
+            <input style={inputStyle} placeholder="Nome autista" value={tfDriverName} onChange={e => setTfDriverName(e.target.value)} maxLength={100} />
+            <input style={inputStyle} placeholder="Telefono autista" value={tfDriverPhone} onChange={e => setTfDriverPhone(e.target.value)} maxLength={50} />
             <select style={inputStyle} value={tfVehicleType} onChange={e => { setTfVehicleType(e.target.value); setTfError('') }}>
               <option value="">Tipologia mezzo *</option>
               <option value="bus">Bus</option>
@@ -401,8 +413,6 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                 style={primaryActionBtnStyle}
                 disabled={savingTransfer}
                 onClick={async () => {
-                  if (!tfLabel.trim()) { setTfError('Il nome del transfer è obbligatorio.'); return }
-
                   if (!tfVehicleType) { setTfError('Selezionare una tipologia mezzo.'); return }
                   const parsedCap = Number.parseInt(tfVehicleCapacity, 10)
                   if (!tfVehicleCapacity || Number.isNaN(parsedCap) || parsedCap <= 0) {
@@ -411,10 +421,11 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                   }
                   setSavingTransfer(true)
                   try {
+                    const internalLabel = `transfer-${Date.now()}`
                     const movementId = await saveTransportMovement({
                       movementId: null,
                       eventId,
-                      label: tfLabel.trim(),
+                      label: internalLabel,
                       movementType: 'transfer',
                       departureAt: tfDepartureAt || null,
                       origin: tfOrigin.trim(),
@@ -423,18 +434,19 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                     const vehicleId = await saveTransportVehicle({
                       vehicleId: null,
                       movementId,
-                      label: tfLabel.trim(),
+                      label: tfDriverName.trim() || vehicleTypeLabel(tfVehicleType),
                       vehicleType: tfVehicleType,
                       capacity: parsedCap,
                       plate: '',
-                      driverName: '',
-                      driverPhone: '',
+                      driverName: tfDriverName.trim(),
+                      driverPhone: tfDriverPhone.trim(),
                       sortOrder: 0,
                     })
                     await transitionTransportMovement(movementId, 'open')
                     showToast('Transfer creato e imbarco aperto', 'success')
                     setShowTransferForm(false)
-                    setTfLabel(''); setTfOrigin(''); setTfDestination(''); setTfDepartureAt('')
+                    setTfOrigin(''); setTfDestination(''); setTfDepartureAt('')
+                    setTfDriverName(''); setTfDriverPhone('')
                     setTfVehicleType(''); setTfVehicleCapacity(''); setTfError('')
                     await loadMovements()
                     const fresh = await fetchTransportMovements(eventId)
@@ -478,13 +490,10 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                   disabled={disabled}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <span style={cardTitleStyle}>{m.label}</span>
+                    <span style={cardTitleStyle}>{m.origin && m.destination ? `${m.origin} → ${m.destination}` : 'Trasferimento'}</span>
                     <span style={statusBadgeStyle(m.movement_status)}>{statusLabel(m.movement_status)}</span>
                   </div>
                   <div style={cardMetaStyle}>
-                    {m.origin && m.destination && (
-                      <span>{m.origin} → {m.destination}</span>
-                    )}
                     {m.departure_at && (
                       <span><Clock size={12} style={{ marginRight: 4 }} />{formatTime(m.departure_at)}</span>
                     )}
@@ -513,8 +522,13 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                           setDeletingMovement(true)
                           try {
                             await transitionTransportMovement(m.id, 'cancelled')
-                            showToast(`Transfer "${m.label}" annullato.`, 'success')
+                            showToast('Transfer annullato.', 'success')
                             setDeleteMovementId(null)
+                            setSelectedMovement(null)
+                            setSelectedVehicle(null)
+                            setPool([])
+                            setVehicles([])
+                            setView('list')
                             await loadMovements()
                           } catch (err: any) {
                             showToast(err?.message ?? 'Errore nell\'annullamento.', 'error')
@@ -551,15 +565,15 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
         <button onClick={goBack} style={backBtnStyle} disabled={disabled}>
           <ArrowLeft size={16} /> Indietro ai transfer
         </button>
-        <h3 style={titleStyle}>{selectedMovement.label}</h3>
-        {selectedMovement.origin && selectedMovement.destination && (
-          <p style={subtitleStyle}>{selectedMovement.origin} → {selectedMovement.destination}</p>
+        <h3 style={titleStyle}>{selectedMovement.origin && selectedMovement.destination ? `${selectedMovement.origin} → ${selectedMovement.destination}` : 'Trasferimento'}</h3>
+        {selectedMovement.departure_at && (
+          <p style={subtitleStyle}><Clock size={12} style={{ marginRight: 4 }} />{formatTime(selectedMovement.departure_at)}</p>
         )}
 
         {/* Add vehicle button */}
         <button
           style={primaryActionBtnStyle}
-          onClick={() => { setShowVehicleForm(true); setEditingVehicleId(null); setVfLabel(''); setVfType(''); setVfCapacity(''); setVfError('') }}
+          onClick={() => { setShowVehicleForm(true); setEditingVehicleId(null); setVfLabel(''); setVfType(''); setVfCapacity(''); setVfDriverName(''); setVfDriverPhone(''); setVfError('') }}
           disabled={disabled || showVehicleForm}
         >
           + Aggiungi mezzo
@@ -574,6 +588,20 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
               value={vfLabel}
               onChange={e => { setVfLabel(e.target.value); setVfError('') }}
               maxLength={100}
+            />
+            <input
+              style={inputStyle}
+              placeholder="Nome autista"
+              value={vfDriverName}
+              onChange={e => setVfDriverName(e.target.value)}
+              maxLength={100}
+            />
+            <input
+              style={inputStyle}
+              placeholder="Telefono autista"
+              value={vfDriverPhone}
+              onChange={e => setVfDriverPhone(e.target.value)}
+              maxLength={50}
             />
             <select
               style={inputStyle}
@@ -620,8 +648,8 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                       vehicleType: vfType,
                       capacity: parsed,
                       plate: '',
-                      driverName: '',
-                      driverPhone: '',
+                      driverName: vfDriverName.trim(),
+                      driverPhone: vfDriverPhone.trim(),
                       sortOrder: editingVehicleId
                         ? (vehicles.find(v => v.id === editingVehicleId)?.sort_order ?? vehicles.length)
                         : vehicles.length,
@@ -629,7 +657,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                     showToast(editingVehicleId ? 'Mezzo modificato correttamente' : 'Mezzo aggiunto correttamente', 'success')
                     setShowVehicleForm(false)
                     setEditingVehicleId(null)
-                    setVfLabel(''); setVfType(''); setVfCapacity(''); setVfError('')
+                    setVfLabel(''); setVfType(''); setVfCapacity(''); setVfDriverName(''); setVfDriverPhone(''); setVfError('')
                     await loadVehicles(selectedMovement.id)
                   } catch (err: any) {
                     showToast(err?.message ?? 'Errore nel salvataggio del mezzo.', 'error')
@@ -667,11 +695,16 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                     disabled={disabled}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={cardTitleStyle}>{v.label}</span>
+                      <span style={cardTitleStyle}>{v.driver_name || v.label}</span>
                       <span style={vehicleStatusBadge(v.operational_status)}>
                         {vehicleStatusLabel(v.operational_status)}
                       </span>
                     </div>
+                    {v.driver_phone && (
+                      <a href={`tel:${v.driver_phone}`} style={{ fontSize: 13, color: 'var(--primary)', textDecoration: 'underline' }} onClick={e => e.stopPropagation()}>
+                        {v.driver_phone}
+                      </a>
+                    )}
                     <div style={cardMetaStyle}>
                       <span style={{ fontSize: 13 }}>{vehicleTypeLabel(v.vehicle_type)}</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -714,6 +747,8 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                         setVfLabel(v.label)
                         setVfType(v.vehicle_type)
                         setVfCapacity(v.capacity != null ? String(v.capacity) : '')
+                        setVfDriverName(v.driver_name || '')
+                        setVfDriverPhone(v.driver_phone || '')
                         setVfError('')
                         setShowVehicleForm(true)
                       }}
@@ -828,7 +863,10 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
         <button onClick={goBack} style={backBtnStyle} disabled={disabled}>
           <ArrowLeft size={16} /> Indietro ai mezzi
         </button>
-        <h3 style={titleStyle}>{selectedVehicle.label}</h3>
+        <h3 style={titleStyle}>{selectedVehicle.driver_name || selectedVehicle.label}</h3>
+        {selectedVehicle.driver_phone && (
+          <p style={subtitleStyle}><a href={`tel:${selectedVehicle.driver_phone}`} style={{ color: 'var(--primary)', textDecoration: 'underline' }}>{selectedVehicle.driver_phone}</a></p>
+        )}
         <p style={subtitleStyle}>
           {selectedVehicle.vehicle_type} — {selectedVehicle.boarded_count}/{selectedVehicle.capacity ?? '∞'} occupati
         </p>
