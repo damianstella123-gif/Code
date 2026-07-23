@@ -42,9 +42,11 @@ export interface TransportVehicle {
   driver_name: string
   driver_phone: string
   sort_order: number
-  operational_status: 'boarding' | 'departed' | 'cancelled'
+  operational_status: 'boarding' | 'departed' | 'arrived' | 'cancelled'
   departed_at: string | null
   departed_by: string | null
+  arrived_at: string | null
+  arrived_by: string | null
   cancelled_at: string | null
   cancelled_by: string | null
   cancellation_reason: string | null
@@ -52,13 +54,14 @@ export interface TransportVehicle {
   updated_at: string
 }
 
-export type TransportVehicleAction = 'depart' | 'cancel' | 'reopen'
+export type TransportVehicleAction = 'depart' | 'cancel' | 'reopen' | 'arrive'
 
 export interface TransportVehicleTransitionResult {
   vehicle_label: string
   action: TransportVehicleAction
-  operational_status: 'boarding' | 'departed' | 'cancelled'
+  operational_status: 'boarding' | 'departed' | 'arrived' | 'cancelled'
   departed_at: string | null
+  arrived_at: string | null
   occupants: number
   capacity: number | null
 }
@@ -576,7 +579,7 @@ export async function unboardTransportAssignment(assignmentId: string): Promise<
 
 // ─── Vehicle Transition ──────────────────────────────────────────────────────
 
-const VALID_VEHICLE_ACTIONS: TransportVehicleAction[] = ['depart', 'cancel', 'reopen']
+const VALID_VEHICLE_ACTIONS: TransportVehicleAction[] = ['depart', 'cancel', 'reopen', 'arrive']
 
 export async function transitionTransportVehicle(
   vehicleId: string,
@@ -618,8 +621,9 @@ export async function transitionTransportVehicle(
   return {
     vehicle_label: result.vehicle_label,
     action: result.action as TransportVehicleAction,
-    operational_status: result.operational_status as 'boarding' | 'departed' | 'cancelled',
+    operational_status: result.operational_status as 'boarding' | 'departed' | 'arrived' | 'cancelled',
     departed_at: result.departed_at as string | null,
+    arrived_at: (result.arrived_at as string | null) ?? null,
     occupants: Number(result.occupants ?? 0),
     capacity: result.capacity != null ? Number(result.capacity) : null,
   }

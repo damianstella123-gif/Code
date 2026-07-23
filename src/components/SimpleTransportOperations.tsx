@@ -32,8 +32,9 @@ interface VehicleRow {
   driver_name: string
   driver_phone: string
   sort_order: number
-  operational_status: 'boarding' | 'departed' | 'cancelled'
+  operational_status: 'boarding' | 'departed' | 'arrived' | 'cancelled'
   departed_at: string | null
+  arrived_at: string | null
   boarded_count: number
 }
 
@@ -61,7 +62,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
   const [unboardConfirmId, setUnboardConfirmId] = useState<string | null>(null)
   const [unboardingId, setUnboardingId] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
-  const [confirmAction, setConfirmAction] = useState<{ type: 'depart' | 'reopen' | 'cancel'; vehicleId: string } | null>(null)
+  const [confirmAction, setConfirmAction] = useState<{ type: 'depart' | 'reopen' | 'cancel' | 'arrive'; vehicleId: string } | null>(null)
   const [cancelReason, setCancelReason] = useState('')
 
   // Vehicle form state
@@ -121,7 +122,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
     try {
       const { data, error } = await supabase
         .from('transport_vehicles')
-        .select('id, label, vehicle_type, capacity, plate, driver_name, driver_phone, sort_order, operational_status, departed_at')
+        .select('id, label, vehicle_type, capacity, plate, driver_name, driver_phone, sort_order, operational_status, departed_at, arrived_at')
         .eq('movement_id', movementId)
         .order('sort_order', { ascending: true })
 
@@ -146,6 +147,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
         sort_order: v.sort_order ?? 0,
         operational_status: v.operational_status ?? 'boarding',
         departed_at: v.departed_at,
+        arrived_at: v.arrived_at ?? null,
         boarded_count: countByVehicle[v.id] ?? 0,
       }))
       setVehicles(rows)
@@ -166,7 +168,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
     try {
       const { data, error } = await supabase
         .from('transport_vehicles')
-        .select('id, label, vehicle_type, capacity, plate, driver_name, driver_phone, sort_order, operational_status, departed_at')
+        .select('id, label, vehicle_type, capacity, plate, driver_name, driver_phone, sort_order, operational_status, departed_at, arrived_at')
         .eq('movement_id', movementId)
         .order('sort_order', { ascending: true })
       if (error) throw error
@@ -188,6 +190,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
         sort_order: v.sort_order ?? 0,
         operational_status: v.operational_status ?? 'boarding',
         departed_at: v.departed_at,
+        arrived_at: v.arrived_at ?? null,
         boarded_count: countByVehicle[v.id] ?? 0,
       }))
       setVehicles(rows)
@@ -347,11 +350,14 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
     try {
       const result = await transitionTransportVehicle(
         confirmAction.vehicleId,
-        confirmAction.type === 'depart' ? 'depart' : confirmAction.type === 'reopen' ? 'reopen' : 'cancel',
+        confirmAction.type,
         confirmAction.type === 'cancel' ? cancelReason.trim() : undefined
       )
-      const actionLabels = { depart: 'Partenza confermata', reopen: 'Imbarco riaperto', cancel: 'Mezzo annullato' }
-      showToast(`${actionLabels[confirmAction.type]} — ${result.vehicle_label}`, 'success')
+      const actionLabels: Record<string, string> = { depart: 'Partenza confermata', arrive: 'Arrivo confermato', reopen: 'Imbarco riaperto', cancel: 'Mezzo annullato' }
+      const timeInfo = confirmAction.type === 'arrive' && result.arrived_at
+        ? ` alle ${formatTime(result.arrived_at)}`
+        : ''
+      showToast(`${actionLabels[confirmAction.type]}${timeInfo} — ${result.vehicle_label}`, 'success')
       setConfirmAction(null)
       setCancelReason('')
       if (selectedMovement) await loadVehicles(selectedMovement.id)
@@ -718,6 +724,11 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                         Partito alle {formatTime(v.departed_at)}
                       </span>
                     )}
+                    {v.operational_status === 'arrived' && v.arrived_at && (
+                      <span style={{ fontSize: 12, color: 'var(--green)' }}>
+                        Arrivato alle {formatTime(v.arrived_at)}
+                      </span>
+                    )}
                   </button>
 
                   {/* Vehicle actions - always visible regardless of status */}
@@ -732,6 +743,24 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                       </button>
                     )}
                     {v.operational_status === 'departed' && (
+                      <>
+                        <button
+                          style={primaryActionBtnStyle}
+                          onClick={() => setConfirmAction({ type: 'arrive', vehicleId: v.id })}
+                          disabled={disabled || actionLoading}
+                        >
+                          <CheckCircle2 size={16} /> Conferma arrivo
+                        </button>
+                        <button
+                          style={secondaryActionBtnStyle}
+                          onClick={() => setConfirmAction({ type: 'reopen', vehicleId: v.id })}
+                          disabled={disabled || actionLoading}
+                        >
+                          Riapri imbarco
+                        </button>
+                      </>
+                    )}
+                    {v.operational_status === 'arrived' && (
                       <button
                         style={secondaryActionBtnStyle}
                         onClick={() => setConfirmAction({ type: 'reopen', vehicleId: v.id })}
@@ -815,11 +844,13 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
             <div style={dialogStyle}>
               <h4 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>
                 {confirmAction.type === 'depart' && 'Conferma partenza'}
+                {confirmAction.type === 'arrive' && 'Conferma arrivo'}
                 {confirmAction.type === 'reopen' && 'Riapri imbarco'}
                 {confirmAction.type === 'cancel' && 'Annulla mezzo'}
               </h4>
               <p style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--muted)' }}>
                 {confirmAction.type === 'depart' && 'Il mezzo risulterà partito. Continuare?'}
+                {confirmAction.type === 'arrive' && 'Il mezzo risulterà arrivato a destinazione. Continuare?'}
                 {confirmAction.type === 'reopen' && 'L\'imbarco verrà riaperto. Continuare?'}
                 {confirmAction.type === 'cancel' && 'Inserire il motivo dell\'annullamento (min 5 caratteri).'}
               </p>
@@ -1017,6 +1048,7 @@ function vehicleStatusLabel(s: string): string {
   const map: Record<string, string> = {
     boarding: 'Imbarco',
     departed: 'Partito',
+    arrived: 'Arrivato',
     cancelled: 'Annullato',
   }
   return map[s] ?? s
@@ -1119,6 +1151,7 @@ function vehicleStatusBadge(status: string): React.CSSProperties {
   const colors: Record<string, { bg: string; fg: string }> = {
     boarding: { bg: 'rgba(59,130,246,0.1)', fg: 'var(--blue, #3b82f6)' },
     departed: { bg: 'rgba(47,158,104,0.15)', fg: 'var(--green)' },
+    arrived: { bg: 'rgba(16,185,129,0.15)', fg: '#059669' },
     cancelled: { bg: 'rgba(220,38,38,0.1)', fg: 'var(--red)' },
   }
   const c = colors[status] ?? colors.boarding
