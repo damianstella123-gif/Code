@@ -67,6 +67,7 @@ export function normalizeRegistrationSlug(value: string): string {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 80)
+    .replace(/^-|-$/g, '')
 }
 
 // ─── Permission check ────────────────────────────────────────────────────────

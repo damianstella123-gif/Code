@@ -88,6 +88,22 @@ function formToPayload(form: FormState): RegistrationSiteUpdate {
   }
 }
 
+function translateRegistrationError(err: any): string {
+  const m = (err?.message ?? '').toLowerCase()
+  const code = err?.code ?? ''
+  if (code === '23505' || m.includes('duplicate') || m.includes('unique') || m === 'duplicate_slug')
+    return 'Questo slug è già in uso. Scegliere un altro indirizzo.'
+  if (code === '23514' || m.includes('slug') || m.includes('check'))
+    return 'Lo slug contiene caratteri non validi o è troppo corto (min 3 caratteri alfanumerici).'
+  if (m.includes('privacy'))
+    return 'Inserire URL privacy o testo privacy per pubblicare.'
+  if (m.includes('date') || m.includes('closes_at'))
+    return 'Le date di apertura/chiusura non sono valide.'
+  if (code === '42501' || m.includes('permission') || m.includes('policy'))
+    return 'Permessi insufficienti per questa operazione.'
+  return 'Errore durante il salvataggio. Riprova o verifica i dati inseriti.'
+}
+
 function validateForPublish(form: FormState): string | null {
   if (!form.title.trim()) return 'Il titolo è obbligatorio per pubblicare.'
   const slug = normalizeRegistrationSlug(form.slug)
@@ -110,6 +126,7 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
   const [form, setForm] = useState<FormState>(emptyForm)
   const [showDelete, setShowDelete] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [publishError, setPublishError] = useState<string | null>(null)
 
   // Collapsible sections
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -159,24 +176,31 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
 
   const handleSave = async (publish?: boolean) => {
     if (readOnly) return
+    setPublishError(null)
+
+    // Normalize slug before any validation
+    const normalizedSlug = normalizeRegistrationSlug(form.slug)
+    const normalizedForm = { ...form, slug: normalizedSlug }
+    setForm(normalizedForm)
+
     if (publish) {
-      const err = validateForPublish(form)
-      if (err) { showToast(err, 'error'); return }
+      const err = validateForPublish(normalizedForm)
+      if (err) { setPublishError(err); return }
       if (!site) {
-        showToast('Salva prima la bozza per poter pubblicare.', 'error')
+        setPublishError('Salva prima la bozza per poter pubblicare.')
         return
       }
     }
 
     // Date validation
-    if (form.opens_at && form.closes_at && new Date(form.closes_at) <= new Date(form.opens_at)) {
-      showToast('La data di chiusura deve essere successiva a quella di apertura.', 'error')
+    if (normalizedForm.opens_at && normalizedForm.closes_at && new Date(normalizedForm.closes_at) <= new Date(normalizedForm.opens_at)) {
+      setPublishError('La data di chiusura deve essere successiva a quella di apertura.')
       return
     }
 
     setSaving(true)
     try {
-      const payload = formToPayload(form)
+      const payload = formToPayload(normalizedForm)
       if (publish) {
         payload.status = 'published'
         if (!site?.published_at) payload.published_at = new Date().toISOString()
@@ -197,12 +221,11 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
       setSite(updated)
       setForm(siteToForm(updated))
       setEditing(false)
+      setPublishError(null)
       showToast(publish ? 'Sito pubblicato con successo' : 'Modifiche salvate', 'success')
     } catch (err: any) {
-      const msg = err.message === 'DUPLICATE_SLUG'
-        ? 'Questo slug è già in uso. Scegliere un altro indirizzo.'
-        : err.message || 'Errore salvataggio'
-      showToast(msg, 'error')
+      const msg = translateRegistrationError(err)
+      setPublishError(msg)
     } finally {
       setSaving(false)
     }
@@ -493,6 +516,12 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
           <Send size={14} /> {saving ? 'Pubblicazione...' : 'Pubblica'}
         </button>
       </div>
+
+      {publishError && (
+        <div style={{ margin: '8px 0 0', padding: '10px 14px', borderRadius: 8, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', color: 'var(--red, #dc2626)', fontSize: 13, lineHeight: 1.4 }}>
+          {publishError}
+        </div>
+      )}
 
       {showDelete && (
         <DeleteConfirmDialog
