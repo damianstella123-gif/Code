@@ -81,12 +81,15 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
   const [deleteMovementId, setDeleteMovementId] = useState<string | null>(null)
   const [deletingMovement, setDeletingMovement] = useState(false)
 
-  // New transfer form state
+  // New transfer form state (unified: movement + first vehicle)
   const [showTransferForm, setShowTransferForm] = useState(false)
   const [tfLabel, setTfLabel] = useState('')
   const [tfOrigin, setTfOrigin] = useState('')
   const [tfDestination, setTfDestination] = useState('')
   const [tfDepartureAt, setTfDepartureAt] = useState('')
+  const [tfVehicleLabel, setTfVehicleLabel] = useState('')
+  const [tfVehicleType, setTfVehicleType] = useState('')
+  const [tfVehicleCapacity, setTfVehicleCapacity] = useState('')
   const [tfError, setTfError] = useState('')
   const [savingTransfer, setSavingTransfer] = useState(false)
 
@@ -151,6 +154,45 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
     }
   }, [showToast])
 
+  const loadVehiclesAndReturn = useCallback(async (movementId: string): Promise<VehicleRow[]> => {
+    setLoadingVehicles(true)
+    try {
+      const { data, error } = await supabase
+        .from('transport_vehicles')
+        .select('id, label, vehicle_type, capacity, plate, driver_name, driver_phone, sort_order, operational_status, departed_at')
+        .eq('movement_id', movementId)
+        .order('sort_order', { ascending: true })
+      if (error) throw error
+      const poolData = await fetchTransportBoardingPool(movementId)
+      const countByVehicle: Record<string, number> = {}
+      for (const p of poolData) {
+        if (p.vehicle_id && p.assignment_status === 'boarded') {
+          countByVehicle[p.vehicle_id] = (countByVehicle[p.vehicle_id] ?? 0) + 1
+        }
+      }
+      const rows: VehicleRow[] = (data ?? []).map((v: any) => ({
+        id: v.id,
+        label: v.label,
+        vehicle_type: v.vehicle_type,
+        capacity: v.capacity,
+        plate: v.plate ?? '',
+        driver_name: v.driver_name ?? '',
+        driver_phone: v.driver_phone ?? '',
+        sort_order: v.sort_order ?? 0,
+        operational_status: v.operational_status ?? 'boarding',
+        departed_at: v.departed_at,
+        boarded_count: countByVehicle[v.id] ?? 0,
+      }))
+      setVehicles(rows)
+      return rows
+    } catch {
+      showToast('Errore nel caricamento dei mezzi.', 'error')
+      return []
+    } finally {
+      setLoadingVehicles(false)
+    }
+  }, [showToast])
+
   // ─── Load boarding pool ──────────────────────────────────────────────────────
 
   const loadPool = useCallback(async (movementId: string) => {
@@ -199,8 +241,20 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
     loadVehicles(m.id)
   }
 
-  const selectVehicle = (v: VehicleRow) => {
+  const selectVehicle = async (v: VehicleRow) => {
     if (!selectedMovement) return
+    if (selectedMovement.movement_status === 'draft') {
+      try {
+        await transitionTransportMovement(selectedMovement.id, 'open')
+        const fresh = await fetchTransportMovements(eventId)
+        const updated = fresh.find(m => m.id === selectedMovement.id)
+        if (updated) setSelectedMovement(updated)
+        setMovements(fresh.filter(m => m.movement_status !== 'cancelled'))
+      } catch (err: any) {
+        showToast(err?.message ?? 'Errore apertura transfer.', 'error')
+        return
+      }
+    }
     setSelectedVehicle(v)
     setView('participants')
     loadPool(selectedMovement.id)
@@ -320,6 +374,27 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
             <input style={inputStyle} placeholder="Origine" value={tfOrigin} onChange={e => setTfOrigin(e.target.value)} maxLength={100} />
             <input style={inputStyle} placeholder="Destinazione" value={tfDestination} onChange={e => setTfDestination(e.target.value)} maxLength={100} />
             <input style={inputStyle} type="datetime-local" value={tfDepartureAt} onChange={e => setTfDepartureAt(e.target.value)} />
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '12px 0' }} />
+            <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Primo mezzo</p>
+            <input style={inputStyle} placeholder="Nome mezzo *" value={tfVehicleLabel} onChange={e => { setTfVehicleLabel(e.target.value); setTfError('') }} maxLength={100} />
+            <select style={inputStyle} value={tfVehicleType} onChange={e => { setTfVehicleType(e.target.value); setTfError('') }}>
+              <option value="">Tipologia mezzo *</option>
+              <option value="bus">Bus</option>
+              <option value="minibus">Minibus</option>
+              <option value="van">Van</option>
+              <option value="auto">Auto</option>
+              <option value="treno">Treno</option>
+              <option value="aereo">Aereo</option>
+              <option value="altro">Altro</option>
+            </select>
+            <input
+              style={inputStyle}
+              placeholder="Capienza (posti) *"
+              type="number"
+              min={1}
+              value={tfVehicleCapacity}
+              onChange={e => { setTfVehicleCapacity(e.target.value); setTfError('') }}
+            />
             {tfError && <p style={formErrorStyle}>{tfError}</p>}
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <button
@@ -327,9 +402,16 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                 disabled={savingTransfer}
                 onClick={async () => {
                   if (!tfLabel.trim()) { setTfError('Il nome del transfer è obbligatorio.'); return }
+                  if (!tfVehicleLabel.trim()) { setTfError('Il nome del mezzo è obbligatorio.'); return }
+                  if (!tfVehicleType) { setTfError('Selezionare una tipologia mezzo.'); return }
+                  const parsedCap = Number.parseInt(tfVehicleCapacity, 10)
+                  if (!tfVehicleCapacity || Number.isNaN(parsedCap) || parsedCap <= 0) {
+                    setTfError('La capienza deve essere un numero intero maggiore di zero.')
+                    return
+                  }
                   setSavingTransfer(true)
                   try {
-                    const newId = await saveTransportMovement({
+                    const movementId = await saveTransportMovement({
                       movementId: null,
                       eventId,
                       label: tfLabel.trim(),
@@ -338,13 +420,36 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                       origin: tfOrigin.trim(),
                       destination: tfDestination.trim()
                     })
-                    showToast('Transfer creato correttamente', 'success')
+                    const vehicleId = await saveTransportVehicle({
+                      vehicleId: null,
+                      movementId,
+                      label: tfVehicleLabel.trim(),
+                      vehicleType: tfVehicleType,
+                      capacity: parsedCap,
+                      plate: '',
+                      driverName: '',
+                      driverPhone: '',
+                      sortOrder: 0,
+                    })
+                    await transitionTransportMovement(movementId, 'open')
+                    showToast('Transfer creato e imbarco aperto', 'success')
                     setShowTransferForm(false)
-                    setTfLabel(''); setTfOrigin(''); setTfDestination(''); setTfDepartureAt(''); setTfError('')
+                    setTfLabel(''); setTfOrigin(''); setTfDestination(''); setTfDepartureAt('')
+                    setTfVehicleLabel(''); setTfVehicleType(''); setTfVehicleCapacity(''); setTfError('')
                     await loadMovements()
                     const fresh = await fetchTransportMovements(eventId)
-                    const created = fresh.find(m => m.id === newId)
-                    if (created) selectMovement(created)
+                    const created = fresh.find(m => m.id === movementId)
+                    if (created) {
+                      setSelectedMovement(created)
+                      setView('vehicles')
+                      const vehs = await loadVehiclesAndReturn(created.id)
+                      const newVeh = vehs.find(v => v.id === vehicleId)
+                      if (newVeh) {
+                        setSelectedVehicle(newVeh)
+                        setView('participants')
+                        loadPool(created.id)
+                      }
+                    }
                   } catch (err: any) {
                     showToast(err?.message ?? 'Errore nella creazione.', 'error')
                   } finally {
