@@ -87,7 +87,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
   const [tfOrigin, setTfOrigin] = useState('')
   const [tfDestination, setTfDestination] = useState('')
   const [tfDepartureAt, setTfDepartureAt] = useState('')
-  const [tfVehicleLabel, setTfVehicleLabel] = useState('')
+
   const [tfVehicleType, setTfVehicleType] = useState('')
   const [tfVehicleCapacity, setTfVehicleCapacity] = useState('')
   const [tfError, setTfError] = useState('')
@@ -376,7 +376,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
             <input style={inputStyle} type="datetime-local" value={tfDepartureAt} onChange={e => setTfDepartureAt(e.target.value)} />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '12px 0' }} />
             <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Primo mezzo</p>
-            <input style={inputStyle} placeholder="Nome mezzo *" value={tfVehicleLabel} onChange={e => { setTfVehicleLabel(e.target.value); setTfError('') }} maxLength={100} />
+
             <select style={inputStyle} value={tfVehicleType} onChange={e => { setTfVehicleType(e.target.value); setTfError('') }}>
               <option value="">Tipologia mezzo *</option>
               <option value="bus">Bus</option>
@@ -402,7 +402,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                 disabled={savingTransfer}
                 onClick={async () => {
                   if (!tfLabel.trim()) { setTfError('Il nome del transfer è obbligatorio.'); return }
-                  if (!tfVehicleLabel.trim()) { setTfError('Il nome del mezzo è obbligatorio.'); return }
+
                   if (!tfVehicleType) { setTfError('Selezionare una tipologia mezzo.'); return }
                   const parsedCap = Number.parseInt(tfVehicleCapacity, 10)
                   if (!tfVehicleCapacity || Number.isNaN(parsedCap) || parsedCap <= 0) {
@@ -423,7 +423,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                     const vehicleId = await saveTransportVehicle({
                       vehicleId: null,
                       movementId,
-                      label: tfVehicleLabel.trim(),
+                      label: tfLabel.trim(),
                       vehicleType: tfVehicleType,
                       capacity: parsedCap,
                       plate: '',
@@ -435,7 +435,7 @@ export default function SimpleTransportOperations({ eventId, disabled }: Props) 
                     showToast('Transfer creato e imbarco aperto', 'success')
                     setShowTransferForm(false)
                     setTfLabel(''); setTfOrigin(''); setTfDestination(''); setTfDepartureAt('')
-                    setTfVehicleLabel(''); setTfVehicleType(''); setTfVehicleCapacity(''); setTfError('')
+                    setTfVehicleType(''); setTfVehicleCapacity(''); setTfError('')
                     await loadMovements()
                     const fresh = await fetchTransportMovements(eventId)
                     const created = fresh.find(m => m.id === movementId)
