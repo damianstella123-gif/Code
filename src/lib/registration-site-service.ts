@@ -251,3 +251,50 @@ export async function configureRegistrationModules(
     active_preset_fields: obj.active_preset_fields as number,
   }
 }
+
+// ─── Registration Branding Assets ──────────────────────────────────────────
+
+export type RegistrationAssetType = 'logo' | 'hero'
+
+const ASSET_BUCKET = 'registration-assets'
+const ASSET_MAX_BYTES = 5 * 1024 * 1024
+const ASSET_ALLOWED_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+}
+
+export async function uploadRegistrationAsset(
+  eventId: string,
+  siteId: string,
+  assetType: RegistrationAssetType,
+  file: File
+): Promise<{ path: string; publicUrl: string }> {
+  if (!eventId || !eventId.trim()) throw new Error('ID evento mancante.')
+  if (!siteId || !siteId.trim()) throw new Error('ID sito mancante.')
+
+  const ext = ASSET_ALLOWED_MIME[file.type]
+  if (!ext) throw new Error('Formato file non supportato. Usa JPEG, PNG o WebP.')
+  if (file.size > ASSET_MAX_BYTES) throw new Error('Il file supera la dimensione massima di 5 MB.')
+
+  const path = `${eventId}/${siteId}/${assetType}-${crypto.randomUUID()}.${ext}`
+
+  const { error } = await supabase.storage
+    .from(ASSET_BUCKET)
+    .upload(path, file, { upsert: false, contentType: file.type })
+
+  if (error) throw new Error('Caricamento non riuscito. Verifica i permessi e riprova.')
+
+  const { data: urlData } = supabase.storage.from(ASSET_BUCKET).getPublicUrl(path)
+
+  return { path, publicUrl: urlData.publicUrl }
+}
+
+export async function deleteRegistrationAsset(path: string): Promise<void> {
+  if (!path || !path.trim() || path.includes('..') || path.startsWith('/')) {
+    throw new Error('Percorso file non valido.')
+  }
+
+  const { error } = await supabase.storage.from(ASSET_BUCKET).remove([path])
+  if (error) throw new Error('Eliminazione non riuscita. Verifica i permessi e riprova.')
+}
