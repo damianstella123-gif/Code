@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Globe, Copy, Trash2, Save, Send, RotateCcw, XCircle, Eye, Lock, ChevronDown, ChevronRight } from 'lucide-react'
+import { Globe, Copy, Trash2, Save, Send, RotateCcw, XCircle, Eye, Lock, ChevronDown, ChevronRight, ExternalLink, Mail, MessageCircle } from 'lucide-react'
 import { useToast } from '@/lib/toast'
 import {
   fetchRegistrationSites,
@@ -350,11 +350,6 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
             <StatusBadge status={site.status} />
           </div>
           <div style={styles.headerActions}>
-            {site.status === 'published' && (
-              <button style={styles.btnOutline} onClick={copyLink}>
-                <Copy size={14} /> Copia Link
-              </button>
-            )}
             {!readOnly && (
               <button style={styles.btnPrimary} onClick={() => setEditing(true)}>
                 Modifica
@@ -364,12 +359,51 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
         </div>
 
         {site.status === 'published' && (
-          <div style={styles.publicPath}>
-            <Globe size={14} style={{ color: 'var(--green)' }} />
-            <a href={`${PUBLIC_APP_URL}/r/${site.slug}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--font-code)', fontSize: 13, color: 'inherit', textDecoration: 'none' }}>
-              {PUBLIC_APP_URL}/r/{site.slug}
-            </a>
-          </div>
+          <>
+            <div style={styles.publicPath}>
+              <Globe size={14} style={{ color: 'var(--green)' }} />
+              <a href={`${PUBLIC_APP_URL}/r/${site.slug}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--font-code)', fontSize: 13, color: 'inherit', textDecoration: 'none' }}>
+                {PUBLIC_APP_URL}/r/{site.slug}
+              </a>
+            </div>
+            <div style={styles.shareRow}>
+              <button
+                style={styles.btnOutline}
+                aria-label="Copia il link di registrazione"
+                onClick={copyLink}
+              >
+                <Copy size={14} /> Copia link
+              </button>
+              <button
+                style={styles.btnOutline}
+                aria-label="Apri il sito di registrazione in una nuova scheda"
+                onClick={() => window.open(`${PUBLIC_APP_URL}/r/${site.slug}`, '_blank', 'noopener,noreferrer')}
+              >
+                <ExternalLink size={14} /> Apri sito
+              </button>
+              <button
+                style={styles.btnOutline}
+                aria-label="Invia il link di registrazione via email"
+                onClick={() => {
+                  const subject = encodeURIComponent(`Iscrizione: ${site.title}`)
+                  const body = encodeURIComponent(`Ciao,\n\nPuoi iscriverti a "${site.title}" al seguente link:\n${PUBLIC_APP_URL}/r/${site.slug}\n\nA presto!`)
+                  window.open(`mailto:?subject=${subject}&body=${body}`, '_self')
+                }}
+              >
+                <Mail size={14} /> Invia via email
+              </button>
+              <button
+                style={styles.btnOutline}
+                aria-label="Condividi il link di registrazione su WhatsApp"
+                onClick={() => {
+                  const text = encodeURIComponent(`Ciao! Iscriviti a "${site.title}" qui: ${PUBLIC_APP_URL}/r/${site.slug}`)
+                  window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer')
+                }}
+              >
+                <MessageCircle size={14} /> Condividi su WhatsApp
+              </button>
+            </div>
+          </>
         )}
 
         <div style={styles.infoGrid}>
@@ -723,8 +757,14 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 12px',
     background: 'var(--panel)',
     borderRadius: 8,
-    marginBottom: 16,
+    marginBottom: 12,
   },
+  shareRow: {
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    gap: 8,
+    marginBottom: 16,
+  } as React.CSSProperties,
   infoGrid: {
     display: 'flex',
     flexDirection: 'column',
