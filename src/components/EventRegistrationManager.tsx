@@ -14,6 +14,10 @@ import {
 import RegistrationFieldsManager from '@/components/RegistrationFieldsManager'
 import RegistrationParticipantsManager from '@/components/RegistrationParticipantsManager'
 
+const PUBLIC_APP_URL =
+  (import.meta.env.VITE_PUBLIC_APP_URL || 'https://simmetriasynergy.netlify.app')
+    .replace(/\/+$/, '')
+
 interface Props {
   eventId: string
   eventName: string
@@ -280,7 +284,7 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
 
   const copyLink = () => {
     if (!site) return
-    const url = `${window.location.origin}/r/${site.slug}`
+    const url = `${PUBLIC_APP_URL}/r/${site.slug}`
     navigator.clipboard.writeText(url).then(
       () => showToast('Link copiato negli appunti', 'success'),
       () => showToast('Impossibile copiare il link', 'error'),
@@ -350,9 +354,9 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
         {site.status === 'published' && (
           <div style={styles.publicPath}>
             <Globe size={14} style={{ color: 'var(--green)' }} />
-            <span style={{ fontFamily: 'var(--font-code)', fontSize: 13 }}>
-              /r/{site.slug}
-            </span>
+            <a href={`${PUBLIC_APP_URL}/r/${site.slug}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--font-code)', fontSize: 13, color: 'inherit', textDecoration: 'none' }}>
+              {PUBLIC_APP_URL}/r/{site.slug}
+            </a>
           </div>
         )}
 
