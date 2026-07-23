@@ -56,6 +56,18 @@ const emptyForm: FormState = {
   hero_image_url: '',
 }
 
+function localToUtc(value: string): string | null {
+  if (!value) return null
+  return new Date(value).toISOString()
+}
+
+function utcToLocal(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 16)
+}
+
 function siteToForm(site: RegistrationSite): FormState {
   return {
     title: site.title ?? '',
@@ -67,8 +79,8 @@ function siteToForm(site: RegistrationSite): FormState {
     confirmation_message: site.confirmation_message ?? '',
     capacity: site.capacity != null ? String(site.capacity) : '',
     waitlist_enabled: site.waitlist_enabled ?? false,
-    opens_at: site.opens_at ? site.opens_at.slice(0, 16) : '',
-    closes_at: site.closes_at ? site.closes_at.slice(0, 16) : '',
+    opens_at: utcToLocal(site.opens_at),
+    closes_at: utcToLocal(site.closes_at),
     logo_url: site.logo_url ?? '',
     hero_image_url: site.hero_image_url ?? '',
   }
@@ -85,8 +97,8 @@ function formToPayload(form: FormState): RegistrationSiteUpdate {
     confirmation_message: form.confirmation_message.trim() || null,
     capacity: form.capacity ? parseInt(form.capacity, 10) : null,
     waitlist_enabled: form.waitlist_enabled,
-    opens_at: form.opens_at || null,
-    closes_at: form.closes_at || null,
+    opens_at: localToUtc(form.opens_at),
+    closes_at: localToUtc(form.closes_at),
     logo_url: form.logo_url.trim() || null,
     hero_image_url: form.hero_image_url.trim() || null,
   }
