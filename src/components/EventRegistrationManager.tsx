@@ -21,6 +21,30 @@ const PUBLIC_APP_URL =
   (import.meta.env.VITE_PUBLIC_APP_URL || 'https://simmetriasynergy.netlify.app')
     .replace(/\/+$/, '')
 
+const THEME_DEFAULTS = {
+  primary_color: '#2563EB',
+  background_color: '#F9FAFB',
+  text_color: '#1F2937',
+}
+
+interface ThemeColors {
+  primary_color: string
+  background_color: string
+  text_color: string
+}
+
+function isValidHex(v: string): boolean {
+  return /^#[0-9A-Fa-f]{6}$/.test(v)
+}
+
+function readThemeColors(theme: Record<string, unknown> | null | undefined): ThemeColors {
+  return {
+    primary_color: typeof theme?.primary_color === 'string' && isValidHex(theme.primary_color) ? theme.primary_color : THEME_DEFAULTS.primary_color,
+    background_color: typeof theme?.background_color === 'string' && isValidHex(theme.background_color) ? theme.background_color : THEME_DEFAULTS.background_color,
+    text_color: typeof theme?.text_color === 'string' && isValidHex(theme.text_color) ? theme.text_color : THEME_DEFAULTS.text_color,
+  }
+}
+
 interface Props {
   eventId: string
   eventName: string
@@ -134,6 +158,43 @@ function validateForPublish(form: FormState): string | null {
     return 'La data di chiusura deve essere successiva a quella di apertura.'
   }
   return null
+}
+
+// ─── Color Control ─────────────────────────────────────────────────────────
+
+function ColorControl({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [text, setText] = useState(value)
+  useEffect(() => { setText(value) }, [value])
+
+  const commitText = (v: string) => {
+    const normalized = v.startsWith('#') ? v : `#${v}`
+    if (isValidHex(normalized)) onChange(normalized)
+    else setText(value)
+  }
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 6 }}>{label}</label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <input
+          type="color"
+          value={value}
+          onChange={e => { onChange(e.target.value); setText(e.target.value) }}
+          style={{ width: 44, height: 44, border: '1px solid #d1d5db', borderRadius: 6, padding: 2, cursor: 'pointer' }}
+        />
+        <input
+          type="text"
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onBlur={e => commitText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') commitText((e.target as HTMLInputElement).value) }}
+          maxLength={7}
+          placeholder="#000000"
+          style={{ height: 44, width: 100, fontSize: 14, padding: '0 10px', border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'monospace' }}
+        />
+      </div>
+    </div>
+  )
 }
 
 // ─── Asset Upload Control ──────────────────────────────────────────────────
@@ -251,6 +312,8 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [fieldsOpen, setFieldsOpen] = useState(false)
   const [uploadingAsset, setUploadingAsset] = useState<RegistrationAssetType | null>(null)
+  const [themeOpen, setThemeOpen] = useState(false)
+  const [themeColors, setThemeColors] = useState<ThemeColors>(THEME_DEFAULTS)
 
   const readOnly = isArchived || !canManage
 
@@ -264,9 +327,11 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
       if (sites.length > 0) {
         setSite(sites[0])
         setForm(siteToForm(sites[0]))
+        setThemeColors(readThemeColors(sites[0].theme))
       } else {
         setSite(null)
         setForm(emptyForm)
+        setThemeColors(THEME_DEFAULTS)
       }
     } catch (err: any) {
       showToast(err.message || 'Errore caricamento', 'error')
@@ -331,6 +396,8 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
     setSaving(true)
     try {
       const payload = formToPayload(normalizedForm)
+      const existingTheme = (site?.theme ?? {}) as Record<string, unknown>
+      payload.theme = { ...existingTheme, ...themeColors }
       if (publish) {
         payload.status = 'published'
         if (!site?.published_at) payload.published_at = new Date().toISOString()
@@ -711,6 +778,34 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
             onChange={handleSlugChange}
             hint="Indirizzo breve della pagina. Min. 3 caratteri, solo lettere minuscole, numeri e trattini."
           />
+        </div>
+      </CollapsibleSection>
+
+      {/* THEME / COLORS */}
+      <CollapsibleSection
+        title="Colori e stile"
+        open={themeOpen}
+        onToggle={() => setThemeOpen(o => !o)}
+      >
+        <div style={styles.formSection}>
+          <ColorControl label="Colore principale" value={themeColors.primary_color} onChange={v => setThemeColors(prev => ({ ...prev, primary_color: v }))} />
+          <ColorControl label="Colore di sfondo" value={themeColors.background_color} onChange={v => setThemeColors(prev => ({ ...prev, background_color: v }))} />
+          <ColorControl label="Colore del testo" value={themeColors.text_color} onChange={v => setThemeColors(prev => ({ ...prev, text_color: v }))} />
+
+          <div style={{ marginTop: 12, padding: 16, borderRadius: 8, border: '1px solid #e5e7eb', backgroundColor: themeColors.background_color }}>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: themeColors.text_color }}>Anteprima</p>
+            <p style={{ margin: '8px 0 12px', fontSize: 14, color: themeColors.text_color }}>Questo è un testo di esempio per la pagina di registrazione.</p>
+            <span style={{ display: 'inline-block', padding: '10px 20px', fontSize: 14, fontWeight: 500, borderRadius: 6, backgroundColor: themeColors.primary_color, color: '#fff' }}>Registrati ora</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setThemeColors(THEME_DEFAULTS)}
+            style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, height: 44, padding: '0 16px', fontSize: 14, borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+          >
+            <RotateCcw size={14} />
+            Ripristina colori predefiniti
+          </button>
         </div>
       </CollapsibleSection>
 
