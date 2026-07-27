@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Globe, Copy, Trash2, Save, Send, RotateCcw, XCircle, Eye, Lock, ChevronDown, ChevronRight, ExternalLink, Mail, MessageCircle } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Globe, Copy, Trash2, Save, Send, RotateCcw, XCircle, Eye, Lock, ChevronDown, ChevronRight, ExternalLink, Mail, MessageCircle, Upload, X } from 'lucide-react'
 import { useToast } from '@/lib/toast'
 import {
   fetchRegistrationSites,
@@ -10,6 +10,9 @@ import {
   normalizeRegistrationSlug,
   type RegistrationSite,
   type RegistrationSiteUpdate,
+  type RegistrationAssetType,
+  uploadRegistrationAsset,
+  deleteRegistrationAsset,
 } from '@/lib/registration-site-service'
 import RegistrationFieldsManager from '@/components/RegistrationFieldsManager'
 import RegistrationParticipantsManager from '@/components/RegistrationParticipantsManager'
@@ -133,6 +136,104 @@ function validateForPublish(form: FormState): string | null {
   return null
 }
 
+// ─── Asset Upload Control ──────────────────────────────────────────────────
+
+interface AssetUploadControlProps {
+  label: string
+  assetType: RegistrationAssetType
+  currentUrl: string
+  siteId: string | null
+  eventId: string
+  uploading: boolean
+  disabled: boolean
+  previewStyle: 'logo' | 'hero'
+  onUploadStart: () => void
+  onUploadEnd: (publicUrl: string | null) => void
+  onRemove: () => void
+  showToast: (msg: string, type: 'success' | 'error' | 'info') => void
+}
+
+function AssetUploadControl({
+  label, assetType, currentUrl, siteId, eventId,
+  uploading, disabled, previewStyle, onUploadStart, onUploadEnd, onRemove, showToast,
+}: AssetUploadControlProps) {
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (fileRef.current) fileRef.current.value = ''
+    if (!file || !siteId) return
+    onUploadStart()
+    try {
+      const { publicUrl } = await uploadRegistrationAsset(eventId, siteId, assetType, file)
+      onUploadEnd(publicUrl)
+    } catch (err: any) {
+      showToast(err?.message || 'Caricamento non riuscito.', 'error')
+      onUploadEnd(null)
+    }
+  }
+
+  if (!siteId) {
+    return (
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 6 }}>{label}</label>
+        <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>Salva prima la bozza per caricare le immagini.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 6 }}>{label}</label>
+
+      {currentUrl && (
+        <div style={{ marginBottom: 8 }}>
+          {previewStyle === 'logo' ? (
+            <img src={currentUrl} alt="Logo" style={{ maxHeight: 100, maxWidth: '100%', objectFit: 'contain', borderRadius: 6, background: '#f3f4f6' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+          ) : (
+            <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 6, overflow: 'hidden', background: '#f3f4f6' }}>
+              <img src={currentUrl} alt="Hero" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
+        <button
+          type="button"
+          disabled={uploading || disabled}
+          onClick={() => fileRef.current?.click()}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 44, padding: '0 16px', fontSize: 14, borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: uploading || disabled ? 'not-allowed' : 'pointer', opacity: uploading || disabled ? 0.6 : 1 }}
+        >
+          <Upload size={16} />
+          {uploading ? 'Caricamento…' : 'Scegli file'}
+        </button>
+
+        {currentUrl && (
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={uploading || disabled}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 44, padding: '0 16px', fontSize: 14, borderRadius: 6, border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', cursor: uploading || disabled ? 'not-allowed' : 'pointer', opacity: uploading || disabled ? 0.6 : 1 }}
+          >
+            <X size={16} />
+            Rimuovi
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Main Component ────────────────────────────────────────────────────────
+
 export default function EventRegistrationManager({ eventId, eventName, isArchived }: Props) {
   const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
@@ -149,6 +250,7 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [fieldsOpen, setFieldsOpen] = useState(false)
+  const [uploadingAsset, setUploadingAsset] = useState<RegistrationAssetType | null>(null)
 
   const readOnly = isArchived || !canManage
 
@@ -188,6 +290,18 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
 
   const handleSlugChange = (value: string) => {
     setForm(prev => ({ ...prev, slug: normalizeRegistrationSlug(value) }))
+  }
+
+  const tryDeleteStorageAsset = (url: string) => {
+    if (!url) return
+    const marker = '/registration-assets/'
+    const idx = url.indexOf(marker)
+    if (idx === -1) return
+    const objectPath = url.substring(idx + marker.length)
+    if (!objectPath || objectPath.includes('..')) return
+    deleteRegistrationAsset(objectPath).catch(() => {
+      showToast('Immagine rimossa dal sito, ma il file nello storage non è stato eliminato.', 'info')
+    })
   }
 
   const handleSave = async (publish?: boolean) => {
@@ -523,8 +637,74 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
         onToggle={() => setAdvancedOpen(o => !o)}
       >
         <div style={styles.formSection}>
-          <Field label="URL Logo" value={form.logo_url} onChange={v => handleChange('logo_url', v)} placeholder="https://..." />
-          <Field label="URL Immagine Hero" value={form.hero_image_url} onChange={v => handleChange('hero_image_url', v)} placeholder="https://..." />
+          <AssetUploadControl
+            label="Carica logo"
+            assetType="logo"
+            currentUrl={form.logo_url}
+            siteId={site?.id ?? null}
+            eventId={eventId}
+            uploading={uploadingAsset === 'logo'}
+            disabled={!!uploadingAsset}
+            previewStyle="logo"
+            onUploadStart={() => setUploadingAsset('logo')}
+            onUploadEnd={async (publicUrl) => {
+              setUploadingAsset(null)
+              if (publicUrl && site) {
+                try {
+                  const updated = await updateRegistrationSite(site.id, { logo_url: publicUrl })
+                  setSite(updated)
+                  setForm(prev => ({ ...prev, logo_url: publicUrl }))
+                  showToast('Logo caricato con successo', 'success')
+                } catch { showToast('Logo caricato ma salvataggio non riuscito', 'error') }
+              }
+            }}
+            onRemove={async () => {
+              if (!site) return
+              const prevUrl = form.logo_url
+              try {
+                const updated = await updateRegistrationSite(site.id, { logo_url: null })
+                setSite(updated)
+                setForm(prev => ({ ...prev, logo_url: '' }))
+                showToast('Logo rimosso', 'success')
+                tryDeleteStorageAsset(prevUrl)
+              } catch { showToast('Errore durante la rimozione', 'error') }
+            }}
+            showToast={showToast}
+          />
+          <AssetUploadControl
+            label="Carica immagine copertina"
+            assetType="hero"
+            currentUrl={form.hero_image_url}
+            siteId={site?.id ?? null}
+            eventId={eventId}
+            uploading={uploadingAsset === 'hero'}
+            disabled={!!uploadingAsset}
+            previewStyle="hero"
+            onUploadStart={() => setUploadingAsset('hero')}
+            onUploadEnd={async (publicUrl) => {
+              setUploadingAsset(null)
+              if (publicUrl && site) {
+                try {
+                  const updated = await updateRegistrationSite(site.id, { hero_image_url: publicUrl })
+                  setSite(updated)
+                  setForm(prev => ({ ...prev, hero_image_url: publicUrl }))
+                  showToast('Immagine copertina caricata con successo', 'success')
+                } catch { showToast('Immagine caricata ma salvataggio non riuscito', 'error') }
+              }
+            }}
+            onRemove={async () => {
+              if (!site) return
+              const prevUrl = form.hero_image_url
+              try {
+                const updated = await updateRegistrationSite(site.id, { hero_image_url: null })
+                setSite(updated)
+                setForm(prev => ({ ...prev, hero_image_url: '' }))
+                showToast('Immagine copertina rimossa', 'success')
+                tryDeleteStorageAsset(prevUrl)
+              } catch { showToast('Errore durante la rimozione', 'error') }
+            }}
+            showToast={showToast}
+          />
           <Field
             label="Slug"
             value={form.slug}
