@@ -89,6 +89,35 @@ export async function fetchPublicRegistrationSite(slug: string): Promise<PublicR
   return data as unknown as PublicRegistrationSite
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export type EmailDeliveryStatus = 'sent' | 'already_sent' | 'processing' | 'failed'
+
+export async function sendRegistrationConfirmationEmail(
+  registrationId: string,
+  qrToken: string
+): Promise<EmailDeliveryStatus> {
+  if (!UUID_RE.test(registrationId) || !UUID_RE.test(qrToken)) {
+    return 'failed'
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke('registration-email-worker', {
+      body: { registration_id: registrationId, qr_token: qrToken },
+    })
+
+    if (error) return 'failed'
+
+    const status = data?.status
+    if (status === 'sent' || status === 'already_sent' || status === 'processing') {
+      return status
+    }
+    return 'failed'
+  } catch {
+    return 'failed'
+  }
+}
+
 export async function submitPublicRegistration(input: RegistrationSubmission): Promise<RegistrationResult> {
   const { data, error } = await supabase.rpc('submit_event_registration', {
     p_slug: input.slug,

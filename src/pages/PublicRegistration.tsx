@@ -4,9 +4,11 @@ import { QRCodeSVG } from 'qrcode.react'
 import {
   fetchPublicRegistrationSite,
   submitPublicRegistration,
+  sendRegistrationConfirmationEmail,
   PublicRegistrationSite,
   PublicRegistrationField,
   RegistrationResult,
+  EmailDeliveryStatus,
 } from '@/lib/public-registration-service'
 
 function getThemeColor(site: PublicRegistrationSite, key: string, fallback: string): string {
@@ -160,6 +162,8 @@ export default function PublicRegistration() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<RegistrationResult | null>(null)
+  const [emailState, setEmailState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+  const [emailRetrying, setEmailRetrying] = useState(false)
 
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -260,11 +264,33 @@ export default function PublicRegistration() {
         honeypot: honeypot || null,
       })
       setResult(res)
+      if (res.registration_id && res.qr_token) {
+        fireEmail(res.registration_id, res.qr_token)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Si è verificato un errore. Riprovare più tardi.')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function fireEmail(regId: string, qrTk: string) {
+    setEmailState('sending')
+    const status: EmailDeliveryStatus = await sendRegistrationConfirmationEmail(regId, qrTk)
+    if (status === 'sent' || status === 'already_sent') {
+      setEmailState('sent')
+    } else if (status === 'processing') {
+      setEmailState('sent')
+    } else {
+      setEmailState('failed')
+    }
+  }
+
+  async function handleRetryEmail() {
+    if (emailRetrying || !result?.registration_id || !result?.qr_token) return
+    setEmailRetrying(true)
+    await fireEmail(result.registration_id, result.qr_token)
+    setEmailRetrying(false)
   }
 
   if (loading) {
@@ -370,6 +396,32 @@ export default function PublicRegistration() {
               Riceverai conferma prima di poter accedere all'evento.
             </p>
           ) : null}
+
+          {emailState === 'sending' && (
+            <p className="pr-muted text-sm mt-4 flex items-center justify-center gap-2">
+              <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+              Invio email di conferma...
+            </p>
+          )}
+          {emailState === 'sent' && (
+            <p className="text-sm mt-4" style={{ color: '#16a34a' }}>Email di conferma inviata.</p>
+          )}
+          {emailState === 'failed' && (
+            <div className="mt-4 space-y-2">
+              <p className="text-sm" style={{ color: '#b45309' }}>
+                Registrazione completata, ma non è stato possibile inviare l'email.
+              </p>
+              <button
+                type="button"
+                disabled={emailRetrying}
+                onClick={handleRetryEmail}
+                className="pr-btn-primary inline-flex items-center justify-center rounded-lg text-sm font-medium transition-opacity print-hidden"
+                style={{ height: '44px', paddingLeft: '20px', paddingRight: '20px' }}
+              >
+                {emailRetrying ? 'Invio in corso...' : 'Riprova invio email'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     )
