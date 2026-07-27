@@ -28,17 +28,17 @@ function DynamicField({
 }) {
   const id = `field-${field.field_key}`
   const baseInput =
-    'w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors'
+    'pr-input w-full rounded-lg border border-gray-300 px-4 py-3 text-sm transition-colors'
 
   const label = (
-    <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">
+    <label htmlFor={id} className="pr-label block text-sm font-medium mb-1">
       {field.label}
       {field.required && <span className="text-red-500 ml-1">*</span>}
     </label>
   )
 
   const helpText = field.help_text ? (
-    <p className="mt-1 text-xs text-gray-500">{field.help_text}</p>
+    <p className="mt-1 text-xs pr-muted">{field.help_text}</p>
   ) : null
 
   if (field.field_type === 'checkbox') {
@@ -49,10 +49,10 @@ function DynamicField({
           id={id}
           checked={value === true}
           onChange={(e) => onChange(field.field_key, e.target.checked)}
-          className="mt-1 h-4 w-4 rounded border-gray-300"
+          className="pr-checkbox mt-1 h-4 w-4 rounded border-gray-300"
         />
         <div>
-          <label htmlFor={id} className="text-sm text-gray-700">
+          <label htmlFor={id} className="pr-label text-sm">
             {field.label}
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </label>
@@ -270,11 +270,25 @@ export default function PublicRegistration() {
   const bgColor = getThemeColor(site, 'background_color', '#f9fafb')
   const textColor = getThemeColor(site, 'text_color', '#1f2937')
 
+  const themeStyle = `
+    .pr-page { --pr-primary: ${primaryColor}; --pr-bg: ${bgColor}; --pr-text: ${textColor}; }
+    .pr-page { background-color: var(--pr-bg); color: var(--pr-text); }
+    .pr-page h1, .pr-page h2 { color: var(--pr-text); }
+    .pr-page .pr-muted { color: color-mix(in srgb, var(--pr-text) 70%, transparent); }
+    .pr-page .pr-label { color: var(--pr-text); }
+    .pr-page a.pr-link { color: var(--pr-primary); }
+    .pr-page .pr-input:focus { outline: none; box-shadow: 0 0 0 2px var(--pr-primary), 0 0 0 4px color-mix(in srgb, var(--pr-primary) 25%, transparent); border-color: var(--pr-primary); }
+    .pr-page .pr-btn-primary { background-color: var(--pr-primary); color: #fff; }
+    .pr-page .pr-btn-primary:hover { opacity: 0.9; }
+    .pr-page .pr-btn-primary:disabled { opacity: 0.5; }
+    .pr-page .pr-checkbox:checked { accent-color: var(--pr-primary); }
+  `
+
   if (result) {
     const isWaitlist = result.registration_status === 'waitlist'
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12" style={{ backgroundColor: bgColor }}>
-        <style>{`
+      <div className="pr-page min-h-screen flex items-center justify-center px-4 py-12">
+        <style>{themeStyle}{`
         @media print {
           body { font-size: 14px; }
           .print-hidden { display: none !important; }
@@ -293,11 +307,11 @@ export default function PublicRegistration() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold mb-2" style={{ color: textColor }}>
+          <h1 className="text-2xl font-bold mb-2">
             {isWaitlist ? 'Inserimento in lista d\'attesa' : 'Registrazione confermata'}
           </h1>
           {result.confirmation_message && (
-            <p className="text-gray-600 mt-4 text-sm leading-relaxed">{result.confirmation_message}</p>
+            <p className="pr-muted mt-4 text-sm leading-relaxed">{result.confirmation_message}</p>
           )}
 
           {!isWaitlist && result.registration_status === 'confirmed' && result.qr_token && result.qr_token.trim() !== '' ? (
@@ -312,20 +326,19 @@ export default function PublicRegistration() {
                   title="Codice QR di accesso all'evento"
                 />
               </div>
-              <p className="text-gray-600 text-sm mt-4" style={{ minHeight: '1.25rem' }}>
+              <p className="pr-muted text-sm mt-4" style={{ minHeight: '1.25rem' }}>
                 Conserva questo codice e presentalo all'ingresso.
               </p>
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90 print-hidden"
-                style={{ backgroundColor: primaryColor }}
+                className="pr-btn-primary mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-opacity print-hidden"
               >
                 Stampa o salva QR
               </button>
             </div>
           ) : isWaitlist ? (
-            <p className="text-gray-600 text-sm mt-4">
+            <p className="pr-muted text-sm mt-4">
               Riceverai conferma prima di poter accedere all'evento.
             </p>
           ) : null}
@@ -335,7 +348,8 @@ export default function PublicRegistration() {
   }
 
   return (
-    <div className="min-h-screen py-8 px-4" style={{ backgroundColor: bgColor, color: textColor }}>
+    <div className="pr-page min-h-screen py-8 px-4">
+      <style>{themeStyle}</style>
       {site.hero_image_url && (
         <div className="max-w-3xl mx-auto mb-6 rounded-2xl overflow-hidden shadow-md">
           <img
@@ -352,8 +366,8 @@ export default function PublicRegistration() {
             <img src={site.logo_url} alt="" className="h-12 mx-auto mb-4 object-contain" />
           )}
           <h1 className="text-2xl sm:text-3xl font-bold">{site.title}</h1>
-          {site.subtitle && <p className="text-lg text-gray-600 mt-2">{site.subtitle}</p>}
-          {site.description && <p className="text-sm text-gray-500 mt-3 leading-relaxed">{site.description}</p>}
+          {site.subtitle && <p className="pr-muted text-lg mt-2">{site.subtitle}</p>}
+          {site.description && <p className="pr-muted text-sm mt-3 leading-relaxed">{site.description}</p>}
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 space-y-5">
@@ -365,7 +379,7 @@ export default function PublicRegistration() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="firstName" className="pr-label block text-sm font-medium mb-1">
                 Nome <span className="text-red-500">*</span>
               </label>
               <input
@@ -373,12 +387,11 @@ export default function PublicRegistration() {
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors"
-                style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
+                className="pr-input w-full rounded-lg border border-gray-300 px-4 py-3 text-sm transition-colors"
               />
             </div>
             <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="lastName" className="pr-label block text-sm font-medium mb-1">
                 Cognome <span className="text-red-500">*</span>
               </label>
               <input
@@ -386,13 +399,13 @@ export default function PublicRegistration() {
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors"
+                className="pr-input w-full rounded-lg border border-gray-300 px-4 py-3 text-sm transition-colors"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="email" className="pr-label block text-sm font-medium mb-1">
               Email <span className="text-red-500">*</span>
             </label>
             <input
@@ -400,63 +413,63 @@ export default function PublicRegistration() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors"
+              className="pr-input w-full rounded-lg border border-gray-300 px-4 py-3 text-sm transition-colors"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Telefono</label>
+              <label htmlFor="phone" className="pr-label block text-sm font-medium mb-1">Telefono</label>
               <input
                 id="phone"
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors"
+                className="pr-input w-full rounded-lg border border-gray-300 px-4 py-3 text-sm transition-colors"
               />
             </div>
             <div>
-              <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-1">Azienda</label>
+              <label htmlFor="company" className="pr-label block text-sm font-medium mb-1">Azienda</label>
               <input
                 id="company"
                 type="text"
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors"
+                className="pr-input w-full rounded-lg border border-gray-300 px-4 py-3 text-sm transition-colors"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-700 mb-1">Ruolo</label>
+            <label htmlFor="jobTitle" className="pr-label block text-sm font-medium mb-1">Ruolo</label>
             <input
               id="jobTitle"
               type="text"
               value={jobTitle}
               onChange={(e) => setJobTitle(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors"
+              className="pr-input w-full rounded-lg border border-gray-300 px-4 py-3 text-sm transition-colors"
             />
           </div>
 
           <div>
-            <label htmlFor="dietary" className="block text-sm font-medium text-gray-700 mb-1">Esigenze alimentari</label>
+            <label htmlFor="dietary" className="pr-label block text-sm font-medium mb-1">Esigenze alimentari</label>
             <input
               id="dietary"
               type="text"
               value={dietary}
               onChange={(e) => setDietary(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors"
+              className="pr-input w-full rounded-lg border border-gray-300 px-4 py-3 text-sm transition-colors"
             />
           </div>
 
           <div>
-            <label htmlFor="accessibility" className="block text-sm font-medium text-gray-700 mb-1">Requisiti di accessibilità</label>
+            <label htmlFor="accessibility" className="pr-label block text-sm font-medium mb-1">Requisiti di accessibilità</label>
             <input
               id="accessibility"
               type="text"
               value={accessibility}
               onChange={(e) => setAccessibility(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors"
+              className="pr-input w-full rounded-lg border border-gray-300 px-4 py-3 text-sm transition-colors"
             />
           </div>
 
@@ -482,9 +495,9 @@ export default function PublicRegistration() {
                 id="privacy"
                 checked={privacyAccepted}
                 onChange={(e) => setPrivacyAccepted(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-gray-300"
+                className="pr-checkbox mt-1 h-4 w-4 rounded border-gray-300"
               />
-              <label htmlFor="privacy" className="text-sm text-gray-700">
+              <label htmlFor="privacy" className="pr-label text-sm">
                 {site.privacy_text || 'Accetto l\'informativa sulla privacy'} <span className="text-red-500">*</span>
                 {site.privacy_url && (
                   <>
@@ -493,8 +506,7 @@ export default function PublicRegistration() {
                       href={site.privacy_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="underline"
-                      style={{ color: primaryColor }}
+                      className="pr-link underline"
                     >
                       Leggi informativa
                     </a>
@@ -509,9 +521,9 @@ export default function PublicRegistration() {
                 id="marketing"
                 checked={marketingConsent}
                 onChange={(e) => setMarketingConsent(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-gray-300"
+                className="pr-checkbox mt-1 h-4 w-4 rounded border-gray-300"
               />
-              <label htmlFor="marketing" className="text-sm text-gray-700">
+              <label htmlFor="marketing" className="pr-label text-sm">
                 Acconsento a ricevere comunicazioni di marketing
               </label>
             </div>
@@ -532,8 +544,7 @@ export default function PublicRegistration() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-3 px-6 rounded-lg text-white font-semibold text-sm transition-opacity disabled:opacity-50"
-            style={{ backgroundColor: primaryColor }}
+            className="pr-btn-primary w-full py-3 px-6 rounded-lg font-semibold text-sm transition-opacity"
           >
             {submitting ? 'Invio in corso...' : 'Registrati'}
           </button>
