@@ -45,6 +45,42 @@ function readThemeColors(theme: Record<string, unknown> | null | undefined): The
   }
 }
 
+const CONTENT_KEYS = ['event_info', 'program', 'venue', 'instructions', 'contacts'] as const
+type ContentKey = typeof CONTENT_KEYS[number]
+
+const CONTENT_DEFAULTS: ContentFields = {
+  event_info: '',
+  program: '',
+  venue: '',
+  instructions: '',
+  contacts: '',
+}
+
+interface ContentFields {
+  event_info: string
+  program: string
+  venue: string
+  instructions: string
+  contacts: string
+}
+
+const CONTENT_LABELS: Record<ContentKey, { label: string; helper: string }> = {
+  event_info: { label: 'Informazioni sull\'evento', helper: 'Descrivi brevemente l\'evento: tema, obiettivi, destinatari.' },
+  program: { label: 'Programma', helper: 'Elenca orari e attività previste.' },
+  venue: { label: 'Luogo', helper: 'Indirizzo, nome della struttura e indicazioni per raggiungerla.' },
+  instructions: { label: 'Indicazioni operative', helper: 'Cosa portare, dress code, parcheggio, accredito e altre info utili.' },
+  contacts: { label: 'Contatti', helper: 'Email, telefono o referenti per assistenza.' },
+}
+
+function readContentFields(content: Record<string, unknown> | null | undefined): ContentFields {
+  const result = { ...CONTENT_DEFAULTS }
+  if (!content) return result
+  for (const key of CONTENT_KEYS) {
+    if (typeof content[key] === 'string') result[key] = content[key] as string
+  }
+  return result
+}
+
 interface Props {
   eventId: string
   eventName: string
@@ -314,6 +350,8 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
   const [uploadingAsset, setUploadingAsset] = useState<RegistrationAssetType | null>(null)
   const [themeOpen, setThemeOpen] = useState(false)
   const [themeColors, setThemeColors] = useState<ThemeColors>(THEME_DEFAULTS)
+  const [contentOpen, setContentOpen] = useState(false)
+  const [contentFields, setContentFields] = useState<ContentFields>(CONTENT_DEFAULTS)
 
   const readOnly = isArchived || !canManage
 
@@ -328,10 +366,12 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
         setSite(sites[0])
         setForm(siteToForm(sites[0]))
         setThemeColors(readThemeColors(sites[0].theme))
+        setContentFields(readContentFields(sites[0].content))
       } else {
         setSite(null)
         setForm(emptyForm)
         setThemeColors(THEME_DEFAULTS)
+        setContentFields(CONTENT_DEFAULTS)
       }
     } catch (err: any) {
       showToast(err.message || 'Errore caricamento', 'error')
@@ -398,6 +438,16 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
       const payload = formToPayload(normalizedForm)
       const existingTheme = (site?.theme ?? {}) as Record<string, unknown>
       payload.theme = { ...existingTheme, ...themeColors }
+      const existingContent = (site?.content ?? {}) as Record<string, unknown>
+      const trimmedContent: Record<string, string> = {}
+      for (const key of CONTENT_KEYS) {
+        const v = contentFields[key].trim()
+        if (v) trimmedContent[key] = v
+      }
+      payload.content = { ...existingContent, ...trimmedContent }
+      for (const key of CONTENT_KEYS) {
+        if (!trimmedContent[key]) delete (payload.content as Record<string, unknown>)[key]
+      }
       if (publish) {
         payload.status = 'published'
         if (!site?.published_at) payload.published_at = new Date().toISOString()
@@ -806,6 +856,35 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
             <RotateCcw size={14} />
             Ripristina colori predefiniti
           </button>
+        </div>
+      </CollapsibleSection>
+
+      {/* CONTENT SECTIONS */}
+      <CollapsibleSection
+        title="Contenuti del sito"
+        open={contentOpen}
+        onToggle={() => setContentOpen(o => !o)}
+      >
+        <div style={styles.formSection}>
+          {CONTENT_KEYS.map(key => (
+            <div key={key} style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
+                {CONTENT_LABELS[key].label}
+              </label>
+              <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 6px' }}>{CONTENT_LABELS[key].helper}</p>
+              <textarea
+                value={contentFields[key]}
+                onChange={e => {
+                  const v = e.target.value
+                  if (v.length <= 5000) setContentFields(prev => ({ ...prev, [key]: v }))
+                }}
+                maxLength={5000}
+                rows={4}
+                style={{ width: '100%', minHeight: 44, fontSize: 14, padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 6, resize: 'vertical', fontFamily: 'inherit' }}
+              />
+              <span style={{ fontSize: 11, color: '#9ca3af' }}>{contentFields[key].length}/5000</span>
+            </div>
+          ))}
         </div>
       </CollapsibleSection>
 

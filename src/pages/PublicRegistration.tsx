@@ -125,6 +125,34 @@ function DynamicField({
   )
 }
 
+const PUBLIC_CONTENT_LABELS: Record<string, string> = {
+  event_info: 'Informazioni sull\'evento',
+  program: 'Programma',
+  venue: 'Luogo',
+  instructions: 'Indicazioni operative',
+  contacts: 'Contatti',
+}
+
+const PUBLIC_CONTENT_KEYS = ['event_info', 'program', 'venue', 'instructions', 'contacts'] as const
+
+function ContentSections({ content }: { content: Record<string, unknown> | null }) {
+  if (!content) return null
+  const sections = PUBLIC_CONTENT_KEYS
+    .filter(k => typeof content[k] === 'string' && (content[k] as string).trim().length > 0)
+    .map(k => ({ key: k, label: PUBLIC_CONTENT_LABELS[k], text: content[k] as string }))
+  if (sections.length === 0) return null
+  return (
+    <div className="space-y-4">
+      {sections.map(s => (
+        <div key={s.key} className="bg-white rounded-xl shadow-sm p-5 sm:p-6 overflow-hidden">
+          <h2 className="text-base font-semibold mb-2">{s.label}</h2>
+          <p className="pr-muted text-sm leading-relaxed" style={{ whiteSpace: 'pre-line', overflowWrap: 'break-word' }}>{s.text}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function PublicRegistration() {
   const { slug } = useParams<{ slug: string }>()
   const [site, setSite] = useState<PublicRegistrationSite | null>(null)
@@ -369,6 +397,9 @@ export default function PublicRegistration() {
           {site.subtitle && <p className="pr-muted text-lg mt-2">{site.subtitle}</p>}
           {site.description && <p className="pr-muted text-sm mt-3 leading-relaxed">{site.description}</p>}
         </div>
+
+        {/* Content sections */}
+        <ContentSections content={site.content} />
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 space-y-5">
           {(error || validationError) && (
