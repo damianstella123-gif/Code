@@ -9,7 +9,8 @@ export type RegistrationEmailBlockType =
   | "button"
   | "divider"
   | "contacts"
-  | "footer";
+  | "footer"
+  | "qr_code";
 
 const ALLOWED_BLOCK_TYPES: ReadonlySet<string> = new Set<RegistrationEmailBlockType>([
   "logo",
@@ -21,6 +22,7 @@ const ALLOWED_BLOCK_TYPES: ReadonlySet<string> = new Set<RegistrationEmailBlockT
   "divider",
   "contacts",
   "footer",
+  "qr_code",
 ]);
 
 export type RegistrationEmailVariableKey =
@@ -69,6 +71,36 @@ export interface RegistrationEmailBlock {
   visible: boolean;
   content: Record<string, unknown>;
 }
+
+export interface RegistrationQrDesign {
+  foreground_color: string;
+  background_color: string;
+  size: number;
+  show_frame: boolean;
+  frame_text: string;
+  logo_url: string | null;
+  logo_scale: number;
+  error_correction: "H";
+  dot_style: "square" | "rounded" | "dots";
+  corner_square_style: "square" | "dot" | "extra_rounded";
+  corner_dot_style: "square" | "dot";
+  quiet_zone: number;
+}
+
+const DEFAULT_QR_DESIGN: RegistrationQrDesign = {
+  foreground_color: "#111827",
+  background_color: "#FFFFFF",
+  size: 220,
+  show_frame: true,
+  frame_text: "Mostra questo QR al check-in",
+  logo_url: null,
+  logo_scale: 0.15,
+  error_correction: "H",
+  dot_style: "rounded",
+  corner_square_style: "extra_rounded",
+  corner_dot_style: "dot",
+  quiet_zone: 4,
+};
 
 export interface RegistrationEmailDesign {
   theme: RegistrationEmailTheme;
@@ -173,6 +205,106 @@ function validateTheme(t: unknown, errors: string[]): void {
   }
 }
 
+const QR_DOT_STYLES = new Set(["square", "rounded", "dots"]);
+const QR_CORNER_SQUARE_STYLES = new Set(["square", "dot", "extra_rounded"]);
+const QR_CORNER_DOT_STYLES = new Set(["square", "dot"]);
+
+const QR_FORBIDDEN_KEYS = new Set([
+  "qr_token", "token", "content", "data", "value", "svg", "path",
+  "html", "css", "script", "style", "draw", "render",
+]);
+
+const QR_DATA_PATTERN =
+  /data\s*:|javascript\s*:|<\s*(?:svg|path|script|style|img)\b/i;
+
+function luminance(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const srgb = [r, g, b].map((c) =>
+    c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  );
+  return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+}
+
+function contrastRatio(c1: string, c2: string): number {
+  const l1 = luminance(c1);
+  const l2 = luminance(c2);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function validateQrDesign(c: Record<string, unknown>, prefix: string, errors: string[]): void {
+  for (const key of Object.keys(c)) {
+    if (QR_FORBIDDEN_KEYS.has(key)) {
+      errors.push(`${prefix}: chiave "${key}" non consentita.`);
+      return;
+    }
+  }
+  for (const val of Object.values(c)) {
+    if (isStr(val) && QR_DATA_PATTERN.test(val)) {
+      errors.push(`${prefix}: contenuto non consentito.`);
+      return;
+    }
+    if (isStr(val) && hasDangerousContent(val)) {
+      errors.push(`${prefix}: contenuto non consentito.`);
+      return;
+    }
+  }
+
+  if (!isHexColor(c.foreground_color)) {
+    errors.push(`${prefix}: foreground_color deve essere #RRGGBB.`);
+  }
+  if (!isHexColor(c.background_color)) {
+    errors.push(`${prefix}: background_color deve essere #RRGGBB.`);
+  }
+  if (isHexColor(c.foreground_color) && isHexColor(c.background_color)) {
+    if (contrastRatio(c.foreground_color as string, c.background_color as string) < 4.5) {
+      errors.push(`${prefix}: il contrasto tra foreground e background deve essere almeno 4.5:1.`);
+    }
+  }
+
+  if (typeof c.size !== "number" || c.size < 160 || c.size > 320) {
+    errors.push(`${prefix}: size deve essere tra 160 e 320.`);
+  }
+  if (typeof c.show_frame !== "boolean") {
+    errors.push(`${prefix}: show_frame deve essere un booleano.`);
+  }
+  if (!isStr(c.frame_text) || (c.frame_text as string).length > 100) {
+    errors.push(`${prefix}: frame_text deve essere una stringa di massimo 100 caratteri.`);
+  }
+  if (isStr(c.frame_text) && hasDangerousContent(c.frame_text)) {
+    errors.push(`${prefix}: frame_text contiene contenuto non consentito.`);
+  }
+
+  if (c.logo_url !== null) {
+    if (!isHttpsUrl(c.logo_url)) {
+      errors.push(`${prefix}: logo_url deve essere null oppure un URL HTTPS.`);
+    }
+  }
+  if (typeof c.logo_scale !== "number" || c.logo_scale < 0 || c.logo_scale > 0.20) {
+    errors.push(`${prefix}: logo_scale deve essere tra 0 e 0.20.`);
+  }
+
+  if (c.error_correction !== "H") {
+    errors.push(`${prefix}: error_correction deve essere "H".`);
+  }
+  if (!isStr(c.dot_style) || !QR_DOT_STYLES.has(c.dot_style as string)) {
+    errors.push(`${prefix}: dot_style deve essere square, rounded o dots.`);
+  }
+  if (!isStr(c.corner_square_style) || !QR_CORNER_SQUARE_STYLES.has(c.corner_square_style as string)) {
+    errors.push(`${prefix}: corner_square_style deve essere square, dot o extra_rounded.`);
+  }
+  if (!isStr(c.corner_dot_style) || !QR_CORNER_DOT_STYLES.has(c.corner_dot_style as string)) {
+    errors.push(`${prefix}: corner_dot_style deve essere square o dot.`);
+  }
+
+  if (typeof c.quiet_zone !== "number" || !Number.isInteger(c.quiet_zone) || c.quiet_zone < 4 || c.quiet_zone > 8) {
+    errors.push(`${prefix}: quiet_zone deve essere un intero tra 4 e 8.`);
+  }
+}
+
 function validateBlockContent(b: RegistrationEmailBlock, idx: number, errors: string[]): void {
   const c = b.content;
   const prefix = `Blocco ${idx + 1} (${b.type})`;
@@ -199,7 +331,6 @@ function validateBlockContent(b: RegistrationEmailBlock, idx: number, errors: st
       checkStringField(c.text, `${prefix} testo`, 1, 5000, errors);
       break;
     case "event_details":
-      // Accepts optional overrides; rendered from variables
       break;
     case "button":
       checkStringField(c.label, `${prefix} etichetta`, 1, 100, errors);
@@ -217,6 +348,9 @@ function validateBlockContent(b: RegistrationEmailBlock, idx: number, errors: st
       break;
     case "footer":
       checkStringField(c.text, `${prefix} testo`, 0, 2000, errors);
+      break;
+    case "qr_code":
+      validateQrDesign(c, prefix, errors);
       break;
   }
 }
@@ -293,10 +427,6 @@ const ESC_MAP: Record<string, string> = {
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ESC_MAP[c]);
-}
-
-function nl2br(s: string): string {
-  return esc(s).replace(/\n/g, "<br>");
 }
 
 function resolveVar(
@@ -447,6 +577,26 @@ ${html}
 ${html}
 </td></tr>`;
     }
+    case "qr_code": {
+      const qr = { ...DEFAULT_QR_DESIGN, ...c } as RegistrationQrDesign;
+      const imgSize = `${qr.size}px`;
+      const cardBg = esc(qr.background_color);
+      const cardFg = esc(qr.foreground_color);
+      let frameHtml = "";
+      if (qr.show_frame && qr.frame_text) {
+        frameHtml = `<tr><td align="center" style="padding:8px 0 0;font-family:${ff},sans-serif;font-size:12px;color:${cardFg};">
+${esc(qr.frame_text)}
+</td></tr>`;
+      }
+      return `<tr><td align="center" style="padding:16px 32px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background-color:${cardBg};border-radius:${radius};padding:16px;">
+<tr><td align="center">
+<img src="cid:registration-qr" alt="QR Code" width="${qr.size}" height="${qr.size}" style="width:${imgSize};height:${imgSize};display:block;" />
+</td></tr>
+${frameHtml}
+</table>
+</td></tr>`;
+    }
     default:
       return "";
   }
@@ -497,6 +647,9 @@ export function renderRegistrationEmailText(
       case "footer":
         if (isStr(c.text)) parts.push("---\n" + resolveVarPlain(c.text as string, variables));
         break;
+      case "qr_code":
+        parts.push("QR code allegato alla presente email.");
+        break;
       case "divider":
         parts.push("---");
         break;
@@ -504,6 +657,56 @@ export function renderRegistrationEmailText(
   }
 
   return parts.filter(Boolean).join("\n\n") + "\n";
+}
+
+// ── Public: default confirmation design ─────────────────────────────
+
+export function createDefaultConfirmationDesign(): RegistrationEmailDesign {
+  return {
+    theme: { ...DEFAULT_THEME },
+    blocks: [
+      {
+        id: "logo-1",
+        type: "logo",
+        visible: true,
+        content: { image_url: "", alt_text: "Logo" },
+      },
+      {
+        id: "heading-1",
+        type: "heading",
+        visible: true,
+        content: { text: "Registrazione confermata" },
+      },
+      {
+        id: "text-1",
+        type: "text",
+        visible: true,
+        content: {
+          text: "Ciao {{first_name}},\n\nla tua registrazione all'evento {{event_title}} è stata confermata.\nDi seguito trovi i dettagli e il tuo codice QR per l'accesso.",
+        },
+      },
+      {
+        id: "event-details-1",
+        type: "event_details",
+        visible: true,
+        content: {},
+      },
+      {
+        id: "qr-code-1",
+        type: "qr_code",
+        visible: true,
+        content: { ...DEFAULT_QR_DESIGN },
+      },
+      {
+        id: "footer-1",
+        type: "footer",
+        visible: true,
+        content: {
+          text: "Questa email è stata inviata automaticamente. Per informazioni, contatta l'organizzatore dell'evento.",
+        },
+      },
+    ],
+  };
 }
 
 // ── Public: default invitation design ────────────────────────────────
