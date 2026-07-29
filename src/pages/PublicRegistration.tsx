@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
+import { buildBadgeUrl } from '@/lib/badge-qr'
 import {
   fetchPublicRegistrationSite,
   submitPublicRegistration,
@@ -372,7 +373,7 @@ export default function PublicRegistration() {
             <div className="mt-6 print-section">
               <div className="inline-block p-4 bg-white border border-gray-200 rounded-xl">
                 <QRCodeSVG
-                  value={result.qr_token}
+                  value={buildBadgeUrl(result.qr_token)}
                   size={200}
                   level="M"
                   bgColor="#ffffff"

@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Camera, CameraOff, Keyboard, Loader2, AlertCircle, CheckCircle2, ScanLine } from 'lucide-react'
 import { useToast } from '@/lib/toast'
 import { boardTransportParticipantByQr, type TransportOperationResult } from '@/lib/transport-service'
+import { extractQrToken } from '@/lib/badge-qr'
 
 interface Props {
   movementId: string
@@ -109,10 +110,15 @@ export default function TransportBoardingScanner({ movementId, disabled, onBoard
 
   // ─── Scan Handling ──────────────────────────────────────────────────
 
-  const handleScanResult = useCallback(async (token: string) => {
-    if (!token || token === lastScannedRef.current) return
-    lastScannedRef.current = token
+  const handleScanResult = useCallback(async (raw: string) => {
+    if (!raw || raw === lastScannedRef.current) return
+    lastScannedRef.current = raw
+    const token = extractQrToken(raw)
     await stopCamera()
+    if (!token) {
+      if (mountedRef.current) setView({ kind: 'error', message: 'Codice QR non valido.' })
+      return
+    }
     await performBoarding(token)
   }, [stopCamera, movementId])
 
@@ -140,12 +146,17 @@ export default function TransportBoardingScanner({ movementId, disabled, onBoard
   // ─── Manual Input ──────────────────────────────────────────────────
 
   function handleManualSubmit() {
-    const trimmed = manualToken.trim()
-    if (!trimmed || disabled) return
-    lastScannedRef.current = trimmed
+    const raw = manualToken.trim()
+    if (!raw || disabled) return
+    lastScannedRef.current = raw
     setManualToken('')
+    const token = extractQrToken(raw)
     stopCamera()
-    performBoarding(trimmed)
+    if (!token) {
+      if (mountedRef.current) setView({ kind: 'error', message: 'Codice QR non valido.' })
+      return
+    }
+    performBoarding(token)
   }
 
   // ─── Reset ─────────────────────────────────────────────────────────

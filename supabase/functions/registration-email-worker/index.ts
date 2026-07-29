@@ -287,11 +287,16 @@ Deno.serve(async (req: Request) => {
       subject = `Lista d'attesa – ${escapeHtml(site?.title || event?.title || "Evento")}`;
     }
 
-    // Generate QR attachment for confirmed
+    // Generate QR attachment for confirmed — encodes badge URL, not raw token
     const attachments: Array<{ filename: string; content: string }> = [];
     if (template === "registration_confirmed") {
       try {
-        const qrDataUrl: string = await QRCode.toDataURL(reg.qr_token, {
+        const publicAppUrl = (Deno.env.get("PUBLIC_APP_URL") || "https://simmetriasynergy.netlify.app").replace(/\/+$/, "");
+        const badgeUrl = `${publicAppUrl}/badge/${reg.qr_token}`;
+        if (!/^https:\/\/.+\/badge\/[0-9a-f-]+$/i.test(badgeUrl)) {
+          throw new Error("invalid badge URL");
+        }
+        const qrDataUrl: string = await QRCode.toDataURL(badgeUrl, {
           type: "image/png",
           width: 300,
           margin: 2,

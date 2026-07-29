@@ -5,6 +5,7 @@ import {
   undoOnsiteRegistrationCheckIn,
   OnsiteRegistration,
 } from '@/lib/onsite-registration-service'
+import { extractQrToken } from '@/lib/badge-qr'
 
 interface Props {
   eventId: string
@@ -60,10 +61,15 @@ export default function OnsiteQrScanner({ eventId, disabled }: Props) {
     if (disabled && cameraActive) { stopCamera() }
   }, [disabled, cameraActive, stopCamera])
 
-  const handleScanResult = useCallback(async (token: string) => {
-    if (!token || token === lastScannedRef.current) return
-    lastScannedRef.current = token
+  const handleScanResult = useCallback(async (raw: string) => {
+    if (!raw || raw === lastScannedRef.current) return
+    lastScannedRef.current = raw
+    const token = extractQrToken(raw)
     await stopCamera()
+    if (!token) {
+      if (mountedRef.current) setView({ kind: 'error', message: 'Codice QR non valido.' })
+      return
+    }
     await performLookup(token)
   }, [eventId, stopCamera])
 
@@ -120,17 +126,24 @@ export default function OnsiteQrScanner({ eventId, disabled }: Props) {
   }
 
   async function handleManualSubmit() {
-    const trimmed = manualToken.trim()
-    if (!trimmed || disabled) return
-    lastScannedRef.current = trimmed
+    const raw = manualToken.trim()
+    if (!raw || disabled) return
+    lastScannedRef.current = raw
     setManualToken('')
+    const token = extractQrToken(raw)
     await stopCamera()
-    await performLookup(trimmed)
+    if (!token) {
+      if (mountedRef.current) setView({ kind: 'error', message: 'Codice QR non valido.' })
+      return
+    }
+    await performLookup(token)
   }
 
   async function handleCheckIn() {
     if (actionLoading || disabled || view.kind !== 'participant') return
-    const token = lastScannedRef.current
+    const raw = lastScannedRef.current
+    if (!raw) return
+    const token = extractQrToken(raw)
     if (!token) return
     setActionLoading(true)
     try {
