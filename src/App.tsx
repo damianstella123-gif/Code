@@ -28,6 +28,7 @@ const EventTimeline = lazy(() => import('./pages/EventTimeline'))
 const Performance = lazy(() => import('./pages/Performance'))
 const Wellness = lazy(() => import('./pages/Wellness'))
 const PublicRegistration = lazy(() => import('./pages/PublicRegistration'))
+const BadgeProgram = lazy(() => import('./pages/BadgeProgram'))
 
 function PageLoader() {
   return (
@@ -243,6 +244,7 @@ export default function App() {
       <Route path="/change-password" element={<ChangePasswordGuard><ChangePassword /></ChangePasswordGuard>} />
       <Route path="/setup-2fa" element={<Setup2FA />} />
       <Route path="/r/:slug" element={<LazyPage><PublicRegistration /></LazyPage>} />
+      <Route path="/badge/:token" element={<LazyPage><BadgeProgram /></LazyPage>} />
 
       <Route path="/dashboard" element={<AuthGuard><Layout><LazyPage><Dashboard /></LazyPage></Layout></AuthGuard>} />
       <Route path="/oggi" element={<AuthGuard><Layout><LazyPage><Oggi /></LazyPage></Layout></AuthGuard>} />
