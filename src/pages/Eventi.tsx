@@ -11,6 +11,8 @@ import {
   Archive,
   RotateCcw,
   Users,
+  ShieldCheck,
+  Loader2,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { loadTasksFromStorage, cacheEventsSnapshot, loadWorkflowsFromStorage } from '@/lib/storage'
@@ -46,6 +48,11 @@ import { TabDocumenti } from './eventi/tabs/TabDocumenti'
 import { TabComunicazioni } from './eventi/tabs/TabComunicazioni'
 import { TabGreenReport } from './eventi/tabs/TabGreenReport'
 import EventOnsitePanel from '@/components/EventOnsitePanel'
+import { fetchSafetyDossier, activateSafetyDossier } from '@/lib/safety-service'
+import type { SafetyDossierBundle } from '@/lib/safety-service'
+import { fetchEventMembers } from '@/lib/event-members-service'
+import { isAdmin } from '@/lib/auth'
+import { TabSafety } from './eventi/tabs/TabSafety'
 
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 
@@ -139,6 +146,12 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [eventTasks, setEventTasks] = useState<Task[]>([])
   const [showTeamPanel, setShowTeamPanel] = useState(false)
+  const [safetyBundle, setSafetyBundle] = useState<SafetyDossierBundle | null | undefined>(undefined)
+  const [canManageSafety, setCanManageSafety] = useState(false)
+  const [activatingSafety, setActivatingSafety] = useState(false)
+  const [showSafetyConfirm, setShowSafetyConfirm] = useState(false)
+  const currentUser = loadUser()
+  const { showToast } = useToast()
   const navigateRouter = useNavigate()
   const tabsContainerRef = useRef<HTMLDivElement>(null)
 
@@ -147,6 +160,27 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
   }
 
   useEffect(() => { fetchTasksByEvent(event.id).then(setEventTasks) }, [event.id])
+
+  // Safety: check membership permissions and dossier existence
+  const loadSafety = useCallback(async () => {
+    const adminBypass = isAdmin(currentUser)
+    const isResponsabile = currentUser?.id === event.responsabile
+    let hasPermission = adminBypass || isResponsabile
+    if (!hasPermission && currentUser?.id) {
+      const { data: members } = await fetchEventMembers(event.id)
+      const me = members.find(m => m.user_id === currentUser.id)
+      if (me?.can_manage_safety) hasPermission = true
+    }
+    setCanManageSafety(hasPermission)
+    try {
+      const bundle = await fetchSafetyDossier(event.id)
+      setSafetyBundle(bundle)
+    } catch {
+      setSafetyBundle(null)
+    }
+  }, [event.id, currentUser?.id, currentUser?.role, event.responsabile])
+
+  useEffect(() => { loadSafety() }, [loadSafety])
 
   useEffect(() => {
     const handler = (ev: globalThis.Event) => setActiveTab((ev as CustomEvent).detail as TabId)
@@ -178,6 +212,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
     { id: 'registrazioni', label: 'Registrazioni' },
     { id: 'onsite', label: 'On Site' },
     { id: 'green', label: 'Green Report' },
+    ...(safetyBundle ? [{ id: 'safety' as TabId, label: 'Safety & PGE' }] : []),
   ]
 
   const daysEnd = daysLeft(event.dataFine)
@@ -264,6 +299,17 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
                     onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
                   >
                     <Archive className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {canManageSafety && safetyBundle === null && (
+                  <button onClick={() => setShowSafetyConfirm(true)}
+                    title="Attiva Safety & PGE"
+                    disabled={activatingSafety}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s', opacity: activatingSafety ? 0.5 : 1 }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--green)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
                   </button>
                 )}
               </>
@@ -389,6 +435,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
           />
         )}
         {activeTab === 'green' && <TabGreenReport event={event} suppliers={suppliers} />}
+        {activeTab === 'safety' && safetyBundle && <TabSafety event={event} canManage={canManageSafety} />}
       </div>
 
       {showTeamPanel && (
@@ -398,6 +445,67 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
           isArchived={isArchived}
           onClose={() => setShowTeamPanel(false)}
         />
+      )}
+
+      {/* Safety activation confirmation */}
+      {showSafetyConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }}>
+          <div style={{
+            background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 10,
+            padding: 24, maxWidth: 420, width: '100%',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <ShieldCheck className="w-5 h-5" style={{ color: 'var(--green)' }} />
+              <h4 style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+                Attiva Safety & PGE
+              </h4>
+            </div>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Verrà creato un dossier sicurezza per questo evento. Il modulo Safety sarà visibile a tutti i membri del team.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowSafetyConfirm(false)} disabled={activatingSafety}
+                style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 11, padding: '8px 16px',
+                  borderRadius: 6, border: '1px solid var(--line)', background: 'var(--panel)',
+                  color: 'var(--muted)', cursor: 'pointer', minHeight: 44,
+                }}
+              >
+                Annulla
+              </button>
+              <button
+                onClick={async () => {
+                  setActivatingSafety(true)
+                  try {
+                    await activateSafetyDossier(event.id)
+                    showToast('Dossier sicurezza attivato', 'success')
+                    setShowSafetyConfirm(false)
+                    await loadSafety()
+                    setActiveTab('safety')
+                  } catch (e: unknown) {
+                    showToast(e instanceof Error ? e.message : 'Errore durante l\'attivazione.', 'error')
+                  } finally {
+                    setActivatingSafety(false)
+                  }
+                }}
+                disabled={activatingSafety}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  fontFamily: 'var(--font-mono)', fontSize: 11, padding: '8px 16px',
+                  borderRadius: 6, background: 'var(--green)', color: 'white',
+                  border: 'none', cursor: 'pointer', minHeight: 44,
+                  opacity: activatingSafety ? 0.6 : 1,
+                }}
+              >
+                {activatingSafety && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {activatingSafety ? 'Attivazione...' : 'Conferma attivazione'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
