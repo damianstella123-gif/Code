@@ -14,6 +14,7 @@ export interface EventMember {
   can_manage_creative: boolean
   can_manage_registration: boolean
   can_access_onsite: boolean
+  can_manage_safety: boolean
   invited_by: string | null
   created_at: string
   updated_at: string
@@ -27,6 +28,7 @@ export type PermissionKey =
   | 'can_manage_creative'
   | 'can_manage_registration'
   | 'can_access_onsite'
+  | 'can_manage_safety'
 
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_manage_members: 'Gestione team',
@@ -36,6 +38,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_manage_creative: 'Creative Studio',
   can_manage_registration: 'Siti di registrazione',
   can_access_onsite: 'Operatività On Site',
+  can_manage_safety: 'Sicurezza & PGE',
 }
 
 export const ALL_PERMISSIONS: PermissionKey[] = [
@@ -46,6 +49,7 @@ export const ALL_PERMISSIONS: PermissionKey[] = [
   'can_manage_creative',
   'can_manage_registration',
   'can_access_onsite',
+  'can_manage_safety',
 ]
 
 export const ROLE_LABELS: Record<MemberRole, string> = {
@@ -64,6 +68,7 @@ export const ROLE_PRESETS: Record<MemberRole, Record<PermissionKey, boolean>> = 
     can_manage_creative: true,
     can_manage_registration: true,
     can_access_onsite: true,
+    can_manage_safety: false,
   },
   collaboratore: {
     can_manage_members: false,
@@ -73,6 +78,7 @@ export const ROLE_PRESETS: Record<MemberRole, Record<PermissionKey, boolean>> = 
     can_manage_creative: true,
     can_manage_registration: true,
     can_access_onsite: true,
+    can_manage_safety: false,
   },
   operativo: {
     can_manage_members: false,
@@ -82,6 +88,7 @@ export const ROLE_PRESETS: Record<MemberRole, Record<PermissionKey, boolean>> = 
     can_manage_creative: false,
     can_manage_registration: false,
     can_access_onsite: true,
+    can_manage_safety: false,
   },
   sola_lettura: {
     can_manage_members: false,
@@ -91,6 +98,7 @@ export const ROLE_PRESETS: Record<MemberRole, Record<PermissionKey, boolean>> = 
     can_manage_creative: false,
     can_manage_registration: false,
     can_access_onsite: false,
+    can_manage_safety: false,
   },
 }
 
