@@ -29,6 +29,7 @@ const Performance = lazy(() => import('./pages/Performance'))
 const Wellness = lazy(() => import('./pages/Wellness'))
 const PublicRegistration = lazy(() => import('./pages/PublicRegistration'))
 const BadgeProgram = lazy(() => import('./pages/BadgeProgram'))
+const CentroSicurezza = lazy(() => import('./pages/CentroSicurezza'))
 
 function PageLoader() {
   return (
@@ -264,6 +265,7 @@ export default function App() {
       <Route path="/feedback-beta" element={<AuthGuard><Layout><LazyPage><FeedbackBeta /></LazyPage></Layout></AuthGuard>} />
       <Route path="/performance" element={<AuthGuard><Layout><LazyPage><Performance /></LazyPage></Layout></AuthGuard>} />
       <Route path="/wellness" element={<AuthGuard><Layout><LazyPage><Wellness /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/centro-sicurezza" element={<AuthGuard><Layout><LazyPage><CentroSicurezza /></LazyPage></Layout></AuthGuard>} />
       <Route path="/timeline/:eventId" element={<AuthGuard><Layout><LazyPage><EventTimeline /></LazyPage></Layout></AuthGuard>} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
