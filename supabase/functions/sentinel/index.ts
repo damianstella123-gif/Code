@@ -8,11 +8,17 @@ const corsHeaders = {
     "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-function json(data: unknown, status = 200) {
+const ALLOWED_ROLES = ["Admin", "Super Admin"];
+
+function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function errorResponse(status: number) {
+  return jsonResponse({ error: "INTERNAL_ERROR" }, status);
 }
 
 function getServiceClient() {
@@ -35,22 +41,51 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  if (req.method !== "POST") {
+    return jsonResponse({ error: "METHOD_NOT_ALLOWED" }, 405);
+  }
+
+  // --- Authorization: resolve caller identity server-side ---
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return jsonResponse({ error: "UNAUTHORIZED" }, 401);
+  }
+
+  const sb = getServiceClient();
+
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  const { data: { user }, error: authErr } = await sb.auth.getUser(token);
+
+  if (authErr || !user) {
+    return jsonResponse({ error: "UNAUTHORIZED" }, 401);
+  }
+
+  const { data: profile } = await sb
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile || !ALLOWED_ROLES.includes(profile.role)) {
+    return jsonResponse({ error: "FORBIDDEN" }, 403);
+  }
+
+  // --- Run checks ---
   try {
-    const sb = getServiceClient();
     const alerts: CheckResult[] = [];
 
     // a) FLY COSTS — check if costs exceed 5 EUR in last 24h
-    const { data: costData } = await sb.rpc("", {}).maybeSingle(); // fallback to raw query
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: costRows } = await sb
       .from("fly_logs")
       .select("estimated_cost_eur")
-      .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      .gte("created_at", since24h);
 
     if (costRows && costRows.length > 0) {
       const totalCost = costRows.reduce(
         (sum: number, r: { estimated_cost_eur: number | null }) =>
           sum + (r.estimated_cost_eur || 0),
-        0
+        0,
       );
       if (totalCost > 5) {
         alerts.push({
@@ -63,10 +98,11 @@ Deno.serve(async (req: Request) => {
     }
 
     // b) ERROR SPIKE — more than 20 errors in last hour
+    const since1h = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { count: errorCount } = await sb
       .from("error_log")
       .select("*", { count: "exact", head: true })
-      .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
+      .gte("created_at", since1h);
 
     if (errorCount && errorCount > 20) {
       alerts.push({
@@ -81,7 +117,7 @@ Deno.serve(async (req: Request) => {
     const { data: rateLimitRows } = await sb
       .from("fly_rate_limits")
       .select("user_id, count")
-      .gte("window_start", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+      .gte("window_start", since1h)
       .gte("count", 20);
 
     if (rateLimitRows && rateLimitRows.length > 0) {
@@ -118,7 +154,7 @@ Deno.serve(async (req: Request) => {
       .from("fly_logs")
       .select("*", { count: "exact", head: true })
       .eq("outcome", "error")
-      .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
+      .gte("created_at", since1h);
 
     if (flyErrorCount && flyErrorCount > 5) {
       alerts.push({
@@ -129,7 +165,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Insert alerts, deduplicating against existing 'new' alerts of same category
+    // --- Insert alerts (deduplicate against existing 'new' alerts) ---
     let inserted = 0;
     for (const alert of alerts) {
       const { data: existing } = await sb
@@ -152,7 +188,7 @@ Deno.serve(async (req: Request) => {
         });
 
       if (insertErr) {
-        console.error(`Failed to insert alert ${alert.category}:`, insertErr);
+        console.error(`sentinel_insert_fail: ${alert.category}`);
         continue;
       }
 
@@ -163,7 +199,7 @@ Deno.serve(async (req: Request) => {
         const { data: admins } = await sb
           .from("profiles")
           .select("id")
-          .in("role", ["Admin", "Super Admin"]);
+          .in("role", ALLOWED_ROLES);
 
         if (admins && admins.length > 0) {
           const notifications = admins.map((a: { id: string }) => ({
@@ -181,14 +217,14 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return json({
+    return jsonResponse({
       ok: true,
       checks_run: 5,
       alerts_found: alerts.length,
       alerts_inserted: inserted,
     });
-  } catch (err) {
-    console.error("Sentinel error:", err);
-    return json({ error: (err as Error).message }, 500);
+  } catch (_err) {
+    console.error("sentinel_check_failure");
+    return errorResponse(500);
   }
 });
