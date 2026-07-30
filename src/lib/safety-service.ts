@@ -40,6 +40,7 @@ export type SafetyRequirementCategory =
   | 'catering'
   | 'speakers'
   | 'other'
+  | 'cyber_security'
 
 const DOSSIER_STATUSES: ReadonlySet<string> = new Set<SafetyDossierStatus>([
   'draft', 'collecting', 'review', 'approved', 'archived',
@@ -57,7 +58,7 @@ const REQUIREMENT_STATUSES: ReadonlySet<string> = new Set<SafetyRequirementStatu
 
 const REQUIREMENT_CATEGORIES: ReadonlySet<string> = new Set<SafetyRequirementCategory>([
   'general', 'location', 'supplier', 'transport', 'activity',
-  'temporary_structures', 'catering', 'speakers', 'other',
+  'temporary_structures', 'catering', 'speakers', 'other', 'cyber_security',
 ])
 
 // ─── Row types ───────────────────────────────────────────────────────────────
@@ -593,7 +594,10 @@ const CATEGORY_LABELS_IT: Record<SafetyRequirementCategory, string> = {
   catering: 'Catering',
   speakers: 'Relatori',
   other: 'Altro',
+  cyber_security: 'Cyber Security',
 }
+
+export { CATEGORY_LABELS_IT, STATUS_LABELS_IT }
 
 export function buildSafetyConsultantEmail(
   bundle: SafetyDossierBundle,
