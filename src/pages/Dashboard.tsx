@@ -271,11 +271,11 @@ export default function Dashboard() {
         tag: 'urgente',
         tagLabel: 'SENTINEL',
         headline: a.message,
-        dek: 'Allarme di sistema rilevato da Sentinel. Verifica nella sezione Impostazioni.',
+        dek: 'Allarme di sistema rilevato da Sentinel. Verifica nel Centro Sicurezza.',
         meta: `sentinel · ${timeAgoLabel(Math.abs(daysLeft(a.created_at)))}`,
         category: 'task',
         score: 200,
-        action: () => navigate('/impostazioni'),
+        action: () => navigate('/centro-sicurezza'),
       })
     })
 

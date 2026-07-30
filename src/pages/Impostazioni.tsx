@@ -4,7 +4,7 @@ import {
   Palette,
   ShieldCheck,
   Bell,
-  Lock,
+
   Database,
   LayoutDashboard,
   Zap,
@@ -22,15 +22,13 @@ import {
   Download,
   User,
   Key,
-  FileWarning,
-  ScrollText,
-  Filter,
+
   Calendar,
 } from 'lucide-react'
 import { loadUser, isAdmin } from '@/lib/auth'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { supabase } from '@/lib/supabase'
-import { fetchErrorLog, type ErrorLogEntry } from '@/lib/error-log'
+
 import { createLeaveRequest, cancelLeaveRequest } from '@/lib/leave-requests-service'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -313,27 +311,7 @@ function RadioGroup({ options, value, onChange }: {
   )
 }
 
-function SliderInput({ value, onChange, min, max, step = 1, label }: {
-  value: number; onChange: (v: number) => void; min: number; max: number; step?: number; label: (v: number) => string
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between items-center">
-        <span className="text-xs" style={{ color: 'var(--muted)' }}>{min} min</span>
-        <span className="text-sm font-semibold" style={{ color: 'var(--red2)' }}>{label(value)}</span>
-        <span className="text-xs" style={{ color: 'var(--muted)' }}>{max} min</span>
-      </div>
-      <input type="range" min={min} max={max} step={step} value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-        style={{
-          background: `linear-gradient(to right, var(--red2) 0%, var(--red2) ${((value - min) / (max - min)) * 100}%, var(--panel2) ${((value - min) / (max - min)) * 100}%, var(--panel2) 100%)`,
-          outline: 'none',
-        }}
-      />
-    </div>
-  )
-}
+
 
 // ─── PERSONAL SECTIONS ───────────────────────────────────────────────────────
 
@@ -1071,21 +1049,7 @@ function RuoliPermessi() {
   )
 }
 
-function SicurezzaSistema({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSettings>) => void }) {
-  return (
-    <SectionCard icon={Lock} title="Sicurezza Sistema" subtitle="Sessioni, autenticazione globale">
-      <div className="space-y-5">
-        <Field label="Timeout sessione" hint="Minuti di inattività prima del logout automatico">
-          <SliderInput value={s.sessionTimeout} onChange={v => upd({ sessionTimeout: v })} min={15} max={480} step={15} label={v => `${v} min${v >= 60 ? ` (${Math.floor(v / 60)}h${v % 60 ? ` ${v % 60}m` : ''})` : ''}`} />
-        </Field>
-        <div>
-          <ToggleRow label="Autenticazione multi-fattore (MFA)" hint="Richiedi verifica aggiuntiva al login" checked={s.richieciMFA} onChange={v => upd({ richieciMFA: v })} />
-          <ToggleRow label="Log accessi" hint="Registra tutti i login e le attività sensibili" checked={s.logAccessi} onChange={v => upd({ logAccessi: v })} />
-        </div>
-      </div>
-    </SectionCard>
-  )
-}
+
 
 function ConfigDashboard({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSettings>) => void }) {
   return (
@@ -1200,339 +1164,11 @@ function DatiApplicazione() {
   )
 }
 
-// ─── Registro Errori ─────────────────────────────────────────────────────────
 
-// ─── Sentinel Section (Admin / Super Admin) ─────────────────────────────────
 
-interface SentinelAlert {
-  id: string
-  created_at: string
-  severity: 'info' | 'warning' | 'critical'
-  category: string
-  message: string
-  detail: Record<string, unknown> | null
-  status: 'new' | 'acknowledged' | 'resolved'
-  resolved_at: string | null
-  resolved_by: string | null
-}
 
-function SentinelSection() {
-  const [alerts, setAlerts] = useState<SentinelAlert[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'critical' | 'warning' | 'info'>('all')
 
-  useEffect(() => {
-    loadAlerts()
-  }, [])
 
-  async function loadAlerts() {
-    setLoading(true)
-    const { data } = await supabase
-      .from('sentinel_alerts')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50)
-    if (data) setAlerts(data as SentinelAlert[])
-    setLoading(false)
-  }
-
-  async function resolve(alertId: string) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase
-      .from('sentinel_alerts')
-      .update({ status: 'resolved', resolved_at: new Date().toISOString(), resolved_by: user.id })
-      .eq('id', alertId)
-    setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, status: 'resolved', resolved_at: new Date().toISOString(), resolved_by: user.id } : a))
-  }
-
-  const filtered = filter === 'all' ? alerts : alerts.filter(a => a.severity === filter)
-  const criticalNew = alerts.filter(a => a.severity === 'critical' && a.status === 'new').length
-
-  const severityIcon = (s: string) => {
-    switch (s) {
-      case 'critical': return { color: '#dc2626', bg: 'rgba(220,38,38,0.10)', label: 'CRITICO' }
-      case 'warning': return { color: '#d97706', bg: 'rgba(217,119,6,0.10)', label: 'WARNING' }
-      default: return { color: '#2563eb', bg: 'rgba(37,99,235,0.10)', label: 'INFO' }
-    }
-  }
-
-  const timeAgo = (d: string) => {
-    const diff = Date.now() - new Date(d).getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 60) return `${mins}m fa`
-    const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return `${hrs}h fa`
-    return `${Math.floor(hrs / 24)}g fa`
-  }
-
-  return (
-    <SectionCard icon={AlertTriangle} title="Sentinel" subtitle="Monitoraggio automatico del sistema">
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        {(['all', 'critical', 'warning', 'info'] as const).map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className="px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wide transition-all"
-            style={{
-              background: filter === f ? 'var(--red2)' : 'var(--bg)',
-              color: filter === f ? 'white' : 'var(--muted)',
-              border: `1px solid ${filter === f ? 'transparent' : 'var(--line)'}`,
-            }}>
-            {f === 'all' ? 'Tutti' : f === 'critical' ? 'Critici' : f === 'warning' ? 'Warning' : 'Info'}
-            {f === 'critical' && criticalNew > 0 && (
-              <span style={{ marginLeft: 6, background: '#dc2626', color: 'white', borderRadius: 99, fontSize: 9, padding: '1px 5px' }}>
-                {criticalNew}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-8">
-          <ShieldCheck className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--muted)', opacity: 0.4 }} />
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun alert {filter !== 'all' ? `di tipo ${filter}` : ''}</p>
-        </div>
-      ) : (
-        <div className="space-y-2 max-h-[520px] overflow-y-auto">
-          {filtered.map(a => {
-            const sev = severityIcon(a.severity)
-            return (
-              <div key={a.id} className="px-3 py-3 rounded-lg text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded font-mono font-bold uppercase" style={{ background: sev.bg, color: sev.color, fontSize: 9 }}>
-                      {sev.label}
-                    </span>
-                    <span className="font-mono" style={{ color: 'var(--muted)' }}>{a.category}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span style={{ color: 'var(--muted)' }}>{timeAgo(a.created_at)}</span>
-                    {a.status === 'new' ? (
-                      <span className="px-2 py-0.5 rounded font-mono" style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626', fontSize: 9 }}>NEW</span>
-                    ) : a.status === 'resolved' ? (
-                      <span className="px-2 py-0.5 rounded font-mono" style={{ background: 'rgba(22,163,74,0.1)', color: '#16a34a', fontSize: 9 }}>RISOLTO</span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded font-mono" style={{ background: 'rgba(217,119,6,0.1)', color: '#d97706', fontSize: 9 }}>ACK</span>
-                    )}
-                  </div>
-                </div>
-                <p className="mb-2" style={{ color: 'var(--text)', fontSize: 13 }}>{a.message}</p>
-                {a.status === 'new' && (
-                  <button onClick={() => resolve(a.id)}
-                    className="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-80"
-                    style={{ background: 'rgba(22,163,74,0.1)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.2)' }}>
-                    Segna come risolto
-                  </button>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </SectionCard>
-  )
-}
-
-function RegistroErrori() {
-  const [entries, setEntries] = useState<ErrorLogEntry[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchErrorLog(50).then(setEntries).catch(() => {}).finally(() => setLoading(false))
-  }, [])
-
-  return (
-    <SectionCard icon={FileWarning} title="Registro Errori" subtitle="Ultime 50 segnalazioni di errore nel sistema">
-      {loading ? (
-        <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>
-      ) : entries.length === 0 ? (
-        <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun errore registrato.</p>
-      ) : (
-        <div className="space-y-2 max-h-[520px] overflow-y-auto">
-          {entries.map(e => (
-            <div key={e.id} className="px-3 py-2.5 rounded-lg text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="font-mono font-semibold" style={{ color: 'var(--red2)' }}>{e.pagina}</span>
-                <span style={{ color: 'var(--muted)' }}>
-                  {new Date(e.created_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-              <p style={{ color: 'var(--text)' }}><strong>{e.azione}</strong>: {e.messaggio}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </SectionCard>
-  )
-}
-
-// ─── Audit Log Section (Super Admin only) ────────────────────────────────────
-
-interface AuditEntry {
-  id: string
-  created_at: string
-  user_id: string | null
-  user_email: string | null
-  action: string
-  table_name: string | null
-  record_id: string | null
-  old_data: Record<string, unknown> | null
-  new_data: Record<string, unknown> | null
-}
-
-function AuditLogSection() {
-  const [entries, setEntries] = useState<AuditEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filterTable, setFilterTable] = useState('')
-  const [filterUser, setFilterUser] = useState('')
-
-  useEffect(() => {
-    loadAuditLog()
-  }, [])
-
-  async function loadAuditLog() {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('audit_log')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100)
-    if (!error && data) setEntries(data as AuditEntry[])
-    setLoading(false)
-  }
-
-  const filtered = entries.filter(e => {
-    if (filterTable && e.table_name !== filterTable) return false
-    if (filterUser && !(e.user_email || '').toLowerCase().includes(filterUser.toLowerCase())) return false
-    return true
-  })
-
-  const tables = [...new Set(entries.map(e => e.table_name).filter(Boolean))]
-
-  const actionColor = (action: string) => {
-    switch (action) {
-      case 'DELETE': return { color: '#dc2626', bg: 'rgba(220,38,38,0.08)' }
-      case 'UPDATE': return { color: '#d97706', bg: 'rgba(217,119,6,0.08)' }
-      default: return { color: 'var(--muted)', bg: 'var(--line)' }
-    }
-  }
-
-  const formatTime = (d: string) => {
-    const date = new Date(d)
-    return date.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
-  }
-
-  return (
-    <SectionCard icon={ScrollText} title="Audit Log" subtitle="Registro delle azioni critiche eseguite nel sistema">
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Filter className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
-          <select
-            value={filterTable}
-            onChange={e => setFilterTable(e.target.value)}
-            style={{
-              fontFamily: 'var(--font-mono)', fontSize: '11px',
-              padding: '6px 10px', borderRadius: '6px',
-              background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)',
-            }}
-          >
-            <option value="">Tutte le tabelle</option>
-            {tables.map(t => <option key={t} value={t!}>{t}</option>)}
-          </select>
-        </div>
-        <input
-          type="text"
-          placeholder="Filtra per email..."
-          value={filterUser}
-          onChange={e => setFilterUser(e.target.value)}
-          style={{
-            fontFamily: 'var(--font-mono)', fontSize: '11px',
-            padding: '6px 10px', borderRadius: '6px', width: '200px',
-            background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)',
-          }}
-        />
-        <button onClick={loadAuditLog}
-          style={{
-            fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase',
-            padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--line)',
-            background: 'var(--bg)', color: 'var(--muted)', cursor: 'pointer',
-          }}>
-          <RotateCcw className="w-3 h-3" />
-        </button>
-      </div>
-
-      {/* Table */}
-      {loading ? (
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', padding: '20px 0' }}>
-          Caricamento...
-        </p>
-      ) : filtered.length === 0 ? (
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', padding: '20px 0' }}>
-          Nessuna voce di audit trovata.
-        </p>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '9px' }}>Data</th>
-                <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '9px' }}>Utente</th>
-                <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '9px' }}>Azione</th>
-                <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '9px' }}>Tabella</th>
-                <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '9px' }}>Record ID</th>
-                <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '9px' }}>Dettagli</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(entry => {
-                const ac = actionColor(entry.action)
-                return (
-                  <tr key={entry.id} style={{ borderBottom: '1px solid var(--line)' }}>
-                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', color: 'var(--muted)' }}>
-                      {formatTime(entry.created_at)}
-                    </td>
-                    <td style={{ padding: '8px 10px', color: 'var(--text)' }}>
-                      {entry.user_email || entry.user_id?.slice(0, 8) || '—'}
-                    </td>
-                    <td style={{ padding: '8px 10px' }}>
-                      <span style={{
-                        padding: '2px 6px', borderRadius: '4px', fontSize: '9px',
-                        fontWeight: 600, color: ac.color, background: ac.bg,
-                      }}>
-                        {entry.action}
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 10px', color: 'var(--text)' }}>
-                      {entry.table_name || '—'}
-                    </td>
-                    <td style={{ padding: '8px 10px', color: 'var(--muted)', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {entry.record_id?.slice(0, 8) || '—'}
-                    </td>
-                    <td style={{ padding: '8px 10px', maxWidth: '250px' }}>
-                      {entry.action === 'DELETE' && entry.old_data && (
-                        <span style={{ color: 'var(--muted)', fontSize: '10px' }}>
-                          {String((entry.old_data as Record<string, string>).nome || (entry.old_data as Record<string, string>).name || (entry.old_data as Record<string, string>).title || (entry.old_data as Record<string, string>).titolo || JSON.stringify(entry.old_data).slice(0, 60))}
-                        </span>
-                      )}
-                      {entry.action === 'UPDATE' && entry.old_data && entry.new_data && (
-                        <span style={{ color: 'var(--muted)', fontSize: '10px' }}>
-                          {Object.keys(entry.new_data).map(k => `${k}: ${String((entry.old_data as Record<string, unknown>)?.[k] ?? '')} → ${String((entry.new_data as Record<string, unknown>)?.[k] ?? '')}`).join(', ').slice(0, 80)}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </SectionCard>
-  )
-}
 
 // ─── Le mie Ferie Section ────────────────────────────────────────────────────
 
@@ -1649,12 +1285,8 @@ const ALL_SECTIONS: SectionDef[] = [
   { id: 'azienda', icon: Building2, label: 'Profilo Azienda', group: 'admin' },
   { id: 'branding', icon: Palette, label: 'Branding', group: 'admin' },
   { id: 'ruoli', icon: ShieldCheck, label: 'Ruoli e Permessi', group: 'admin' },
-  { id: 'sicurezza', icon: Lock, label: 'Sicurezza Sistema', group: 'admin' },
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard Globale', group: 'admin' },
   { id: 'dati', icon: Database, label: 'Dati Applicazione', group: 'admin' },
-  { id: 'errori', icon: FileWarning, label: 'Registro Errori', group: 'admin' },
-  { id: 'sentinel', icon: AlertTriangle, label: 'Sentinel', group: 'admin' },
-  { id: 'audit', icon: ScrollText, label: 'Audit Log', group: 'admin' },
 ]
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -1664,7 +1296,7 @@ export default function Impostazioni() {
   const showAdmin = isAdmin(currentUser)
 
   const sections = showAdmin
-    ? ALL_SECTIONS.filter(s => s.id !== 'audit' || currentUser?.role === 'Super Admin')
+    ? ALL_SECTIONS
     : ALL_SECTIONS.filter(s => s.group === 'personal')
 
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS)
@@ -1835,12 +1467,8 @@ export default function Impostazioni() {
           {showAdmin && activeSection === 'azienda' && <ProfiloAzienda s={settings} upd={upd} />}
           {showAdmin && activeSection === 'branding' && <Branding s={settings} upd={upd} />}
           {showAdmin && activeSection === 'ruoli' && <RuoliPermessi />}
-          {showAdmin && activeSection === 'sicurezza' && <SicurezzaSistema s={settings} upd={upd} />}
           {showAdmin && activeSection === 'dashboard' && <ConfigDashboard s={settings} upd={upd} />}
           {showAdmin && activeSection === 'dati' && <DatiApplicazione />}
-          {showAdmin && activeSection === 'errori' && <RegistroErrori />}
-          {showAdmin && activeSection === 'sentinel' && <SentinelSection />}
-          {currentUser?.role === 'Super Admin' && activeSection === 'audit' && <AuditLogSection />}
         </div>
       </div>
     </div>

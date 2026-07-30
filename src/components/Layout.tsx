@@ -36,6 +36,7 @@ import {
   Moon,
   Archive,
   HeartPulse,
+  Shield,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
@@ -69,6 +70,7 @@ const iconMap: Record<string, React.ElementType> = {
   '/impostazioni': SlidersHorizontal,
   '/feedback-beta': MessageCircle,
   '/wellness': HeartPulse,
+  '/centro-sicurezza': Shield,
 }
 
 const NAV_GROUPS: { label: string; paths: string[] }[] = [
@@ -76,7 +78,7 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
   { label: 'Operativo', paths: ['/eventi', '/task', '/calendario', '/fornitori'] },
   { label: 'Business', paths: ['/crm', '/amministrazione'] },
   { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
-  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/performance', '/wellness', '/impostazioni', '/feedback-beta'] },
+  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/performance', '/wellness', '/centro-sicurezza', '/impostazioni', '/feedback-beta'] },
 ]
 
 interface SidebarProps {
@@ -160,7 +162,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                       <Icon className="shell-nav-icon" />
                       <span className="shell-nav-label">{item.name}</span>
                       {item.href === '/comunicazioni' && <ChatBadge />}
-                      {item.href === '/impostazioni' && <SentinelBadge />}
+                      {item.href === '/centro-sicurezza' && <SentinelBadge />}
                     </Link>
                   )
                 })}
