@@ -266,7 +266,7 @@ export default function PublicRegistration() {
       })
       setResult(res)
       if (res.registration_id && res.qr_token) {
-        fireEmail(res.registration_id, res.qr_token)
+        fireEmail(res.registration_id, res.qr_token, res.manage_token)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Si è verificato un errore. Riprovare più tardi.')
@@ -275,9 +275,9 @@ export default function PublicRegistration() {
     }
   }
 
-  async function fireEmail(regId: string, qrTk: string) {
+  async function fireEmail(regId: string, qrTk: string, manageTk?: string | null) {
     setEmailState('sending')
-    const status: EmailDeliveryStatus = await sendRegistrationConfirmationEmail(regId, qrTk)
+    const status: EmailDeliveryStatus = await sendRegistrationConfirmationEmail(regId, qrTk, manageTk)
     if (status === 'sent' || status === 'already_sent') {
       setEmailState('sent')
     } else if (status === 'processing') {
@@ -290,7 +290,7 @@ export default function PublicRegistration() {
   async function handleRetryEmail() {
     if (emailRetrying || !result?.registration_id || !result?.qr_token) return
     setEmailRetrying(true)
-    await fireEmail(result.registration_id, result.qr_token)
+    await fireEmail(result.registration_id, result.qr_token, result.manage_token)
     setEmailRetrying(false)
   }
 
@@ -397,6 +397,37 @@ export default function PublicRegistration() {
               Riceverai conferma prima di poter accedere all'evento.
             </p>
           ) : null}
+
+          {result.manage_token && (
+            <div style={{ marginTop: 20, padding: '16px', background: '#f0f9ff', borderRadius: 12, border: '1px solid #bae6fd' }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: '#0c4a6e', marginBottom: 8 }}>Link personale di modifica</p>
+              <p style={{ fontSize: 13, color: '#0369a1', lineHeight: 1.5, marginBottom: 12 }}>
+                Usa questo link per modificare i tuoi dati di registrazione.
+                {result.manage_token_expires_at && (
+                  <> Valido fino al {new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date(result.manage_token_expires_at))}.</>)}
+              </p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <a
+                  href={`/manage-registration/${result.manage_token}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, background: primaryColor, color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}
+                >
+                  Apri pagina di modifica
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = `${window.location.origin}/manage-registration/${result.manage_token}`
+                    navigator.clipboard?.writeText(url).catch(() => {})
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, border: '1px solid #bae6fd', background: '#fff', color: '#0369a1', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+                >
+                  Copia link personale
+                </button>
+              </div>
+            </div>
+          )}
 
           {emailState === 'sending' && (
             <p className="pr-muted text-sm mt-4 flex items-center justify-center gap-2">

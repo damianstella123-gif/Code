@@ -2,6 +2,13 @@
   command = "npm run build"
   publish = "dist"
 
+[[headers]]
+  for = "/manage-registration/*"
+  [headers.values]
+    Referrer-Policy = "no-referrer"
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

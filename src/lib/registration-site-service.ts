@@ -28,6 +28,7 @@ export interface RegistrationSite {
   updated_at: string
   theme: Record<string, unknown> | null
   content: Record<string, unknown> | null
+  settings: Record<string, unknown> | null
 }
 
 export interface RegistrationFormField {

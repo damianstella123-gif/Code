@@ -352,6 +352,9 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
   const [themeColors, setThemeColors] = useState<ThemeColors>(THEME_DEFAULTS)
   const [contentOpen, setContentOpen] = useState(false)
   const [contentFields, setContentFields] = useState<ContentFields>(CONTENT_DEFAULTS)
+  const [selfServiceOpen, setSelfServiceOpen] = useState(false)
+  const [selfServiceEnabled, setSelfServiceEnabled] = useState(false)
+  const [selfServiceUntil, setSelfServiceUntil] = useState('')
 
   const readOnly = isArchived || !canManage
 
@@ -367,6 +370,11 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
         setForm(siteToForm(sites[0]))
         setThemeColors(readThemeColors(sites[0].theme))
         setContentFields(readContentFields(sites[0].content))
+        const s = sites[0].settings
+        if (s) {
+          setSelfServiceEnabled(!!s.self_service_edit_enabled)
+          setSelfServiceUntil(typeof s.self_service_edit_until === 'string' ? utcToLocal(s.self_service_edit_until) : '')
+        }
       } else {
         setSite(null)
         setForm(emptyForm)
@@ -438,6 +446,12 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
       const payload = formToPayload(normalizedForm)
       const existingTheme = (site?.theme ?? {}) as Record<string, unknown>
       payload.theme = { ...existingTheme, ...themeColors }
+      const existingSettings = (site?.settings ?? {}) as Record<string, unknown>
+      payload.settings = {
+        ...existingSettings,
+        self_service_edit_enabled: selfServiceEnabled,
+        ...(selfServiceUntil ? { self_service_edit_until: localToUtc(selfServiceUntil) } : { self_service_edit_until: null }),
+      }
       const existingContent = (site?.content ?? {}) as Record<string, unknown>
       const trimmedContent: Record<string, string> = {}
       for (const key of CONTENT_KEYS) {
@@ -885,6 +899,43 @@ export default function EventRegistrationManager({ eventId, eventName, isArchive
               <span style={{ fontSize: 11, color: '#9ca3af' }}>{contentFields[key].length}/5000</span>
             </div>
           ))}
+        </div>
+      </CollapsibleSection>
+
+      {/* SELF-SERVICE EDITING */}
+      <CollapsibleSection
+        title="Modifica autonoma iscrizione"
+        open={selfServiceOpen}
+        onToggle={() => setSelfServiceOpen(o => !o)}
+      >
+        <p style={styles.sectionHint}>
+          Se attivato, i partecipanti riceveranno un link personale nell'email di conferma per modificare i propri dati di registrazione.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: readOnly ? 'default' : 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={selfServiceEnabled}
+              onChange={e => setSelfServiceEnabled(e.target.checked)}
+              disabled={readOnly}
+            />
+            Permetti ai partecipanti di modificare i propri dati
+          </label>
+          {selfServiceEnabled && (
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 4 }}>
+                Scadenza link di modifica (opzionale)
+              </label>
+              <input
+                type="datetime-local"
+                style={{ ...styles.input, maxWidth: 280 }}
+                value={selfServiceUntil}
+                onChange={e => setSelfServiceUntil(e.target.value)}
+                disabled={readOnly}
+              />
+              <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Se lasciato vuoto, il link non scadrà.</p>
+            </div>
+          )}
         </div>
       </CollapsibleSection>
 

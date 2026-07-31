@@ -57,6 +57,8 @@ export interface RegistrationResult {
   registration_status: string
   qr_token: string | null
   confirmation_message: string | null
+  manage_token: string | null
+  manage_token_expires_at: string | null
 }
 
 // ─── Error translation ───────────────────────────────────────────────────────
@@ -90,20 +92,27 @@ export async function fetchPublicRegistrationSite(slug: string): Promise<PublicR
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const HEX_64_RE = /^[0-9a-fA-F]{64}$/
 
 export type EmailDeliveryStatus = 'sent' | 'already_sent' | 'processing' | 'failed'
 
 export async function sendRegistrationConfirmationEmail(
   registrationId: string,
-  qrToken: string
+  qrToken: string,
+  manageToken?: string | null
 ): Promise<EmailDeliveryStatus> {
   if (!UUID_RE.test(registrationId) || !UUID_RE.test(qrToken)) {
     return 'failed'
   }
 
+  const body: Record<string, string> = { registration_id: registrationId, qr_token: qrToken }
+  if (manageToken && HEX_64_RE.test(manageToken)) {
+    body.manage_token = manageToken
+  }
+
   try {
     const { data, error } = await supabase.functions.invoke('registration-email-worker', {
-      body: { registration_id: registrationId, qr_token: qrToken },
+      body,
     })
 
     if (error) return 'failed'
@@ -161,5 +170,88 @@ export async function submitPublicRegistration(input: RegistrationSubmission): P
     registration_status: result.registration_status,
     qr_token: result.qr_token,
     confirmation_message: typeof result.confirmation_message === 'string' ? result.confirmation_message : null,
+    manage_token: typeof result.manage_token === 'string' ? result.manage_token : null,
+    manage_token_expires_at: typeof result.manage_token_expires_at === 'string' ? result.manage_token_expires_at : null,
   }
+}
+
+// ─── Self-service registration editing ──────────────────────────────────────
+
+export interface EditableRegistrationField {
+  field_key: string
+  label: string
+  field_type: string
+  required: boolean
+  options: string[] | null
+  placeholder: string
+  help_text: string
+}
+
+export interface EditableRegistration {
+  registration_id: string
+  registration_status: string
+  phone: string | null
+  company: string | null
+  job_title: string | null
+  dietary_requirements: string | null
+  accessibility_requirements: string | null
+  marketing_consent: boolean
+  custom_answers: Record<string, unknown> | null
+  manage_token_expires_at: string | null
+  site_title: string
+  site_logo_url: string | null
+  site_theme: Record<string, unknown>
+  event_title: string
+  fields: EditableRegistrationField[]
+}
+
+export type EditableRegistrationPatch = Partial<{
+  phone: string | null
+  company: string | null
+  job_title: string | null
+  dietary_requirements: string | null
+  accessibility_requirements: string | null
+  marketing_consent: boolean
+  custom_answers: Record<string, unknown> | null
+}>
+
+export async function fetchEditableRegistration(token: string): Promise<EditableRegistration | null> {
+  if (!HEX_64_RE.test(token)) return null
+
+  const { data, error } = await supabase.rpc('get_registration_by_manage_token', { p_manage_token: token })
+  if (error || !data) return null
+
+  const d = data as Record<string, unknown>
+  if (!d.registration_id) return null
+
+  return d as unknown as EditableRegistration
+}
+
+export async function updateEditableRegistration(
+  token: string,
+  patch: EditableRegistrationPatch
+): Promise<{ ok: boolean; error?: string }> {
+  if (!HEX_64_RE.test(token)) return { ok: false, error: 'Collegamento non valido.' }
+
+  const { data, error } = await supabase.rpc('update_registration_by_manage_token', {
+    p_manage_token: token,
+    p_patch: patch,
+  })
+
+  if (error) return { ok: false, error: 'Si è verificato un errore. Riprovare più tardi.' }
+
+  const result = data as Record<string, unknown> | null
+  if (!result) return { ok: false, error: 'Si è verificato un errore. Riprovare più tardi.' }
+
+  if (typeof result.error === 'string') {
+    if (result.error === 'INVALID_TOKEN' || result.error === 'TOKEN_NOT_FOUND') {
+      return { ok: false, error: 'Collegamento non valido o scaduto.' }
+    }
+    if (result.error === 'CANCELLED_REGISTRATION') {
+      return { ok: false, error: 'Questa registrazione è stata annullata.' }
+    }
+    return { ok: false, error: 'Si è verificato un errore. Riprovare più tardi.' }
+  }
+
+  return { ok: result.status === 'updated' }
 }

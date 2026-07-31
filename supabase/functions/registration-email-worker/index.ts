@@ -16,6 +16,31 @@ function isUUID(v: unknown): v is string {
   );
 }
 
+function isHex64(v: unknown): v is string {
+  return typeof v === "string" && /^[0-9a-fA-F]{64}$/.test(v);
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const b = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) b[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  return b;
+}
+
+function bytesToHex(buf: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function buildManageBlock(url: string, expiry: string | null, color: string): string {
+  const expiryLine = expiry
+    ? `<p style="margin:8px 0 0;font-size:12px;color:#6b7280;">Link valido fino al ${escapeHtml(expiry)}</p>`
+    : "";
+  return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 8px;"><tr><td align="center">
+<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 28px;background:${escapeHtml(color)};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;">Gestisci la tua iscrizione</a>
+</td></tr></table>
+<p style="margin:4px 0 0;font-size:12px;color:#6b7280;text-align:center;">Usa questo link per modificare i tuoi dati di registrazione.</p>
+${expiryLine}`;
+}
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
@@ -48,6 +73,8 @@ function buildConfirmedHtml(params: {
   confirmationMessage: string | null;
   logoUrl: string | null;
   primaryColor: string;
+  manageUrl: string | null;
+  manageExpiry: string | null;
 }): string {
   const name = escapeHtml(params.firstName);
   const title = escapeHtml(params.siteTitle || params.eventTitle);
@@ -81,6 +108,7 @@ ${logoBlock}
 <p style="margin:0 0 12px;font-size:14px;color:#374151;line-height:1.5;">La tua registrazione a <strong>${title}</strong> è stata confermata.</p>
 ${dateBlock}${locBlock}${confMsg}
 <p style="margin:16px 0 4px;font-size:14px;color:#374151;">In allegato trovi il tuo codice QR per l'accredito.</p>
+${params.manageUrl ? buildManageBlock(params.manageUrl, params.manageExpiry, color) : ""}
 </td></tr>
 <tr><td style="padding:16px 32px 24px;font-size:11px;color:#9ca3af;text-align:center;border-top:1px solid #f3f4f6;">
 Questa email è stata inviata automaticamente. Non rispondere a questo messaggio.<br/>I tuoi dati sono trattati nel rispetto della normativa sulla privacy.
@@ -99,6 +127,8 @@ function buildWaitlistHtml(params: {
   location: string | null;
   logoUrl: string | null;
   primaryColor: string;
+  manageUrl: string | null;
+  manageExpiry: string | null;
 }): string {
   const name = escapeHtml(params.firstName);
   const title = escapeHtml(params.siteTitle || params.eventTitle);
@@ -129,6 +159,7 @@ ${logoBlock}
 <p style="margin:0 0 12px;font-size:14px;color:#374151;line-height:1.5;">Ti confermiamo che sei stato inserito nella lista d'attesa per <strong>${title}</strong>.</p>
 ${dateBlock}${locBlock}
 <p style="margin:16px 0 0;font-size:14px;color:#374151;line-height:1.5;">Ti contatteremo se si libera un posto. Non è necessaria alcuna azione da parte tua.</p>
+${params.manageUrl ? buildManageBlock(params.manageUrl, params.manageExpiry, color) : ""}
 </td></tr>
 <tr><td style="padding:16px 32px 24px;font-size:11px;color:#9ca3af;text-align:center;border-top:1px solid #f3f4f6;">
 Questa email è stata inviata automaticamente. Non rispondere a questo messaggio.<br/>I tuoi dati sono trattati nel rispetto della normativa sulla privacy.
@@ -166,13 +197,14 @@ Deno.serve(async (req: Request) => {
 
     const registrationId: string = body.registration_id;
     const suppliedQrToken: string = body.qr_token;
+    const suppliedManageToken: string | null = isHex64(body.manage_token) ? body.manage_token : null;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Load registration and verify qr_token
     const { data: reg, error: regErr } = await supabase
       .from("event_registrations")
-      .select("id, first_name, last_name, email, registration_status, qr_token, site_id, event_id")
+      .select("id, first_name, last_name, email, registration_status, qr_token, site_id, event_id, manage_token_hash, manage_token_expires_at, manage_token_revoked_at")
       .eq("id", registrationId)
       .maybeSingle();
 
@@ -262,6 +294,25 @@ Deno.serve(async (req: Request) => {
         ? (site.theme as Record<string, unknown>).primary_color
         : "#2563eb") as string;
 
+    // Verify manage token if supplied
+    let manageUrl: string | null = null;
+    let manageExpiry: string | null = null;
+    if (suppliedManageToken && reg.manage_token_hash) {
+      try {
+        const hash = bytesToHex(await crypto.subtle.digest("SHA-256", hexToBytes(suppliedManageToken)));
+        const storedHex = typeof reg.manage_token_hash === "string"
+          ? reg.manage_token_hash.replace(/^\\x/, "")
+          : "";
+        const notRevoked = !reg.manage_token_revoked_at;
+        const notExpired = !reg.manage_token_expires_at || new Date(reg.manage_token_expires_at) > new Date();
+        if (hash === storedHex && notRevoked && notExpired) {
+          const appBase = (Deno.env.get("PUBLIC_APP_URL") || "https://simmetriasynergy.netlify.app").replace(/\/+$/, "");
+          manageUrl = `${appBase}/manage-registration/${suppliedManageToken}`;
+          manageExpiry = reg.manage_token_expires_at ? formatDate(reg.manage_token_expires_at) : null;
+        }
+      } catch { /* token verification failed — send without manage link */ }
+    }
+
     // Build email
     let html: string;
     let subject: string;
@@ -280,10 +331,12 @@ Deno.serve(async (req: Request) => {
       html = buildConfirmedHtml({
         ...emailParams,
         confirmationMessage: site?.confirmation_message || null,
+        manageUrl,
+        manageExpiry,
       });
       subject = `Registrazione confermata – ${escapeHtml(site?.title || event?.title || "Evento")}`;
     } else {
-      html = buildWaitlistHtml(emailParams);
+      html = buildWaitlistHtml({ ...emailParams, manageUrl, manageExpiry });
       subject = `Lista d'attesa – ${escapeHtml(site?.title || event?.title || "Evento")}`;
     }
 
