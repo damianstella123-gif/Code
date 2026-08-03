@@ -3,59 +3,76 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers":
     "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-function json(data: unknown, status = 200) {
+const ADMIN_ROLES = ["Super Admin", "Admin"];
+
+const VALID_ACTIONS = new Set([
+  "list-users",
+  "create-user",
+  "update-user",
+  "reset-password",
+]);
+
+const VALID_APP_ROLES = new Set([
+  "Super Admin",
+  "Admin",
+  "Senior PM",
+  "Project Manager",
+  "Junior Event Assistant",
+  "Amministrazione",
+  "Regista",
+  "Commerciale",
+  "Partner",
+]);
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_STR = 200;
+
+function jsonResp(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
-function getAdminClient() {
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+function safeStr(v: unknown, maxLen = MAX_STR): string | undefined {
+  if (v === undefined) return undefined;
+  if (typeof v !== "string") return undefined;
+  return v.slice(0, maxLen).trim();
 }
 
-async function verifyPartner(
+function getAdminClient() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
+
+async function authorize(
   adminClient: ReturnType<typeof createClient>,
   req: Request
 ): Promise<{ userId: string } | Response> {
   const authHeader = req.headers.get("Authorization") ?? "";
-  const token = authHeader.replace("Bearer ", "");
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token) return jsonResp({ error: "AUTH_REQUIRED" }, 401);
 
-  if (!token) {
-    return json({ error: "Token mancante" }, 401);
-  }
+  const { data: { user }, error } = await adminClient.auth.getUser(token);
+  if (error || !user) return jsonResp({ error: "AUTH_REQUIRED" }, 401);
 
-  const {
-    data: { user },
-    error,
-  } = await adminClient.auth.getUser(token);
-
-  if (error || !user) {
-    return json({ error: "Non autenticato: " + (error?.message ?? "utente non trovato") }, 401);
-  }
-
-  const { data: profile, error: profileError } = await adminClient
+  const { data: profile } = await adminClient
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profileError || !profile) {
-    return json({ error: "Profilo non trovato" }, 403);
-  }
-
-  const ADMIN_ROLES = ["Super Admin", "Admin"];
-  if (!ADMIN_ROLES.includes(profile.role)) {
-    return json({ error: "Accesso negato: ruolo insufficiente (" + profile.role + ")" }, 403);
+  if (!profile || !ADMIN_ROLES.includes(profile.role)) {
+    return jsonResp({ error: "ROLE_NOT_ALLOWED" }, 403);
   }
 
   return { userId: user.id };
@@ -66,16 +83,26 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  if (req.method !== "GET" && req.method !== "POST") {
+    return jsonResp({ error: "INVALID_ACTION" }, 405);
+  }
+
   try {
     const adminClient = getAdminClient();
-    const auth = await verifyPartner(adminClient, req);
+    const auth = await authorize(adminClient, req);
     if (auth instanceof Response) return auth;
 
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
+    if (!action || !VALID_ACTIONS.has(action)) {
+      return jsonResp({ error: "INVALID_ACTION" }, 400);
+    }
+
     // ─── LIST USERS ────────────────────────────────────────────
     if (action === "list-users") {
+      if (req.method !== "GET") return jsonResp({ error: "INVALID_ACTION" }, 405);
+
       const { data, error } = await adminClient
         .from("profiles")
         .select(
@@ -83,21 +110,46 @@ Deno.serve(async (req: Request) => {
         )
         .order("created_at", { ascending: true });
 
-      if (error) return json({ error: error.message }, 500);
-      return json({ users: data });
+      if (error) return jsonResp({ error: "INTERNAL_ERROR" }, 500);
+      return jsonResp({ users: data });
+    }
+
+    // All remaining actions require POST
+    if (req.method !== "POST") return jsonResp({ error: "INVALID_ACTION" }, 405);
+
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResp({ error: "INVALID_INPUT" }, 400);
+    }
+
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return jsonResp({ error: "INVALID_INPUT" }, 400);
     }
 
     // ─── CREATE USER ───────────────────────────────────────────
-    if (action === "create-user" && req.method === "POST") {
-      const body = await req.json();
-      const { email, password, first_name, last_name, role } = body;
+    if (action === "create-user") {
+      const email = safeStr(body.email);
+      const password = safeStr(body.password, 128);
+      const first_name = safeStr(body.first_name);
+      const last_name = safeStr(body.last_name);
+      const role = safeStr(body.role);
 
       if (!email || !password || !first_name || !last_name || !role) {
-        return json({ error: "Campi obbligatori: email, password, first_name, last_name, role" }, 400);
+        return jsonResp({ error: "INVALID_INPUT" }, 400);
+      }
+
+      if (!EMAIL_RE.test(email)) {
+        return jsonResp({ error: "INVALID_INPUT" }, 400);
       }
 
       if (password.length < 6) {
-        return json({ error: "Password minima 6 caratteri" }, 400);
+        return jsonResp({ error: "INVALID_INPUT" }, 400);
+      }
+
+      if (!VALID_APP_ROLES.has(role)) {
+        return jsonResp({ error: "INVALID_INPUT" }, 400);
       }
 
       const { data: newUser, error: createError } =
@@ -109,16 +161,18 @@ Deno.serve(async (req: Request) => {
         });
 
       if (createError) {
-        return json({ error: createError.message }, 400);
+        if (createError.message?.includes("already been registered")) {
+          return jsonResp({ error: "EMAIL_IN_USE" }, 409);
+        }
+        return jsonResp({ error: "INTERNAL_ERROR" }, 500);
       }
 
       const userId = newUser.user.id;
 
-      // Wait for the trigger to create the profile row
       await new Promise((r) => setTimeout(r, 500));
 
-      // Force UPDATE profile with correct values (trigger may have used empty metadata)
-      const { error: updateError } = await adminClient.from("profiles").update({
+      const profilePayload = {
+        id: userId,
         email,
         first_name,
         last_name,
@@ -129,43 +183,48 @@ Deno.serve(async (req: Request) => {
         is_active: true,
         attivo: true,
         force_password_change: true,
-      }).eq("id", userId);
+      };
+
+      const { error: updateError } = await adminClient
+        .from("profiles")
+        .update(profilePayload)
+        .eq("id", userId);
 
       if (updateError) {
-        // Fallback: upsert if row doesn't exist yet
-        await adminClient.from("profiles").upsert({
-          id: userId,
-          email,
-          first_name,
-          last_name,
-          role,
-          nome: `${first_name} ${last_name}`.trim(),
-          ruolo: role,
-          reparto: "",
-          is_active: true,
-          attivo: true,
-          force_password_change: true,
-        }, { onConflict: "id" });
+        await adminClient
+          .from("profiles")
+          .upsert(profilePayload, { onConflict: "id" });
       }
 
-      // Also ensure auth user_metadata is correct (GoTrue may not store it on create)
       await adminClient.auth.admin.updateUserById(userId, {
         user_metadata: { first_name, last_name, role },
       });
 
-      return json({ user: { id: userId, email } });
+      return jsonResp({ user: { id: userId, email } });
     }
 
     // ─── UPDATE USER ───────────────────────────────────────────
-    if (action === "update-user" && req.method === "POST") {
-      const body = await req.json();
-      const { user_id, first_name, last_name, role, is_active, email, avatar_url } = body;
-
-      if (!user_id) {
-        return json({ error: "user_id obbligatorio" }, 400);
+    if (action === "update-user") {
+      const user_id = safeStr(body.user_id);
+      if (!user_id || !UUID_RE.test(user_id)) {
+        return jsonResp({ error: "INVALID_INPUT" }, 400);
       }
 
-      // Fetch current profile for computing nome
+      const first_name = safeStr(body.first_name);
+      const last_name = safeStr(body.last_name);
+      const role = safeStr(body.role);
+      const email = safeStr(body.email);
+      const avatar_url = body.avatar_url === null ? null : safeStr(body.avatar_url, 2048);
+      const is_active = typeof body.is_active === "boolean" ? body.is_active : undefined;
+
+      if (role !== undefined && !VALID_APP_ROLES.has(role)) {
+        return jsonResp({ error: "INVALID_INPUT" }, 400);
+      }
+
+      if (email !== undefined && !EMAIL_RE.test(email)) {
+        return jsonResp({ error: "INVALID_INPUT" }, 400);
+      }
+
       const { data: currentProfile } = await adminClient
         .from("profiles")
         .select("first_name, last_name")
@@ -175,7 +234,9 @@ Deno.serve(async (req: Request) => {
       const finalFirstName = first_name ?? currentProfile?.first_name ?? "";
       const finalLastName = last_name ?? currentProfile?.last_name ?? "";
 
-      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      const patch: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
 
       if (first_name !== undefined) patch.first_name = first_name;
       if (last_name !== undefined) patch.last_name = last_name;
@@ -194,13 +255,7 @@ Deno.serve(async (req: Request) => {
         patch.avatar_url = avatar_url;
       }
 
-      // Handle email change - sync profiles AND Supabase Auth
       if (email !== undefined) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          return json({ error: "Formato email non valido" }, 400);
-        }
-
         const { data: existingUser } = await adminClient
           .from("profiles")
           .select("id")
@@ -209,33 +264,31 @@ Deno.serve(async (req: Request) => {
           .maybeSingle();
 
         if (existingUser) {
-          return json({ error: "Questa email è già in uso da un altro utente" }, 409);
+          return jsonResp({ error: "EMAIL_IN_USE" }, 409);
         }
 
-        // Update email in Supabase Auth (admin privilege)
-        const { error: authEmailError } = await adminClient.auth.admin.updateUserById(
-          user_id,
-          { email, email_confirm: true }
-        );
+        const { error: authEmailError } =
+          await adminClient.auth.admin.updateUserById(user_id, {
+            email,
+            email_confirm: true,
+          });
 
         if (authEmailError) {
-          return json({ error: "Errore aggiornamento email: " + authEmailError.message }, 500);
+          return jsonResp({ error: "INTERNAL_ERROR" }, 500);
         }
 
         patch.email = email;
       }
 
-      // Apply profile update
       const { error: updateError } = await adminClient
         .from("profiles")
         .update(patch)
         .eq("id", user_id);
 
       if (updateError) {
-        return json({ error: updateError.message }, 400);
+        return jsonResp({ error: "INTERNAL_ERROR" }, 500);
       }
 
-      // Ban/unban in auth
       if (is_active === false) {
         await adminClient.auth.admin.updateUserById(user_id, {
           ban_duration: "876000h",
@@ -246,8 +299,11 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      // Sync user_metadata in auth for name/role changes
-      if (first_name !== undefined || last_name !== undefined || role !== undefined) {
+      if (
+        first_name !== undefined ||
+        last_name !== undefined ||
+        role !== undefined
+      ) {
         const metaUpdate: Record<string, string> = {};
         if (first_name !== undefined) metaUpdate.first_name = first_name;
         if (last_name !== undefined) metaUpdate.last_name = last_name;
@@ -257,20 +313,20 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      return json({ success: true });
+      return jsonResp({ success: true });
     }
 
     // ─── RESET PASSWORD ────────────────────────────────────────
-    if (action === "reset-password" && req.method === "POST") {
-      const body = await req.json();
-      const { user_id, new_password } = body;
+    if (action === "reset-password") {
+      const user_id = safeStr(body.user_id);
+      const new_password = safeStr(body.new_password, 128);
 
-      if (!user_id || !new_password) {
-        return json({ error: "user_id e new_password obbligatori" }, 400);
+      if (!user_id || !UUID_RE.test(user_id)) {
+        return jsonResp({ error: "INVALID_INPUT" }, 400);
       }
 
-      if (new_password.length < 6) {
-        return json({ error: "Password minima 6 caratteri" }, 400);
+      if (!new_password || new_password.length < 6) {
+        return jsonResp({ error: "INVALID_INPUT" }, 400);
       }
 
       const { error: resetError } =
@@ -279,15 +335,19 @@ Deno.serve(async (req: Request) => {
         });
 
       if (resetError) {
-        return json({ error: resetError.message }, 400);
+        return jsonResp({ error: "INTERNAL_ERROR" }, 500);
       }
 
-      return json({ success: true });
+      await adminClient
+        .from("profiles")
+        .update({ force_password_change: true })
+        .eq("id", user_id);
+
+      return jsonResp({ success: true });
     }
 
-    return json({ error: `Azione non valida: ${action}` }, 400);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Errore interno";
-    return json({ error: msg }, 500);
+    return jsonResp({ error: "INVALID_ACTION" }, 400);
+  } catch {
+    return jsonResp({ error: "INTERNAL_ERROR" }, 500);
   }
 });
