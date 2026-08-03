@@ -67,7 +67,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   SITE_NOT_AVAILABLE: 'Il sito di registrazione non è disponibile al momento.',
   REGISTRATION_REJECTED: 'La registrazione è stata rifiutata. Verificare i dati inseriti.',
   VALIDATION_ERROR: 'Dati non validi. Controllare i campi obbligatori.',
-  ALREADY_REGISTERED: 'Risulti già registrato/a a questo evento.',
+  REGISTRATION_NOT_COMPLETED: 'Non è stato possibile completare la registrazione. Se hai già inviato questo modulo, controlla la tua email di conferma.',
   EVENT_FULL: 'L\'evento ha raggiunto la capacità massima.',
 }
 
