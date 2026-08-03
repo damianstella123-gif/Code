@@ -266,7 +266,7 @@ export default function PublicRegistration() {
       })
       setResult(res)
       if (res.registration_id && res.qr_token) {
-        fireEmail(res.registration_id, res.qr_token, res.manage_token)
+        fireEmail(res.registration_id, res.qr_token, res.manage_token, res.email_signature, res.email_issued_at)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Si è verificato un errore. Riprovare più tardi.')
@@ -275,9 +275,9 @@ export default function PublicRegistration() {
     }
   }
 
-  async function fireEmail(regId: string, qrTk: string, manageTk?: string | null) {
+  async function fireEmail(regId: string, qrTk: string, manageTk?: string | null, sig?: string | null, issuedAt?: number | null) {
     setEmailState('sending')
-    const status: EmailDeliveryStatus = await sendRegistrationConfirmationEmail(regId, qrTk, manageTk)
+    const status: EmailDeliveryStatus = await sendRegistrationConfirmationEmail(regId, qrTk, manageTk, sig, issuedAt)
     if (status === 'sent' || status === 'already_sent') {
       setEmailState('sent')
     } else if (status === 'processing') {
@@ -290,7 +290,7 @@ export default function PublicRegistration() {
   async function handleRetryEmail() {
     if (emailRetrying || !result?.registration_id || !result?.qr_token) return
     setEmailRetrying(true)
-    await fireEmail(result.registration_id, result.qr_token, result.manage_token)
+    await fireEmail(result.registration_id, result.qr_token, result.manage_token, result.email_signature, result.email_issued_at)
     setEmailRetrying(false)
   }
 

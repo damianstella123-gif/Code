@@ -30,6 +30,30 @@ function bytesToHex(buf: ArrayBuffer): string {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+const TWENTY_FOUR_HOURS_S = 24 * 60 * 60;
+
+async function computeHmac(message: string, keyHex: string): Promise<string> {
+  const enc = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(keyHex),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(message));
+  return bytesToHex(sig);
+}
+
 function buildManageBlock(url: string, expiry: string | null, color: string): string {
   const expiryLine = expiry
     ? `<p style="margin:8px 0 0;font-size:12px;color:#6b7280;">Link valido fino al ${escapeHtml(expiry)}</p>`
@@ -179,6 +203,7 @@ Deno.serve(async (req: Request) => {
     const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const HMAC_KEY = Deno.env.get("REGISTRATION_EMAIL_HMAC_KEY");
 
     if (!RESEND_API_KEY || !RESEND_FROM_EMAIL || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return new Response(
@@ -198,6 +223,45 @@ Deno.serve(async (req: Request) => {
     const registrationId: string = body.registration_id;
     const suppliedQrToken: string = body.qr_token;
     const suppliedManageToken: string | null = isHex64(body.manage_token) ? body.manage_token : null;
+
+    // ── HMAC signature verification ─────────────────────────────────────
+    if (!HMAC_KEY) {
+      return new Response(
+        JSON.stringify({ status: "failed" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const suppliedSignature = typeof body.email_signature === "string" ? body.email_signature : "";
+    const suppliedIssuedAt = typeof body.email_issued_at === "number" ? body.email_issued_at : 0;
+
+    if (!suppliedSignature || !suppliedIssuedAt) {
+      return new Response(
+        JSON.stringify({ status: "failed" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const nowEpoch = Math.floor(Date.now() / 1000);
+    if (nowEpoch - suppliedIssuedAt > TWENTY_FOUR_HOURS_S || suppliedIssuedAt > nowEpoch + 60) {
+      return new Response(
+        JSON.stringify({ status: "failed" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const expectedSignature = await computeHmac(
+      `${registrationId}:${suppliedQrToken}:${suppliedIssuedAt}`,
+      HMAC_KEY,
+    );
+
+    if (!constantTimeEqual(expectedSignature, suppliedSignature.toLowerCase())) {
+      return new Response(
+        JSON.stringify({ status: "failed" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    // ── End HMAC verification ───────────────────────────────────────────
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 

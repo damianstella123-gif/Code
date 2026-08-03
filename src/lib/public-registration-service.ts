@@ -59,6 +59,8 @@ export interface RegistrationResult {
   confirmation_message: string | null
   manage_token: string | null
   manage_token_expires_at: string | null
+  email_signature: string | null
+  email_issued_at: number | null
 }
 
 // ─── Error translation ───────────────────────────────────────────────────────
@@ -99,15 +101,23 @@ export type EmailDeliveryStatus = 'sent' | 'already_sent' | 'processing' | 'fail
 export async function sendRegistrationConfirmationEmail(
   registrationId: string,
   qrToken: string,
-  manageToken?: string | null
+  manageToken?: string | null,
+  emailSignature?: string | null,
+  emailIssuedAt?: number | null
 ): Promise<EmailDeliveryStatus> {
   if (!UUID_RE.test(registrationId) || !UUID_RE.test(qrToken)) {
     return 'failed'
   }
 
-  const body: Record<string, string> = { registration_id: registrationId, qr_token: qrToken }
+  const body: Record<string, string | number> = { registration_id: registrationId, qr_token: qrToken }
   if (manageToken && HEX_64_RE.test(manageToken)) {
     body.manage_token = manageToken
+  }
+  if (emailSignature) {
+    body.email_signature = emailSignature
+  }
+  if (typeof emailIssuedAt === 'number' && emailIssuedAt > 0) {
+    body.email_issued_at = emailIssuedAt
   }
 
   try {
@@ -172,6 +182,8 @@ export async function submitPublicRegistration(input: RegistrationSubmission): P
     confirmation_message: typeof result.confirmation_message === 'string' ? result.confirmation_message : null,
     manage_token: typeof result.manage_token === 'string' ? result.manage_token : null,
     manage_token_expires_at: typeof result.manage_token_expires_at === 'string' ? result.manage_token_expires_at : null,
+    email_signature: typeof result.email_signature === 'string' ? result.email_signature : null,
+    email_issued_at: typeof result.email_issued_at === 'number' ? result.email_issued_at : null,
   }
 }
 
