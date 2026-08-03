@@ -312,9 +312,9 @@ function CompanyDetail({ group, onBack, onRefresh, onNavigateToEvent }: CompanyD
     const file = e.target.files?.[0]
     if (!file) return
 
-    const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
+    const allowed = ['image/png', 'image/jpeg', 'image/webp']
     if (!allowed.includes(file.type)) {
-      setUploadError('Formato non supportato. Usa PNG, JPG, WEBP o SVG.')
+      setUploadError('Formato non supportato. Usa PNG, JPG o WEBP.')
       return
     }
     if (file.size > 2 * 1024 * 1024) {

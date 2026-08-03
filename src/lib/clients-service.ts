@@ -293,7 +293,17 @@ export async function setReferentePrincipale(clientId: string, referenteId: stri
 
 // ─── Company Logo ───────────────────────────────────────────────────────────
 
+const LOGO_ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp']
+const LOGO_MAX_BYTES = 2 * 1024 * 1024
+
 export async function uploadCompanyLogo(companyName: string, file: File): Promise<string | null> {
+  if (!LOGO_ALLOWED_MIME.includes(file.type)) {
+    throw new Error('Formato non supportato. Usa PNG, JPG o WEBP.')
+  }
+  if (file.size > LOGO_MAX_BYTES) {
+    throw new Error('Il file supera il limite di 2 MB.')
+  }
+
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png'
   const path = `${companyName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_${Date.now()}.${ext}`
 
@@ -302,8 +312,7 @@ export async function uploadCompanyLogo(companyName: string, file: File): Promis
     .upload(path, file, { upsert: true, contentType: file.type })
 
   if (uploadErr) {
-    logError('clients-service', 'uploadCompanyLogo', uploadErr)
-    throw new Error(uploadErr.message)
+    throw new Error('Errore durante il caricamento del logo.')
   }
 
   const { data: urlData } = supabase.storage.from('company-logos').getPublicUrl(path)

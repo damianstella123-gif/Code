@@ -112,6 +112,9 @@ export function SupplierPhotoGallery({ supplierId, supplierCategory }: { supplie
   const filtered = filterCat ? photos.filter(p => p.categoria === filterCat) : photos
   const activeCats = [...new Set(photos.map(p => p.categoria))]
 
+  const PHOTO_ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp', 'image/avif']
+  const PHOTO_MAX_BYTES = 5 * 1024 * 1024
+
   async function handleUpload(files: FileList) {
     if (!files.length) return
     setUploading(true)
@@ -120,11 +123,17 @@ export function SupplierPhotoGallery({ supplierId, supplierCategory }: { supplie
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
+      if (!PHOTO_ALLOWED_MIME.includes(file.type)) {
+        showToast('Formato non supportato. Usa PNG, JPG, WEBP o AVIF.'); continue
+      }
+      if (file.size > PHOTO_MAX_BYTES) {
+        showToast('Il file supera il limite di 5 MB.'); continue
+      }
       const path = `${supplierId}/${Date.now()}-${file.name}`
       const { error: uploadErr } = await supabase.storage
         .from('supplier-photos')
         .upload(path, file)
-      if (uploadErr) { showToast(`Errore upload: ${file.name}`); continue }
+      if (uploadErr) { showToast('Errore durante il caricamento della foto.'); continue }
 
       const { data: urlData } = supabase.storage
         .from('supplier-photos')
@@ -255,7 +264,7 @@ export function SupplierPhotoGallery({ supplierId, supplierCategory }: { supplie
             style={{ border: '2px dashed var(--line)', color: 'var(--muted)' }}>
             <Plus className="w-4 h-4" />
             <span className="text-sm">{uploading ? 'Caricamento...' : 'Seleziona immagini'}</span>
-            <input type="file" multiple accept="image/*" className="hidden" disabled={uploading}
+            <input type="file" multiple accept="image/png,image/jpeg,image/webp,image/avif" className="hidden" disabled={uploading}
               onChange={e => { if (e.target.files) handleUpload(e.target.files) }} />
           </label>
         </div>
