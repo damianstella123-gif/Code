@@ -551,12 +551,12 @@ export default function CommandBar({ events, tasks, clients }: CommandBarProps) 
       const token = session?.access_token
       if (!token) throw new Error('Non autenticato')
 
-      const res = await fetch('https://vbsligpuwjzvywkpkhdn.supabase.co/functions/v1/fly-gateway', {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fly-gateway`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZic2xpZ3B1d2p6dnl3a3BraGRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNDIyNDAsImV4cCI6MjA5NjgxODI0MH0.YaHlfxvKtht8WSg9xWxT3nrFxsJAmC4HcgunLqZwiOQ',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({ message: text.trim(), history: flyHistory }),
       })
