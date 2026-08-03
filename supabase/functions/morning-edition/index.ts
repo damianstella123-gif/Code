@@ -3,24 +3,35 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers":
     "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-function json(data: unknown, status = 200) {
+function jsonResp(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(payload);
+  } catch {
+    return null;
+  }
+}
+
 function getServiceClient() {
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  return createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
 }
 
 Deno.serve(async (req: Request) => {
@@ -28,27 +39,55 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  if (req.method !== "POST") {
+    return jsonResp({ error: "INVALID_ACTION" }, 405);
+  }
+
+  // ─── Authorize: only service_role JWTs ─────────────────────────────
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token) return jsonResp({ error: "AUTH_REQUIRED" }, 401);
+
+  const claims = decodeJwtPayload(token);
+  if (!claims || claims.role !== "service_role") {
+    return jsonResp({ error: "ROLE_NOT_ALLOWED" }, 403);
+  }
+
+  // ─── Validate body ────────────────────────────────────────────────
+  try {
+    const rawBody = await req.text();
+    if (rawBody.length > 0) {
+      const parsed = JSON.parse(rawBody);
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        return jsonResp({ error: "INVALID_INPUT" }, 400);
+      }
+    }
+  } catch {
+    return jsonResp({ error: "INVALID_INPUT" }, 400);
+  }
+
   try {
     const sb = getServiceClient();
-    const url = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Get all active users
     const { data: users } = await sb
       .from("profiles")
       .select("id, first_name, last_name, settings, is_active")
       .eq("is_active", true);
 
     if (!users || users.length === 0) {
-      return json({ ok: true, message: "No active users", processed: 0 });
+      return jsonResp({ ok: true, processed: 0, leave_alerts: 0 });
     }
 
     const today = new Date().toISOString().split("T")[0];
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+    const tomorrow = new Date(Date.now() + 86400000)
+      .toISOString()
+      .split("T")[0];
     const in72h = new Date(Date.now() + 72 * 3600000).toISOString();
 
-    // ─── Leave alerts for admins ──────────────────────────────────────────────
-    const in7days = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+    // ─── Leave alerts for admins ─────────────────────────────────────
+    const in7days = new Date(Date.now() + 7 * 86400000)
+      .toISOString()
+      .split("T")[0];
 
     const { data: admins } = await sb
       .from("profiles")
@@ -57,21 +96,18 @@ Deno.serve(async (req: Request) => {
 
     const adminIds = (admins ?? []).map((a: { id: string }) => a.id);
 
-    // Leaves starting in 7 days
     const { data: leaves7 } = await sb
       .from("leave_requests")
       .select("id, tipo, data_inizio, data_fine, profiles(first_name, last_name)")
       .eq("stato", "approvata")
       .eq("data_inizio", in7days);
 
-    // Leaves starting tomorrow
     const { data: leaves1 } = await sb
       .from("leave_requests")
       .select("id, tipo, data_inizio, data_fine, profiles(first_name, last_name)")
       .eq("stato", "approvata")
       .eq("data_inizio", tomorrow);
 
-    // Leaves active today
     const { data: leavesToday } = await sb
       .from("leave_requests")
       .select("id, tipo, data_inizio, data_fine, profiles(first_name, last_name)")
@@ -79,60 +115,86 @@ Deno.serve(async (req: Request) => {
       .lte("data_inizio", today)
       .gte("data_fine", today);
 
-    const EMOJI: Record<string, string> = { ferie: "🏖️", permesso: "⏰", malattia: "🤒", recupero: "💤" };
+    const EMOJI: Record<string, string> = {
+      ferie: "\u{1F3D6}\uFE0F",
+      permesso: "\u23F0",
+      malattia: "\u{1F912}",
+      recupero: "\u{1F4A4}",
+    };
+
+    let leaveAlerts = 0;
 
     for (const l of leaves7 ?? []) {
-      const prof = l.profiles as unknown as { first_name: string; last_name: string };
+      const prof = l.profiles as unknown as {
+        first_name: string;
+        last_name: string;
+      };
       const nome = `${prof.first_name} ${prof.last_name}`;
       const nots = adminIds.map((aid: string) => ({
-        user_id: aid, is_read: false,
+        user_id: aid,
+        is_read: false,
         title: "\u{1F4C5} Ferie in arrivo",
         message: `${nome} ha ${l.tipo} tra 7 giorni (${l.data_inizio} \u2192 ${l.data_fine}). Verifica la copertura.`,
         type: "leave_reminder",
         related_entity_type: "leave_request",
         related_entity_id: l.id,
       }));
-      if (nots.length > 0) await sb.from("notifications").insert(nots);
+      if (nots.length > 0) {
+        await sb.from("notifications").insert(nots);
+        leaveAlerts += nots.length;
+      }
     }
 
     for (const l of leaves1 ?? []) {
-      const prof = l.profiles as unknown as { first_name: string; last_name: string };
+      const prof = l.profiles as unknown as {
+        first_name: string;
+        last_name: string;
+      };
       const nome = `${prof.first_name} ${prof.last_name}`;
       const nots = adminIds.map((aid: string) => ({
-        user_id: aid, is_read: false,
+        user_id: aid,
+        is_read: false,
         title: "\u26A0\uFE0F Ferie domani",
         message: `Domani ${nome} \u00E8 in ${l.tipo} (fino al ${l.data_fine}). Verifica la copertura.`,
         type: "leave_reminder",
         related_entity_type: "leave_request",
         related_entity_id: l.id,
       }));
-      if (nots.length > 0) await sb.from("notifications").insert(nots);
+      if (nots.length > 0) {
+        await sb.from("notifications").insert(nots);
+        leaveAlerts += nots.length;
+      }
     }
 
     for (const l of leavesToday ?? []) {
-      const prof = l.profiles as unknown as { first_name: string; last_name: string };
+      const prof = l.profiles as unknown as {
+        first_name: string;
+        last_name: string;
+      };
       const nome = `${prof.first_name} ${prof.last_name}`;
       const em = EMOJI[l.tipo] || "\u{1F4C5}";
       const nots = adminIds.map((aid: string) => ({
-        user_id: aid, is_read: false,
+        user_id: aid,
+        is_read: false,
         title: "\u{1F3D6}\uFE0F In ferie oggi",
         message: `${em} Oggi ${nome} \u00E8 in ${l.tipo} (rientra il ${l.data_fine})`,
         type: "leave_reminder",
         related_entity_type: "leave_request",
         related_entity_id: l.id,
       }));
-      if (nots.length > 0) await sb.from("notifications").insert(nots);
+      if (nots.length > 0) {
+        await sb.from("notifications").insert(nots);
+        leaveAlerts += nots.length;
+      }
     }
-    // ─── End leave alerts ─────────────────────────────────────────────────────
 
+    // ─── Per-user morning briefs ─────────────────────────────────────
     let processed = 0;
 
     for (const user of users) {
-      // Check morningEdition setting (default: true)
       const settings = (user.settings || {}) as Record<string, unknown>;
       if (settings.morningEdition === false) continue;
 
-      // a) Overdue tasks assigned to this user
       const { data: overdueTasks } = await sb
         .from("tasks")
         .select("id, titolo, scadenza, priorita, stato")
@@ -140,7 +202,6 @@ Deno.serve(async (req: Request) => {
         .neq("stato", "completato")
         .lt("scadenza", today);
 
-      // b) Tasks due today/tomorrow
       const { data: upcomingTasks } = await sb
         .from("tasks")
         .select("id, titolo, scadenza, priorita, stato")
@@ -148,7 +209,6 @@ Deno.serve(async (req: Request) => {
         .neq("stato", "completato")
         .in("scadenza", [today, tomorrow]);
 
-      // c) Events in next 72h
       const { data: upcomingEvents } = await sb
         .from("events")
         .select("id, nome, data_inizio, location, stato")
@@ -156,14 +216,13 @@ Deno.serve(async (req: Request) => {
         .lte("data_inizio", in72h)
         .neq("stato", "completato");
 
-      // d) Budget warnings — events where cost > 90% of budget
       const { data: budgetEvents } = await sb
         .from("events")
         .select("id, nome, budget")
         .neq("stato", "completato")
         .gt("budget", 0);
 
-      const budgetWarnings: { nome: string; budget: number; spent: number }[] = [];
+      const budgetWarnings: { nome: string }[] = [];
       if (budgetEvents) {
         for (const ev of budgetEvents.slice(0, 10)) {
           const { data: budgetRows } = await sb
@@ -172,117 +231,69 @@ Deno.serve(async (req: Request) => {
             .eq("evento", ev.id);
           if (budgetRows) {
             const spent = budgetRows.reduce(
-              (s: number, r: { costo_unitario: number | null; quantita: number | null }) =>
-                s + (r.costo_unitario || 0) * (r.quantita || 1),
+              (
+                s: number,
+                r: { costo_unitario: number | null; quantita: number | null }
+              ) => s + (r.costo_unitario || 0) * (r.quantita || 1),
               0
             );
             if (spent > ev.budget * 0.9) {
-              budgetWarnings.push({ nome: ev.nome, budget: ev.budget, spent });
+              budgetWarnings.push({ nome: ev.nome });
             }
           }
         }
       }
 
-      // e) Payments due today/tomorrow or overdue
       const { data: paymentsDue } = await sb
         .from("event_payments")
-        .select("id, event_id, tipo, descrizione, importo, data_scadenza")
+        .select("id, data_scadenza")
         .is("data_pagamento", null)
         .lte("data_scadenza", tomorrow);
 
-      const paymentAlerts: { descrizione: string; importo: number; scadenza: string; in_ritardo: boolean }[] = [];
-      if (paymentsDue) {
-        for (const p of paymentsDue) {
-          paymentAlerts.push({
-            descrizione: p.descrizione,
-            importo: p.importo,
-            scadenza: p.data_scadenza,
-            in_ritardo: p.data_scadenza < today,
-          });
-        }
-      }
+      const overduePayments = (paymentsDue ?? []).filter(
+        (p) => p.data_scadenza < today
+      );
+      const duePayments = (paymentsDue ?? []).filter(
+        (p) => p.data_scadenza >= today
+      );
 
-      // Build data payload for Fly
-      const datiUtente = {
-        task_scaduti: (overdueTasks || []).map((t) => ({
-          titolo: t.titolo,
-          scadenza: t.scadenza,
-          priorita: t.priorita,
-        })),
-        task_oggi_domani: (upcomingTasks || []).map((t) => ({
-          titolo: t.titolo,
-          scadenza: t.scadenza,
-          priorita: t.priorita,
-        })),
-        eventi_72h: (upcomingEvents || []).map((e) => ({
-          nome: e.nome,
-          data: e.data_inizio,
-          location: e.location,
-        })),
-        budget_warning: budgetWarnings,
-        pagamenti_scadenza: paymentAlerts,
-      };
+      const overdueCount = (overdueTasks ?? []).length;
+      const upcomingCount = (upcomingTasks ?? []).length;
+      const eventsCount = (upcomingEvents ?? []).length;
+      const budgetCount = budgetWarnings.length;
+      const overduePayCount = overduePayments.length;
+      const duePayCount = duePayments.length;
 
-      // Skip if there's nothing to report
       const hasContent =
-        datiUtente.task_scaduti.length > 0 ||
-        datiUtente.task_oggi_domani.length > 0 ||
-        datiUtente.eventi_72h.length > 0 ||
-        datiUtente.budget_warning.length > 0 ||
-        datiUtente.pagamenti_scadenza.length > 0;
+        overdueCount > 0 ||
+        upcomingCount > 0 ||
+        eventsCount > 0 ||
+        budgetCount > 0 ||
+        overduePayCount > 0 ||
+        duePayCount > 0;
 
       if (!hasContent) continue;
 
-      // Call fly-gateway to generate the brief
-      const flyPayload = {
-        message: `Genera l'Edizione del mattino per ${user.first_name || "l'utente"}: sintesi operativa in max 5 punti, tono da Chief of Staff, priorità urgenti prima, italiano. Dati: ${JSON.stringify(datiUtente)}`,
-        history: [],
-      };
+      const lines: string[] = [];
+      if (overdueCount > 0)
+        lines.push(
+          `${overdueCount} task in ritardo richiedono attenzione immediata.`
+        );
+      if (upcomingCount > 0)
+        lines.push(`${upcomingCount} task in scadenza oggi/domani.`);
+      if (eventsCount > 0)
+        lines.push(`${eventsCount} eventi nelle prossime 72 ore.`);
+      if (budgetCount > 0)
+        lines.push(`${budgetCount} budget in zona critica (>90%).`);
+      if (overduePayCount > 0)
+        lines.push(`${overduePayCount} pagamenti in ritardo.`);
+      if (duePayCount > 0)
+        lines.push(`${duePayCount} pagamenti in scadenza oggi/domani.`);
 
-      let briefText = "";
-      try {
-        const flyRes = await fetch(`${url}/functions/v1/fly-gateway`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${serviceKey}`,
-          },
-          body: JSON.stringify(flyPayload),
-        });
-
-        if (flyRes.ok) {
-          const flyData = await flyRes.json();
-          briefText = flyData.reply || flyData.message || "";
-        }
-      } catch (flyErr) {
-        console.error(`Fly call failed for user ${user.id}:`, flyErr);
-      }
-
-      // Fallback: if Fly didn't respond, generate a simple summary
-      if (!briefText) {
-        const lines: string[] = [];
-        if (datiUtente.task_scaduti.length > 0)
-          lines.push(`${datiUtente.task_scaduti.length} task in ritardo richiedono attenzione immediata.`);
-        if (datiUtente.task_oggi_domani.length > 0)
-          lines.push(`${datiUtente.task_oggi_domani.length} task in scadenza oggi/domani.`);
-        if (datiUtente.eventi_72h.length > 0)
-          lines.push(`${datiUtente.eventi_72h.length} eventi nelle prossime 72 ore.`);
-        if (datiUtente.budget_warning.length > 0)
-          lines.push(`${datiUtente.budget_warning.length} budget in zona critica (>90%).`);
-        const overdue = datiUtente.pagamenti_scadenza.filter(p => p.in_ritardo);
-        const due = datiUtente.pagamenti_scadenza.filter(p => !p.in_ritardo);
-        if (overdue.length > 0)
-          lines.push(`${overdue.length} pagamenti in ritardo.`);
-        if (due.length > 0)
-          lines.push(`${due.length} pagamenti in scadenza oggi/domani.`);
-        briefText = lines.join(" ");
-      }
-
-      // Insert notification
       await sb.from("notifications").insert({
         user_id: user.id,
         title: "Edizione del Mattino",
-        message: briefText,
+        message: lines.join(" "),
         type: "morning_edition",
         related_entity_type: "morning_edition",
         is_read: false,
@@ -291,9 +302,8 @@ Deno.serve(async (req: Request) => {
       processed++;
     }
 
-    return json({ ok: true, processed });
-  } catch (err) {
-    console.error("Morning edition error:", err);
-    return json({ error: (err as Error).message }, 500);
+    return jsonResp({ ok: true, processed, leave_alerts: leaveAlerts });
+  } catch {
+    return jsonResp({ error: "INTERNAL_ERROR" }, 500);
   }
 });
