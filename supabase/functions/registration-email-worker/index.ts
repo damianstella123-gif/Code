@@ -142,6 +142,68 @@ Questa email è stata inviata automaticamente. Non rispondere a questo messaggio
 </body></html>`;
 }
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(payload);
+  } catch {
+    return null;
+  }
+}
+
+function isServiceRole(req: Request): boolean {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token) return false;
+  const claims = decodeJwtPayload(token);
+  return !!claims && claims.role === "service_role";
+}
+
+function buildRetentionNoticeHtml(params: {
+  firstName: string;
+  siteTitle: string;
+  eventTitle: string;
+  startDate: string | null;
+  endDate: string | null;
+  logoUrl: string | null;
+  primaryColor: string;
+}): string {
+  const name = escapeHtml(params.firstName);
+  const title = escapeHtml(params.eventTitle || params.siteTitle);
+  const color = escapeHtml(params.primaryColor);
+  const start = formatDate(params.startDate);
+  const end = formatDate(params.endDate);
+  const logoBlock = params.logoUrl
+    ? `<img src="${escapeHtml(params.logoUrl)}" alt="" style="max-height:48px;margin-bottom:16px;" />`
+    : "";
+  const dateBlock = start
+    ? `<p style="margin:4px 0;font-size:14px;color:#374151;"><strong>Date evento:</strong> ${escapeHtml(start)}${end && end !== start ? ` – ${escapeHtml(end)}` : ""}</p>`
+    : "";
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body style="margin:0;padding:0;background:#f9fafb;font-family:sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:100%;">
+<tr><td style="background:${color};padding:24px;text-align:center;">
+${logoBlock}
+<h1 style="margin:0;color:#ffffff;font-size:20px;">Dati di registrazione cancellati</h1>
+</td></tr>
+<tr><td style="padding:24px 32px;">
+<p style="margin:0 0 16px;font-size:16px;color:#111827;">Gentile <strong>${name}</strong>,</p>
+<p style="margin:0 0 12px;font-size:14px;color:#374151;line-height:1.5;">La informiamo che, in conformità alla politica di conservazione dei dati della nostra agenzia, i Suoi dati personali di registrazione (nome, contatti, esigenze alimentari/accessibilità) relativi all'evento <strong>${title}</strong> sono stati cancellati oggi, a 30 giorni dalla conclusione dell'evento, come Le era stato comunicato al momento della registrazione.</p>
+${dateBlock}
+<p style="margin:16px 0 0;font-size:14px;color:#374151;line-height:1.5;">Non è richiesta alcuna azione da parte Sua. Se in futuro desidera partecipare ad altri eventi, potrà registrarsi nuovamente.</p>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;font-size:11px;color:#9ca3af;text-align:center;border-top:1px solid #f3f4f6;">
+Questa email è stata inviata automaticamente. Non rispondere a questo messaggio.<br/>I Suoi dati sono trattati nel rispetto della normativa sulla privacy.
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
 function buildWaitlistHtml(params: {
   firstName: string;
   siteTitle: string;
@@ -213,7 +275,21 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => null);
-    if (!body || !isUUID(body.registration_id) || !isUUID(body.qr_token)) {
+    if (!body || !isUUID(body.registration_id)) {
+      return new Response(
+        JSON.stringify({ status: "failed" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const isRetention = body.template === "retention_notice";
+    if (isRetention && !isServiceRole(req)) {
+      return new Response(
+        JSON.stringify({ status: "failed" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (!isRetention && !isUUID(body.qr_token)) {
       return new Response(
         JSON.stringify({ status: "failed" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -221,45 +297,47 @@ Deno.serve(async (req: Request) => {
     }
 
     const registrationId: string = body.registration_id;
-    const suppliedQrToken: string = body.qr_token;
+    const suppliedQrToken: string = isRetention ? "" : body.qr_token;
     const suppliedManageToken: string | null = isHex64(body.manage_token) ? body.manage_token : null;
 
-    // ── HMAC signature verification ─────────────────────────────────────
-    if (!HMAC_KEY) {
-      return new Response(
-        JSON.stringify({ status: "failed" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    // ── HMAC signature verification (browser-initiated templates only) ──
+    if (!isRetention) {
+      if (!HMAC_KEY) {
+        return new Response(
+          JSON.stringify({ status: "failed" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const suppliedSignature = typeof body.email_signature === "string" ? body.email_signature : "";
+      const suppliedIssuedAt = typeof body.email_issued_at === "number" ? body.email_issued_at : 0;
+
+      if (!suppliedSignature || !suppliedIssuedAt) {
+        return new Response(
+          JSON.stringify({ status: "failed" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const nowEpoch = Math.floor(Date.now() / 1000);
+      if (nowEpoch - suppliedIssuedAt > TWENTY_FOUR_HOURS_S || suppliedIssuedAt > nowEpoch + 60) {
+        return new Response(
+          JSON.stringify({ status: "failed" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const expectedSignature = await computeHmac(
+        `${registrationId}:${suppliedQrToken}:${suppliedIssuedAt}`,
+        HMAC_KEY,
       );
-    }
 
-    const suppliedSignature = typeof body.email_signature === "string" ? body.email_signature : "";
-    const suppliedIssuedAt = typeof body.email_issued_at === "number" ? body.email_issued_at : 0;
-
-    if (!suppliedSignature || !suppliedIssuedAt) {
-      return new Response(
-        JSON.stringify({ status: "failed" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const nowEpoch = Math.floor(Date.now() / 1000);
-    if (nowEpoch - suppliedIssuedAt > TWENTY_FOUR_HOURS_S || suppliedIssuedAt > nowEpoch + 60) {
-      return new Response(
-        JSON.stringify({ status: "failed" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const expectedSignature = await computeHmac(
-      `${registrationId}:${suppliedQrToken}:${suppliedIssuedAt}`,
-      HMAC_KEY,
-    );
-
-    if (!constantTimeEqual(expectedSignature, suppliedSignature.toLowerCase())) {
-      return new Response(
-        JSON.stringify({ status: "failed" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (!constantTimeEqual(expectedSignature, suppliedSignature.toLowerCase())) {
+        return new Response(
+          JSON.stringify({ status: "failed" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
     // ── End HMAC verification ───────────────────────────────────────────
 
@@ -272,7 +350,13 @@ Deno.serve(async (req: Request) => {
       .eq("id", registrationId)
       .maybeSingle();
 
-    if (regErr || !reg || reg.qr_token !== suppliedQrToken) {
+    if (regErr || !reg) {
+      return new Response(
+        JSON.stringify({ status: "failed" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (!isRetention && reg.qr_token !== suppliedQrToken) {
       return new Response(
         JSON.stringify({ status: "failed" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -280,8 +364,9 @@ Deno.serve(async (req: Request) => {
     }
 
     // Load outbox row
-    const template =
-      reg.registration_status === "confirmed"
+    const template = isRetention
+      ? "retention_notice"
+      : reg.registration_status === "confirmed"
         ? "registration_confirmed"
         : reg.registration_status === "waitlist"
           ? "registration_waitlist"
@@ -399,6 +484,9 @@ Deno.serve(async (req: Request) => {
         manageExpiry,
       });
       subject = `Registrazione confermata – ${escapeHtml(site?.title || event?.title || "Evento")}`;
+    } else if (template === "retention_notice") {
+      html = buildRetentionNoticeHtml(emailParams);
+      subject = `Cancellazione dati di registrazione – ${escapeHtml(event?.title || site?.title || "Evento")}`;
     } else {
       html = buildWaitlistHtml({ ...emailParams, manageUrl, manageExpiry });
       subject = `Lista d'attesa – ${escapeHtml(site?.title || event?.title || "Evento")}`;
