@@ -345,7 +345,7 @@ Deno.serve(async (req: Request) => {
 
     // Load registration and verify qr_token
     const { data: reg, error: regErr } = await supabase
-      .from("event_registrations")
+      .from("event_registrations_readable")
       .select("id, first_name, last_name, email, registration_status, qr_token, site_id, event_id, manage_token_hash, manage_token_expires_at, manage_token_revoked_at")
       .eq("id", registrationId)
       .maybeSingle();

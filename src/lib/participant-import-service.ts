@@ -473,7 +473,7 @@ export async function checkParticipantImportDuplicates(
   if (!allowed) throw new Error('Non hai i permessi per importare partecipanti in questo evento.')
 
   const { data, error } = await supabase
-    .from('event_registrations')
+    .from('event_registrations_readable')
     .select('id, first_name, last_name, email, company')
     .eq('event_id', eventId)
 
@@ -520,27 +520,21 @@ export async function importParticipantRows(
   }
 
   const payload = newRows.map(row => ({
-    site_id: null,
-    event_id: eventId,
-    source: 'import',
-    registration_status: 'confirmed',
     first_name: row.first_name,
     last_name: row.last_name,
-    email: row.email || null,
+    email: row.email || '',
     phone: row.phone,
     company: row.company,
     job_title: row.job_title,
     dietary_requirements: row.dietary_requirements,
     accessibility_requirements: row.accessibility_requirements,
     custom_answers: row.extraFields,
-    privacy_accepted: false,
-    marketing_consent: false,
   }))
 
-  const { data, error } = await supabase
-    .from('event_registrations')
-    .insert(payload)
-    .select('id')
+  const { data, error } = await supabase.rpc('bulk_import_event_registrations', {
+    p_event_id: eventId,
+    p_rows: payload,
+  })
 
   if (error) {
     if (error.code === '23505') {
@@ -549,9 +543,11 @@ export async function importParticipantRows(
     throw new Error('Errore durante l\'inserimento dei partecipanti. Riprova.')
   }
 
+  const inserted = (data ?? []) as Array<{ id: string }>
+
   return {
-    insertedCount: data?.length ?? 0,
-    skippedDuplicateCount: duplicates.length,
-    insertedIds: (data ?? []).map(r => r.id),
+    insertedCount: inserted.length,
+    skippedDuplicateCount: duplicates.length + Math.max(0, newRows.length - inserted.length),
+    insertedIds: inserted.map(r => r.id),
   }
 }

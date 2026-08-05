@@ -2370,9 +2370,11 @@ async function executeProposal(
         const { rows: validRows, errors: parseErrors } = parseParticipantSheet(sheet, safeMapping, preserveUnmapped);
         if (validRows.length === 0) throw new Error("Nessuna riga valida trovata nel foglio selezionato.");
 
-        // Re-check duplicates against DB immediately before insert
+        // Re-check duplicates against DB immediately before insert.
+        // Reads go through the readable view so first_name/last_name/email
+        // come back decrypted when only the _enc columns are populated.
         const { data: existing, error: existErr } = await supabaseClient
-          .from("event_registrations")
+          .from("event_registrations_readable")
           .select("first_name, last_name, email, company")
           .eq("event_id", eventId);
         if (existErr) throw new Error("Impossibile verificare i partecipanti esistenti.");
@@ -2410,33 +2412,33 @@ async function executeProposal(
 
         if (newRows.length === 0) throw new Error("Tutti i partecipanti risultano già presenti.");
 
-        // Insert in one atomic batch
+        // Insert in one atomic batch via the server-side RPC that
+        // dual-writes plaintext and encrypted columns using the shared
+        // pii_key() + _hmac_email_lookup() helpers.
         const payload = newRows.map((row) => ({
-          site_id: null,
-          event_id: eventId,
-          source: "import",
-          registration_status: "confirmed",
           first_name: row.first_name,
           last_name: row.last_name,
-          email: row.email || null,
+          email: row.email || "",
           phone: row.phone || "",
           company: row.company || "",
           job_title: row.job_title || "",
           dietary_requirements: row.dietary_requirements || "",
           accessibility_requirements: row.accessibility_requirements || "",
           custom_answers: row.extraFields,
-          privacy_accepted: false,
-          marketing_consent: false,
         }));
 
-        const { error: insErr } = await supabaseClient
-          .from("event_registrations")
-          .insert(payload);
+        const { data: insertedRows, error: insErr } = await supabaseClient.rpc(
+          "bulk_import_event_registrations",
+          { p_event_id: eventId, p_rows: payload },
+        );
         if (insErr) throw new Error("Errore durante l'inserimento dei partecipanti.");
 
+        const insertedCount = Array.isArray(insertedRows) ? insertedRows.length : 0;
+        const rpcSkipped = Math.max(0, newRows.length - insertedCount);
+
         result = {
-          inserted_count: newRows.length,
-          duplicate_count: duplicateCount,
+          inserted_count: insertedCount,
+          duplicate_count: duplicateCount + rpcSkipped,
           invalid_count: parseErrors.length,
         };
 
@@ -2444,7 +2446,7 @@ async function executeProposal(
         await supabaseClient.from("fly_actions_log").insert({
           user_id: userId,
           action_type: "import_participants",
-          payload: { event_id: eventId, inserted_count: newRows.length, duplicate_count: duplicateCount, invalid_count: parseErrors.length },
+          payload: { event_id: eventId, inserted_count: insertedCount, duplicate_count: duplicateCount + rpcSkipped, invalid_count: parseErrors.length },
           status: "executed",
         });
         return { success: true, message: "Azione eseguita.", data: result };

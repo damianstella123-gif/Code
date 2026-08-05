@@ -30,7 +30,7 @@ export async function fetchEventRegistrations(
   siteId?: string,
 ): Promise<EventRegistration[]> {
   let query = supabase
-    .from('event_registrations')
+    .from('event_registrations_readable')
     .select('*')
     .eq('event_id', eventId)
     .order('created_at', { ascending: false })
@@ -97,7 +97,7 @@ export async function findRegistrationByQr(
   qrToken: string,
 ): Promise<EventRegistration | null> {
   const { data, error } = await supabase
-    .from('event_registrations')
+    .from('event_registrations_readable')
     .select('*')
     .eq('event_id', eventId)
     .eq('qr_token', qrToken)
