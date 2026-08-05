@@ -213,6 +213,11 @@ export async function parseParticipantDocument(
   const buffer = await blob.arrayBuffer()
   const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' })
 
+  await supabase
+    .from('documents')
+    .update({ is_participant_data: true })
+    .eq('id', document.id)
+
   const sheets: ParticipantImportSheet[] = []
 
   for (const sheetName of workbook.SheetNames) {
