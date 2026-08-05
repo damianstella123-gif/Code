@@ -631,7 +631,7 @@ export default function PublicRegistration() {
             </div>
 
             <p className="pr-label text-xs pl-7" style={{ opacity: 0.75 }}>
-              Per la tua privacy, i tuoi dati personali (nome, contatti, esigenze alimentari/accessibilità) verranno cancellati automaticamente 30 giorni dopo la conclusione dell'evento.
+              Per la Sua privacy, i Suoi dati personali (nome, contatti, esigenze alimentari/accessibilità) verranno cancellati automaticamente 30 giorni dopo la conclusione dell'evento.
             </p>
 
             <div className="flex items-start gap-3">
