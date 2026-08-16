@@ -81,7 +81,50 @@ export function getBreakLabel(type: BreakType): string {
   return BREAK_LABELS[type]
 }
 
-export async function getBreakRecommendation(): Promise<{ type: BreakType; text: string } | null> {
+export type BreakTriggerReason = 'time_elapsed' | 'mood_low'
+
+export interface BreakRecommendation {
+  type: BreakType
+  text: string
+  reason: BreakTriggerReason
+  workMinutes: number
+}
+
+const MOOD_LOW_THRESHOLD = 2
+const RECENT_MOOD_WINDOW_HOURS = 4
+
+const BREAK_TEXTS: Record<BreakType, string> = {
+  walk: 'Sei al lavoro da un po\'. Alzati e fai due passi: schiarisce le idee.',
+  zen: 'Prenditi un momento di calma: tre respiri lenti e occhi chiusi per un minuto.',
+  hydrate: 'Bevi un bicchiere d\'acqua e stacca lo sguardo dallo schermo per un attimo.',
+  stretch: 'Sciogli collo, spalle e polsi con qualche allungamento, un paio di minuti.',
+  vibe: 'Metti la tua canzone preferita e stacca la testa per qualche minuto.',
+}
+
+// Deterministic choice based on how long the current active session has run
+// and the person's most recent mood. Never random, never fabricated.
+function chooseBreak(activeMinutes: number, moodScore: number | null): { type: BreakType; reason: BreakTriggerReason } {
+  if (moodScore !== null && moodScore <= MOOD_LOW_THRESHOLD) {
+    return activeMinutes >= 75
+      ? { type: 'walk', reason: 'mood_low' }
+      : { type: 'zen', reason: 'mood_low' }
+  }
+
+  if (activeMinutes >= 90) return { type: 'walk', reason: 'time_elapsed' }
+  if (activeMinutes >= 60) return { type: 'stretch', reason: 'time_elapsed' }
+  return { type: 'hydrate', reason: 'time_elapsed' }
+}
+
+// DB constraint on break_recommendations.recommendation_type allows a fixed set.
+const DB_RECOMMENDATION_TYPE: Record<BreakType, string> = {
+  walk: 'walk_outdoor',
+  zen: 'meditation',
+  hydrate: 'hydration',
+  stretch: 'stretch',
+  vibe: 'social',
+}
+
+export async function getBreakRecommendation(activeMinutes: number): Promise<BreakRecommendation | null> {
   const { data: recent } = await supabase
     .from('break_recommendations')
     .select('created_at')
@@ -94,30 +137,62 @@ export async function getBreakRecommendation(): Promise<{ type: BreakType; text:
     if (now - lastTime < 20 * 60 * 1000) return null
   }
 
-  const types: BreakType[] = ['walk', 'zen', 'hydrate', 'vibe', 'stretch']
-  const type = types[Math.floor(Math.random() * types.length)]
+  const since = new Date()
+  since.setHours(since.getHours() - RECENT_MOOD_WINDOW_HOURS)
 
-  const texts: Record<BreakType, string[]> = {
-    walk: ['Muovi le gambe! Il genio cammina.', 'Steve Jobs faceva meeting camminando. Tu?'],
-    zen: ['3 respiri profondi. Non costa nulla.', 'Chiudi gli occhi 60 secondi. Il mondo resiste.'],
-    hydrate: ['Bevi acqua. Il cervello e al 75% H2O.', 'Un bicchiere d\'acqua = +14% produttivita.'],
-    vibe: ['Metti la tua canzone preferita. 3 minuti.', 'Quick dance break. Nessuno ti giudica.'],
-    stretch: ['Collo, spalle, polsi. 2 minuti.', 'Alzati e stirati. La sedia non e il tuo destino.'],
-  }
+  const { data: moodRows } = await supabase
+    .from('wellness_logs')
+    .select('mood')
+    .eq('tipo', 'mood')
+    .not('mood', 'is', null)
+    .gte('created_at', since.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
 
-  const options = texts[type]
-  const text = options[Math.floor(Math.random() * options.length)]
+  const latestMood = moodRows && moodRows.length > 0 ? (moodRows[0].mood as MoodEmoji) : null
+  const moodScore = latestMood ? (MOOD_SCORES[latestMood] ?? null) : null
 
-  return { type, text }
+  const { type, reason } = chooseBreak(activeMinutes, moodScore)
+
+  return { type, text: BREAK_TEXTS[type], reason, workMinutes: Math.max(0, Math.round(activeMinutes)) }
 }
 
-export async function saveBreakRecommendation(type: BreakType, text: string): Promise<void> {
+export async function saveBreakRecommendation(rec: BreakRecommendation): Promise<void> {
   await supabase.from('break_recommendations').insert({
-    recommendation_type: type,
-    recommendation_text: text,
-    trigger_reason: 'desktime_52min',
-    work_duration_minutes: 52,
+    recommendation_type: DB_RECOMMENDATION_TYPE[rec.type],
+    recommendation_text: rec.text,
+    trigger_reason: rec.reason,
+    work_duration_minutes: rec.workMinutes,
   })
+}
+
+export interface TeamMoodAggregate {
+  sufficient: boolean
+  contributors: number
+  trend: { date: string; avgMood: number; contributors: number }[]
+}
+
+export async function getTeamMoodAggregate(daysBack = 14): Promise<TeamMoodAggregate | null> {
+  const { data, error } = await supabase.rpc('get_team_mood_aggregate', { days_back: daysBack })
+  if (error || !data) return null
+
+  const payload = data as {
+    sufficient?: boolean
+    contributors?: number
+    trend?: { date: string; avg_mood: number; contributors: number }[]
+  }
+
+  return {
+    sufficient: !!payload.sufficient,
+    contributors: Number(payload.contributors) || 0,
+    trend: Array.isArray(payload.trend)
+      ? payload.trend.map(r => ({
+          date: String(r.date),
+          avgMood: Number(r.avg_mood) || 0,
+          contributors: Number(r.contributors) || 0,
+        }))
+      : [],
+  }
 }
 
 export async function markBreakTaken(breakType: BreakType): Promise<void> {

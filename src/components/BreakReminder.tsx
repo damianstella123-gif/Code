@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { X, Coffee, Droplets, Music, Wind, Footprints, Timer } from 'lucide-react'
 import { getBreakRecommendation, saveBreakRecommendation, markBreakTaken, getBreakLabel } from '@/lib/wellness-service'
 import type { BreakType } from '@/lib/wellness-service'
@@ -20,13 +20,15 @@ export default function BreakReminder() {
   const [timerActive, setTimerActive] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState(BREAK_DURATION)
   const [completed, setCompleted] = useState(false)
+  const sessionStartRef = useRef<number>(Date.now())
 
   const triggerBreak = useCallback(async () => {
-    const rec = await getBreakRecommendation()
+    const activeMinutes = (Date.now() - sessionStartRef.current) / 60000
+    const rec = await getBreakRecommendation(activeMinutes)
     if (rec) {
       setBreakInfo(rec)
       setVisible(true)
-      await saveBreakRecommendation(rec.type, rec.text)
+      await saveBreakRecommendation(rec)
     }
   }, [])
 
@@ -54,6 +56,7 @@ export default function BreakReminder() {
   const startBreak = async (type: BreakType) => {
     setTimerActive(true)
     setSecondsLeft(BREAK_DURATION)
+    sessionStartRef.current = Date.now()
     await markBreakTaken(type)
   }
 
