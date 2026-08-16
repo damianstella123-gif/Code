@@ -21,6 +21,17 @@ function errorResponse(status: number) {
   return jsonResponse({ error: "INTERNAL_ERROR" }, status);
 }
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(payload);
+  } catch {
+    return null;
+  }
+}
+
 function getServiceClient() {
   const url = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -54,20 +65,26 @@ Deno.serve(async (req: Request) => {
   const sb = getServiceClient();
 
   const token = authHeader.replace(/^Bearer\s+/i, "");
-  const { data: { user }, error: authErr } = await sb.auth.getUser(token);
 
-  if (authErr || !user) {
-    return jsonResponse({ error: "UNAUTHORIZED" }, 401);
-  }
+  const claims = decodeJwtPayload(token);
+  const isServiceRole = !!claims && claims.role === "service_role";
 
-  const { data: profile } = await sb
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
+  if (!isServiceRole) {
+    const { data: { user }, error: authErr } = await sb.auth.getUser(token);
 
-  if (!profile || !ALLOWED_ROLES.includes(profile.role)) {
-    return jsonResponse({ error: "FORBIDDEN" }, 403);
+    if (authErr || !user) {
+      return jsonResponse({ error: "UNAUTHORIZED" }, 401);
+    }
+
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!profile || !ALLOWED_ROLES.includes(profile.role)) {
+      return jsonResponse({ error: "FORBIDDEN" }, 403);
+    }
   }
 
   // --- Run checks ---
