@@ -86,9 +86,12 @@ export default function WellnessDashboard() {
                 strokeDasharray={`${(stats?.wellnessScore || 0) * 2.64} 264`}
               />
             </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-xl sm:text-2xl font-bold" style={{ color: 'var(--foreground)' }}>
                 {stats?.wellnessScore || 0}
+              </span>
+              <span className="text-[9px] leading-tight" style={{ color: 'var(--muted)' }}>
+                Punteggio generale
               </span>
             </div>
           </div>
