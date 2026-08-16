@@ -34,19 +34,19 @@ export function getMoodEmoji(mood: MoodEmoji): string {
 
 // The database stores mood as emoji characters; the app uses friendly names.
 const MOOD_TO_DB: Record<MoodEmoji, string> = {
-  fire: '\u{1F525}',
+  fire: '\u{1F60D}',
   happy: '\u{1F60A}',
   neutral: '\u{1F610}',
-  tired: '\u{1F634}',
-  dead: '\u{1F480}',
+  tired: '\u{1F615}',
+  dead: '\u{1F620}',
 }
 
 const DB_TO_MOOD: Record<string, MoodEmoji> = {
-  '\u{1F525}': 'fire',
+  '\u{1F60D}': 'fire',
   '\u{1F60A}': 'happy',
   '\u{1F610}': 'neutral',
-  '\u{1F634}': 'tired',
-  '\u{1F480}': 'dead',
+  '\u{1F615}': 'tired',
+  '\u{1F620}': 'dead',
 }
 
 function dbMoodToApp(dbMood: string): MoodEmoji {
@@ -63,11 +63,12 @@ const BREAK_TO_DB: Record<BreakType, string> = {
 }
 
 export async function logMood(mood: MoodEmoji, context?: string): Promise<void> {
-  await supabase.from('wellness_logs').insert({
+  const { error } = await supabase.from('wellness_logs').insert({
     tipo: 'mood_emoji',
     mood: MOOD_TO_DB[mood],
     mood_context: context || null,
   })
+  if (error) throw new Error(`Failed to log mood: ${error.message}`)
 }
 
 export async function getRecentMoods(days = 7): Promise<{ mood: MoodEmoji; created_at: string }[]> {
@@ -242,12 +243,13 @@ export async function markBreakTaken(breakType: BreakType): Promise<void> {
       .eq('id', data[0].id)
   }
 
-  await supabase.from('wellness_logs').insert({
+  const { error: breakLogError } = await supabase.from('wellness_logs').insert({
     tipo: 'break_taken',
     break_type: BREAK_TO_DB[breakType],
     break_taken_at: new Date().toISOString(),
     break_duration_minutes: 17,
   })
+  if (breakLogError) throw new Error(`Failed to log break: ${breakLogError.message}`)
 }
 
 export async function giveRecognition(toUserId: string, tipo: string, message: string): Promise<void> {
