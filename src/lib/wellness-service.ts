@@ -32,10 +32,40 @@ export function getMoodEmoji(mood: MoodEmoji): string {
   return emojis[mood]
 }
 
+// The database stores mood as emoji characters; the app uses friendly names.
+const MOOD_TO_DB: Record<MoodEmoji, string> = {
+  fire: '\u{1F525}',
+  happy: '\u{1F60A}',
+  neutral: '\u{1F610}',
+  tired: '\u{1F634}',
+  dead: '\u{1F480}',
+}
+
+const DB_TO_MOOD: Record<string, MoodEmoji> = {
+  '\u{1F525}': 'fire',
+  '\u{1F60A}': 'happy',
+  '\u{1F610}': 'neutral',
+  '\u{1F634}': 'tired',
+  '\u{1F480}': 'dead',
+}
+
+function dbMoodToApp(dbMood: string): MoodEmoji {
+  return DB_TO_MOOD[dbMood] ?? 'neutral'
+}
+
+// The database stores break_type as specific activity names.
+const BREAK_TO_DB: Record<BreakType, string> = {
+  walk: 'walking',
+  zen: 'meditation',
+  hydrate: 'hydration',
+  stretch: 'stretching',
+  vibe: 'other',
+}
+
 export async function logMood(mood: MoodEmoji, context?: string): Promise<void> {
   await supabase.from('wellness_logs').insert({
-    tipo: 'mood',
-    mood,
+    tipo: 'mood_emoji',
+    mood: MOOD_TO_DB[mood],
     mood_context: context || null,
   })
 }
@@ -47,12 +77,14 @@ export async function getRecentMoods(days = 7): Promise<{ mood: MoodEmoji; creat
   const { data } = await supabase
     .from('wellness_logs')
     .select('mood, created_at')
-    .eq('tipo', 'mood')
+    .eq('tipo', 'mood_emoji')
     .gte('created_at', since.toISOString())
     .order('created_at', { ascending: false })
     .limit(50)
 
-  return (data || []).filter((d): d is { mood: MoodEmoji; created_at: string } => !!d.mood)
+  return (data || [])
+    .filter((d): d is { mood: string; created_at: string } => !!d.mood)
+    .map(d => ({ mood: dbMoodToApp(d.mood), created_at: d.created_at }))
 }
 
 export function computeMoodTrend(moods: { mood: MoodEmoji }[]): 'up' | 'down' | 'stable' {
@@ -143,13 +175,13 @@ export async function getBreakRecommendation(activeMinutes: number): Promise<Bre
   const { data: moodRows } = await supabase
     .from('wellness_logs')
     .select('mood')
-    .eq('tipo', 'mood')
+    .eq('tipo', 'mood_emoji')
     .not('mood', 'is', null)
     .gte('created_at', since.toISOString())
     .order('created_at', { ascending: false })
     .limit(1)
 
-  const latestMood = moodRows && moodRows.length > 0 ? (moodRows[0].mood as MoodEmoji) : null
+  const latestMood = moodRows && moodRows.length > 0 ? dbMoodToApp(moodRows[0].mood) : null
   const moodScore = latestMood ? (MOOD_SCORES[latestMood] ?? null) : null
 
   const { type, reason } = chooseBreak(activeMinutes, moodScore)
@@ -211,8 +243,8 @@ export async function markBreakTaken(breakType: BreakType): Promise<void> {
   }
 
   await supabase.from('wellness_logs').insert({
-    tipo: 'break',
-    break_type: breakType,
+    tipo: 'break_taken',
+    break_type: BREAK_TO_DB[breakType],
     break_taken_at: new Date().toISOString(),
     break_duration_minutes: 17,
   })
@@ -262,14 +294,14 @@ export async function getUserWellnessStats(): Promise<{
     supabase
       .from('wellness_logs')
       .select('mood')
-      .eq('tipo', 'mood')
+      .eq('tipo', 'mood_emoji')
       .gte('created_at', weekAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(10),
     supabase
       .from('wellness_logs')
       .select('id')
-      .eq('tipo', 'break')
+      .eq('tipo', 'break_taken')
       .gte('created_at', today.toISOString()),
     supabase
       .from('recognition_logs')
@@ -283,7 +315,7 @@ export async function getUserWellnessStats(): Promise<{
 
   const moods = (moodsRes.data || []).filter(m => m.mood)
   const avgMood = moods.length > 0
-    ? moods.reduce((sum, m) => sum + (MOOD_SCORES[m.mood as MoodEmoji] || 3), 0) / moods.length
+    ? moods.reduce((sum, m) => sum + (MOOD_SCORES[dbMoodToApp(m.mood)] || 3), 0) / moods.length
     : 3
 
   const breaksToday = breaksRes.data?.length || 0
