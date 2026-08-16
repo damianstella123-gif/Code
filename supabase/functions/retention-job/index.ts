@@ -65,6 +65,7 @@ async function processEvent(
   supabaseUrl: string,
   serviceKey: string,
   event: EventRow,
+  skipNotice: boolean,
 ): Promise<PerEventCounters> {
   const counters: PerEventCounters = {
     registrations_deleted: 0,
@@ -73,7 +74,7 @@ async function processEvent(
     notices_failed: 0,
   };
 
-  // 1. Load registrations and dispatch retention_notice emails
+  // 1. Load registrations and (unless skipped) dispatch retention_notice emails
   const { data: regs } = await sb
     .from("event_registrations")
     .select("id")
@@ -81,20 +82,24 @@ async function processEvent(
 
   const registrationIds: string[] = ((regs ?? []) as RegistrationRow[]).map((r) => r.id);
 
-  for (const regId of registrationIds) {
-    // Idempotent outbox insert (unique on registration_id, template)
-    const { error: outboxErr } = await sb
-      .from("registration_email_outbox")
-      .insert({ registration_id: regId, template: "retention_notice" });
-    // 23505 = unique_violation, treat as already-queued: continue anyway
-    if (outboxErr && (outboxErr as { code?: string }).code !== "23505") {
-      counters.notices_failed += 1;
-      continue;
-    }
+  // skipNotice is used ONLY for the one-time manual catch-up of the backlog.
+  // The default scheduled path leaves skipNotice = false and still sends notices.
+  if (!skipNotice) {
+    for (const regId of registrationIds) {
+      // Idempotent outbox insert (unique on registration_id, template)
+      const { error: outboxErr } = await sb
+        .from("registration_email_outbox")
+        .insert({ registration_id: regId, template: "retention_notice" });
+      // 23505 = unique_violation, treat as already-queued: continue anyway
+      if (outboxErr && (outboxErr as { code?: string }).code !== "23505") {
+        counters.notices_failed += 1;
+        continue;
+      }
 
-    const sent = await sendRetentionNotice(supabaseUrl, serviceKey, regId);
-    if (sent) counters.notices_sent += 1;
-    else counters.notices_failed += 1;
+      const sent = await sendRetentionNotice(supabaseUrl, serviceKey, regId);
+      if (sent) counters.notices_sent += 1;
+      else counters.notices_failed += 1;
+    }
   }
 
   // 2. Collect participant-data documents from both tables, delete storage + rows
@@ -163,19 +168,35 @@ Deno.serve(async (req: Request) => {
     return jsonResp({ error: "INVALID_ACTION" }, 405);
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "");
   if (!token) return jsonResp({ error: "AUTH_REQUIRED" }, 401);
+  // Accept either a JWT with a service_role claim (legacy key format) or a
+  // bearer that matches the project's service role key directly (new sb_secret_
+  // key format, which is not a JWT). The scheduled cron sends this key.
   const claims = decodeJwtPayload(token);
-  if (!claims || claims.role !== "service_role") {
+  const isServiceRole =
+    (!!claims && claims.role === "service_role") || token === serviceKey;
+  if (!isServiceRole) {
     return jsonResp({ error: "ROLE_NOT_ALLOWED" }, 403);
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const sb = createClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+
+  // Optional one-time flag for the manual backlog catch-up. Defaults to false,
+  // so scheduled runs are unchanged and always send retention notices.
+  let skipNotice = false;
+  try {
+    const body = await req.json();
+    skipNotice = body?.skip_notice === true;
+  } catch {
+    skipNotice = false;
+  }
 
   try {
     // Find qualifying events: ended >= 30 days ago, not yet processed
@@ -196,13 +217,14 @@ Deno.serve(async (req: Request) => {
 
     for (const ev of eventList) {
       try {
-        const c = await processEvent(sb, supabaseUrl, serviceKey, ev);
+        const c = await processEvent(sb, supabaseUrl, serviceKey, ev, skipNotice);
         await sb.from("retention_job_log").insert({
           event_id: ev.id,
           registrations_deleted: c.registrations_deleted,
           documents_deleted: c.documents_deleted,
           notices_sent: c.notices_sent,
           notices_failed: c.notices_failed,
+          note: skipNotice ? "catch_up_skip_notice" : null,
         });
         await sb
           .from("events")
@@ -230,6 +252,7 @@ Deno.serve(async (req: Request) => {
 
     return jsonResp({
       ok: true,
+      skip_notice: skipNotice,
       events_considered: eventList.length,
       events_processed: perEvent.length,
     });

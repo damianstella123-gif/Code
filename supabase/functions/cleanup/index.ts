@@ -40,6 +40,10 @@ async function authorize(
   if (claims && claims.role === "service_role") {
     return { ok: true };
   }
+  // New sb_secret_ service key is not a JWT: accept a direct match instead.
+  if (token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
+    return { ok: true };
+  }
 
   const { data: { user }, error } = await adminClient.auth.getUser(token);
   if (error || !user) return jsonResp({ error: "AUTH_REQUIRED" }, 401);

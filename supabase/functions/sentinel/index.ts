@@ -67,7 +67,11 @@ Deno.serve(async (req: Request) => {
   const token = authHeader.replace(/^Bearer\s+/i, "");
 
   const claims = decodeJwtPayload(token);
-  const isServiceRole = !!claims && claims.role === "service_role";
+  // Accept a JWT service_role claim (legacy key) or a direct match against the
+  // new sb_secret_ service key (not a JWT). The scheduled cron sends this key.
+  const isServiceRole =
+    (!!claims && claims.role === "service_role") ||
+    token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!isServiceRole) {
     const { data: { user }, error: authErr } = await sb.auth.getUser(token);
