@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { useChatNotifications } from '@/lib/chat-notifications'
 import { useToast } from '@/lib/toast'
 import CommandBar from '@/components/CommandBar'
+import ShieldStatus from '@/components/ShieldStatus'
 import type { Event } from '@/data/events'
 import type { Task } from '@/data/tasks'
 import type { Client } from '@/data/clients'
@@ -384,6 +385,8 @@ export default function Dashboard() {
         pendingPayments={pendingPayments}
         admin={admin}
       />
+
+      <ShieldStatus />
 
       <div className="wire-tabs" style={{ flexWrap: 'wrap', gap: '4px' }}>
         {(['tutto', 'eventi', 'task', 'clienti'] as const).map(t => (
