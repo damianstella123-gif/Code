@@ -5,7 +5,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchClients } from '@/lib/clients-service'
-import { fetchBudgets } from '@/lib/budgets-service'
+import { fetchEventPaymentsSummary } from '@/lib/event-payments-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchAllProfiles, type Profile } from '@/lib/profiles'
@@ -53,7 +53,7 @@ export default function Presentazioni() {
 
   const refresh = useCallback(async () => {
     const [ev, cl, sp, bg, tk, pr] = await Promise.all([
-      fetchEvents(), fetchClients(), fetchSuppliers(), fetchBudgets(), fetchTasks(), fetchAllProfiles(),
+      fetchEvents(), fetchClients(), fetchSuppliers(), fetchEventPaymentsSummary(), fetchTasks(), fetchAllProfiles(),
     ])
     setEvents(ev)
     setClients(cl as Client[])

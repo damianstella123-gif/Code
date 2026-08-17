@@ -19,7 +19,7 @@ import { loadTasksFromStorage, cacheEventsSnapshot, loadWorkflowsFromStorage } f
 import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote, archiveEvent, restoreEvent, fetchEventById } from '@/lib/events-service'
 import { fetchTasksByEvent } from '@/lib/tasks-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
-import { fetchBudgets } from '@/lib/budgets-service'
+import { fetchEventPaymentsSummary } from '@/lib/event-payments-service'
 import { fetchCommunications } from '@/lib/communications-service'
 import { fetchClients as fetchClientsService } from '@/lib/clients-service'
 import type { Client } from '@/data/clients'
@@ -586,7 +586,7 @@ export default function Eventi() {
   useEffect(() => {
     let cancelled = false
     Promise.all([
-      fetchBudgets(),
+      fetchEventPaymentsSummary(),
       fetchSuppliers(),
       fetchCommunications(),
       fetchClientsService(),

@@ -37,7 +37,7 @@ import { fetchEvents, moveEventWithTimelineShift, resizeEventOnly } from '@/lib/
 import { trackAction } from '@/lib/impact-tracker'
 import { fetchTasks, upsertTask, changeTaskStatus } from '@/lib/tasks-service'
 import { fetchDossiers as fetchPractices } from '@/lib/dossier-service'
-import { fetchBudgets } from '@/lib/budgets-service'
+import { fetchEventPaymentsSummary } from '@/lib/event-payments-service'
 import { fetchCreativeProjects, type CreativeProject } from '@/lib/creative-service'
 import { fetchSocialContents, type SocialContent } from '@/lib/social-service'
 import { supabase } from '@/lib/supabase'
@@ -2366,7 +2366,7 @@ export default function Calendario() {
 
   const refresh = useCallback(async () => {
     try {
-      const [t, e, p, u, cr, so, memos] = await Promise.all([fetchTasks(), fetchEvents(), fetchPractices(), fetchBudgets(), fetchCreativeProjects(), fetchSocialContents(), fetchCalendarItems()])
+      const [t, e, p, u, cr, so, memos] = await Promise.all([fetchTasks(), fetchEvents(), fetchPractices(), fetchEventPaymentsSummary(), fetchCreativeProjects(), fetchSocialContents(), fetchCalendarItems()])
       setAllTasks(t)
       setAllEvents(e)
       setAllPratiche(p)

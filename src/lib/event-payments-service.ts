@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { logError } from './error-log'
+import type { Uscita, StatoPagamento } from '@/data/amministrazione'
 
 export type RequestStatus =
   | 'bozza'
@@ -158,6 +159,43 @@ export async function fetchAllPendingPayments(daysAhead: number = 7): Promise<Ev
     .order('data_scadenza', { ascending: true })
   if (error) { logError('event-payments', 'fetchAllPendingPayments', error); return [] }
   return (data ?? []).map(rowToPayment)
+}
+
+function paymentStatoToUscita(stato: string | null): StatoPagamento {
+  switch (stato) {
+    case 'pagato': return 'pagato'
+    case 'in_ritardo': return 'scaduto'
+    default: return 'in_attesa'
+  }
+}
+
+// Per-event supplier-side spend, shaped as Uscita[] so screens that previously
+// read the dead `budgets` table can consume live event_payments unchanged.
+export async function fetchEventPaymentsSummary(): Promise<Uscita[]> {
+  const { data, error } = await supabase
+    .from('event_payments')
+    .select('id, event_id, supplier_id, categoria, importo, stato, data_scadenza, data_pagamento, note, descrizione')
+    .eq('tipo', 'pagamento_fornitore')
+    .order('data_scadenza', { ascending: true })
+    .limit(2000)
+  if (error) {
+    logError('event-payments', 'fetchEventPaymentsSummary', error)
+    throw new Error(error.message)
+  }
+  return (data ?? []).map((r: any): Uscita => ({
+    id: r.id,
+    fornitoreId: r.supplier_id ?? '',
+    eventoId: r.event_id,
+    categoria: r.categoria ?? '',
+    importo: num(r.importo),
+    quantity: 1,
+    unitPrice: null,
+    stato: paymentStatoToUscita(r.stato),
+    scadenza: r.data_scadenza,
+    dataPagamento: r.data_pagamento,
+    note: r.note ?? r.descrizione ?? '',
+    fatturaId: null,
+  }))
 }
 
 export async function fetchAllUscite(): Promise<EventPayment[]> {
