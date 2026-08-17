@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { X, Coffee, Droplets, Music, Wind, Footprints, Timer } from 'lucide-react'
 import { getBreakRecommendation, saveBreakRecommendation, markBreakTaken, getBreakLabel } from '@/lib/wellness-service'
 import type { BreakType } from '@/lib/wellness-service'
+import { useWellnessConsent } from './WellnessConsent'
 
 const BREAK_ICONS: Record<BreakType, React.ElementType> = {
   walk: Footprints,
@@ -21,6 +22,7 @@ export default function BreakReminder() {
   const [secondsLeft, setSecondsLeft] = useState(BREAK_DURATION)
   const [completed, setCompleted] = useState(false)
   const sessionStartRef = useRef<number>(Date.now())
+  const { status } = useWellnessConsent()
 
   const triggerBreak = useCallback(async () => {
     const activeMinutes = (Date.now() - sessionStartRef.current) / 60000
@@ -33,10 +35,11 @@ export default function BreakReminder() {
   }, [])
 
   useEffect(() => {
+    if (status !== 'granted') return
     const timer = setInterval(triggerBreak, WORK_INTERVAL)
     const initial = setTimeout(triggerBreak, WORK_INTERVAL)
     return () => { clearInterval(timer); clearTimeout(initial) }
-  }, [triggerBreak])
+  }, [triggerBreak, status])
 
   useEffect(() => {
     if (!timerActive || secondsLeft <= 0) return

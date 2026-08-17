@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Minus, Activity, Coffee, Heart, Shield } from 'lucide-react'
 import MoodTracker from './MoodTracker'
+import { useWellnessConsent, WellnessConsentPrompt } from './WellnessConsent'
 import {
   getRecentMoods,
   computeMoodTrend,
@@ -22,10 +23,12 @@ export default function WellnessDashboard() {
   const [moods, setMoods] = useState<{ mood: MoodEmoji; created_at: string }[]>([])
   const [trend, setTrend] = useState<'up' | 'down' | 'stable'>('stable')
   const [refreshKey, setRefreshKey] = useState(0)
+  const { status, accept, decline } = useWellnessConsent()
 
   useEffect(() => {
+    if (status !== 'granted') return
     loadData()
-  }, [refreshKey])
+  }, [refreshKey, status])
 
   async function loadData() {
     const [s, m] = await Promise.all([
@@ -50,6 +53,31 @@ export default function WellnessDashboard() {
     'Stacca lo sguardo dallo schermo ogni 20 minuti.',
   ]
   const dailyTip = tips[new Date().getDay() % tips.length]
+
+  if (status === 'loading') return null
+
+  if (status === 'undecided') {
+    return <WellnessConsentPrompt onAccept={accept} onDecline={decline} />
+  }
+
+  if (status === 'declined') {
+    return (
+      <div
+        className="rounded-2xl p-5 sm:p-6"
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)' }}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <Heart className="w-5 h-5" style={{ color: 'var(--muted)' }} />
+          <h3 className="text-base font-semibold" style={{ color: 'var(--foreground)' }}>
+            Il tuo benessere
+          </h3>
+        </div>
+        <p className="text-sm" style={{ color: 'var(--muted)', lineHeight: 1.5 }}>
+          Le funzioni per il tuo benessere sono disattivate. Puoi riattivarle quando vuoi dalle Impostazioni, nella tua area personale.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">

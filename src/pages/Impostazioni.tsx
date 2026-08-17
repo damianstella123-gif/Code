@@ -22,10 +22,11 @@ import {
   Download,
   User,
   Key,
-
+  Heart,
   Calendar,
 } from 'lucide-react'
 import { loadUser, isAdmin } from '@/lib/auth'
+import { useWellnessConsent } from '@/components/WellnessConsent'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { supabase } from '@/lib/supabase'
 
@@ -748,6 +749,31 @@ function TemaSection() {
   )
 }
 
+function BenessereSection() {
+  const { status, accept, disable } = useWellnessConsent()
+  const granted = status === 'granted'
+
+  async function toggle(v: boolean) {
+    if (v) await accept()
+    else await disable()
+  }
+
+  return (
+    <SectionCard icon={Heart} title="Benessere" subtitle="Pause intelligenti e check-in di come ti senti">
+      <p className="text-sm mb-4" style={{ color: 'var(--muted)', lineHeight: 1.5 }}>
+        Se attivo, Simmetria Synergy pu\u00f2 suggerirti delle pause e chiederti come ti senti durante la
+        giornata. Sono dati solo per te: nessun collega o responsabile vede le tue risposte individuali.
+      </p>
+      <ToggleRow
+        label="Attiva pause e check-in del benessere"
+        hint="Puoi disattivarlo in qualsiasi momento"
+        checked={granted}
+        onChange={toggle}
+      />
+    </SectionCard>
+  )
+}
+
 function NotifichePersonali({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSettings>) => void }) {
   return (
     <SectionCard icon={Bell} title="Notifiche" subtitle="Le tue preferenze di notifica">
@@ -1281,6 +1307,7 @@ const ALL_SECTIONS: SectionDef[] = [
   { id: 'tema', icon: Sun, label: 'Tema', group: 'personal' },
   { id: 'notifiche', icon: Bell, label: 'Notifiche', group: 'personal' },
   { id: 'ferie', icon: Calendar, label: 'Le mie Ferie', group: 'personal' },
+  { id: 'benessere', icon: Heart, label: 'Benessere', group: 'personal' },
   { id: 'fly', icon: Zap, label: 'Fly Assistant', group: 'personal' },
   { id: 'azienda', icon: Building2, label: 'Profilo Azienda', group: 'admin' },
   { id: 'branding', icon: Palette, label: 'Branding', group: 'admin' },
@@ -1463,6 +1490,7 @@ export default function Impostazioni() {
           {activeSection === 'tema' && <TemaSection />}
           {activeSection === 'notifiche' && <NotifichePersonali s={settings} upd={upd} />}
           {activeSection === 'ferie' && <LeMieFerieSection />}
+          {activeSection === 'benessere' && <BenessereSection />}
           {activeSection === 'fly' && <FlyConfig s={settings} upd={upd} />}
           {showAdmin && activeSection === 'azienda' && <ProfiloAzienda s={settings} upd={upd} />}
           {showAdmin && activeSection === 'branding' && <Branding s={settings} upd={upd} />}

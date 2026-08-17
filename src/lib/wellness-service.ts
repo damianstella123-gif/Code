@@ -1,4 +1,28 @@
 import { supabase } from './supabase'
+import { loadUser } from './auth'
+
+// Whether the current user has agreed to let the wellness features run for them.
+// null = not yet decided (show the one-time prompt). A timestamp = consented.
+export async function getWellnessConsent(): Promise<string | null> {
+  const user = loadUser()
+  if (!user) return null
+  const { data } = await supabase
+    .from('profiles')
+    .select('wellness_consent_at')
+    .eq('id', user.id)
+    .maybeSingle()
+  return data?.wellness_consent_at ?? null
+}
+
+export async function setWellnessConsent(enabled: boolean): Promise<void> {
+  const user = loadUser()
+  if (!user) throw new Error('Utente non disponibile')
+  const { error } = await supabase
+    .from('profiles')
+    .update({ wellness_consent_at: enabled ? new Date().toISOString() : null })
+    .eq('id', user.id)
+  if (error) throw new Error(`Impossibile aggiornare il consenso: ${error.message}`)
+}
 
 export type MoodEmoji = 'fire' | 'happy' | 'neutral' | 'tired' | 'dead'
 
