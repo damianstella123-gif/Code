@@ -1,9 +1,9 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sun, Moon, Calendar, ListTodo, AlertCircle, MessageSquare, ChevronRight } from 'lucide-react'
+import { Sun, Moon, Calendar, ListTodo, AlertCircle, MessageSquare, ChevronRight, Palmtree, CreditCard } from 'lucide-react'
 import { loadUser, isAdmin } from '@/lib/auth'
 import { useTheme } from '@/lib/theme'
-import { daysLeft } from '@/lib/format'
+import { daysLeft, fmtLong } from '@/lib/format'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchClients } from '@/lib/clients-service'
@@ -18,6 +18,12 @@ import type { Client } from '@/data/clients'
 
 type StoryTag = 'urgente' | 'corso' | 'buona' | 'attesa'
 type Category = 'eventi' | 'task' | 'clienti'
+
+type LeaveToday = {
+  id: string
+  data_fine: string
+  profiles?: { first_name: string; last_name: string } | null
+}
 
 type Story = {
   id: string
@@ -60,6 +66,9 @@ export default function Dashboard() {
   const [feedFilter, setFeedFilter] = useState<string | null>(null)
   const [sentinelAlerts, setSentinelAlerts] = useState<{ id: string; message: string; created_at: string }[]>([])
   const [morningEdition, setMorningEdition] = useState<{ id: string; message: string; created_at: string } | null>(null)
+  const [leaves, setLeaves] = useState<LeaveToday[]>([])
+  const [pendingPayments, setPendingPayments] = useState(0)
+  const admin = isAdmin(currentUser)
   useEffect(() => {
     async function load() {
       try {
@@ -119,6 +128,21 @@ export default function Dashboard() {
         .limit(1)
         .maybeSingle()
         .then(({ data }) => { if (data) setMorningEdition(data) })
+    }
+    // Team members on approved leave today
+    const todayISO = new Date().toISOString().split('T')[0]
+    supabase.from('leave_requests')
+      .select('id, data_fine, profiles(first_name, last_name)')
+      .eq('stato', 'approvata')
+      .lte('data_inizio', todayISO)
+      .gte('data_fine', todayISO)
+      .then(({ data }) => { if (data) setLeaves(data as unknown as LeaveToday[]) })
+    // Pending payment approvals (admin only)
+    if (admin) {
+      supabase.from('event_payments')
+        .select('id', { count: 'exact', head: true })
+        .eq('stato_approvazione', 'in_attesa')
+        .then(({ count }) => setPendingPayments(count || 0))
     }
     const clock = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(clock)
@@ -326,7 +350,7 @@ export default function Dashboard() {
   return (
     <div className="wire-page" style={{ minWidth: 0, maxWidth: '100%', overflowX: 'hidden' }}>
       <div className="wire-masthead" style={{ flexWrap: 'wrap', gap: '4px 12px' }}>
-        <span className="wire-masthead-title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>SIMMETRIA WIRE{firstName ? ` — ${firstName.toUpperCase()}` : ''}</span>
+        <span className="wire-masthead-title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>SIMMETRIA WIRE{firstName ? ` — Buongiorno, ${firstName}` : ''}</span>
         <div className="wire-masthead-right" style={{ flexShrink: 0 }}>
           <span className="wire-clock" style={{ fontSize: '12px' }}>
             {now.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase()} · {now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -356,6 +380,9 @@ export default function Dashboard() {
         tasks={liveTasks}
         setTasks={setLiveTasks}
         navigate={navigate}
+        leaves={leaves}
+        pendingPayments={pendingPayments}
+        admin={admin}
       />
 
       <div className="wire-tabs" style={{ flexWrap: 'wrap', gap: '4px' }}>
@@ -489,11 +516,14 @@ function MorningEditionCard({ edition }: { edition: { id: string; message: strin
   )
 }
 
-function DashboardWidgets({ events, tasks, setTasks, navigate }: {
+function DashboardWidgets({ events, tasks, setTasks, navigate, leaves, pendingPayments, admin }: {
   events: Event[]
   tasks: Task[]
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>
   navigate: (path: string) => void
+  leaves: LeaveToday[]
+  pendingPayments: number
+  admin: boolean
 }) {
   const { unread } = useChatNotifications()
 
@@ -698,6 +728,66 @@ function DashboardWidgets({ events, tasks, setTasks, navigate }: {
           Chat <ChevronRight className="w-3 h-3" />
         </div>
       </div>
+
+      {/* IL TEAM */}
+      <div
+        className="rounded-[14px] p-4"
+        style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+      >
+        <div className="flex items-center justify-between mb-2 pb-2" style={{ borderBottom: '1px solid var(--line)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Il team</span>
+          <Palmtree className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+        </div>
+        {leaves.length > 0 ? (
+          <>
+            <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--text)', lineHeight: 1.1 }}>
+              {leaves.length}
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>in assenza oggi</p>
+            <div className="space-y-1.5" style={{ minWidth: 0 }}>
+              {leaves.slice(0, 3).map(l => {
+                const name = [l.profiles?.first_name, l.profiles?.last_name].filter(Boolean).join(' ').trim() || 'Membro del team'
+                return (
+                  <div key={l.id} className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--text)', minWidth: 0 }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{name}</span>
+                    <span style={{ color: 'var(--muted)', fontSize: 12, flexShrink: 0 }}>rientra {fmtLong(l.data_fine)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: 'var(--green)', lineHeight: 1.1 }}>0</p>
+            <p style={{ fontSize: 14, color: 'var(--green)', marginTop: 8 }}>Tutti presenti</p>
+          </>
+        )}
+      </div>
+
+      {/* PAGAMENTI IN SOSPESO (admin) */}
+      {admin && (
+        <div
+          className="rounded-[14px] p-4 transition-all cursor-pointer"
+          style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+          onClick={() => navigate('/amministrazione')}
+          onMouseEnter={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--red2) 40%, transparent)')}
+          onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line)')}
+        >
+          <div className="flex items-center justify-between mb-2 pb-2" style={{ borderBottom: '1px solid var(--line)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Pagamenti in sospeso</span>
+            <CreditCard className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+          </div>
+          <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: pendingPayments > 0 ? 'var(--red2)' : 'var(--green)', lineHeight: 1.1 }}>
+            {pendingPayments}
+          </p>
+          <p style={{ fontSize: 14, color: pendingPayments > 0 ? 'var(--muted)' : 'var(--green)', marginTop: 8 }}>
+            {pendingPayments > 0 ? 'da approvare' : 'Nessun pagamento in attesa'}
+          </p>
+          <div className="flex items-center gap-1 mt-3 font-medium" style={{ color: 'var(--red2)', fontSize: 12 }}>
+            Amministrazione <ChevronRight className="w-3 h-3" />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

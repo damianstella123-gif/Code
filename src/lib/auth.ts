@@ -97,7 +97,6 @@ export type NavItem = {
 }
 
 const ALL_NAV: NavItem[] = [
-  { name: 'Oggi', href: '/oggi' },
   { name: 'Dashboard', href: '/dashboard' },
   { name: 'Eventi', href: '/eventi' },
   { name: 'CRM', href: '/crm' },
@@ -130,19 +129,19 @@ export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
 
   if (role === 'Regista') {
     return ALL_NAV.filter(item =>
-      ['/oggi', '/dashboard', '/eventi', '/task', '/calendario', '/fornitori', '/comunicazioni', '/dossier', '/impostazioni', '/feedback-beta'].includes(item.href)
+      ['/dashboard', '/eventi', '/task', '/calendario', '/fornitori', '/comunicazioni', '/dossier', '/impostazioni', '/feedback-beta'].includes(item.href)
     )
   }
 
   if (role === 'Commerciale') {
     return ALL_NAV.filter(item =>
-      ['/oggi', '/dashboard', '/crm', '/presentazioni', '/comunicazioni', '/calendario', '/dossier', '/creative-studio', '/impostazioni', '/feedback-beta'].includes(item.href)
+      ['/dashboard', '/crm', '/presentazioni', '/comunicazioni', '/calendario', '/dossier', '/creative-studio', '/impostazioni', '/feedback-beta'].includes(item.href)
     )
   }
 
   if (role === 'Amministrazione' || role === 'Finance') {
     return ALL_NAV.filter(item =>
-      ['/oggi', '/dashboard', '/amministrazione', '/eventi', '/calendario', '/impostazioni', '/feedback-beta'].includes(item.href)
+      ['/dashboard', '/amministrazione', '/eventi', '/calendario', '/impostazioni', '/feedback-beta'].includes(item.href)
     )
   }
 

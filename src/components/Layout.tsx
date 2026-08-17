@@ -53,7 +53,6 @@ import { fetchNotifications, fetchUnreadCount, markAsRead, markAllAsRead, archiv
 import type { Notification } from '@/lib/notifications-service'
 
 const iconMap: Record<string, React.ElementType> = {
-  '/oggi': Sun,
   '/dashboard': LayoutDashboard,
   '/eventi': Calendar,
   '/crm': Users,
@@ -74,7 +73,7 @@ const iconMap: Record<string, React.ElementType> = {
 }
 
 const NAV_GROUPS: { label: string; paths: string[] }[] = [
-  { label: '', paths: ['/oggi', '/dashboard'] },
+  { label: '', paths: ['/dashboard'] },
   { label: 'Operativo', paths: ['/eventi', '/task', '/calendario', '/fornitori'] },
   { label: 'Business', paths: ['/crm', '/amministrazione'] },
   { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
@@ -269,7 +268,7 @@ function NotificationCard({ notification: n, onAction, onClick }: {
         <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>
           {n.message}
         </div>
-        <button onClick={(e) => { e.stopPropagation(); onAction('/oggi') }}
+        <button onClick={(e) => { e.stopPropagation(); onAction('/dashboard') }}
           style={{ marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
           Leggi tutto &rarr;
         </button>
@@ -724,11 +723,10 @@ function SentinelBadge() {
   )
 }
 
-const PRIMARY_MOBILE_PATHS = ['/oggi', '/dashboard', '/eventi', '/task']
+const PRIMARY_MOBILE_PATHS = ['/dashboard', '/eventi', '/task']
 const OVERFLOW_MOBILE_PATHS = ['/crm', '/calendario', '/fornitori', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/wellness']
 
 const mobileLabels: Record<string, string> = {
-  '/oggi': 'Oggi',
   '/dashboard': 'Home',
   '/eventi': 'Eventi',
   '/crm': 'CRM',
@@ -856,7 +854,6 @@ export default function Layout({ children }: { children: ReactNode }) {
     const timer = setTimeout(() => {
       import('../pages/Eventi')
       import('../pages/Task')
-      import('../pages/Oggi')
     }, 2000)
     return () => clearTimeout(timer)
   }, [])

@@ -9,7 +9,6 @@ import { supabase } from './lib/supabase'
 import { fetchProfile } from './lib/profiles'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
-const Oggi = lazy(() => import('./pages/Oggi'))
 const Eventi = lazy(() => import('./pages/Eventi'))
 const CRM = lazy(() => import('./pages/CRM'))
 const Task = lazy(() => import('./pages/Task'))
@@ -250,7 +249,7 @@ export default function App() {
       <Route path="/manage-registration/:token" element={<LazyPage><ManageRegistration /></LazyPage>} />
 
       <Route path="/dashboard" element={<AuthGuard><Layout><LazyPage><Dashboard /></LazyPage></Layout></AuthGuard>} />
-      <Route path="/oggi" element={<AuthGuard><Layout><LazyPage><Oggi /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/oggi" element={<Navigate to="/dashboard" replace />} />
       <Route path="/eventi" element={<AuthGuard><Layout><LazyPage><Eventi /></LazyPage></Layout></AuthGuard>} />
       <Route path="/crm" element={<AuthGuard><Layout><LazyPage><CRM /></LazyPage></Layout></AuthGuard>} />
       <Route path="/task" element={<AuthGuard><Layout><LazyPage><Task /></LazyPage></Layout></AuthGuard>} />
