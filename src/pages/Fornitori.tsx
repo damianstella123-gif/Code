@@ -1102,10 +1102,16 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
           <div className="relative group flex-shrink-0">
             <SupplierLogo supplier={supplier} size={72} />
             <button onClick={() => fileRef.current?.click()}
-              className="absolute inset-0 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute inset-0 rounded-xl hidden md:flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               style={{ background: 'rgba(0,0,0,0.6)' }}>
               {uploading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 : <Upload className="w-5 h-5 text-white" />}
+            </button>
+            <button onClick={() => fileRef.current?.click()}
+              className="md:hidden absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full flex items-center justify-center shadow-lg"
+              style={{ background: 'var(--accent)' }} title="Carica logo">
+              {uploading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : <Upload className="w-4 h-4 text-white" />}
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
           </div>

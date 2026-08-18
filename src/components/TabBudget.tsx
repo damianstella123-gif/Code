@@ -913,7 +913,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     return (
       <div key={item.id} className="group relative" style={{ borderBottom: '1px solid var(--line)' }}>
         <button
-          className="w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.02] transition-colors"
+          className="w-full text-left pl-4 pr-11 md:px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.02] transition-colors"
           onClick={() => setExpandedId(isExpanded ? null : item.id)}
         >
           <ChevronDown className={`w-3.5 h-3.5 transition-transform flex-shrink-0 ${isExpanded ? '' : '-rotate-90'}`} style={{ color: 'var(--muted)' }} />
@@ -938,7 +938,8 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         {isSupportedTable(item.table) && (
           <button
             onClick={(e) => { e.stopPropagation(); setEditingLine({ id: item.id, table: item.table, categoria: item.categoria }) }}
-            className="absolute right-2 top-2.5 p-1 rounded hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 md:p-1 md:top-2.5 md:translate-y-0 rounded transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-white/10"
+            style={{ background: 'var(--panel2)' }}
             title="Modifica voce economica"
           >
             <Pencil className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />

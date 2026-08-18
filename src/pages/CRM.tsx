@@ -451,7 +451,7 @@ function CompanyDetail({ group, onBack, onRefresh, onNavigateToEvent }: CompanyD
                 </div>
                 <button
                   onClick={() => setEditTarget(row)}
-                  className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10 flex-shrink-0"
+                  className="p-1.5 rounded-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-white/10 flex-shrink-0"
                   title="Modifica referente">
                   <Pencil className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
                 </button>
