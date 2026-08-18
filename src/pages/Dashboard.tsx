@@ -1,8 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sun, Moon, Calendar, ListTodo, AlertCircle, MessageSquare, ChevronRight, Palmtree, CreditCard } from 'lucide-react'
+import { Calendar, ListTodo, AlertCircle, MessageSquare, ChevronRight, Palmtree, CreditCard } from 'lucide-react'
 import { loadUser, isAdmin } from '@/lib/auth'
-import { useTheme } from '@/lib/theme'
 import { daysLeft, fmtLong } from '@/lib/format'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
@@ -54,7 +53,6 @@ function timeAgoLabel(days: number): string {
 export default function Dashboard() {
   const navigate = useNavigate()
   const currentUser = loadUser()
-  const { resolved, toggleTheme } = useTheme()
   const { showToast } = useToast()
 
   const [liveTasks, setLiveTasks] = useState<Task[]>([])
@@ -351,15 +349,12 @@ export default function Dashboard() {
   return (
     <div className="wire-page" style={{ minWidth: 0, maxWidth: '100%', overflowX: 'hidden' }}>
       <div className="wire-masthead" style={{ flexWrap: 'wrap', gap: '4px 12px' }}>
-        <span className="wire-masthead-title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>SIMMETRIA WIRE{firstName ? ` — Buongiorno, ${firstName}` : ''}</span>
+        <span className="wire-masthead-title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Simmetria Synergy{firstName ? ` — Buongiorno, ${firstName}` : ''}</span>
         <div className="wire-masthead-right" style={{ flexShrink: 0 }}>
           <span className="wire-clock" style={{ fontSize: '12px' }}>
             {now.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase()} · {now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
           <span className="wire-live-dot" />
-          <button onClick={toggleTheme} className="wire-theme-toggle" title={resolved === 'dark' ? 'Passa a Light' : 'Passa a Dark'} style={{ minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-            {resolved === 'dark' ? <Moon size={16} style={{ color: 'var(--blue)' }} /> : <Sun size={16} style={{ color: 'var(--yellow)' }} />}
-          </button>
         </div>
       </div>
 

@@ -8,7 +8,7 @@ const CONSENT_EVENT = 'wellness-consent-changed'
 export type ConsentStatus = 'loading' | 'granted' | 'undecided' | 'declined'
 
 const CONSENT_SENTENCE =
-  'Simmetria Synergy pu\u00f2 suggerirti pause e chiederti come ti senti durante la giornata, solo per te \u2014 nessun collega o responsabile vede i tuoi dati individuali. Vuoi attivarlo?'
+  'Simmetria Synergy offre un assistente dedicato al tuo benessere lavorativo, basato su un approccio supportato da studi scientifici in ergonomia e psicologia del lavoro sulla gestione delle pause. Pu\u00f2 suggerirti pause quando ne rileva il bisogno e chiederti, se lo desideri, come ti senti durante la giornata. La tua privacy \u00e8 per noi una priorit\u00e0 concreta, non solo dichiarata: i tuoi dati individuali sono visibili esclusivamente a te; ai responsabili viene mostrato solo un andamento aggregato dell\u2019intero team, mai il dato della singola persona. Puoi attivare o disattivare questa funzione in qualsiasi momento dalle tue Impostazioni personali.'
 
 export function useWellnessConsent() {
   const [status, setStatus] = useState<ConsentStatus>('loading')
@@ -98,7 +98,7 @@ export function WellnessConsentPrompt({
           className="px-4 py-2.5 rounded-xl text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-60"
           style={{ background: '#10b981', color: '#fff' }}
         >
-          S\u00ec, attiva
+          Attiva
         </button>
         <button
           onClick={onDecline}
@@ -106,7 +106,7 @@ export function WellnessConsentPrompt({
           className="px-4 py-2.5 rounded-xl text-sm font-medium transition-opacity hover:opacity-80 disabled:opacity-60"
           style={{ background: 'var(--secondary)', color: 'var(--foreground)' }}
         >
-          No, non ora
+          Non ora
         </button>
       </div>
     </div>
