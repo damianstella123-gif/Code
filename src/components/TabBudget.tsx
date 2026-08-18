@@ -476,8 +476,8 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     return { venduto, costo, fee, commissioni, ricavi, margine, marginePct }
   }, [lines, feePct])
 
-  const fmt = (n: number) => '\u20AC' + n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
-  const fmtN = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2 })
+  const fmt = (n: number) => '\u20AC' + n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const fmtN = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   // Confirmed vs estimated split — uses net amounts
   const confirmSplit = useMemo(() => {
