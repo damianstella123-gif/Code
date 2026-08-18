@@ -1,13 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShieldCheck } from 'lucide-react'
+import { ShieldCheck, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { loadUser } from '@/lib/auth'
+import {
+  evaluateMfaStatus,
+  registerMfaSkip,
+  roleRequiresMfa,
+  hasVerifiedTotp,
+  type MfaEnforcement,
+} from '@/lib/mfa'
 
-// TEMPORANEAMENTE DISATTIVATO — riattivare quando fotocamera disponibile
 export default function Setup2FA() {
   const navigate = useNavigate()
 
-  useEffect(() => { navigate('/dashboard', { replace: true }) }, [navigate])
+  const [ready, setReady] = useState(false)
+  const [enforcement, setEnforcement] = useState<MfaEnforcement>('grace')
+  const [skipsLeft, setSkipsLeft] = useState(0)
+  const [daysLeft, setDaysLeft] = useState(0)
 
   const [step, setStep] = useState<'enroll' | 'verify'>('enroll')
   const [factorId, setFactorId] = useState('')
@@ -17,16 +27,46 @@ export default function Setup2FA() {
   const [error, setError] = useState<string | null>(null)
   const [enrolling, setEnrolling] = useState(false)
 
+  useEffect(() => {
+    let mounted = true
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) { navigate('/login', { replace: true }); return }
+
+      const stored = loadUser()
+      const role = stored?.role
+      // Already protected, or role never required 2FA: nothing to do here.
+      if (!roleRequiresMfa(role) || (await hasVerifiedTotp())) {
+        navigate('/dashboard', { replace: true })
+        return
+      }
+
+      const state = await evaluateMfaStatus(session.user.id, role)
+      if (!mounted) return
+      setEnforcement(state.status === 'ok' ? 'grace' : state.status)
+      setSkipsLeft(state.skipsLeft)
+      setDaysLeft(state.daysLeft)
+      setReady(true)
+    }
+    init()
+    return () => { mounted = false }
+  }, [navigate])
+
   const startEnroll = async () => {
     setEnrolling(true)
     setError(null)
     try {
-      const { data, error: enrollError } = await supabase.auth.mfa.enroll({
-        factorType: 'totp',
-      })
+      const { data, error: enrollError } = await supabase.auth.mfa.enroll({ factorType: 'totp' })
       if (enrollError) {
-        setError(enrollError.message)
-        setEnrolling(false)
+        // A previous unverified enrollment can block a new one; clean it up.
+        const { data: factors } = await supabase.auth.mfa.listFactors()
+        const stale = factors?.all?.filter(f => f.status !== 'verified') ?? []
+        for (const f of stale) await supabase.auth.mfa.unenroll({ factorId: f.id })
+        const retry = await supabase.auth.mfa.enroll({ factorType: 'totp' })
+        if (retry.error || !retry.data) { setError(retry.error?.message ?? 'Errore'); return }
+        setFactorId(retry.data.id)
+        setQrUri(retry.data.totp.uri)
+        setStep('verify')
         return
       }
       if (data) {
@@ -43,32 +83,19 @@ export default function Setup2FA() {
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (code.length !== 6) {
-      setError('Inserisci un codice di 6 cifre')
-      return
-    }
+    if (code.length !== 6) { setError('Inserisci un codice di 6 cifre'); return }
     setLoading(true)
     setError(null)
     try {
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-        factorId,
-      })
-      if (challengeError) {
-        setError(challengeError.message)
-        setLoading(false)
-        return
-      }
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId })
+      if (challengeError) { setError(challengeError.message); setLoading(false); return }
 
       const { error: verifyError } = await supabase.auth.mfa.verify({
         factorId,
         challengeId: challengeData.id,
         code,
       })
-      if (verifyError) {
-        setError('Codice non valido. Riprova.')
-        setLoading(false)
-        return
-      }
+      if (verifyError) { setError('Codice non valido. Riprova.'); setLoading(false); return }
 
       navigate('/dashboard', { replace: true })
     } catch (err) {
@@ -78,11 +105,27 @@ export default function Setup2FA() {
     }
   }
 
+  const handleSkip = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) await registerMfaSkip(session.user.id)
+    navigate('/dashboard', { replace: true })
+  }
+
   const inputStyle = {
     background: 'var(--panel2)',
     border: '1px solid var(--line)',
     color: 'var(--text)',
   }
+
+  if (!ready) {
+    return (
+      <div className="login-background flex items-center justify-center px-4">
+        <div className="animate-pulse text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</div>
+      </div>
+    )
+  }
+
+  const canSkip = enforcement === 'grace' && step === 'enroll'
 
   return (
     <div className="login-background flex items-center justify-center px-4">
@@ -100,7 +143,9 @@ export default function Setup2FA() {
             </h1>
           </div>
           <p className="text-sm" style={{ color: 'var(--muted)' }}>
-            Il tuo ruolo richiede l'autenticazione a due fattori per accedere.
+            {enforcement === 'blocked'
+              ? 'Il periodo di prova è terminato: configura l\u2019autenticazione a due fattori per continuare.'
+              : 'Il tuo ruolo richiede l\u2019autenticazione a due fattori per accedere.'}
           </p>
         </div>
 
@@ -114,6 +159,16 @@ export default function Setup2FA() {
             boxShadow: '0 12px 40px rgba(38, 41, 46, 0.10)',
           }}
         >
+          {enforcement === 'grace' && step === 'enroll' && (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs"
+              style={{ background: 'rgba(255,175,60,0.10)', border: '1px solid rgba(255,175,60,0.25)', color: 'var(--text)' }}>
+              <Clock className="w-4 h-4 flex-shrink-0" style={{ color: '#c47f00' }} />
+              <span>
+                Puoi rimandare ancora {skipsLeft} {skipsLeft === 1 ? 'volta' : 'volte'} o per {daysLeft} {daysLeft === 1 ? 'giorno' : 'giorni'}, poi la configurazione sarà obbligatoria.
+              </span>
+            </div>
+          )}
+
           {step === 'enroll' && (
             <div className="space-y-4 text-center">
               <p className="text-sm" style={{ color: 'var(--text)' }}>
@@ -131,6 +186,15 @@ export default function Setup2FA() {
               >
                 {enrolling ? 'Generazione QR...' : 'Genera codice QR'}
               </button>
+              {canSkip && (
+                <button
+                  onClick={handleSkip}
+                  className="w-full py-2.5 rounded-xl text-xs font-medium transition-all"
+                  style={{ background: 'transparent', border: '1px solid var(--line)', color: 'var(--muted)' }}
+                >
+                  Ricordamelo più tardi
+                </button>
+              )}
             </div>
           )}
 

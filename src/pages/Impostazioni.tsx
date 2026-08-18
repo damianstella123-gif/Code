@@ -25,7 +25,9 @@ import {
   Heart,
   Calendar,
 } from 'lucide-react'
-import { loadUser, isAdmin } from '@/lib/auth'
+import { loadUser, isAdmin, isSuperAdmin } from '@/lib/auth'
+import { adminListUsers } from '@/lib/users-service'
+import { resetUserMfa } from '@/lib/mfa'
 import { useWellnessConsent } from '@/components/WellnessConsent'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { supabase } from '@/lib/supabase'
@@ -703,6 +705,132 @@ export function TwoFactorSection() {
   )
 }
 
+interface AdminRow { id: string; first_name: string; last_name: string; email: string; role: string }
+
+function MfaRecoverySection() {
+  const currentUser = loadUser()
+  const [rows, setRows] = useState<AdminRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    setLoading(true)
+    try {
+      const users = await adminListUsers()
+      const admins = users
+        .filter(u => (u.role === 'Admin' || u.role === 'Super Admin') && u.id !== currentUser?.id)
+        .map(u => ({
+          id: u.id,
+          first_name: (u as any).first_name ?? '',
+          last_name: (u as any).last_name ?? '',
+          email: (u as any).email ?? '',
+          role: u.role as string,
+        }))
+      setRows(admins)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore nel caricamento')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleReset(id: string) {
+    setBusyId(id)
+    setError(null)
+    setSuccess(null)
+    const res = await resetUserMfa(id)
+    setBusyId(null)
+    setConfirmId(null)
+    if (res.success) {
+      setSuccess('2FA reimpostata. La persona dovrà configurarla di nuovo al prossimo accesso.')
+      setTimeout(() => setSuccess(null), 5000)
+      return
+    }
+    const msg = res.error ?? ''
+    if (msg.includes('AAL2')) {
+      setError('Per reimpostare la 2FA di un altro account devi prima attivare la tua 2FA e accedere con essa.')
+    } else if (msg.includes('NOT_AUTHORIZED')) {
+      setError('Solo un Super Admin può eseguire questa operazione.')
+    } else if (msg.includes('INVALID_TARGET')) {
+      setError('Operazione non valida.')
+    } else {
+      setError('Impossibile reimpostare la 2FA. Riprova.')
+    }
+  }
+
+  return (
+    <SectionCard icon={RotateCcw} title="Recupero 2FA" subtitle="Reimposta l'autenticazione a due fattori di un amministratore bloccato">
+      <div className="space-y-4 max-w-xl">
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>
+          Se un amministratore perde l'accesso alla sua app authenticator, puoi azzerare la sua 2FA:
+          dovrà configurarla di nuovo al prossimo accesso. Questa azione richiede che tu abbia già la tua 2FA attiva.
+        </p>
+
+        {loading && <p className="text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>}
+
+        {!loading && rows.length === 0 && (
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun altro amministratore presente.</p>
+        )}
+
+        <div className="space-y-2">
+          {rows.map(r => (
+            <div key={r.id} className="flex items-center gap-3 px-4 py-3 rounded-xl"
+              style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
+                  {`${r.first_name} ${r.last_name}`.trim() || r.email}
+                </p>
+                <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{r.role} · {r.email}</p>
+              </div>
+              {confirmId === r.id ? (
+                <div className="flex gap-2 flex-shrink-0">
+                  <button onClick={() => handleReset(r.id)} disabled={busyId === r.id}
+                    className="px-3 py-2 rounded-xl text-xs font-mono uppercase tracking-wide text-white"
+                    style={{ background: 'var(--red2)', opacity: busyId === r.id ? 0.6 : 1 }}>
+                    {busyId === r.id ? '...' : 'Conferma'}
+                  </button>
+                  <button onClick={() => setConfirmId(null)}
+                    className="px-3 py-2 rounded-xl text-xs font-mono uppercase tracking-wide"
+                    style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
+                    Annulla
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => { setConfirmId(r.id); setError(null); setSuccess(null) }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono uppercase tracking-wide flex-shrink-0"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Reimposta 2FA
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs"
+            style={{ background: 'rgba(208,0,58,0.08)', border: '1px solid rgba(208,0,58,0.2)', color: 'var(--red2)' }}>
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs"
+            style={{ background: 'rgba(56,210,125,0.08)', border: '1px solid rgba(56,210,125,0.2)', color: 'var(--green)' }}>
+            <Check className="w-3.5 h-3.5 flex-shrink-0" />
+            {success}
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  )
+}
+
 function TemaSection() {
   const { theme, setTheme } = useTheme()
 
@@ -1302,8 +1430,7 @@ type SectionDef = { id: string; icon: React.ElementType; label: string; group: '
 const ALL_SECTIONS: SectionDef[] = [
   { id: 'profilo', icon: User, label: 'Il mio Profilo', group: 'personal' },
   { id: 'password', icon: Key, label: 'Cambio Password', group: 'personal' },
-  /* 2FA — temporaneamente disattivato, riattivare quando fotocamera disponibile */
-  // { id: '2fa', icon: ShieldCheck, label: 'Autenticazione 2FA', group: 'personal' },
+  { id: '2fa', icon: ShieldCheck, label: 'Autenticazione 2FA', group: 'personal' },
   { id: 'tema', icon: Sun, label: 'Tema', group: 'personal' },
   { id: 'notifiche', icon: Bell, label: 'Notifiche', group: 'personal' },
   { id: 'ferie', icon: Calendar, label: 'Le mie Ferie', group: 'personal' },
@@ -1314,6 +1441,7 @@ const ALL_SECTIONS: SectionDef[] = [
   { id: 'ruoli', icon: ShieldCheck, label: 'Ruoli e Permessi', group: 'admin' },
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard Globale', group: 'admin' },
   { id: 'dati', icon: Database, label: 'Dati Applicazione', group: 'admin' },
+  { id: 'recupero2fa', icon: RotateCcw, label: 'Recupero 2FA', group: 'admin' },
 ]
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -1321,10 +1449,12 @@ const ALL_SECTIONS: SectionDef[] = [
 export default function Impostazioni() {
   const currentUser = loadUser()
   const showAdmin = isAdmin(currentUser)
+  const showSuper = isSuperAdmin(currentUser)
 
-  const sections = showAdmin
+  const sections = (showAdmin
     ? ALL_SECTIONS
     : ALL_SECTIONS.filter(s => s.group === 'personal')
+  ).filter(s => s.id !== 'recupero2fa' || showSuper)
 
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS)
   const [activeSection, setActiveSection] = useState('profilo')
@@ -1485,8 +1615,7 @@ export default function Impostazioni() {
         <div className="flex-1 min-w-0 space-y-0">
           {activeSection === 'profilo' && <ProfiloPersonale />}
           {activeSection === 'password' && <CambioPasswordSection />}
-          {/* 2FA — temporaneamente disattivato, riattivare quando fotocamera disponibile */}
-          {/* activeSection === '2fa' && <TwoFactorSection /> */}
+          {activeSection === '2fa' && <TwoFactorSection />}
           {activeSection === 'tema' && <TemaSection />}
           {activeSection === 'notifiche' && <NotifichePersonali s={settings} upd={upd} />}
           {activeSection === 'ferie' && <LeMieFerieSection />}
@@ -1497,6 +1626,7 @@ export default function Impostazioni() {
           {showAdmin && activeSection === 'ruoli' && <RuoliPermessi />}
           {showAdmin && activeSection === 'dashboard' && <ConfigDashboard s={settings} upd={upd} />}
           {showAdmin && activeSection === 'dati' && <DatiApplicazione />}
+          {showSuper && activeSection === 'recupero2fa' && <MfaRecoverySection />}
         </div>
       </div>
     </div>

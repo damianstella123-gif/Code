@@ -46,6 +46,18 @@ function safeStr(v: unknown, maxLen = MAX_STR): string | undefined {
   return v.slice(0, maxLen).trim();
 }
 
+// Reads the assurance level claim (aal1 / aal2) straight from the caller's JWT.
+function decodeAal(token: string): string | null {
+  try {
+    const payload = token.split(".")[1];
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const claims = JSON.parse(json);
+    return typeof claims.aal === "string" ? claims.aal : null;
+  } catch {
+    return null;
+  }
+}
+
 function getAdminClient() {
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -57,7 +69,7 @@ function getAdminClient() {
 async function authorize(
   adminClient: ReturnType<typeof createClient>,
   req: Request
-): Promise<{ userId: string } | Response> {
+): Promise<{ userId: string; aal: string | null } | Response> {
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "");
   if (!token) return jsonResp({ error: "AUTH_REQUIRED" }, 401);
@@ -75,7 +87,7 @@ async function authorize(
     return jsonResp({ error: "ROLE_NOT_ALLOWED" }, 403);
   }
 
-  return { userId: user.id };
+  return { userId: user.id, aal: decodeAal(token) };
 }
 
 Deno.serve(async (req: Request) => {
@@ -97,6 +109,14 @@ Deno.serve(async (req: Request) => {
 
     if (!action || !VALID_ACTIONS.has(action)) {
       return jsonResp({ error: "INVALID_ACTION" }, 400);
+    }
+
+    // Step-up requirement: resetting a password always demands a 2FA-verified
+    // (aal2) session. Role changes are gated per-action below. Routine edits
+    // (name, avatar, activation) and read-only listing stay open so normal
+    // admin work is not blocked during the 2FA grace period.
+    if (action === "reset-password" && auth.aal !== "aal2") {
+      return jsonResp({ error: "MFA_REQUIRED" }, 403);
     }
 
     // ─── LIST USERS ────────────────────────────────────────────
@@ -150,6 +170,11 @@ Deno.serve(async (req: Request) => {
 
       if (!VALID_APP_ROLES.has(role)) {
         return jsonResp({ error: "INVALID_INPUT" }, 400);
+      }
+
+      // Minting a privileged account requires a 2FA-verified session.
+      if (ADMIN_ROLES.includes(role) && auth.aal !== "aal2") {
+        return jsonResp({ error: "MFA_REQUIRED" }, 403);
       }
 
       const { data: newUser, error: createError } =
@@ -219,6 +244,11 @@ Deno.serve(async (req: Request) => {
 
       if (role !== undefined && !VALID_APP_ROLES.has(role)) {
         return jsonResp({ error: "INVALID_INPUT" }, 400);
+      }
+
+      // Changing a role is a privilege operation: require a 2FA-verified session.
+      if (role !== undefined && auth.aal !== "aal2") {
+        return jsonResp({ error: "MFA_REQUIRED" }, 403);
       }
 
       if (email !== undefined && !EMAIL_RE.test(email)) {

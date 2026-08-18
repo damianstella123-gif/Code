@@ -4,6 +4,7 @@ import { LogIn, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { fetchProfile } from '@/lib/profiles'
 import { saveUser } from '@/lib/auth'
+import { evaluateMfaStatus, roleRequiresMfa, hasVerifiedTotp } from '@/lib/mfa'
 import { syncThemeFromProfile } from '@/lib/theme'
 import BrandEvolutionTransition from '@/components/BrandEvolutionTransition'
 
@@ -16,13 +17,11 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null)
   const [showTransition, setShowTransition] = useState(false)
 
-  // 2FA state — temporaneamente disattivato, riattivare rimuovendo commenti sopra
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [mfaStep, _setMfaStep] = useState(false)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [mfaFactorId, _setMfaFactorId] = useState('')
+  const [mfaStep, setMfaStep] = useState(false)
+  const [mfaFactorId, setMfaFactorId] = useState('')
   const [mfaCode, setMfaCode] = useState('')
   const [mfaLoading, setMfaLoading] = useState(false)
+  const [postLoginTarget, setPostLoginTarget] = useState('/dashboard')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,8 +57,8 @@ export default function Login() {
         return
       }
 
-      /* 2FA step — temporaneamente disattivato */
-      /*
+      // If this account has an enrolled TOTP factor, step up to a 2FA challenge
+      // before completing the login.
       const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
       if (aalData && aalData.nextLevel === 'aal2' && aalData.currentLevel === 'aal1') {
         const { data: factorsData } = await supabase.auth.mfa.listFactors()
@@ -71,7 +70,6 @@ export default function Login() {
           return
         }
       }
-      */
 
       await completeLogin(authUser)
     } catch (err) {
@@ -143,6 +141,15 @@ export default function Login() {
     })
 
     await syncThemeFromProfile()
+
+    // Route admins who still owe 2FA setup to the enrollment screen; the setup
+    // page decides whether they may postpone or are blocked.
+    const role = profile?.role ?? (meta.role as string) ?? 'User'
+    if (roleRequiresMfa(role) && !(await hasVerifiedTotp())) {
+      await evaluateMfaStatus(profile?.id ?? authUser.id, role)
+      setPostLoginTarget('/setup-2fa')
+    }
+
     setShowTransition(true)
   }
 
@@ -318,7 +325,7 @@ export default function Login() {
       </div>
 
       {showTransition && (
-        <BrandEvolutionTransition onComplete={() => navigate('/dashboard')} />
+        <BrandEvolutionTransition onComplete={() => navigate(postLoginTarget)} />
       )}
     </div>
   )

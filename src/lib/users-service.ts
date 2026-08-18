@@ -21,6 +21,9 @@ async function call(action: string, method: 'GET' | 'POST' = 'GET', body?: unkno
   const res = await fetch(`${EDGE_URL}?action=${action}`, opts)
   const json = await res.json()
   if (!res.ok) {
+    if (json.error === 'MFA_REQUIRED') {
+      throw new Error('Questa operazione richiede l\u2019autenticazione a due fattori. Attiva la 2FA sul tuo account e accedi con essa, poi riprova.')
+    }
     throw new Error(json.error ?? `Errore ${res.status}`)
   }
   return json
