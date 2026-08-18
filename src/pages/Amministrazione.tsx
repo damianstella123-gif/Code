@@ -628,13 +628,11 @@ export default function Amministrazione() {
     for (const ec of visibleEventEcon) {
       const usciteManualiEvento = visibleUscite.filter(u => u.eventoId === ec.eventId).reduce((s, u) => s + u.importo, 0)
       if (usciteManualiEvento > 0 && ec.costo > 0) {
-        const ev = events.find(e => e.id === ec.eventId)
-        alerts.push({ eventId: ec.eventId, eventName: ev?.nome ?? ec.eventId, manuali: usciteManualiEvento, servizi: ec.costo, tipo: 'uscite' })
+        alerts.push({ eventId: ec.eventId, eventName: eventName(ec.eventId), manuali: usciteManualiEvento, servizi: ec.costo, tipo: 'uscite' })
       }
       const entrateManualiEvento = visibleEntrate.filter(e => e.eventoId === ec.eventId).reduce((s, e) => s + e.importo, 0)
       if (entrateManualiEvento > 0 && ec.venduto > 0) {
-        const ev = events.find(e => e.id === ec.eventId)
-        alerts.push({ eventId: ec.eventId, eventName: ev?.nome ?? ec.eventId, manuali: entrateManualiEvento, servizi: ec.venduto, tipo: 'entrate' })
+        alerts.push({ eventId: ec.eventId, eventName: eventName(ec.eventId), manuali: entrateManualiEvento, servizi: ec.venduto, tipo: 'entrate' })
       }
     }
     return alerts
