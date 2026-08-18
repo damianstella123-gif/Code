@@ -1010,7 +1010,7 @@ export default function Amministrazione() {
                         style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)', padding: '6px 0' }}
                       >
                         <span style={{ color: 'var(--yellow)' }}>{alert.tipo === 'uscite' ? 'Costi' : 'Entrate'}:</span>{' '}
-                        {alert.eventName} &mdash; {fmtAmount(alert.manuali)} manuali + {fmtAmount(alert.servizi)} servizi
+                        {alert.eventName} &mdash; {fmtAmount(alert.manuali)} manuali &middot; {fmtAmount(alert.servizi)} servizi
                         <ChevronDown className="w-3 h-3 inline-block ml-1" style={{ color: 'var(--muted)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                       </button>
                       {isExpanded && (
