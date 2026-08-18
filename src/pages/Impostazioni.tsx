@@ -1541,7 +1541,7 @@ export default function Impostazioni() {
         </div>
       )}
 
-      <div className="flex gap-6 items-start">
+      <div className="flex flex-col lg:flex-row gap-6 items-stretch lg:items-start">
         {/* Left nav */}
         <div className="hidden lg:flex flex-col gap-1 w-52 flex-shrink-0 sticky top-24">
           <p className="text-xs font-mono uppercase tracking-widest px-4 py-2" style={{ color: 'var(--muted)' }}>
