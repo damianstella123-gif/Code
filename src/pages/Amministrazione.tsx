@@ -588,12 +588,6 @@ export default function Amministrazione() {
   const margineReale = totEntrateManuali - totUsciteManuali
   const marginePercReale = totEntrateManuali > 0 ? Math.round((margineReale / totEntrateManuali) * 100) : 0
 
-  // Legacy aggregate for PDF/export (still useful)
-  const totEntrate = totEntrateManuali + totRicaviEventi
-  const totUscite = totUsciteManuali + totCostiEventi
-  const margine = totEntrate - totUscite
-  const marginePerc = totEntrate > 0 ? Math.round((margine / totEntrate) * 100) : 0
-
   // ─── DSO / DPO ─────────────────────────────────────────────────────────────
   const { dso, dpo } = useMemo(() => {
     function avgDaysFromEntrate(items: Entrata[]) {
@@ -784,10 +778,11 @@ export default function Amministrazione() {
     doc.text('SIMMETRIA HUB - Riepilogo Budget', 14, 20)
     doc.setFontSize(10)
     doc.text(`Data: ${fmtDate(new Date().toISOString())}`, 14, 28)
-    doc.text(`Budget eventi: ${formatEur(budgetEvents)}  |  Entrate: ${formatEur(totEntrate)}  |  Uscite: ${formatEur(totUscite)}  |  Margine: ${formatEur(margine)} (${marginePerc}%)`, 14, 34)
+    doc.text(`Registrato (reale) - Entrate: ${formatEur(totEntrateManuali)}  |  Uscite: ${formatEurUscita(totUsciteManuali)}  |  Margine: ${formatEur(margineReale)} (${marginePercReale}%)`, 14, 34)
+    doc.text(`Previsionale (servizi) - Ricavi: ${formatEur(totRicaviEventi)}  |  Costi: ${formatEurUscita(totCostiEventi)}  |  Margine: ${formatEur(marginePrevisto)} (${marginePercPrevisto}%)`, 14, 40)
 
     autoTable(doc, {
-      startY: 42,
+      startY: 48,
       head: [['Fornitore', 'Evento', 'Categoria', 'Qta', 'P.Unit.', 'Importo', 'Stato', 'Scadenza']],
       body: visibleUscite.map(u => [
         supplierName(u.fornitoreId),
