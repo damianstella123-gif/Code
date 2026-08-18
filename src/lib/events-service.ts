@@ -210,6 +210,19 @@ export async function restoreEvent(id: string): Promise<void> {
   invalidateCache('events_list')
 }
 
+export async function fetchAllEventNames(): Promise<{ id: string; nome: string }[]> {
+  const { data, error } = await supabase
+    .from('events')
+    .select('id, title')
+    .order('created_at', { ascending: false })
+    .limit(5000)
+  if (error) {
+    logError('events-service', 'fetchAllEventNames', error)
+    throw new Error(error.message)
+  }
+  return ((data ?? []) as { id: string; title: string }[]).map(r => ({ id: r.id, nome: r.title }))
+}
+
 export async function fetchEventsByClientName(clientName: string): Promise<Event[]> {
   const { data: clientRows } = await supabase
     .from('clients')

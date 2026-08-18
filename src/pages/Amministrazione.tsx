@@ -33,7 +33,7 @@ import type {
 } from '@/data/amministrazione'
 import type { Supplier } from '@/data/suppliers'
 import type { Event } from '@/data/events'
-import { fetchEvents } from '@/lib/events-service'
+import { fetchEvents, fetchAllEventNames } from '@/lib/events-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
 import { fetchClients } from '@/lib/clients-service'
 import {
@@ -117,7 +117,7 @@ function statoFatLabel(s: Fattura['stato']) {
 
 let _clients: { id: string; nome: string }[] = []
 let _suppliers: Supplier[] = []
-let _events: Event[] = []
+let _eventNames: { id: string; nome: string }[] = []
 
 function clientName(id: string) {
   return _clients.find(c => c.id === id)?.nome ?? '—'
@@ -127,7 +127,7 @@ function supplierName(id: string) {
 }
 function eventName(id: string | null) {
   if (!id) return '—'
-  return _events.find(e => e.id === id)?.nome ?? '—'
+  return _eventNames.find(e => e.id === id)?.nome ?? '—'
 }
 
 // ─── Modale nuovo movimento ───────────────────────────────────────────────────
@@ -501,7 +501,7 @@ export default function Amministrazione() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([fetchEvents(), fetchSuppliers(), fetchClients(), fetchInvoices(), fetchAdminDocuments(), fetchFattureDB()]).then(async ([ev, sp, cl, inv, docs, fat]) => {
+    Promise.all([fetchEvents(), fetchSuppliers(), fetchClients(), fetchInvoices(), fetchAdminDocuments(), fetchFattureDB(), fetchAllEventNames()]).then(async ([ev, sp, cl, inv, docs, fat, evNames]) => {
       if (cancelled) return
       setEvents(ev)
       setSuppliers(sp)
@@ -511,7 +511,7 @@ export default function Amministrazione() {
       setFatture(fat)
       _clients = cl.map(c => ({ id: c.id, nome: c.nome }))
       _suppliers = sp
-      _events = ev
+      _eventNames = evNames
 
       const feePctMap: Record<string, number> = {}
       for (const e of ev) feePctMap[e.id] = e.fee_agenzia_pct ?? 6
