@@ -61,6 +61,9 @@ import AdminPaymentRequests from '@/components/AdminPaymentRequests'
 function formatEur(n: number) {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 }
+function formatEurUscita(n: number) {
+  return n === 0 ? formatEur(0) : `-${formatEur(Math.abs(n))}`
+}
 function formatDate(d: string) {
   return fmtLong(d)
 }
@@ -1070,7 +1073,7 @@ export default function Amministrazione() {
                   <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', opacity: 0.6 }}>Uscite Registrate</p>
                   <ArrowDownRight className="w-4 h-4" style={{ color: 'var(--red2)', opacity: 0.7 }} />
                 </div>
-                <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: 'var(--red2)', lineHeight: 1.1 }}>{formatEur(totUsciteManuali)}</p>
+                <p style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 600, color: 'var(--red2)', lineHeight: 1.1 }}>{formatEurUscita(totUsciteManuali)}</p>
                 <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{visibleUscite.length} voci</p>
               </div>
               <div style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
@@ -1144,7 +1147,7 @@ export default function Amministrazione() {
                   </div>
                   <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                     <span style={{ color: 'var(--muted)' }}>Uscite</span>
-                    <span style={{ color: 'var(--red2)' }}>{formatEur(totUsciteManuali)}</span>
+                    <span style={{ color: 'var(--red2)' }}>{formatEurUscita(totUsciteManuali)}</span>
                   </div>
                   <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, borderTop: '1px solid var(--line)', paddingTop: 6 }}>
                     <span style={{ color: 'var(--text)' }}>Margine</span>
@@ -1268,7 +1271,7 @@ export default function Amministrazione() {
                       <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.categoria} · {eventName(u.eventoId)}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p style={{ fontFamily: 'var(--font-serif)', fontSize: 15, fontWeight: 600, color: 'var(--red2)' }}>{formatEur(u.importo)}</p>
+                      <p style={{ fontFamily: 'var(--font-serif)', fontSize: 15, fontWeight: 600, color: 'var(--red2)' }}>{formatEurUscita(u.importo)}</p>
                       <StatoBadge stato={u.stato} />
                     </div>
                   </div>
@@ -1411,7 +1414,7 @@ export default function Amministrazione() {
                       <td className="mobile-hide" style={tdMuted}>{u.categoria}</td>
                       <td className="mobile-hide" style={tdStyle}>{u.quantity ?? 1}</td>
                       <td className="mobile-hide" style={{ ...tdAmount, color: 'var(--muted)' }}>{u.unitPrice != null ? formatEur(u.unitPrice) : '—'}</td>
-                      <td style={{ ...tdAmount, color: 'var(--red2)' }}>{formatEur(u.importo)}</td>
+                      <td style={{ ...tdAmount, color: 'var(--red2)' }}>{formatEurUscita(u.importo)}</td>
                       <td style={{ padding: '12px 16px' }}><StatoBadge stato={u.stato} /></td>
                       <td style={{ ...tdMuted, color: isScad ? 'var(--red2)' : 'var(--muted)' }}>
                         {formatDateShort(u.scadenza)} {isScad && '!'}
@@ -1505,7 +1508,7 @@ export default function Amministrazione() {
                       <td className="mobile-hide" style={{ ...tdStyle, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--muted)' }} title={eventName(f.eventoId)}>{eventName(f.eventoId)}</td>
                       <td className="mobile-hide" style={{ ...tdAmount, color: 'var(--muted)' }}>{formatEur(f.imponibile)}</td>
                       <td className="mobile-hide" style={{ ...tdAmount, color: 'var(--muted)' }}>{formatEur(f.iva)}</td>
-                      <td style={{ ...tdAmount, color: f.tipo === 'entrata' ? 'var(--green)' : 'var(--red2)' }}>{formatEur(f.importo)}</td>
+                      <td style={{ ...tdAmount, color: f.tipo === 'entrata' ? 'var(--green)' : 'var(--red2)' }}>{f.tipo === 'entrata' ? formatEur(f.importo) : formatEurUscita(f.importo)}</td>
                       <td style={{ padding: '12px 16px' }}>
                         <span style={{
                           fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
