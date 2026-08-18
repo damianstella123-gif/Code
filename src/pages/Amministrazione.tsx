@@ -1001,6 +1001,7 @@ export default function Amministrazione() {
                 {doppioConteggioAlerts.map(alert => {
                   const key = `${alert.eventId}-${alert.tipo}`
                   const isExpanded = expandedDoppioConteggio === key
+                  const fmtAmount = alert.tipo === 'uscite' ? formatEurUscita : formatEur
                   return (
                     <div key={key}>
                       <button
@@ -1009,7 +1010,7 @@ export default function Amministrazione() {
                         style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)', padding: '6px 0' }}
                       >
                         <span style={{ color: 'var(--yellow)' }}>{alert.tipo === 'uscite' ? 'Costi' : 'Entrate'}:</span>{' '}
-                        {alert.eventName} &mdash; {formatEur(alert.manuali)} manuali + {formatEur(alert.servizi)} servizi
+                        {alert.eventName} &mdash; {fmtAmount(alert.manuali)} manuali + {fmtAmount(alert.servizi)} servizi
                         <ChevronDown className="w-3 h-3 inline-block ml-1" style={{ color: 'var(--muted)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                       </button>
                       {isExpanded && (
@@ -1024,11 +1025,11 @@ export default function Amministrazione() {
                             ).map((mov: any) => (
                               <div key={mov.id} className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text)', marginBottom: 2 }}>
                                 <span>{mov.note || (alert.tipo === 'uscite' ? mov.categoria : 'Entrata')}</span>
-                                <span>{formatEur(mov.importo)}</span>
+                                <span>{fmtAmount(mov.importo)}</span>
                               </div>
                             ))}
                             <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, color: 'var(--yellow)', borderTop: '1px solid var(--line)', paddingTop: 4, marginTop: 4 }}>
-                              <span>Totale</span><span>{formatEur(alert.manuali)}</span>
+                              <span>Totale</span><span>{fmtAmount(alert.manuali)}</span>
                             </div>
                           </div>
                           <div>
@@ -1037,7 +1038,7 @@ export default function Amministrazione() {
                             </p>
                             <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text)' }}>
                               <span>Aggregato servizi evento</span>
-                              <span>{formatEur(alert.servizi)}</span>
+                              <span>{fmtAmount(alert.servizi)}</span>
                             </div>
                           </div>
                         </div>
