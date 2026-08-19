@@ -326,14 +326,14 @@ export default function Dashboard() {
   }, [])
 
   const kpi = useMemo(() => {
-    const taskAperti = liveTasks.filter(t => t.stato !== 'completato').length
+    const taskAperti = liveTasks.filter(t => t.stato !== 'completato' && t.assegnatario === currentUser?.id).length
     const eventiImminenti = liveEvents.filter(e => {
       const dl = daysLeft(e.dataInizio)
       return dl >= 0 && dl <= 14 && e.stato !== 'completato'
     }).length
     const clientiAttivi = liveClients.filter(c => c.stato === 'attivo' || c.stato === 'vip').length
     return { taskAperti, eventiImminenti, clientiAttivi }
-  }, [liveTasks, liveEvents, liveClients])
+  }, [liveTasks, liveEvents, liveClients, currentUser])
 
   if (loading) {
     return (
