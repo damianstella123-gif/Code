@@ -287,7 +287,7 @@ function runSearch(query: string, ruolo: string, userId: string): SearchResult[]
           label: c.stato === 'vip' ? 'VIP' : c.stato === 'prospect' ? 'Prospect' : c.stato === 'attivo' ? 'Attivo' : 'Perso',
           color: c.stato === 'vip' ? 'var(--yellow)' : c.stato === 'attivo' ? 'var(--green)' : c.stato === 'prospect' ? 'var(--blue)' : 'var(--muted)',
         },
-        route: '/crm',
+        route: '/network/clienti',
         score: s,
       })
     }
@@ -306,7 +306,7 @@ function runSearch(query: string, ruolo: string, userId: string): SearchResult[]
           color: s_.statoContratto === 'attivo' ? 'var(--green)' : s_.statoContratto === 'in_scadenza' ? 'var(--yellow)' : 'var(--red2)',
         },
         urgency: s_.statoContratto === 'scaduto' ? 'critical' : s_.statoContratto === 'in_scadenza' ? 'warning' : undefined,
-        route: '/fornitori',
+        route: '/network/fornitori',
         score: s,
       })
     }

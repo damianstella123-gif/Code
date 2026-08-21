@@ -99,10 +99,9 @@ export type NavItem = {
 const ALL_NAV: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard' },
   { name: 'Eventi', href: '/eventi' },
-  { name: 'CRM', href: '/crm' },
+  { name: 'Network', href: '/network' },
   { name: 'Task', href: '/task' },
   { name: 'Calendario', href: '/calendario' },
-  { name: 'Fornitori', href: '/fornitori' },
   { name: 'Amministrazione', href: '/amministrazione' },
   { name: 'Creative Studio', href: '/creative-studio' },
   { name: 'Presentazioni', href: '/presentazioni' },
@@ -129,13 +128,13 @@ export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
 
   if (role === 'Regista') {
     return ALL_NAV.filter(item =>
-      ['/dashboard', '/eventi', '/task', '/calendario', '/fornitori', '/comunicazioni', '/dossier', '/impostazioni', '/feedback-beta'].includes(item.href)
+      ['/dashboard', '/eventi', '/task', '/calendario', '/network', '/comunicazioni', '/dossier', '/impostazioni', '/feedback-beta'].includes(item.href)
     )
   }
 
   if (role === 'Commerciale') {
     return ALL_NAV.filter(item =>
-      ['/dashboard', '/crm', '/presentazioni', '/comunicazioni', '/calendario', '/dossier', '/creative-studio', '/impostazioni', '/feedback-beta'].includes(item.href)
+      ['/dashboard', '/network', '/presentazioni', '/comunicazioni', '/calendario', '/dossier', '/creative-studio', '/impostazioni', '/feedback-beta'].includes(item.href)
     )
   }
 

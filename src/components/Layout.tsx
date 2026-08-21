@@ -15,7 +15,6 @@ import {
   Users,
   CheckSquare,
   CalendarDays,
-  Truck,
   Settings,
   Menu,
   X,
@@ -55,10 +54,9 @@ import type { Notification } from '@/lib/notifications-service'
 const iconMap: Record<string, React.ElementType> = {
   '/dashboard': LayoutDashboard,
   '/eventi': Calendar,
-  '/crm': Users,
+  '/network': Users,
   '/task': CheckSquare,
   '/calendario': CalendarDays,
-  '/fornitori': Truck,
   '/amministrazione': Settings,
   '/creative-studio': Palette,
   '/comunicazioni': MessageSquare,
@@ -74,8 +72,8 @@ const iconMap: Record<string, React.ElementType> = {
 
 const NAV_GROUPS: { label: string; paths: string[] }[] = [
   { label: '', paths: ['/dashboard'] },
-  { label: 'Operativo', paths: ['/eventi', '/task', '/calendario', '/fornitori'] },
-  { label: 'Business', paths: ['/crm', '/amministrazione'] },
+  { label: 'Operativo', paths: ['/eventi', '/task', '/calendario'] },
+  { label: 'Business', paths: ['/network', '/amministrazione'] },
   { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
   { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/performance', '/wellness', '/centro-sicurezza', '/impostazioni', '/feedback-beta'] },
 ]
@@ -148,7 +146,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                 {group.label && <p className="shell-nav-group-label">{group.label}</p>}
                 {groupItems.map((item) => {
                   const Icon = iconMap[item.href] ?? LayoutDashboard
-                  const isActive = location.pathname === item.href
+                  const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/')
                   return (
                     <Link
                       key={item.href}
@@ -421,10 +419,10 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
         navigate(`/amministrazione?tab=uscite`)
         break
       case 'client':
-        navigate(`/crm?id=${entityId}`)
+        navigate(`/network/clienti?id=${entityId}`)
         break
       case 'referente':
-        navigate(`/crm`)
+        navigate(`/network/clienti`)
         break
       case 'archive_item':
         navigate(`/dossier`)
@@ -435,7 +433,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
         break
       case 'supplier':
       case 'fornitore':
-        navigate(`/fornitori?id=${entityId}`)
+        navigate(`/network/fornitori?id=${entityId}`)
         break
       default:
         break
@@ -726,15 +724,14 @@ function SentinelBadge() {
 }
 
 const PRIMARY_MOBILE_PATHS = ['/dashboard', '/eventi', '/task']
-const OVERFLOW_MOBILE_PATHS = ['/crm', '/calendario', '/fornitori', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/wellness']
+const OVERFLOW_MOBILE_PATHS = ['/network', '/calendario', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/wellness']
 
 const mobileLabels: Record<string, string> = {
   '/dashboard': 'Home',
   '/eventi': 'Eventi',
-  '/crm': 'CRM',
+  '/network': 'Network',
   '/task': 'Task',
   '/calendario': 'Agenda',
-  '/fornitori': 'Fornitori',
   '/amministrazione': 'Admin',
 }
 
@@ -761,7 +758,7 @@ function BottomNav() {
             <div className="grid grid-cols-4 gap-1 p-3">
               {overflowItems.map(item => {
                 const Icon = iconMap[item.href] ?? LayoutDashboard
-                const isActive = location.pathname === item.href
+                const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/')
                 return (
                   <Link
                     key={item.href}
@@ -789,7 +786,7 @@ function BottomNav() {
         <div className="flex items-center justify-around h-[56px] px-1">
           {primaryItems.slice(0, 4).map(item => {
             const Icon = iconMap[item.href] ?? LayoutDashboard
-            const isActive = location.pathname === item.href
+            const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/')
             return (
               <Link
                 key={item.href}

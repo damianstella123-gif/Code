@@ -126,9 +126,9 @@ function EntityCard({ entity, navigate }: { entity: FlyEntity; navigate: (path: 
   function handleClick() {
     switch (entity.type) {
       case 'event': navigate(`/eventi?id=${entity.id}`); break
-      case 'supplier': navigate('/fornitori'); break
+      case 'supplier': navigate('/network/fornitori'); break
       case 'task': navigate('/task'); break
-      case 'client': navigate(`/crm?client=${entity.id}`); break
+      case 'client': navigate(`/network/clienti?client=${entity.id}`); break
     }
   }
 
@@ -232,7 +232,7 @@ export default function CommandBar({ events, tasks, clients }: CommandBarProps) 
         { label: 'Task aperti', query: 'quali task sono aperti su questo evento?' },
         { label: 'Green Report', query: 'genera il green report di questo evento' }
       )
-    } else if (path === '/fornitori') {
+    } else if (path === '/network/fornitori') {
       sugg.push(
         { label: 'Hotel Milano', query: 'fornitori hotel a Milano' },
         { label: 'DMC estero', query: 'fornitori DMC per eventi internazionali' }
@@ -476,7 +476,7 @@ export default function CommandBar({ events, tasks, clients }: CommandBarProps) 
     setCommandResults([])
     if (type === 'event') navigate(`/eventi?id=${id}`)
     else if (type === 'task') navigate('/task')
-    else navigate('/crm')
+    else navigate('/network/clienti')
   }, [navigate])
 
   // ─── Keyboard navigation ────────────────────────────────────────────────────

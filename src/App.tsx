@@ -15,6 +15,7 @@ const CRM = lazy(() => import('./pages/CRM'))
 const Task = lazy(() => import('./pages/Task'))
 const Calendario = lazy(() => import('./pages/Calendario'))
 const Fornitori = lazy(() => import('./pages/Fornitori'))
+const Network = lazy(() => import('./pages/Network'))
 const Amministrazione = lazy(() => import('./pages/Amministrazione'))
 const Comunicazioni = lazy(() => import('./pages/Comunicazioni'))
 const Workflow = lazy(() => import('./pages/Workflow'))
@@ -216,10 +217,14 @@ export default function App() {
       <Route path="/dashboard" element={<AuthGuard><Layout><LazyPage><Dashboard /></LazyPage></Layout></AuthGuard>} />
       <Route path="/oggi" element={<Navigate to="/dashboard" replace />} />
       <Route path="/eventi" element={<AuthGuard><Layout><LazyPage><Eventi /></LazyPage></Layout></AuthGuard>} />
-      <Route path="/crm" element={<AuthGuard><Layout><LazyPage><CRM /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/network" element={<AuthGuard><Layout><LazyPage><Network /></LazyPage></Layout></AuthGuard>}>
+        <Route path="clienti" element={<CRM />} />
+        <Route path="fornitori" element={<Fornitori />} />
+      </Route>
+      <Route path="/crm" element={<Navigate to="/network/clienti" replace />} />
+      <Route path="/fornitori" element={<Navigate to="/network/fornitori" replace />} />
       <Route path="/task" element={<AuthGuard><Layout><LazyPage><Task /></LazyPage></Layout></AuthGuard>} />
       <Route path="/calendario" element={<AuthGuard><Layout><LazyPage><Calendario /></LazyPage></Layout></AuthGuard>} />
-      <Route path="/fornitori" element={<AuthGuard><Layout><LazyPage><Fornitori /></LazyPage></Layout></AuthGuard>} />
       <Route path="/amministrazione" element={<AuthGuard><Layout><LazyPage><Amministrazione /></LazyPage></Layout></AuthGuard>} />
       <Route path="/comunicazioni" element={<AuthGuard><Layout><LazyPage><Comunicazioni /></LazyPage></Layout></AuthGuard>} />
       <Route path="/workflow" element={<AuthGuard><Layout><LazyPage><Workflow /></LazyPage></Layout></AuthGuard>} />

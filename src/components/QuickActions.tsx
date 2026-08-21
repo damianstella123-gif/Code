@@ -66,7 +66,7 @@ export default function QuickActions() {
       fly,
     ]
 
-    if (location.pathname === '/fornitori') return [
+    if (location.pathname === '/network/fornitori') return [
       { icon: <Building2 size={16} />, label: 'Nuovo fornitore', onClick: () => { window.dispatchEvent(new CustomEvent('new-supplier')); setOpen(false) } },
       fly,
     ]

@@ -283,7 +283,7 @@ export default function Dashboard() {
         meta: 'aggiornato ora · CRM',
         category: 'clienti',
         score: 5,
-        action: () => navigate('/crm'),
+        action: () => navigate('/network/clienti'),
       })
     }
 
