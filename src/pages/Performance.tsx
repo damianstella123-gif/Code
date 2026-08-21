@@ -755,6 +755,12 @@ function PersonalPerformanceView({ userId, userName }: { userId: string; userNam
         </p>
       </div>
 
+      <div style={{ padding: '12px 16px', borderRadius: 10, background: 'color-mix(in srgb, var(--muted) 8%, transparent)', marginBottom: 20 }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', lineHeight: 1.6 }}>
+          Qui trovi i dati sul tuo contributo lavorativo (attivit&agrave; completate, tempo risparmiato), raccolti per aiutarti a crescere e per bilanciare il carico del team. Questi dati non includono mai informazioni sul tuo benessere personale (Wellness), che restano private e visibili solo a te.
+        </p>
+      </div>
+
       <div className="space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
