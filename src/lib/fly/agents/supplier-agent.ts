@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { Agent, AgentResponse, FlyContext } from '../types'
+import { trackAction } from '../../impact-tracker'
 
 export const supplierAgent: Agent = {
   id: 'supplier',
@@ -94,6 +95,8 @@ export const supplierAgent: Agent = {
         chips: ['Orari mancanti', 'Riepilogo evento'],
       }
     }
+
+    trackAction('supplier_found', { eventId: context.eventId })
 
     // Default overview
     const byCategory: Record<string, number> = {}

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { Agent, AgentResponse, FlyContext } from '../types'
+import { trackAction } from '../../impact-tracker'
 
 export const budgetAgent: Agent = {
   id: 'budget',
@@ -90,6 +91,8 @@ export const budgetAgent: Agent = {
     if (numVoci === 0) {
       return { agent: 'budget', text: `Il budget di "${eventName}" e vuoto. Non ci sono ancora voci economiche inserite.\n\nInserisci venduto e costi nei servizi operativi (tab Fornitori).`, chips: ['Info mancanti', 'Fornitori'] }
     }
+
+    trackAction('budget_calculated', { eventId: context.eventId })
 
     return {
       agent: 'budget',

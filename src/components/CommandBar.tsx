@@ -644,6 +644,7 @@ export default function CommandBar({ events, tasks, clients }: CommandBarProps) 
       final[msgIndex] = { ...msg, proposalStatus: 'done' }
       final.push({ role: 'assistant', content: `Fatto. ${data.message}` })
       setFlyHistory(final)
+      trackAction('fly_task_created')
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Errore'
       const final = [...updated]

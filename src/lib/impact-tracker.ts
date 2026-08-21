@@ -26,7 +26,7 @@ export async function trackAction(
     const { data: cfg } = await supabase
       .from('impact_roi_config')
       .select('costo_orario_eur')
-      .eq('ruolo', user.role || 'User')
+      .eq('role', user.role || 'User')
       .maybeSingle()
 
     const costoOrario = cfg?.costo_orario_eur ?? 8.5
