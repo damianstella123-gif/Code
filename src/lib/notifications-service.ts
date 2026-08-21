@@ -34,20 +34,22 @@ export function isCriticalNotification(type: string): boolean {
 }
 
 export async function fetchNotifications(userId: string): Promise<Notification[]> {
+  const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+
   const { data, error } = await supabase
     .from('notifications')
     .select('*')
     .eq('user_id', userId)
-    .eq('is_read', false)
-    .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    .gte('created_at', since48h)
     .order('created_at', { ascending: false })
-    .limit(20)
+    .limit(30)
   if (error) {
     logError('notifications-service', 'fetchNotifications', error)
     throw new Error(error.message)
   }
   const notifications = (data ?? []) as Notification[]
   notifications.sort((a, b) => {
+    if (a.is_read !== b.is_read) return a.is_read ? 1 : -1
     const pa = PRIORITY[a.type] ?? 5
     const pb = PRIORITY[b.type] ?? 5
     if (pa !== pb) return pa - pb

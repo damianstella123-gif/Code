@@ -218,9 +218,11 @@ function NotificationCard({ notification: n, onAction, onClick }: {
   onAction: (path: string) => void
   onClick: () => void
 }) {
+  const readStyle = n.is_read ? { opacity: 0.55 } : {}
+
   if (n.type === 'payment_approval') {
     return (
-      <div style={{ background: 'rgba(234,179,8,0.08)', borderLeft: '3px solid var(--yellow)', padding: '10px 14px', borderBottom: '1px solid var(--line)' }}>
+      <div onClick={onClick} style={{ ...readStyle, background: 'rgba(234,179,8,0.08)', borderLeft: '3px solid var(--yellow)', padding: '10px 14px', borderBottom: '1px solid var(--line)', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4, flex: 1 }}>{n.message}</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', flexShrink: 0 }}>{formatTimeAgo(n.created_at)}</div>
@@ -235,7 +237,7 @@ function NotificationCard({ notification: n, onAction, onClick }: {
 
   if (n.type === 'leave_request') {
     return (
-      <div style={{ background: 'rgba(59,130,246,0.08)', borderLeft: '3px solid var(--blue)', padding: '10px 14px', borderBottom: '1px solid var(--line)' }}>
+      <div onClick={onClick} style={{ ...readStyle, background: 'rgba(59,130,246,0.08)', borderLeft: '3px solid var(--blue)', padding: '10px 14px', borderBottom: '1px solid var(--line)', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4, flex: 1 }}>{n.message}</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', flexShrink: 0 }}>{formatTimeAgo(n.created_at)}</div>
@@ -250,7 +252,7 @@ function NotificationCard({ notification: n, onAction, onClick }: {
 
   if (n.type === 'sentinel_critical') {
     return (
-      <div style={{ background: 'rgba(200,25,46,0.08)', borderLeft: '3px solid var(--red2)', padding: '10px 14px', borderBottom: '1px solid var(--line)' }}>
+      <div onClick={onClick} style={{ ...readStyle, background: 'rgba(200,25,46,0.08)', borderLeft: '3px solid var(--red2)', padding: '10px 14px', borderBottom: '1px solid var(--line)', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4, flex: 1, fontWeight: 500 }}>{n.message}</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', flexShrink: 0 }}>{formatTimeAgo(n.created_at)}</div>
@@ -261,7 +263,7 @@ function NotificationCard({ notification: n, onAction, onClick }: {
 
   if (n.type === 'morning_edition') {
     return (
-      <div style={{ background: 'rgba(255,193,7,0.06)', borderLeft: '3px solid var(--yellow)', padding: '10px 14px', borderBottom: '1px solid var(--line)' }}>
+      <div onClick={onClick} style={{ ...readStyle, background: 'rgba(255,193,7,0.06)', borderLeft: '3px solid var(--yellow)', padding: '10px 14px', borderBottom: '1px solid var(--line)', cursor: 'pointer' }}>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--yellow)', letterSpacing: '0.1em', marginBottom: 4, fontWeight: 600 }}>
           BRIEFING DI OGGI
         </div>
@@ -280,11 +282,11 @@ function NotificationCard({ notification: n, onAction, onClick }: {
     <div
       className="wire-card-sm"
       onClick={onClick}
-      style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid var(--line)', transition: 'background .15s' }}
+      style={{ ...readStyle, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid var(--line)', transition: 'background .15s' }}
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--panel2)' }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
     >
-      <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red2)', marginTop: 5, flexShrink: 0, boxShadow: '0 0 5px rgba(200,25,46,.5)' }} />
+      {!n.is_read && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red2)', marginTop: 5, flexShrink: 0, boxShadow: '0 0 5px rgba(200,25,46,.5)' }} />}
       <div style={{ flex: 1, fontSize: 13, color: 'var(--text)', lineHeight: 1.4 }}>{n.message}</div>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', flexShrink: 0, marginTop: 2 }}>{formatTimeAgo(n.created_at)}</div>
     </div>
@@ -391,14 +393,14 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
   }, [])
 
   const handleNotificationClick = async (n: Notification) => {
-    await markAsRead(n.id)
-    setNotifications(prev => prev.filter(x => x.id !== n.id))
-    setUnreadCount(prev => Math.max(0, prev - 1))
+    if (!n.is_read) {
+      await markAsRead(n.id)
+      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x))
+      setUnreadCount(prev => Math.max(0, prev - 1))
+    }
     setNotifOpen(false)
 
     if (!n.related_entity_type || !n.related_entity_id) {
-      setNotifToast('Elemento collegato non disponibile')
-      setTimeout(() => setNotifToast(null), 3000)
       return
     }
 
@@ -436,8 +438,6 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
         navigate(`/fornitori?id=${entityId}`)
         break
       default:
-        setNotifToast('Elemento collegato non disponibile')
-        setTimeout(() => setNotifToast(null), 3000)
         break
     }
   }
@@ -446,7 +446,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
     await markAllAsRead(session.user.id)
-    setNotifications([])
+    setNotifications(prev => prev.map(x => ({ ...x, is_read: true })))
     setUnreadCount(0)
   }
 
@@ -545,9 +545,11 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                   ) : (
                     notifications.map(n => (
                       <NotificationCard key={n.id} notification={n} onAction={async (path) => {
-                        await markAsRead(n.id)
-                        setNotifications(prev => prev.filter(x => x.id !== n.id))
-                        setUnreadCount(prev => Math.max(0, prev - 1))
+                        if (!n.is_read) {
+                          await markAsRead(n.id)
+                          setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x))
+                          setUnreadCount(prev => Math.max(0, prev - 1))
+                        }
                         setNotifOpen(false)
                         navigate(path)
                       }} onClick={() => handleNotificationClick(n)} />
@@ -555,7 +557,7 @@ function Topbar({ setOpen }: { setOpen: (open: boolean) => void }) {
                   )}
                 </div>
                 <div style={{ padding: '10px 16px', borderTop: '1px solid var(--line)', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
-                  Le notifiche lette spariscono dopo 24 ore
+                  Ultime 48 ore &middot; le lette appaiono in grigio
                 </div>
               </div>
               </>
