@@ -266,7 +266,7 @@ function EventROISection() {
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{e.title}</span>
                     <br /><span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)' }}>{fmtShort(e.data_fine)}</span>
                   </td>
-                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{e.client || '-'}</td>
+                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{e.client_name || e.client || '-'}</td>
                   <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{fmtEur(e.revenue)}</td>
                   <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{fmtEur(e.costi_totali)}</td>
                   <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: e.margine_eur >= 0 ? 'var(--green)' : 'var(--red2)' }}>{fmtEur(e.margine_eur)}</td>
@@ -373,7 +373,7 @@ function EventDetailModal({ event: e, onClose }: { event: EventROI; onClose: () 
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>DETTAGLIO EVENTO</p>
         <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{e.title}</p>
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginBottom: 20 }}>
-          {e.client} &middot; {fmtShort(e.data_fine)} &middot; {e.attendees} pax
+          {e.client_name || e.client || '-'} &middot; {fmtShort(e.data_fine)} &middot; {e.attendees} pax
         </p>
 
         {/* Revenue vs Cost */}

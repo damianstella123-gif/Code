@@ -435,6 +435,7 @@ export interface EventROI {
   event_id: string
   title: string
   client: string
+  client_name: string
   revenue: number
   costi_totali: number
   costi_hotel: number
@@ -456,6 +457,13 @@ export async function getEventROI(eventId: string, debug = false): Promise<Event
   const { data: event } = await supabase.from('events')
     .select('*').eq('id', eventId).maybeSingle()
   if (!event) return null
+
+  let clientName = event.client || ''
+  const clientKey = event.client_id || event.client
+  if (clientKey) {
+    const { data: cl } = await supabase.from('clients').select('name').eq('id', clientKey).maybeSingle()
+    if (cl?.name) clientName = cl.name
+  }
 
   if (debug) console.log('%c ROI Debug — ' + event.title, 'font-weight:bold;font-size:13px')
 
@@ -537,6 +545,7 @@ export async function getEventROI(eventId: string, debug = false): Promise<Event
     event_id: eventId,
     title: event.title || '',
     client: event.client || '',
+    client_name: clientName,
     revenue,
     costi_totali,
     costi_hotel,
@@ -563,7 +572,15 @@ export async function getAllEventsROI(filters?: {
   if (filters?.from) q = q.gte('end_date', filters.from)
   if (filters?.to) q = q.lte('end_date', filters.to)
   if (filters?.status) q = q.eq('status', filters.status)
-  if (filters?.client) q = q.ilike('client', `%${filters.client}%`)
+  if (filters?.client) {
+    const { data: matchingClients } = await supabase.from('clients').select('id').ilike('name', `%${filters.client}%`)
+    const clientIds = (matchingClients || []).map(c => c.id)
+    if (clientIds.length > 0) {
+      q = q.in('client_id', clientIds)
+    } else {
+      q = q.ilike('client', `%${filters.client}%`)
+    }
+  }
 
   const { data: events } = await q.order('end_date', { ascending: false }).limit(50)
   if (!events || events.length === 0) return []
