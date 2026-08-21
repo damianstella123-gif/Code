@@ -37,8 +37,7 @@ export default function BreakReminder() {
   useEffect(() => {
     if (status !== 'granted') return
     const timer = setInterval(triggerBreak, WORK_INTERVAL)
-    const initial = setTimeout(triggerBreak, WORK_INTERVAL)
-    return () => { clearInterval(timer); clearTimeout(initial) }
+    return () => { clearInterval(timer) }
   }, [triggerBreak, status])
 
   useEffect(() => {

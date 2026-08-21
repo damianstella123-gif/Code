@@ -182,9 +182,13 @@ const DB_RECOMMENDATION_TYPE: Record<BreakType, string> = {
 }
 
 export async function getBreakRecommendation(activeMinutes: number): Promise<BreakRecommendation | null> {
+  const user = loadUser()
+  if (!user) return null
+
   const { data: recent } = await supabase
     .from('break_recommendations')
     .select('created_at')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(1)
 
@@ -215,7 +219,10 @@ export async function getBreakRecommendation(activeMinutes: number): Promise<Bre
 }
 
 export async function saveBreakRecommendation(rec: BreakRecommendation): Promise<void> {
+  const user = loadUser()
+  if (!user) return
   await supabase.from('break_recommendations').insert({
+    user_id: user.id,
     recommendation_type: DB_RECOMMENDATION_TYPE[rec.type],
     recommendation_text: rec.text,
     trigger_reason: rec.reason,
@@ -253,6 +260,8 @@ export async function getTeamMoodAggregate(daysBack = 14): Promise<TeamMoodAggre
 }
 
 export async function markBreakTaken(breakType: BreakType): Promise<void> {
+  const user = loadUser()
+
   const { data } = await supabase
     .from('break_recommendations')
     .select('id')
@@ -267,12 +276,15 @@ export async function markBreakTaken(breakType: BreakType): Promise<void> {
       .eq('id', data[0].id)
   }
 
-  const { error: breakLogError } = await supabase.from('wellness_logs').insert({
+  const insertPayload: Record<string, unknown> = {
     tipo: 'break_taken',
     break_type: BREAK_TO_DB[breakType],
     break_taken_at: new Date().toISOString(),
     break_duration_minutes: 17,
-  })
+  }
+  if (user) insertPayload.user_id = user.id
+
+  const { error: breakLogError } = await supabase.from('wellness_logs').insert(insertPayload)
   if (breakLogError) throw new Error(`Failed to log break: ${breakLogError.message}`)
 }
 
