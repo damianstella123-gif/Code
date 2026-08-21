@@ -63,15 +63,16 @@ type SortField = 'title' | 'revenue' | 'costi_totali' | 'margine_eur' | 'margine
 export default function Performance() {
   const navigate = useNavigate()
   const user = loadUser()
-  const [tab, setTab] = useState<'eventi' | 'synergy'>('eventi')
+  const isManager = user && ['Admin', 'Super Admin'].includes(user.role)
+  const [tab, setTab] = useState<'eventi' | 'synergy'>('synergy')
 
   useEffect(() => {
-    if (!user || !['Admin', 'Super Admin'].includes(user.role)) {
-      navigate('/dashboard')
-    }
+    if (!user) navigate('/dashboard')
   }, [user, navigate])
 
-  if (!user || !['Admin', 'Super Admin'].includes(user.role)) return null
+  if (!user) return null
+
+  if (!isManager) return <PersonalPerformanceView userId={user.id} userName={`${(user as any).first_name ?? ''} ${(user as any).last_name ?? ''}`.trim() || 'Tu'} />
 
   return (
     <div>
@@ -675,6 +676,142 @@ function SynergyUserRow({ row, expanded, onToggle }: {
         </tr>
       )}
     </>
+  )
+}
+
+// ─── PERSONAL VIEW (non-manager employees) ──────────────────────────────────
+
+function PersonalPerformanceView({ userId, userName }: { userId: string; userName: string }) {
+  const [impactRows, setImpactRows] = useState<ImpactRow[]>([])
+  const [monthlyReports, setMonthlyReports] = useState<MonthlyReport[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      const now = new Date()
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+      const [impactRes, monthlyRes] = await Promise.all([
+        supabase.from('impact_actions_log').select('*').eq('user_id', userId).gte('created_at', startOfMonth),
+        supabase.from('impact_monthly_reports').select('*').eq('user_id', userId),
+      ])
+      setImpactRows((impactRes.data ?? []) as ImpactRow[])
+      setMonthlyReports((monthlyRes.data ?? []) as MonthlyReport[])
+      setLoading(false)
+    }
+    load()
+  }, [userId])
+
+  const oreMese = useMemo(() => impactRows.reduce((s, r) => s + (r.minuti_risparmiati || 0), 0) / 60, [impactRows])
+  const valoreMese = useMemo(() => impactRows.reduce((s, r) => s + (r.valore_eur || 0), 0), [impactRows])
+  const numActions = impactRows.length
+  const azioneTop = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const r of impactRows) { const t = r.action_type || 'unknown'; counts[t] = (counts[t] || 0) + 1 }
+    let max = 0; let top = ''
+    for (const [k, v] of Object.entries(counts)) { if (v > max) { max = v; top = k } }
+    return top
+  }, [impactRows])
+
+  const chartData = useMemo(() => {
+    const now = new Date()
+    const months: { label: string; mese: number; anno: number; ore: number }[] = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      months.push({ label: MONTH_NAMES[d.getMonth()], mese: d.getMonth() + 1, anno: d.getFullYear(), ore: 0 })
+    }
+    for (const r of monthlyReports) {
+      const match = months.find(m => m.mese === r.mese && m.anno === r.anno)
+      if (match) match.ore += r.ore_risparmiate
+    }
+    const currentMonth = months[months.length - 1]
+    if (currentMonth) currentMonth.ore += oreMese
+    return months
+  }, [monthlyReports, oreMese])
+
+  const actionBreakdown = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const r of impactRows) { const t = r.action_type || 'unknown'; counts[t] = (counts[t] || 0) + 1 }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([type, count]) => ({
+      name: getActionLabel(type),
+      count,
+    }))
+  }, [impactRows])
+
+  if (loading) {
+    return <div style={{ textAlign: 'center', padding: 40, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>Caricamento...</div>
+  }
+
+  return (
+    <div>
+      <div className="wire-card-flat" style={{ padding: '16px', marginBottom: '20px', borderRadius: 12, border: '1px solid var(--line)' }}>
+        <div className="wire-masthead" style={{ marginBottom: 0 }}>
+          <div>
+            <span className="wire-masthead-title">IL MIO IMPATTO</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginLeft: '12px' }}>{userName}</span>
+          </div>
+        </div>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+          Quanto tempo e valore risparmi usando Synergy ogni mese.
+        </p>
+      </div>
+
+      <div className="space-y-6">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <KpiCard label="ORE RISPARMIATE" value={oreMese.toFixed(1)} color="var(--text)" />
+          <KpiCard label="VALORE GENERATO" value={`${valoreMese.toFixed(0)} EUR`} color="var(--text)" />
+          <KpiCard label="AZIONI MESE" value={String(numActions)} color="var(--text)" />
+          <KpiCard label="AZIONE TOP" value={getActionLabel(azioneTop) || '-'} color="var(--text)" />
+        </div>
+
+        {/* Trend chart */}
+        <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 12 }}>Il tuo trend — ultimi 6 mesi</p>
+          {chartData.some(d => d.ore > 0) ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <XAxis dataKey="label" tick={{ fontFamily: 'var(--font-mono)', fontSize: 10, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontFamily: 'var(--font-mono)', fontSize: 10, fill: 'var(--muted)' }} axisLine={false} tickLine={false} width={35} />
+                <Tooltip contentStyle={{ fontFamily: 'var(--font-mono)', fontSize: 10, background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 8 }} formatter={(v) => [`${Number(v).toFixed(1)} ore`, 'Ore']} />
+                <Bar dataKey="ore" radius={[6, 6, 0, 0]}>
+                  {chartData.map((_, i) => <Cell key={i} fill="var(--blue)" />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ padding: '30px 0', textAlign: 'center' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>Nessun dato storico ancora disponibile.</p>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Continua a usare Synergy e vedrai crescere il tuo impatto!</p>
+            </div>
+          )}
+        </div>
+
+        {/* Action breakdown */}
+        {actionBreakdown.length > 0 && (
+          <div style={{ border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase', color: 'var(--muted)' }}>Le tue azioni questo mese</p>
+            </div>
+            {actionBreakdown.map(({ name, count }) => (
+              <div key={name} className="flex items-center justify-between" style={{ padding: '10px 16px', borderBottom: '1px solid var(--line)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }}>{name}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{count}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {numActions === 0 && (
+          <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: '32px 20px', textAlign: 'center' }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text)', fontWeight: 500, marginBottom: 6 }}>Nessuna attivita registrata questo mese</p>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', maxWidth: 360, margin: '0 auto' }}>
+              Usa Fly per le query, carica documenti, cerca fornitori o invia messaggi in chat — ogni azione viene tracciata automaticamente qui.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
