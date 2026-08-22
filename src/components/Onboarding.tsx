@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getAllowedNavForRole } from '@/lib/auth'
 
@@ -34,12 +34,6 @@ const ALL_STEPS: TourStep[] = [
     requiredHref: '/eventi',
   },
   {
-    title: 'Network',
-    body: 'Clienti e fornitori in un unico punto. Il tuo CRM integrato.',
-    targetSelector: '[data-onboarding="network"]',
-    requiredHref: '/network',
-  },
-  {
     title: 'Task',
     body: 'Le attivita assegnate a te e al tuo team, con scadenze e priorita.',
     targetSelector: '[data-onboarding="task"]',
@@ -52,16 +46,16 @@ const ALL_STEPS: TourStep[] = [
     requiredHref: '/calendario',
   },
   {
-    title: 'Comunicazioni',
-    body: 'Chat di team, canali per evento, messaggi diretti.',
-    targetSelector: '[data-onboarding="comunicazioni"]',
-    requiredHref: '/comunicazioni',
+    title: 'Network',
+    body: 'Clienti e fornitori in un unico punto. Il tuo CRM integrato.',
+    targetSelector: '[data-onboarding="network"]',
+    requiredHref: '/network',
   },
   {
-    title: 'Amministrazione',
-    body: 'Fatture, preventivi e gestione finanziaria degli eventi.',
-    targetSelector: '[data-onboarding="amministrazione"]',
-    requiredHref: '/amministrazione',
+    title: 'Feedback',
+    body: 'Suggerisci miglioramenti, vota le proposte del team.',
+    targetSelector: '[data-onboarding="feedback-beta"]',
+    requiredHref: '/feedback-beta',
   },
   {
     title: 'Sei pronto!',
@@ -75,37 +69,68 @@ function getStepsForRole(role: string): TourStep[] {
   return ALL_STEPS.filter(s => !s.requiredHref || allowedHrefs.includes(s.requiredHref))
 }
 
+const POLL_INTERVAL = 80
+const POLL_MAX = 800
+
 export default function Onboarding({ onComplete, userName, userRole }: Props) {
   const steps = getStepsForRole(userRole)
   const [step, setStep] = useState(0)
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
-  const [highlightedEl, setHighlightedEl] = useState<HTMLElement | null>(null)
+  const highlightedRef = useRef<HTMLElement | null>(null)
+  const pollTimerRef = useRef<number | null>(null)
 
   const clearHighlight = useCallback(() => {
-    if (highlightedEl) {
-      highlightedEl.style.removeProperty('position')
-      highlightedEl.style.removeProperty('z-index')
-      highlightedEl.style.removeProperty('box-shadow')
-      setHighlightedEl(null)
+    const el = highlightedRef.current
+    if (el) {
+      el.style.removeProperty('position')
+      el.style.removeProperty('z-index')
+      el.style.removeProperty('box-shadow')
+      highlightedRef.current = null
     }
-  }, [highlightedEl])
+  }, [])
+
+  const applyHighlight = useCallback((el: HTMLElement) => {
+    const rect = el.getBoundingClientRect()
+    setTargetRect(rect)
+    el.style.position = 'relative'
+    el.style.zIndex = '1001'
+    el.style.boxShadow = '0 0 0 4px rgba(200,25,46,0.45), 0 0 20px rgba(200,25,46,0.2)'
+    highlightedRef.current = el
+  }, [])
 
   useEffect(() => {
     clearHighlight()
+    if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
+
     const sel = steps[step]?.targetSelector
     if (!sel) { setTargetRect(null); return }
+
     const el = document.querySelector<HTMLElement>(sel)
     if (el) {
-      const rect = el.getBoundingClientRect()
-      setTargetRect(rect)
-      el.style.position = 'relative'
-      el.style.zIndex = '1001'
-      el.style.boxShadow = '0 0 0 4px rgba(200,25,46,0.45), 0 0 20px rgba(200,25,46,0.2)'
-      setHighlightedEl(el)
-    } else {
-      setTargetRect(null)
+      applyHighlight(el)
+      return () => { clearHighlight() }
     }
-    return () => { clearHighlight() }
+
+    let elapsed = 0
+    pollTimerRef.current = window.setInterval(() => {
+      elapsed += POLL_INTERVAL
+      const found = document.querySelector<HTMLElement>(sel)
+      if (found) {
+        if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
+        applyHighlight(found)
+      } else if (elapsed >= POLL_MAX) {
+        if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
+        // Element doesn't exist for this role - skip this step automatically
+        if (step < steps.length - 1) {
+          setStep(s => s + 1)
+        }
+      }
+    }, POLL_INTERVAL)
+
+    return () => {
+      clearHighlight()
+      if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
+    }
   }, [step])
 
   async function finish() {

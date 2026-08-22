@@ -155,7 +155,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                       to={item.href}
                       onClick={() => setOpen(false)}
                       className={cn('shell-nav-item', isActive && 'shell-nav-item--active')}
-                      data-onboarding={item.href.replace('/', '')}
+                      data-onboarding={item.href.split('/')[1]}
                     >
                       <div className="shell-nav-indicator" />
                       <Icon className="shell-nav-icon" />
