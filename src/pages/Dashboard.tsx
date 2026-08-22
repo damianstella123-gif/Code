@@ -416,6 +416,8 @@ export default function Dashboard() {
         leaves={leaves}
         pendingPayments={pendingPayments}
         admin={admin}
+        financePayments={financePayments}
+        showFinance={isFinance(currentUser) || admin}
       />
 
       <ShieldStatus />
@@ -560,7 +562,7 @@ function MorningEditionCard({ edition }: { edition: { id: string; message: strin
   )
 }
 
-function DashboardWidgets({ events, tasks, setTasks, navigate, leaves, pendingPayments, admin }: {
+function DashboardWidgets({ events, tasks, setTasks, navigate, leaves, pendingPayments, admin, financePayments, showFinance }: {
   events: Event[]
   tasks: Task[]
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>
@@ -568,6 +570,8 @@ function DashboardWidgets({ events, tasks, setTasks, navigate, leaves, pendingPa
   leaves: LeaveToday[]
   pendingPayments: number
   admin: boolean
+  financePayments: EventPayment[]
+  showFinance: boolean
 }) {
   const { unread } = useChatNotifications()
 
@@ -832,6 +836,38 @@ function DashboardWidgets({ events, tasks, setTasks, navigate, leaves, pendingPa
           </div>
         </div>
       )}
+
+      {/* FLUSSO DI CASSA 14GG (finance/admin) */}
+      {showFinance && (() => {
+        const pending = financePayments.filter(p => p.stato !== 'pagato')
+        const entrata = pending.filter(p => p.tipo === 'incasso_cliente').reduce((s, p) => s + (p.importo ?? 0), 0)
+        const uscita = pending.filter(p => p.tipo === 'pagamento_fornitore').reduce((s, p) => s + (p.importo ?? 0), 0)
+        const netto = entrata - uscita
+        const fmtCur = (v: number) => `\u20ac${v.toLocaleString('it-IT', { maximumFractionDigits: 0 })}`
+        return (
+          <div
+            className="rounded-[14px] p-4 transition-all cursor-pointer"
+            style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}
+            onClick={() => navigate('/amministrazione')}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--red2) 40%, transparent)')}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--line)')}
+          >
+            <div className="flex items-center justify-between mb-2 pb-2" style={{ borderBottom: '1px solid var(--line)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.08em', color: 'var(--muted)' }} className="uppercase">Flusso di cassa (14gg)</span>
+              <CreditCard className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+            </div>
+            <p style={{ fontFamily: 'var(--font-serif, Georgia, serif)', fontSize: 28, color: netto >= 0 ? 'var(--green)' : 'var(--red2)', lineHeight: 1.1 }}>
+              {fmtCur(netto)}
+            </p>
+            <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8 }}>
+              {fmtCur(entrata)} previsti in entrata &middot; {fmtCur(uscita)} in uscita
+            </p>
+            <div className="flex items-center gap-1 mt-3 font-medium" style={{ color: 'var(--red2)', fontSize: 12 }}>
+              Amministrazione <ChevronRight className="w-3 h-3" />
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
