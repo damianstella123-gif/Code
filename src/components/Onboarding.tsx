@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getAllowedNavForRole } from '@/lib/auth'
 
@@ -11,7 +11,6 @@ interface Props {
 interface TourStep {
   title: string
   body: string
-  targetSelector: string | null
   requiredHref?: string
 }
 
@@ -19,48 +18,40 @@ const ALL_STEPS: TourStep[] = [
   {
     title: 'Benvenuto in Synergy, {name}!',
     body: 'Sono Fly, il tuo assistente digitale.\nTi mostro le sezioni principali in pochi passi.',
-    targetSelector: null,
   },
   {
     title: 'Dashboard',
-    body: 'La tua panoramica: eventi in arrivo, task aperti, statistiche rapide.',
-    targetSelector: '[data-onboarding="dashboard"]',
+    body: 'La trovi come prima voce nel menu a sinistra.\nPanoramica rapida: eventi in arrivo, task aperti, statistiche.',
     requiredHref: '/dashboard',
   },
   {
     title: 'Eventi',
-    body: 'Gestisci tutti gli eventi: crea, modifica, assegna il team.',
-    targetSelector: '[data-onboarding="eventi"]',
+    body: 'Nel menu a sinistra, sotto Dashboard.\nGestisci tutti gli eventi: crea, modifica, assegna il team.',
     requiredHref: '/eventi',
   },
   {
     title: 'Task',
-    body: 'Le attivita assegnate a te e al tuo team, con scadenze e priorita.',
-    targetSelector: '[data-onboarding="task"]',
+    body: 'Nel menu a sinistra, sezione Operativo.\nLe attivita assegnate a te e al tuo team, con scadenze e priorita.',
     requiredHref: '/task',
   },
   {
     title: 'Calendario',
-    body: 'Tutto in una vista: eventi, task, scadenze, ferie.',
-    targetSelector: '[data-onboarding="calendario"]',
+    body: 'Nel menu a sinistra, sezione Operativo.\nTutto in una vista: eventi, task, scadenze, ferie.',
     requiredHref: '/calendario',
   },
   {
     title: 'Network',
-    body: 'Clienti e fornitori in un unico punto. Il tuo CRM integrato.',
-    targetSelector: '[data-onboarding="network"]',
+    body: 'Nel menu a sinistra, sezione Operativo.\nClienti e fornitori in un unico punto. Il tuo CRM integrato.',
     requiredHref: '/network',
   },
   {
     title: 'Feedback',
-    body: 'Suggerisci miglioramenti, vota le proposte del team.',
-    targetSelector: '[data-onboarding="feedback-beta"]',
+    body: 'In fondo al menu, sezione Sistema.\nSuggerisci miglioramenti, vota le proposte del team.',
     requiredHref: '/feedback-beta',
   },
   {
     title: 'Sei pronto!',
     body: 'Puoi rivedere questo tour in qualsiasi momento dalla sezione Aiuto nel menu.',
-    targetSelector: null,
   },
 ]
 
@@ -69,71 +60,9 @@ function getStepsForRole(role: string): TourStep[] {
   return ALL_STEPS.filter(s => !s.requiredHref || allowedHrefs.includes(s.requiredHref))
 }
 
-const POLL_INTERVAL = 80
-const POLL_MAX = 800
-const SPOTLIGHT_PADDING = 6
-const SPOTLIGHT_RADIUS = 10
-
 export default function Onboarding({ onComplete, userName, userRole }: Props) {
   const steps = getStepsForRole(userRole)
   const [step, setStep] = useState(0)
-  const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
-  const pollTimerRef = useRef<number | null>(null)
-  const rafRef = useRef<number | null>(null)
-
-  const findAndTrack = useCallback((sel: string) => {
-    const el = document.querySelector<HTMLElement>(sel)
-    if (!el) return null
-    const rect = el.getBoundingClientRect()
-    setTargetRect(rect)
-    return el
-  }, [])
-
-  useEffect(() => {
-    setTargetRect(null)
-    if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
-    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
-
-    const sel = steps[step]?.targetSelector
-    if (!sel) return
-
-    const el = findAndTrack(sel)
-    if (el) {
-      const onResize = () => { setTargetRect(el.getBoundingClientRect()) }
-      window.addEventListener('resize', onResize)
-      // Recompute position on each frame for ~300ms to catch layout shifts
-      let frames = 0
-      const trackFrames = () => {
-        setTargetRect(el.getBoundingClientRect())
-        frames++
-        if (frames < 18) rafRef.current = requestAnimationFrame(trackFrames)
-      }
-      rafRef.current = requestAnimationFrame(trackFrames)
-      return () => {
-        window.removeEventListener('resize', onResize)
-        if (rafRef.current) cancelAnimationFrame(rafRef.current)
-      }
-    }
-
-    // Poll for element existence
-    let elapsed = 0
-    pollTimerRef.current = window.setInterval(() => {
-      elapsed += POLL_INTERVAL
-      const found = findAndTrack(sel)
-      if (found) {
-        if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
-      } else if (elapsed >= POLL_MAX) {
-        if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
-        // Element not in DOM — skip step
-        if (step < steps.length - 1) setStep(s => s + 1)
-      }
-    }, POLL_INTERVAL)
-
-    return () => {
-      if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
-      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
-    }
-  }, [step])
 
   async function finish() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -148,6 +77,10 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
     setStep(s => s + 1)
   }
 
+  function back() {
+    if (step > 0) setStep(s => s - 1)
+  }
+
   function skip() { finish() }
 
   const current = steps[step]
@@ -156,63 +89,39 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
   const isLast = step === steps.length - 1
   const progress = ((step + 1) / steps.length) * 100
 
-  // Compute tooltip position relative to the spotlight rect
-  let cardPosition: React.CSSProperties
-  if (targetRect) {
-    const cardWidth = 380
-    const rightOfTarget = targetRect.right + 16
-    const fitsRight = rightOfTarget + cardWidth < window.innerWidth
-    const below = targetRect.bottom + 16
-    const fitsBelow = below + 200 < window.innerHeight
-
-    if (fitsRight) {
-      cardPosition = {
-        top: Math.max(16, targetRect.top),
-        left: rightOfTarget,
-      }
-    } else if (fitsBelow) {
-      cardPosition = {
-        top: below,
-        left: Math.max(16, Math.min(targetRect.left, window.innerWidth - cardWidth - 16)),
-      }
-    } else {
-      cardPosition = {
-        bottom: window.innerHeight - targetRect.top + 16,
-        left: Math.max(16, Math.min(targetRect.left, window.innerWidth - cardWidth - 16)),
-      }
-    }
-  } else {
-    cardPosition = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
-  }
-
-  // Spotlight cutout rect with padding
-  const spotStyle: React.CSSProperties | null = targetRect ? {
-    position: 'fixed',
-    top: targetRect.top - SPOTLIGHT_PADDING,
-    left: targetRect.left - SPOTLIGHT_PADDING,
-    width: targetRect.width + SPOTLIGHT_PADDING * 2,
-    height: targetRect.height + SPOTLIGHT_PADDING * 2,
-    borderRadius: SPOTLIGHT_RADIUS,
-    boxShadow: '0 0 0 9999px rgba(0,0,0,0.7)',
-    zIndex: 10000,
-    pointerEvents: 'none',
-    transition: 'top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease',
-  } : null
-
   return (
     <>
       <style>{`
-        @keyframes onb-slide-up {
-          from { opacity: 0; transform: translateY(12px); }
-          to { opacity: 1; transform: translateY(0); }
+        @keyframes onb-fade-in {
+          from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+          to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
         }
-        .onb-card { animation: onb-slide-up 0.25s ease-out; }
+        .onb-card {
+          animation: onb-fade-in 0.2s ease-out;
+          position: fixed;
+          top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          z-index: 10001;
+          background: var(--panel-solid, #1a1a1a);
+          border: 1px solid var(--red2);
+          border-radius: 16px;
+          padding: 28px 32px;
+          max-width: 420px;
+          width: 90vw;
+          box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+        }
         .onb-btn-primary {
           font-family: var(--font-mono); font-size: 12px; font-weight: 600;
           color: #fff; background: var(--red2); border: none; border-radius: 8px;
           padding: 10px 20px; cursor: pointer; transition: opacity 0.15s;
         }
         .onb-btn-primary:hover { opacity: 0.85; }
+        .onb-btn-secondary {
+          font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+          color: var(--muted); background: var(--line, #333); border: none; border-radius: 8px;
+          padding: 10px 16px; cursor: pointer; transition: opacity 0.15s;
+        }
+        .onb-btn-secondary:hover { opacity: 0.85; }
         .onb-btn-skip {
           font-family: var(--font-mono); font-size: 11px; color: var(--muted);
           background: none; border: none; cursor: pointer; padding: 6px 12px;
@@ -220,35 +129,14 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
         .onb-btn-skip:hover { color: var(--text); }
       `}</style>
 
-      {/* Full-screen click catcher (behind spotlight) */}
+      {/* Dimmed backdrop — no blur */}
       <div
-        style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: targetRect ? 'transparent' : 'rgba(0,0,0,0.7)',
-        }}
+        style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)' }}
         onClick={e => { if (e.target === e.currentTarget && !isFirst) next() }}
       />
 
-      {/* Box-shadow spotlight cutout — dims everything except the target */}
-      {spotStyle && <div style={spotStyle} />}
-
-      {/* Tooltip card */}
-      <div
-        className="onb-card"
-        key={step}
-        style={{
-          position: 'fixed',
-          zIndex: 10001,
-          background: 'var(--panel-solid, #1a1a1a)',
-          border: '3px solid #00FF00',
-          borderRadius: 16,
-          padding: '24px 28px',
-          maxWidth: 380,
-          width: '90vw',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
-          ...cardPosition,
-        }}
-      >
+      {/* Centered card */}
+      <div className="onb-card" key={step}>
         {/* Progress bar */}
         <div style={{ position: 'absolute', top: 0, left: 16, right: 16, height: 3, borderRadius: 2, background: 'var(--line, #333)', overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${progress}%`, background: 'var(--red2)', transition: 'width 0.3s ease' }} />
@@ -258,10 +146,10 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             {step + 1} / {steps.length}
           </p>
-          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
             {title}
           </h2>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, whiteSpace: 'pre-line', marginBottom: 20 }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, whiteSpace: 'pre-line', marginBottom: 24 }}>
             {current.body}
           </p>
         </div>
@@ -270,9 +158,16 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
           <button className="onb-btn-skip" onClick={skip}>
             {isLast ? '' : 'Salta tutto'}
           </button>
-          <button className="onb-btn-primary" onClick={next}>
-            {isFirst ? 'Inizia' : isLast ? 'Chiudi' : 'PROVA123'} &rarr;
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {!isFirst && (
+              <button className="onb-btn-secondary" onClick={back}>
+                &larr; Indietro
+              </button>
+            )}
+            <button className="onb-btn-primary" onClick={next}>
+              {isFirst ? 'Inizia' : isLast ? 'Chiudi' : 'Avanti'} &rarr;
+            </button>
+          </div>
         </div>
       </div>
     </>
