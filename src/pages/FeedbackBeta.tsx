@@ -1,19 +1,27 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Search, X, Pencil, Trash2, MessageCircle, Bug, Lightbulb, Sparkles, AlertTriangle } from 'lucide-react'
-import { fetchFeedbacks, insertFeedback, updateFeedback, deleteFeedback, type Feedback } from '@/lib/feedback-service'
-import { loadUser } from '@/lib/auth'
+import {
+  Search, X, Pencil, Trash2, MessageCircle, Bug, Lightbulb, Sparkles,
+  AlertTriangle, ThumbsUp, ChevronDown, ChevronUp, Send,
+} from 'lucide-react'
+import {
+  fetchFeedbacks, insertFeedback, updateFeedback, deleteFeedback,
+  fetchVoteSummaries, toggleVote, fetchCommentCounts, fetchComments, addComment, deleteComment,
+  type Feedback, type FeedbackVoteSummary, type FeedbackComment,
+} from '@/lib/feedback-service'
+import { loadUser, isManager } from '@/lib/auth'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { fmtLong } from '@/lib/format'
 
 type FilterStato = 'Tutti' | Feedback['stato']
 type FilterCategoria = 'Tutte' | Feedback['categoria']
+type SortMode = 'recenti' | 'voti'
 
 const STATI: Feedback['stato'][] = ['Nuovo', 'In valutazione', 'Pianificato', 'Risolto']
 const CATEGORIE: Feedback['categoria'][] = ['Bug', 'Miglioramento', 'Funzione mancante', 'Idea']
 const PRIORITA: Feedback['priorita'][] = ['Bassa', 'Media', 'Alta']
 
 const MODULI = [
-  'Dashboard', 'Eventi', 'CRM', 'Task', 'Calendario', 'Fornitori',
+  'Dashboard', 'Eventi', 'Network', 'Task', 'Calendario', 'Fornitori',
   'Amministrazione', 'Creative Studio', 'Social Studio', 'Presentazioni',
   'Dossier', 'Comunicazioni', 'Workflow', 'Utenti', 'Impostazioni', 'Altro',
 ]
@@ -53,9 +61,7 @@ function statoColor(s: Feedback['stato']) {
   }
 }
 
-function formatDate(d: string) {
-  return fmtLong(d)
-}
+// ─── Form Modal ────────────────────────────────────────────────────────────
 
 interface FeedbackFormProps {
   initial: Feedback | null
@@ -202,25 +208,114 @@ function FeedbackForm({ initial, onClose, onSaved }: FeedbackFormProps) {
   )
 }
 
+// ─── Comment Section ───────────────────────────────────────────────────────
+
+function CommentsSection({ feedbackId }: { feedbackId: string }) {
+  const user = loadUser()
+  const [comments, setComments] = useState<FeedbackComment[]>([])
+  const [newBody, setNewBody] = useState('')
+  const [sending, setSending] = useState(false)
+
+  useEffect(() => {
+    fetchComments(feedbackId).then(setComments)
+  }, [feedbackId])
+
+  const handleSend = async () => {
+    if (!newBody.trim()) return
+    setSending(true)
+    const authorName = user ? `${user.first_name} ${user.last_name}` : ''
+    const c = await addComment(feedbackId, newBody.trim(), authorName)
+    if (c) setComments(prev => [...prev, c])
+    setNewBody('')
+    setSending(false)
+  }
+
+  const handleDelete = async (id: string) => {
+    const ok = await deleteComment(id)
+    if (ok) setComments(prev => prev.filter(c => c.id !== id))
+  }
+
+  const canDelete = (c: FeedbackComment) => {
+    if (!user) return false
+    if (c.user_id === user.id) return true
+    return isManager(user)
+  }
+
+  return (
+    <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--line)' }}>
+      {comments.map(c => (
+        <div key={c.id} className="flex items-start gap-2 mb-2.5">
+          <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[9px] font-bold"
+            style={{ background: 'var(--panel2)', color: 'var(--muted)' }}>
+            {(c.author_name || '?')[0].toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold" style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
+                {c.author_name || 'Anonimo'}
+              </span>
+              <span className="text-[10px]" style={{ color: 'var(--muted)' }}>{fmtLong(c.created_at)}</span>
+              {canDelete(c) && (
+                <button onClick={() => handleDelete(c.id)} className="ml-auto p-0.5 rounded hover:bg-white/10">
+                  <Trash2 className="w-3 h-3" style={{ color: 'var(--muted)' }} />
+                </button>
+              )}
+            </div>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text)', lineHeight: 1.5 }}>{c.body}</p>
+          </div>
+        </div>
+      ))}
+
+      <div className="flex items-center gap-2 mt-2">
+        <input
+          type="text"
+          value={newBody}
+          onChange={e => setNewBody(e.target.value)}
+          placeholder="Scrivi un commento..."
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+          className="flex-1 px-3 py-2 rounded-lg text-xs focus:outline-none"
+          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}
+        />
+        <button onClick={handleSend} disabled={sending || !newBody.trim()}
+          className="p-2 rounded-lg transition-all disabled:opacity-30"
+          style={{ background: 'var(--red2)', color: 'white' }}>
+          <Send className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────
+
 export default function FeedbackBeta() {
+  const user = loadUser()
   const [list, setList] = useState<Feedback[]>([])
+  const [votes, setVotes] = useState<Map<string, FeedbackVoteSummary>>(new Map())
+  const [commentCounts, setCommentCounts] = useState<Map<string, number>>(new Map())
   const [search, setSearch] = useState('')
   const [filterStato, setFilterStato] = useState<FilterStato>('Tutti')
   const [filterCategoria, setFilterCategoria] = useState<FilterCategoria>('Tutte')
+  const [sortMode, setSortMode] = useState<SortMode>('voti')
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState<Feedback | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Feedback | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set())
 
   const refresh = useCallback(() => {
     fetchFeedbacks().then(setList)
+    fetchVoteSummaries().then(setVotes)
+    fetchCommentCounts().then(setCommentCounts)
   }, [])
 
   useEffect(() => { refresh() }, [refresh])
   useRealtimeTable('feedback', refresh)
+  useRealtimeTable('feedback_votes', () => fetchVoteSummaries().then(setVotes))
+  useRealtimeTable('feedback_comments', () => fetchCommentCounts().then(setCommentCounts))
 
   const filtered = useMemo(() => {
-    return list.filter(f => {
+    let items = list.filter(f => {
       if (filterStato !== 'Tutti' && f.stato !== filterStato) return false
       if (filterCategoria !== 'Tutte' && f.categoria !== filterCategoria) return false
       if (search.trim()) {
@@ -232,7 +327,16 @@ export default function FeedbackBeta() {
       }
       return true
     })
-  }, [list, search, filterStato, filterCategoria])
+
+    if (sortMode === 'voti') {
+      items = [...items].sort((a, b) => {
+        const va = votes.get(a.id)?.count ?? 0
+        const vb = votes.get(b.id)?.count ?? 0
+        return vb - va || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+    }
+    return items
+  }, [list, search, filterStato, filterCategoria, sortMode, votes])
 
   const counts = useMemo(() => ({
     totale: list.length,
@@ -240,6 +344,11 @@ export default function FeedbackBeta() {
     valutazione: list.filter(f => f.stato === 'In valutazione').length,
     risolto: list.filter(f => f.stato === 'Risolto').length,
   }), [list])
+
+  const handleVote = async (feedbackId: string) => {
+    await toggleVote(feedbackId)
+    fetchVoteSummaries().then(setVotes)
+  }
 
   const handleDelete = async () => {
     if (!deleteTarget) return
@@ -251,6 +360,21 @@ export default function FeedbackBeta() {
     }
     setDeleteTarget(null)
     refresh()
+  }
+
+  const toggleComments = (id: string) => {
+    setExpandedComments(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const canEditDelete = (fb: Feedback) => {
+    if (!user) return false
+    if (fb.autore_id === user.id) return true
+    return isManager(user)
   }
 
   return (
@@ -279,7 +403,7 @@ export default function FeedbackBeta() {
         <span style={{ color: 'var(--green)' }}>Risolti <strong>{counts.risolto}</strong></span>
       </div>
 
-      {/* Search + Filters */}
+      {/* Search + Filters + Sort */}
       <div className="flex flex-col md:flex-row gap-3 py-4 border-b" style={{ borderColor: 'var(--line)' }}>
         <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg flex-1 min-w-[200px]"
           style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
@@ -308,6 +432,13 @@ export default function FeedbackBeta() {
           <option value="Tutti">Tutti gli stati</option>
           {STATI.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+
+        <select value={sortMode} onChange={e => setSortMode(e.target.value as SortMode)}
+          className="px-3 py-2.5 rounded-lg text-sm"
+          style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+          <option value="voti">Piu votati</option>
+          <option value="recenti">Piu recenti</option>
+        </select>
       </div>
 
       {/* List */}
@@ -321,16 +452,40 @@ export default function FeedbackBeta() {
           {filtered.map((fb, i) => {
             const CatIcon = categoriaIcon(fb.categoria)
             const catColor = categoriaColor(fb.categoria)
+            const voteSummary = votes.get(fb.id)
+            const voteCount = voteSummary?.count ?? 0
+            const votedByMe = voteSummary?.voted_by_me ?? false
+            const commentCount = commentCounts.get(fb.id) ?? 0
+            const commentsOpen = expandedComments.has(fb.id)
+
             return (
               <div key={fb.id}
                 className="border-b py-4 animate-fade-in"
-                style={{ borderColor: 'var(--line)', animationDelay: `${i * 40}ms` }}>
-                <div className="flex items-start gap-4">
+                style={{ borderColor: 'var(--line)', animationDelay: `${i * 30}ms` }}>
+                <div className="flex items-start gap-3">
+                  {/* Vote button */}
+                  <button
+                    onClick={() => handleVote(fb.id)}
+                    className="flex flex-col items-center gap-0.5 pt-0.5 flex-shrink-0 rounded-lg px-2 py-1.5 transition-all"
+                    style={{
+                      background: votedByMe ? 'color-mix(in srgb, var(--red2) 12%, transparent)' : 'var(--panel2)',
+                      border: votedByMe ? '1px solid color-mix(in srgb, var(--red2) 30%, transparent)' : '1px solid var(--line)',
+                    }}
+                    title={votedByMe ? 'Rimuovi voto' : 'Supporta'}
+                  >
+                    <ThumbsUp className="w-3.5 h-3.5" style={{ color: votedByMe ? 'var(--red2)' : 'var(--muted)' }} />
+                    <span className="text-[10px] font-bold" style={{ color: votedByMe ? 'var(--red2)' : 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                      {voteCount}
+                    </span>
+                  </button>
+
+                  {/* Category icon */}
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                     style={{ background: `${catColor}15` }}>
                     <CatIcon className="w-4 h-4" style={{ color: catColor }} />
                   </div>
 
+                  {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span className="px-2 py-0.5 rounded text-xs font-mono"
@@ -354,20 +509,34 @@ export default function FeedbackBeta() {
                     )}
                     <div className="flex items-center gap-4 mt-2 text-xs font-mono" style={{ color: 'var(--muted)' }}>
                       <span>{fb.autore_nome || 'Anonimo'}</span>
-                      <span>{formatDate(fb.created_at)}</span>
+                      <span>{fmtLong(fb.created_at)}</span>
+                      <button
+                        onClick={() => toggleComments(fb.id)}
+                        className="flex items-center gap-1 hover:opacity-80 transition-opacity"
+                        style={{ color: commentCount > 0 ? 'var(--blue)' : 'var(--muted)' }}
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                        <span>{commentCount}</span>
+                        {commentsOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
                     </div>
+
+                    {commentsOpen && <CommentsSection feedbackId={fb.id} />}
                   </div>
 
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button onClick={() => { setEditTarget(fb); setShowForm(true) }}
-                      className="p-1.5 rounded-lg hover:bg-white/10 transition-all" title="Modifica">
-                      <Pencil className="w-4 h-4" style={{ color: 'var(--muted)' }} />
-                    </button>
-                    <button onClick={() => { setDeleteError(null); setDeleteTarget(fb) }}
-                      className="p-1.5 rounded-lg hover:bg-white/10 transition-all" title="Elimina">
-                      <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
-                    </button>
-                  </div>
+                  {/* Edit/Delete (only for author or admin) */}
+                  {canEditDelete(fb) && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button onClick={() => { setEditTarget(fb); setShowForm(true) }}
+                        className="p-1.5 rounded-lg hover:bg-white/10 transition-all" title="Modifica">
+                        <Pencil className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+                      </button>
+                      <button onClick={() => { setDeleteError(null); setDeleteTarget(fb) }}
+                        className="p-1.5 rounded-lg hover:bg-white/10 transition-all" title="Elimina">
+                        <Trash2 className="w-4 h-4" style={{ color: 'var(--red2)' }} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -394,7 +563,7 @@ export default function FeedbackBeta() {
             onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Eliminare il feedback?</h3>
             <p className="text-xs mt-2" style={{ color: 'var(--muted)' }}>
-              Vuoi eliminare "{deleteTarget.titolo}"?
+              Vuoi eliminare &quot;{deleteTarget.titolo}&quot;?
             </p>
             {deleteError && (
               <p className="text-xs mt-2 px-2 py-1.5 rounded" style={{ color: 'var(--red2)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
