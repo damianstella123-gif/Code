@@ -79,7 +79,8 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
   { label: 'Operativo', paths: ['/eventi', '/task', '/calendario'] },
   { label: 'Business', paths: ['/network', '/amministrazione'] },
   { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
-  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/performance', '/wellness', '/growth', '/centro-sicurezza', '/ai-trasparenza', '/impostazioni', '/feedback-beta', '/aiuto'] },
+  { label: 'Crescita', paths: ['/performance', '/growth', '/ai-trasparenza'] },
+  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/wellness', '/centro-sicurezza', '/impostazioni', '/feedback-beta', '/aiuto'] },
 ]
 
 interface SidebarProps {
