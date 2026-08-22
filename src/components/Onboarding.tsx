@@ -240,7 +240,7 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
           position: 'fixed',
           zIndex: 10001,
           background: 'var(--panel-solid, #1a1a1a)',
-          border: '1px solid var(--red2)',
+          border: '3px solid #00FF00',
           borderRadius: 16,
           padding: '24px 28px',
           maxWidth: 380,
@@ -271,7 +271,7 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
             {isLast ? '' : 'Salta tutto'}
           </button>
           <button className="onb-btn-primary" onClick={next}>
-            {isFirst ? 'Inizia' : isLast ? 'Chiudi' : 'Avanti'} &rarr;
+            {isFirst ? 'Inizia' : isLast ? 'Chiudi' : 'PROVA123'} &rarr;
           </button>
         </div>
       </div>
