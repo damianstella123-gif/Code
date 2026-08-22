@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Sparkles, CheckCircle2, Plus, Pencil, Trash2, Users, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Sparkles, CheckCircle2, Plus, Pencil, Trash2, Users, ChevronDown, ChevronUp, PartyPopper } from 'lucide-react'
 import {
   fetchPills, fetchMyReads, markPillRead, createPill, updatePill, deletePill,
   fetchAllReadsAdmin, type AiPill, type AiPillRead, type AiPillReadWithProfile,
@@ -19,6 +19,9 @@ export default function AiTrasparenza() {
   const [showRegister, setShowRegister] = useState(false)
   const [allReads, setAllReads] = useState<AiPillReadWithProfile[]>([])
   const [registerLoading, setRegisterLoading] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+  const [showAllDone, setShowAllDone] = useState(false)
+  const prevProgressRef = useRef(0)
 
   const load = useCallback(async () => {
     try {
@@ -33,12 +36,22 @@ export default function AiTrasparenza() {
 
   const readIds = new Set(reads.map(r => r.pill_id))
   const progress = pills.length > 0 ? readIds.size : 0
+  const allComplete = pills.length > 0 && progress === pills.length
+
+  useEffect(() => {
+    if (progress > prevProgressRef.current && progress === pills.length && pills.length > 0) {
+      setShowAllDone(true)
+    }
+    prevProgressRef.current = progress
+  }, [progress, pills.length])
 
   async function handleMark(pillId: string) {
     if (readIds.has(pillId)) return
     try {
-      await markPillRead(pillId)
-      setReads(prev => [...prev, { pill_id: pillId, user_id: user?.id ?? '', read_at: new Date().toISOString() }])
+      const userId = await markPillRead(pillId)
+      setReads(prev => [...prev, { pill_id: pillId, user_id: userId, read_at: new Date().toISOString() }])
+      setToast('Fatto! Una in meno.')
+      setTimeout(() => setToast(null), 2500)
     } catch { /* ignore */ }
   }
 
@@ -68,26 +81,31 @@ export default function AiTrasparenza() {
         <Sparkles size={28} style={{ color: 'var(--blue)' }} />
         <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)', margin: 0 }}>AI & Trasparenza</h1>
       </div>
-      <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 24, lineHeight: 1.5 }}>
+      <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 12, lineHeight: 1.6 }}>
         Piccola cosa: la legge europea chiede a tutte le aziende che usano l'AI di tenere il team informato. Invece di darti un manuale da 100 pagine, abbiamo pensato di rendertela leggera. Due minuti a pillola, quando ti va.
+      </p>
+      <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 24, lineHeight: 1.5, fontStyle: 'italic' }}>
+        Questa formazione è richiesta dalla legge europea a tutte le aziende che usano l'AI. Grazie per dedicarci due minuti: ci aiuti a lavorare tutti in modo più sicuro e sereno.
       </p>
 
       {/* Progress */}
       <div style={{ background: 'var(--panel-solid)', borderRadius: 12, padding: '16px 20px', marginBottom: 24, border: '1px solid var(--line)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
-            Hai completato {progress} di {pills.length} pillole
+            {allComplete
+              ? 'Tutte completate! Grazie.'
+              : `Hai completato ${progress} di ${pills.length} pillole`}
           </span>
-          <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+          <span style={{ fontSize: 13, color: allComplete ? 'var(--green)' : 'var(--muted)', fontWeight: allComplete ? 600 : 400 }}>
             {pills.length > 0 ? Math.round((progress / pills.length) * 100) : 0}%
           </span>
         </div>
         <div style={{ height: 6, borderRadius: 3, background: 'var(--line)', overflow: 'hidden' }}>
           <div style={{
             height: '100%', borderRadius: 3,
-            background: progress === pills.length ? 'var(--green)' : 'var(--blue)',
+            background: allComplete ? 'var(--green)' : 'var(--blue)',
             width: `${pills.length > 0 ? (progress / pills.length) * 100 : 0}%`,
-            transition: 'width 0.3s ease',
+            transition: 'width 0.4s ease',
           }} />
         </div>
       </div>
@@ -127,6 +145,12 @@ export default function AiTrasparenza() {
         <p style={{ textAlign: 'center', color: 'var(--muted)', marginTop: 40 }}>Nessuna pillola disponibile.</p>
       )}
 
+      {/* Toast notification */}
+      {toast && <Toast message={toast} />}
+
+      {/* All done celebration */}
+      {showAllDone && <AllDoneCelebration onClose={() => setShowAllDone(false)} />}
+
       {/* Form modal */}
       {showForm && (
         <PillFormModal
@@ -149,6 +173,60 @@ export default function AiTrasparenza() {
   )
 }
 
+// ─── Toast ─────────────────────────────────────────────────────────────────
+
+function Toast({ message }: { message: string }) {
+  return (
+    <div style={{
+      position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+      background: 'var(--green)', color: '#fff', padding: '10px 20px', borderRadius: 10,
+      fontSize: 14, fontWeight: 600, zIndex: 2000, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+      display: 'flex', alignItems: 'center', gap: 8,
+      animation: 'fadeInUp 0.3s ease',
+    }}>
+      <CheckCircle2 size={16} /> {message}
+    </div>
+  )
+}
+
+// ─── All Done Celebration ──────────────────────────────────────────────────
+
+function AllDoneCelebration({ onClose }: { onClose: () => void }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1500, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.4)', padding: 16, animation: 'fadeIn 0.3s ease',
+    }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--panel-solid)', borderRadius: 20, padding: '40px 32px', textAlign: 'center',
+        maxWidth: 400, width: '100%', animation: 'scaleIn 0.3s ease', position: 'relative',
+      }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: '50%', background: 'rgba(34,197,94,0.12)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
+        }}>
+          <PartyPopper size={28} style={{ color: 'var(--green)' }} />
+        </div>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+          Grazie!
+        </h2>
+        <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)', marginBottom: 8 }}>
+          Hai completato tutte le pillole. Sei ufficialmente aggiornato, e ci hai aiutato a tenere Simmetria in regola.
+        </p>
+        <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--muted)', marginBottom: 20 }}>
+          Piccola cosa per te, grande cosa per il team.
+        </p>
+        <button onClick={onClose} style={{
+          padding: '10px 24px', borderRadius: 10, background: 'var(--green)', color: '#fff',
+          border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600,
+        }}>
+          Perfetto
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Pill Card ─────────────────────────────────────────────────────────────
 
 interface PillCardProps {
@@ -164,11 +242,27 @@ interface PillCardProps {
 
 function PillCard({ pill, isRead, expanded, onToggle, onMark, admin, onEdit, onDelete }: PillCardProps) {
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null)
+  const [justCompleted, setJustCompleted] = useState(false)
+
+  function handleQuizAnswer(idx: number) {
+    setQuizAnswer(idx)
+    if (idx === pill.quiz_json?.correct && !isRead) {
+      setJustCompleted(true)
+      onMark()
+    }
+  }
+
+  function handleManualMark() {
+    setJustCompleted(true)
+    onMark()
+  }
 
   return (
     <div style={{
-      background: 'var(--panel-solid)', borderRadius: 12, border: '1px solid var(--line)',
-      overflow: 'hidden', transition: 'box-shadow 0.2s',
+      background: 'var(--panel-solid)', borderRadius: 12,
+      border: justCompleted ? '1px solid var(--green)' : '1px solid var(--line)',
+      overflow: 'hidden', transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
+      boxShadow: justCompleted ? '0 0 0 3px rgba(34,197,94,0.1)' : 'none',
     }}>
       <button onClick={onToggle} style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
@@ -179,7 +273,7 @@ function PillCard({ pill, isRead, expanded, onToggle, onMark, admin, onEdit, onD
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: isRead ? 'var(--green)' : 'var(--line)',
           color: isRead ? '#fff' : 'var(--muted)',
-          transition: 'all 0.2s',
+          transition: 'all 0.3s ease',
         }}>
           {isRead ? <CheckCircle2 size={16} /> : <span style={{ fontSize: 12, fontWeight: 700 }}>{pill.sort_order}</span>}
         </div>
@@ -207,8 +301,8 @@ function PillCard({ pill, isRead, expanded, onToggle, onMark, admin, onEdit, onD
                   if (showResult && chosen && !correct) { bg = 'rgba(239,68,68,0.1)'; border = '1px solid var(--red2)' }
                   if (showResult && !chosen && correct) { bg = 'rgba(34,197,94,0.05)'; border = '1px solid var(--green)' }
                   return (
-                    <button key={idx} onClick={() => setQuizAnswer(idx)} disabled={showResult}
-                      style={{ padding: '8px 12px', borderRadius: 6, background: bg, border, cursor: showResult ? 'default' : 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--text)' }}>
+                    <button key={idx} onClick={() => handleQuizAnswer(idx)} disabled={showResult}
+                      style={{ padding: '8px 12px', borderRadius: 6, background: bg, border, cursor: showResult ? 'default' : 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--text)', transition: 'all 0.2s ease' }}>
                       {opt}
                     </button>
                   )
@@ -216,23 +310,27 @@ function PillCard({ pill, isRead, expanded, onToggle, onMark, admin, onEdit, onD
               </div>
               {quizAnswer !== null && (
                 <p style={{ marginTop: 10, fontSize: 13, fontWeight: 600, color: quizAnswer === pill.quiz_json.correct ? 'var(--green)' : 'var(--red2)' }}>
-                  {quizAnswer === pill.quiz_json.correct ? 'Esatto!' : 'Ricontrolla la risposta.'}
+                  {quizAnswer === pill.quiz_json.correct ? 'Esatto! Pillola completata.' : 'Non proprio, ma nessun problema. Guarda la risposta giusta evidenziata qui sopra.'}
                 </p>
               )}
             </div>
           )}
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            {!isRead && (
-              <button onClick={onMark} style={{
+            {!isRead && !justCompleted && (
+              <button onClick={handleManualMark} style={{
                 padding: '8px 16px', borderRadius: 8, background: 'var(--green)', color: '#fff',
                 border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
                 display: 'flex', alignItems: 'center', gap: 6,
               }}>
-                <CheckCircle2 size={14} /> Fatto
+                <CheckCircle2 size={14} /> Fatto, letta!
               </button>
             )}
-            {isRead && <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>Completata</span>}
+            {(isRead || justCompleted) && (
+              <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <CheckCircle2 size={14} /> Completata
+              </span>
+            )}
             {admin && (
               <>
                 <button onClick={onEdit} style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: 6, background: 'none', border: '1px solid var(--line)', cursor: 'pointer', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>

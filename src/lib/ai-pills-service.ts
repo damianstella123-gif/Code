@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { loadUser } from './auth'
 
 export interface AiPill {
   id: string
@@ -32,20 +33,24 @@ export async function fetchPills(): Promise<AiPill[]> {
 }
 
 export async function fetchMyReads(): Promise<AiPillRead[]> {
+  const user = loadUser()
+  if (!user) return []
   const { data, error } = await supabase
     .from('ai_pill_reads')
-    .select('*')
+    .select('pill_id, user_id, read_at')
+    .eq('user_id', user.id)
   if (error) throw error
   return data ?? []
 }
 
-export async function markPillRead(pillId: string): Promise<void> {
+export async function markPillRead(pillId: string): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
   const { error } = await supabase
     .from('ai_pill_reads')
     .upsert({ pill_id: pillId, user_id: user.id }, { onConflict: 'pill_id,user_id' })
   if (error) throw error
+  return user.id
 }
 
 export async function createPill(pill: { title: string; body: string; quiz_json?: AiPill['quiz_json']; sort_order?: number }): Promise<AiPill> {
