@@ -71,65 +71,67 @@ function getStepsForRole(role: string): TourStep[] {
 
 const POLL_INTERVAL = 80
 const POLL_MAX = 800
+const SPOTLIGHT_PADDING = 6
+const SPOTLIGHT_RADIUS = 10
 
 export default function Onboarding({ onComplete, userName, userRole }: Props) {
   const steps = getStepsForRole(userRole)
   const [step, setStep] = useState(0)
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
-  const highlightedRef = useRef<HTMLElement | null>(null)
   const pollTimerRef = useRef<number | null>(null)
+  const rafRef = useRef<number | null>(null)
 
-  const clearHighlight = useCallback(() => {
-    const el = highlightedRef.current
-    if (el) {
-      el.style.removeProperty('position')
-      el.style.removeProperty('z-index')
-      el.style.removeProperty('box-shadow')
-      highlightedRef.current = null
-    }
-  }, [])
-
-  const applyHighlight = useCallback((el: HTMLElement) => {
+  const findAndTrack = useCallback((sel: string) => {
+    const el = document.querySelector<HTMLElement>(sel)
+    if (!el) return null
     const rect = el.getBoundingClientRect()
     setTargetRect(rect)
-    el.style.position = 'relative'
-    el.style.zIndex = '1001'
-    el.style.boxShadow = '0 0 0 4px rgba(200,25,46,0.45), 0 0 20px rgba(200,25,46,0.2)'
-    highlightedRef.current = el
+    return el
   }, [])
 
   useEffect(() => {
-    clearHighlight()
+    setTargetRect(null)
     if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
 
     const sel = steps[step]?.targetSelector
-    if (!sel) { setTargetRect(null); return }
+    if (!sel) return
 
-    const el = document.querySelector<HTMLElement>(sel)
+    const el = findAndTrack(sel)
     if (el) {
-      applyHighlight(el)
-      return () => { clearHighlight() }
+      const onResize = () => { setTargetRect(el.getBoundingClientRect()) }
+      window.addEventListener('resize', onResize)
+      // Recompute position on each frame for ~300ms to catch layout shifts
+      let frames = 0
+      const trackFrames = () => {
+        setTargetRect(el.getBoundingClientRect())
+        frames++
+        if (frames < 18) rafRef.current = requestAnimationFrame(trackFrames)
+      }
+      rafRef.current = requestAnimationFrame(trackFrames)
+      return () => {
+        window.removeEventListener('resize', onResize)
+        if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      }
     }
 
+    // Poll for element existence
     let elapsed = 0
     pollTimerRef.current = window.setInterval(() => {
       elapsed += POLL_INTERVAL
-      const found = document.querySelector<HTMLElement>(sel)
+      const found = findAndTrack(sel)
       if (found) {
         if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
-        applyHighlight(found)
       } else if (elapsed >= POLL_MAX) {
         if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
-        // Element doesn't exist for this role - skip this step automatically
-        if (step < steps.length - 1) {
-          setStep(s => s + 1)
-        }
+        // Element not in DOM — skip step
+        if (step < steps.length - 1) setStep(s => s + 1)
       }
     }, POLL_INTERVAL)
 
     return () => {
-      clearHighlight()
       if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null }
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
     }
   }, [step])
 
@@ -138,7 +140,6 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
     if (session) {
       await supabase.from('profiles').update({ onboarding_completed: true, onboarding_step: steps.length - 1 }).eq('id', session.user.id)
     }
-    clearHighlight()
     onComplete()
   }
 
@@ -155,18 +156,48 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
   const isLast = step === steps.length - 1
   const progress = ((step + 1) / steps.length) * 100
 
+  // Compute tooltip position relative to the spotlight rect
   let cardPosition: React.CSSProperties
   if (targetRect) {
+    const cardWidth = 380
+    const rightOfTarget = targetRect.right + 16
+    const fitsRight = rightOfTarget + cardWidth < window.innerWidth
     const below = targetRect.bottom + 16
     const fitsBelow = below + 200 < window.innerHeight
-    cardPosition = {
-      top: fitsBelow ? below : undefined,
-      bottom: fitsBelow ? undefined : window.innerHeight - targetRect.top + 16,
-      left: Math.max(16, Math.min(targetRect.left, window.innerWidth - 420)),
+
+    if (fitsRight) {
+      cardPosition = {
+        top: Math.max(16, targetRect.top),
+        left: rightOfTarget,
+      }
+    } else if (fitsBelow) {
+      cardPosition = {
+        top: below,
+        left: Math.max(16, Math.min(targetRect.left, window.innerWidth - cardWidth - 16)),
+      }
+    } else {
+      cardPosition = {
+        bottom: window.innerHeight - targetRect.top + 16,
+        left: Math.max(16, Math.min(targetRect.left, window.innerWidth - cardWidth - 16)),
+      }
     }
   } else {
     cardPosition = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
   }
+
+  // Spotlight cutout rect with padding
+  const spotStyle: React.CSSProperties | null = targetRect ? {
+    position: 'fixed',
+    top: targetRect.top - SPOTLIGHT_PADDING,
+    left: targetRect.left - SPOTLIGHT_PADDING,
+    width: targetRect.width + SPOTLIGHT_PADDING * 2,
+    height: targetRect.height + SPOTLIGHT_PADDING * 2,
+    borderRadius: SPOTLIGHT_RADIUS,
+    boxShadow: '0 0 0 9999px rgba(0,0,0,0.7)',
+    zIndex: 10000,
+    pointerEvents: 'none',
+    transition: 'top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease',
+  } : null
 
   return (
     <>
@@ -188,53 +219,60 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
         }
         .onb-btn-skip:hover { color: var(--text); }
       `}</style>
+
+      {/* Full-screen click catcher (behind spotlight) */}
       <div
         style={{
-          position: 'fixed', inset: 0, zIndex: 1000,
-          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(3px)',
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: targetRect ? 'transparent' : 'rgba(0,0,0,0.7)',
         }}
         onClick={e => { if (e.target === e.currentTarget && !isFirst) next() }}
+      />
+
+      {/* Box-shadow spotlight cutout — dims everything except the target */}
+      {spotStyle && <div style={spotStyle} />}
+
+      {/* Tooltip card */}
+      <div
+        className="onb-card"
+        key={step}
+        style={{
+          position: 'fixed',
+          zIndex: 10001,
+          background: 'var(--panel-solid, #1a1a1a)',
+          border: '1px solid var(--red2)',
+          borderRadius: 16,
+          padding: '24px 28px',
+          maxWidth: 380,
+          width: '90vw',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+          ...cardPosition,
+        }}
       >
-        <div
-          className="onb-card"
-          key={step}
-          style={{
-            position: 'absolute',
-            background: 'var(--panel-solid, #1a1a1a)',
-            border: '1px solid var(--red2)',
-            borderRadius: 16,
-            padding: '24px 28px',
-            maxWidth: 400,
-            width: '90vw',
-            boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
-            ...cardPosition,
-          }}
-        >
-          {/* Progress bar */}
-          <div style={{ position: 'absolute', top: 0, left: 16, right: 16, height: 3, borderRadius: 2, background: 'var(--line, #333)', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${progress}%`, background: 'var(--red2)', transition: 'width 0.3s ease' }} />
-          </div>
+        {/* Progress bar */}
+        <div style={{ position: 'absolute', top: 0, left: 16, right: 16, height: 3, borderRadius: 2, background: 'var(--line, #333)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${progress}%`, background: 'var(--red2)', transition: 'width 0.3s ease' }} />
+        </div>
 
-          <div style={{ marginTop: 8 }}>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {step + 1} / {steps.length}
-            </p>
-            <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
-              {title}
-            </h2>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, whiteSpace: 'pre-line', marginBottom: 20 }}>
-              {current.body}
-            </p>
-          </div>
+        <div style={{ marginTop: 8 }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            {step + 1} / {steps.length}
+          </p>
+          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+            {title}
+          </h2>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, whiteSpace: 'pre-line', marginBottom: 20 }}>
+            {current.body}
+          </p>
+        </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <button className="onb-btn-skip" onClick={skip}>
-              {isLast ? '' : 'Salta tutto'}
-            </button>
-            <button className="onb-btn-primary" onClick={next}>
-              {isFirst ? 'Inizia' : isLast ? 'Chiudi' : 'Avanti'} &rarr;
-            </button>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <button className="onb-btn-skip" onClick={skip}>
+            {isLast ? '' : 'Salta tutto'}
+          </button>
+          <button className="onb-btn-primary" onClick={next}>
+            {isFirst ? 'Inizia' : isLast ? 'Chiudi' : 'Avanti'} &rarr;
+          </button>
         </div>
       </div>
     </>
