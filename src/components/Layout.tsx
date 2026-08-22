@@ -36,6 +36,7 @@ import {
   Archive,
   HeartPulse,
   Shield,
+  HelpCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
@@ -66,6 +67,7 @@ const iconMap: Record<string, React.ElementType> = {
   '/utenti': UserCog,
   '/impostazioni': SlidersHorizontal,
   '/feedback-beta': MessageCircle,
+  '/aiuto': HelpCircle,
   '/wellness': HeartPulse,
   '/centro-sicurezza': Shield,
 }
@@ -75,7 +77,7 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
   { label: 'Operativo', paths: ['/eventi', '/task', '/calendario'] },
   { label: 'Business', paths: ['/network', '/amministrazione'] },
   { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
-  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/performance', '/wellness', '/centro-sicurezza', '/impostazioni', '/feedback-beta'] },
+  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/performance', '/wellness', '/centro-sicurezza', '/impostazioni', '/feedback-beta', '/aiuto'] },
 ]
 
 interface SidebarProps {
@@ -153,7 +155,7 @@ function Sidebar({ open, setOpen }: SidebarProps) {
                       to={item.href}
                       onClick={() => setOpen(false)}
                       className={cn('shell-nav-item', isActive && 'shell-nav-item--active')}
-                      {...(item.href === '/calendario' ? { 'data-onboarding': 'calendario' } : {})}
+                      data-onboarding={item.href.replace('/', '')}
                     >
                       <div className="shell-nav-indicator" />
                       <Icon className="shell-nav-icon" />
@@ -724,7 +726,7 @@ function SentinelBadge() {
 }
 
 const PRIMARY_MOBILE_PATHS = ['/dashboard', '/eventi', '/task']
-const OVERFLOW_MOBILE_PATHS = ['/network', '/calendario', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/wellness']
+const OVERFLOW_MOBILE_PATHS = ['/network', '/calendario', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/wellness', '/aiuto']
 
 const mobileLabels: Record<string, string> = {
   '/dashboard': 'Home',
@@ -882,6 +884,7 @@ return (
           <Onboarding
             onComplete={() => setShowOnboarding(false)}
             userName={user?.first_name || 'amico'}
+            userRole={user?.ruolo || 'Project Manager'}
           />
         )}
       </div>
