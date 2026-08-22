@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, ListTodo, AlertCircle, MessageSquare, ChevronRight, Palmtree, CreditCard } from 'lucide-react'
-import { loadUser, isAdmin } from '@/lib/auth'
+import { loadUser, isAdmin, isCommerciale, isSeniorPM, isRegista } from '@/lib/auth'
 import { daysLeft, fmtLong } from '@/lib/format'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
@@ -60,7 +60,11 @@ export default function Dashboard() {
   const [liveClients, setLiveClients] = useState<Client[]>([])
   const [profileMap, setProfileMap] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'tutto' | Category>('tutto')
+  const [tab, setTab] = useState<'tutto' | Category>(() => {
+    if (isCommerciale(currentUser)) return 'clienti'
+    if (isSeniorPM(currentUser) || isRegista(currentUser) || currentUser?.role === 'Project Manager') return 'eventi'
+    return 'tutto'
+  })
   const [now, setNow] = useState(new Date())
   const [feedFilter, setFeedFilter] = useState<string | null>(null)
   const [sentinelAlerts, setSentinelAlerts] = useState<{ id: string; message: string; created_at: string }[]>([])
