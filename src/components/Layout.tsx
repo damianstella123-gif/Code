@@ -37,6 +37,7 @@ import {
   HeartPulse,
   Shield,
   HelpCircle,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
@@ -70,6 +71,7 @@ const iconMap: Record<string, React.ElementType> = {
   '/aiuto': HelpCircle,
   '/wellness': HeartPulse,
   '/centro-sicurezza': Shield,
+  '/ai-trasparenza': Sparkles,
 }
 
 const NAV_GROUPS: { label: string; paths: string[] }[] = [
@@ -77,7 +79,7 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
   { label: 'Operativo', paths: ['/eventi', '/task', '/calendario'] },
   { label: 'Business', paths: ['/network', '/amministrazione'] },
   { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
-  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/performance', '/wellness', '/centro-sicurezza', '/impostazioni', '/feedback-beta', '/aiuto'] },
+  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/performance', '/wellness', '/centro-sicurezza', '/ai-trasparenza', '/impostazioni', '/feedback-beta', '/aiuto'] },
 ]
 
 interface SidebarProps {
@@ -726,7 +728,7 @@ function SentinelBadge() {
 }
 
 const PRIMARY_MOBILE_PATHS = ['/dashboard', '/eventi', '/task']
-const OVERFLOW_MOBILE_PATHS = ['/network', '/calendario', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/wellness', '/aiuto']
+const OVERFLOW_MOBILE_PATHS = ['/network', '/calendario', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/wellness', '/ai-trasparenza', '/aiuto']
 
 const mobileLabels: Record<string, string> = {
   '/dashboard': 'Home',

@@ -33,6 +33,7 @@ const PublicRegistration = lazy(() => import('./pages/PublicRegistration'))
 const ManageRegistration = lazy(() => import('./pages/ManageRegistration'))
 const BadgeProgram = lazy(() => import('./pages/BadgeProgram'))
 const CentroSicurezza = lazy(() => import('./pages/CentroSicurezza'))
+const AiTrasparenza = lazy(() => import('./pages/AiTrasparenza'))
 
 function PageLoader() {
   return (
@@ -239,6 +240,7 @@ export default function App() {
       <Route path="/performance" element={<AuthGuard><Layout><LazyPage><Performance /></LazyPage></Layout></AuthGuard>} />
       <Route path="/wellness" element={<AuthGuard><Layout><LazyPage><Wellness /></LazyPage></Layout></AuthGuard>} />
       <Route path="/centro-sicurezza" element={<AuthGuard><Layout><LazyPage><CentroSicurezza /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/ai-trasparenza" element={<AuthGuard><Layout><LazyPage><AiTrasparenza /></LazyPage></Layout></AuthGuard>} />
       <Route path="/timeline/:eventId" element={<AuthGuard><Layout><LazyPage><EventTimeline /></LazyPage></Layout></AuthGuard>} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

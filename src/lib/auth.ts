@@ -113,6 +113,7 @@ const ALL_NAV: NavItem[] = [
   { name: 'Performance', href: '/performance' },
   { name: 'Wellness', href: '/wellness' },
   { name: 'Centro Sicurezza', href: '/centro-sicurezza' },
+  { name: 'AI & Trasparenza', href: '/ai-trasparenza' },
   { name: 'Impostazioni', href: '/impostazioni' },
   { name: 'Feedback Beta', href: '/feedback-beta' },
   { name: 'Aiuto', href: '/aiuto' },
@@ -129,19 +130,19 @@ export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
 
   if (role === 'Regista') {
     return ALL_NAV.filter(item =>
-      ['/dashboard', '/eventi', '/task', '/calendario', '/network', '/comunicazioni', '/dossier', '/impostazioni', '/feedback-beta', '/aiuto'].includes(item.href)
+      ['/dashboard', '/eventi', '/task', '/calendario', '/network', '/comunicazioni', '/dossier', '/ai-trasparenza', '/impostazioni', '/feedback-beta', '/aiuto'].includes(item.href)
     )
   }
 
   if (role === 'Commerciale') {
     return ALL_NAV.filter(item =>
-      ['/dashboard', '/network', '/presentazioni', '/comunicazioni', '/calendario', '/dossier', '/creative-studio', '/impostazioni', '/feedback-beta', '/aiuto'].includes(item.href)
+      ['/dashboard', '/network', '/presentazioni', '/comunicazioni', '/calendario', '/dossier', '/creative-studio', '/ai-trasparenza', '/impostazioni', '/feedback-beta', '/aiuto'].includes(item.href)
     )
   }
 
   if (role === 'Amministrazione' || role === 'Finance') {
     return ALL_NAV.filter(item =>
-      ['/dashboard', '/amministrazione', '/eventi', '/calendario', '/impostazioni', '/feedback-beta', '/aiuto'].includes(item.href)
+      ['/dashboard', '/amministrazione', '/eventi', '/calendario', '/ai-trasparenza', '/impostazioni', '/feedback-beta', '/aiuto'].includes(item.href)
     )
   }
 
