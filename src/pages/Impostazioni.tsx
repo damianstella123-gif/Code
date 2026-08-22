@@ -1209,34 +1209,41 @@ function ConfigDashboard({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSetti
   return (
     <SectionCard icon={LayoutDashboard} title="Configurazione Dashboard" subtitle="Layout, widget e KPI visibili (globale)">
       <div className="space-y-6">
-        <div>
-          <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>Layout</p>
-          <RadioGroup value={s.layoutDashboard} onChange={v => upd({ layoutDashboard: v as AppSettings['layoutDashboard'] })}
-            options={[
-              { value: 'compatto', label: 'Compatto', desc: 'Più informazioni in meno spazio' },
-              { value: 'standard', label: 'Standard', desc: 'Bilanciamento leggibilità/densità' },
-              { value: 'espanso', label: 'Espanso', desc: 'Card grandi per monitor ad alta risoluzione' },
-            ]}
-          />
+        <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', marginBottom: 8 }}>
+          <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5, margin: 0 }}>
+            Le opzioni qui sotto saranno attive in un prossimo aggiornamento. Salviamo già le tue preferenze.
+          </p>
         </div>
-        <div>
-          <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>KPI visibili</p>
-          <ChipGroup
-            options={[
-              { value: 'eventi', label: 'Eventi attivi' },
-              { value: 'task', label: 'Task aperti' },
-              { value: 'fatturato', label: 'Fatturato' },
-              { value: 'fornitori', label: 'Fornitori' },
-              { value: 'workflow', label: 'Workflow' },
-              { value: 'clienti', label: 'Clienti' },
-            ]}
-            selected={s.kpiVisibili}
-            onChange={v => upd({ kpiVisibili: v })}
-          />
-        </div>
-        <div>
-          <ToggleRow label="Avanzamento workflow" hint="Mostra barra progresso workflow nella dashboard" checked={s.mostraAvanzamentoWorkflow} onChange={v => upd({ mostraAvanzamentoWorkflow: v })} />
-          <ToggleRow label="Calendario laterale" hint="Mini-calendario nella sidebar dashboard" checked={s.mostraCalendarioLaterale} onChange={v => upd({ mostraCalendarioLaterale: v })} />
+        <div style={{ opacity: 0.45, pointerEvents: 'none' }}>
+          <div style={{ position: 'relative' }}>
+            <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: 'var(--muted)' }}>Layout <span style={{ fontSize: 10, fontWeight: 600, background: 'var(--line)', borderRadius: 4, padding: '2px 6px', marginLeft: 6, verticalAlign: 'middle' }}>In arrivo</span></p>
+            <RadioGroup value={s.layoutDashboard} onChange={v => upd({ layoutDashboard: v as AppSettings['layoutDashboard'] })}
+              options={[
+                { value: 'compatto', label: 'Compatto', desc: 'Più informazioni in meno spazio' },
+                { value: 'standard', label: 'Standard', desc: 'Bilanciamento leggibilità/densità' },
+                { value: 'espanso', label: 'Espanso', desc: 'Card grandi per monitor ad alta risoluzione' },
+              ]}
+            />
+          </div>
+          <div style={{ position: 'relative' }}>
+            <p className="text-xs font-mono uppercase tracking-widest mb-3 mt-6" style={{ color: 'var(--muted)' }}>KPI visibili <span style={{ fontSize: 10, fontWeight: 600, background: 'var(--line)', borderRadius: 4, padding: '2px 6px', marginLeft: 6, verticalAlign: 'middle' }}>In arrivo</span></p>
+            <ChipGroup
+              options={[
+                { value: 'eventi', label: 'Eventi attivi' },
+                { value: 'task', label: 'Task aperti' },
+                { value: 'fatturato', label: 'Fatturato' },
+                { value: 'fornitori', label: 'Fornitori' },
+                { value: 'workflow', label: 'Workflow' },
+                { value: 'clienti', label: 'Clienti' },
+              ]}
+              selected={s.kpiVisibili}
+              onChange={v => upd({ kpiVisibili: v })}
+            />
+          </div>
+          <div>
+            <ToggleRow label="Avanzamento workflow" hint="Mostra barra progresso workflow nella dashboard" checked={s.mostraAvanzamentoWorkflow} onChange={v => upd({ mostraAvanzamentoWorkflow: v })} />
+            <ToggleRow label="Calendario laterale" hint="Mini-calendario nella sidebar dashboard" checked={s.mostraCalendarioLaterale} onChange={v => upd({ mostraCalendarioLaterale: v })} />
+          </div>
         </div>
       </div>
     </SectionCard>

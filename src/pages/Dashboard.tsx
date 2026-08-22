@@ -114,19 +114,24 @@ export default function Dashboard() {
         .limit(5)
         .then(({ data }) => { if (data) setSentinelAlerts(data) })
     }
-    // Fetch today's morning edition for current user
+    // Fetch today's morning edition if user has it enabled
     if (currentUser) {
-      const todayStart = new Date()
-      todayStart.setHours(0, 0, 0, 0)
-      supabase.from('notifications')
-        .select('id, message, created_at')
-        .eq('user_id', currentUser.id)
-        .eq('type', 'morning_edition')
-        .gte('created_at', todayStart.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-        .then(({ data }) => { if (data) setMorningEdition(data) })
+      supabase.from('profiles').select('settings').eq('id', currentUser.id).maybeSingle()
+        .then(({ data: profile }) => {
+          const enabled = profile?.settings?.morningEdition !== false
+          if (!enabled) return
+          const todayStart = new Date()
+          todayStart.setHours(0, 0, 0, 0)
+          supabase.from('notifications')
+            .select('id, message, created_at')
+            .eq('user_id', currentUser.id)
+            .eq('type', 'morning_edition')
+            .gte('created_at', todayStart.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+            .then(({ data }) => { if (data) setMorningEdition(data) })
+        })
     }
     // Team members on approved leave today
     const todayISO = new Date().toISOString().split('T')[0]
