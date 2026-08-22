@@ -218,7 +218,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
   )
 }
 
-function ToggleRow({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+function ToggleRow({ label, hint, checked, onChange }: { label: React.ReactNode; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <div className="flex items-center justify-between gap-4 py-3" style={{ borderBottom: '1px solid var(--line)' }}>
       <div className="flex-1 min-w-0">
@@ -1209,8 +1209,9 @@ function ConfigDashboard({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSetti
   return (
     <SectionCard icon={LayoutDashboard} title="Configurazione Dashboard" subtitle="Layout, widget e KPI visibili (globale)">
       <div className="space-y-6">
-        <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', marginBottom: 8 }}>
-          <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5, margin: 0 }}>
+        <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <Info size={16} style={{ color: 'var(--blue)', flexShrink: 0, marginTop: 1 }} />
+          <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, margin: 0 }}>
             Le opzioni qui sotto saranno attive in un prossimo aggiornamento. Salviamo già le tue preferenze.
           </p>
         </div>
@@ -1241,8 +1242,8 @@ function ConfigDashboard({ s, upd }: { s: AppSettings; upd: (p: Partial<AppSetti
             />
           </div>
           <div>
-            <ToggleRow label="Avanzamento workflow" hint="Mostra barra progresso workflow nella dashboard" checked={s.mostraAvanzamentoWorkflow} onChange={v => upd({ mostraAvanzamentoWorkflow: v })} />
-            <ToggleRow label="Calendario laterale" hint="Mini-calendario nella sidebar dashboard" checked={s.mostraCalendarioLaterale} onChange={v => upd({ mostraCalendarioLaterale: v })} />
+            <ToggleRow label={<>Avanzamento workflow <span style={{ fontSize: 10, fontWeight: 600, background: 'var(--line)', borderRadius: 4, padding: '2px 6px', marginLeft: 6, verticalAlign: 'middle' }}>In arrivo</span></>} hint="Mostra barra progresso workflow nella dashboard" checked={s.mostraAvanzamentoWorkflow} onChange={v => upd({ mostraAvanzamentoWorkflow: v })} />
+            <ToggleRow label={<>Calendario laterale <span style={{ fontSize: 10, fontWeight: 600, background: 'var(--line)', borderRadius: 4, padding: '2px 6px', marginLeft: 6, verticalAlign: 'middle' }}>In arrivo</span></>} hint="Mini-calendario nella sidebar dashboard" checked={s.mostraCalendarioLaterale} onChange={v => upd({ mostraCalendarioLaterale: v })} />
           </div>
         </div>
       </div>
