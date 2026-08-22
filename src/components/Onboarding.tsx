@@ -4,7 +4,7 @@ import { getAllowedNavForRole } from '@/lib/auth'
 
 interface Props {
   onComplete: () => void
-  userName: string
+  userName?: string
   userRole: string
 }
 
@@ -16,42 +16,42 @@ interface TourStep {
 
 const ALL_STEPS: TourStep[] = [
   {
-    title: 'Benvenuto in Synergy, {name}!',
-    body: 'Sono Fly, il tuo assistente digitale.\nTi mostro le sezioni principali in pochi passi.',
+    title: 'Benvenuto in Synergy',
+    body: 'Synergy è lo spazio di lavoro di Simmetria: eventi, task, clienti e molto altro, tutto in un posto solo. Ti facciamo fare un giro veloce delle cose principali. Bastano due minuti, e puoi saltare quando vuoi.',
   },
   {
-    title: 'Dashboard',
-    body: 'La trovi come prima voce nel menu a sinistra.\nPanoramica rapida: eventi in arrivo, task aperti, statistiche.',
+    title: 'La tua Dashboard',
+    body: 'È la tua pagina di partenza. Ogni volta che entri, qui trovi un colpo d\u2019occhio su cosa conta oggi: le tue attività, le scadenze vicine, gli aggiornamenti importanti. Se ti perdi, torna sempre qui.',
     requiredHref: '/dashboard',
   },
   {
-    title: 'Eventi',
-    body: 'Nel menu a sinistra, sotto Dashboard.\nGestisci tutti gli eventi: crea, modifica, assegna il team.',
+    title: 'Gli Eventi',
+    body: 'Il cuore di Synergy. Nel menu trovi Eventi: qui vivono tutti gli eventi di Simmetria, con date, clienti, budget, fornitori, programma e documenti. Ogni evento ha la sua scheda completa: tutto quello che serve, in un posto solo.',
     requiredHref: '/eventi',
   },
   {
-    title: 'Task',
-    body: 'Nel menu a sinistra, sezione Operativo.\nLe attivita assegnate a te e al tuo team, con scadenze e priorita.',
+    title: 'I Task',
+    body: 'Le cose da fare. Qui vedi i tuoi compiti, chi ci sta lavorando, cosa scade. Quando qualcuno ti assegna un\u2019attività, la trovi qui e ricevi una notifica. Niente più cose che si perdono.',
     requiredHref: '/task',
   },
   {
-    title: 'Calendario',
-    body: 'Nel menu a sinistra, sezione Operativo.\nTutto in una vista: eventi, task, scadenze, ferie.',
+    title: 'Il Calendario',
+    body: 'Tutto ciò che ha una data, in un\u2019unica vista: eventi, scadenze, impegni. Per sapere cosa succede questa settimana senza dover chiedere a nessuno.',
     requiredHref: '/calendario',
   },
   {
-    title: 'Network',
-    body: 'Nel menu a sinistra, sezione Operativo.\nClienti e fornitori in un unico punto. Il tuo CRM integrato.',
+    title: 'Il Network',
+    body: 'Qui trovi i Clienti e i Fornitori, in due sezioni separate. Anagrafiche, contatti, storico: la rubrica intelligente di Simmetria. Ognuno vede la sezione di sua competenza.',
     requiredHref: '/network',
   },
   {
-    title: 'Feedback',
-    body: 'In fondo al menu, sezione Sistema.\nSuggerisci miglioramenti, vota le proposte del team.',
+    title: 'La tua voce conta',
+    body: 'Synergy cresce con voi. Se trovi un problema, hai un\u2019idea o vorresti migliorare qualcosa, segnalalo nella sezione Feedback, e puoi votare le proposte dei colleghi. Le idee più sostenute salgono in cima. Questo spazio è di tutti: usalo!',
     requiredHref: '/feedback-beta',
   },
   {
-    title: 'Sei pronto!',
-    body: 'Puoi rivedere questo tour in qualsiasi momento dalla sezione Aiuto nel menu.',
+    title: 'Sei pronto',
+    body: 'Questo era l\u2019essenziale. Quando vuoi approfondire una qualsiasi funzione, trovi la sezione Help sempre nel menu. Buon lavoro, e grazie per far parte di questo progetto.',
   },
 ]
 
@@ -60,7 +60,7 @@ function getStepsForRole(role: string): TourStep[] {
   return ALL_STEPS.filter(s => !s.requiredHref || allowedHrefs.includes(s.requiredHref))
 }
 
-export default function Onboarding({ onComplete, userName, userRole }: Props) {
+export default function Onboarding({ onComplete, userRole }: Props) {
   const steps = getStepsForRole(userRole)
   const [step, setStep] = useState(0)
 
@@ -84,7 +84,6 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
   function skip() { finish() }
 
   const current = steps[step]
-  const title = current.title.replace('{name}', userName)
   const isFirst = step === 0
   const isLast = step === steps.length - 1
   const progress = ((step + 1) / steps.length) * 100
@@ -106,7 +105,7 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
           border: 1px solid var(--red2);
           border-radius: 16px;
           padding: 28px 32px;
-          max-width: 420px;
+          max-width: 460px;
           width: 90vw;
           box-shadow: 0 16px 48px rgba(0,0,0,0.5);
         }
@@ -129,15 +128,12 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
         .onb-btn-skip:hover { color: var(--text); }
       `}</style>
 
-      {/* Dimmed backdrop — no blur */}
       <div
         style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.7)' }}
         onClick={e => { if (e.target === e.currentTarget && !isFirst) next() }}
       />
 
-      {/* Centered card */}
       <div className="onb-card" key={step}>
-        {/* Progress bar */}
         <div style={{ position: 'absolute', top: 0, left: 16, right: 16, height: 3, borderRadius: 2, background: 'var(--line, #333)', overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${progress}%`, background: 'var(--red2)', transition: 'width 0.3s ease' }} />
         </div>
@@ -146,10 +142,10 @@ export default function Onboarding({ onComplete, userName, userRole }: Props) {
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             {step + 1} / {steps.length}
           </p>
-          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
-            {title}
+          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+            {current.title}
           </h2>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, whiteSpace: 'pre-line', marginBottom: 24 }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 24 }}>
             {current.body}
           </p>
         </div>
