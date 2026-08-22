@@ -1,11 +1,12 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, ListTodo, AlertCircle, MessageSquare, ChevronRight, Palmtree, CreditCard } from 'lucide-react'
-import { loadUser, isAdmin, isCommerciale, isSeniorPM, isRegista } from '@/lib/auth'
+import { loadUser, isAdmin, isFinance, isCommerciale, isSeniorPM, isRegista } from '@/lib/auth'
 import { daysLeft, fmtLong } from '@/lib/format'
 import { fetchEvents } from '@/lib/events-service'
 import { fetchTasks } from '@/lib/tasks-service'
 import { fetchClients } from '@/lib/clients-service'
+import { fetchAllPendingPayments, type EventPayment } from '@/lib/event-payments-service'
 import { useRealtimeTable } from '@/lib/use-realtime'
 import { supabase } from '@/lib/supabase'
 import { useChatNotifications } from '@/lib/chat-notifications'
@@ -17,7 +18,7 @@ import type { Task } from '@/data/tasks'
 import type { Client } from '@/data/clients'
 
 type StoryTag = 'urgente' | 'corso' | 'buona' | 'attesa'
-type Category = 'eventi' | 'task' | 'clienti'
+type Category = 'eventi' | 'task' | 'clienti' | 'finance'
 
 type LeaveToday = {
   id: string
@@ -62,9 +63,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'tutto' | Category>(() => {
     if (isCommerciale(currentUser)) return 'clienti'
+    if (isFinance(currentUser)) return 'finance'
     if (isSeniorPM(currentUser) || isRegista(currentUser) || currentUser?.role === 'Project Manager') return 'eventi'
     return 'tutto'
   })
+  const [financePayments, setFinancePayments] = useState<EventPayment[]>([])
   const [now, setNow] = useState(new Date())
   const [feedFilter, setFeedFilter] = useState<string | null>(null)
   const [sentinelAlerts, setSentinelAlerts] = useState<{ id: string; message: string; created_at: string }[]>([])
@@ -151,6 +154,10 @@ export default function Dashboard() {
         .select('id', { count: 'exact', head: true })
         .eq('stato_approvazione', 'in_attesa')
         .then(({ count }) => setPendingPayments(count || 0))
+    }
+    // Finance feed payments
+    if (isFinance(currentUser) || isAdmin(currentUser)) {
+      fetchAllPendingPayments(14).then(setFinancePayments).catch(() => {})
     }
     const clock = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(clock)
@@ -311,8 +318,29 @@ export default function Dashboard() {
       })
     })
 
+    // Finance: pending payments
+    financePayments
+      .filter(p => p.stato !== 'pagato')
+      .forEach(p => {
+        const isLate = p.stato === 'in_ritardo'
+        const dl = daysLeft(p.data_scadenza)
+        const importoFmt = (p.importo ?? 0).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+        const tipoLabel = p.tipo === 'incasso_cliente' ? 'Incasso cliente' : 'Pagamento fornitore'
+        items.push({
+          id: `fin-${p.id}`,
+          tag: isLate ? 'urgente' : 'attesa',
+          tagLabel: isLate ? TAG_LABEL.urgente : TAG_LABEL.attesa,
+          headline: `€${importoFmt} in scadenza`,
+          dek: `${tipoLabel}. ${p.descrizione || ''}`.trim(),
+          meta: dl < 0 ? `scaduto da ${Math.abs(dl)}g` : dl === 0 ? 'scade oggi' : `scade tra ${dl}g`,
+          category: 'finance',
+          score: isLate ? 110 + Math.abs(dl) : 60 + Math.max(0, 14 - dl),
+          action: () => navigate('/amministrazione'),
+        })
+      })
+
     return items.sort((a, b) => b.score - a.score)
-  }, [liveTasks, liveEvents, liveClients, eventById, profileMap, navigate, sentinelAlerts])
+  }, [liveTasks, liveEvents, liveClients, eventById, profileMap, navigate, sentinelAlerts, financePayments])
 
   const filteredByTab = tab === 'tutto' ? stories : stories.filter(s => s.category === tab)
 
@@ -403,6 +431,15 @@ export default function Dashboard() {
             {t}
           </button>
         ))}
+        {(isFinance(currentUser) || admin) && (
+          <button
+            className={`wire-tab ${tab === 'finance' ? 'wire-tab--active' : ''}`}
+            onClick={() => { setTab('finance'); setFeedFilter(null) }}
+            style={{ minHeight: 44, fontSize: '14px' }}
+          >
+            economia
+          </button>
+        )}
         {feedFilter && (
           <button
             className="wire-tab"
