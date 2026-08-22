@@ -241,10 +241,13 @@ function TeamSection() {
 
   return (
     <div className="px-4 pb-8">
-      <div className="flex items-center gap-2 mb-4 mt-2">
+      <div className="flex items-center gap-2 mb-1 mt-2">
         <Users className="w-5 h-5" style={{ color: 'var(--blue)' }} />
         <h2 className="font-semibold text-base" style={{ color: 'var(--text)' }}>Il mio team</h2>
       </div>
+      <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
+        Qui puoi proporre aree di crescita per chi ti riporta. Restano in bozza, visibili solo a te, finché non le condividi.
+      </p>
 
       <div className="space-y-6">
         {reports.map(report => (
@@ -289,7 +292,7 @@ function TeamSection() {
                       value={newObjByArea[area.id] ?? ''}
                       onChange={e => setNewObjByArea(prev => ({ ...prev, [area.id]: e.target.value }))}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddObjective(report.id, area.id) } }}
-                      placeholder="Aggiungi obiettivo..."
+                      placeholder="Es: Presentare a un cliente senza supervisione entro fine anno"
                       className="flex-1 px-3 py-1.5 rounded-lg text-sm"
                       style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
                     />
@@ -302,6 +305,7 @@ function TeamSection() {
                       <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>Un traguardo concreto e verificabile.</p>
 
                   {area.stato === 'condiviso' && <NotesThread areaId={area.id} />}
                 </div>
@@ -314,7 +318,7 @@ function TeamSection() {
                   value={newAreaByReport[report.id] ?? ''}
                   onChange={e => setNewAreaByReport(prev => ({ ...prev, [report.id]: e.target.value }))}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddArea(report.id) } }}
-                  placeholder="Nuova area per questa persona..."
+                  placeholder="Es: Autonomia nelle trattative, Public speaking, Gestione del tempo..."
                   className="flex-1 px-3 py-1.5 rounded-lg text-sm"
                   style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}
                 />
@@ -409,6 +413,9 @@ export default function Growth() {
           <TrendingUp className="w-5 h-5" style={{ color: 'var(--red2)' }} />
           <span className="wire-masthead-title">La mia crescita professionale</span>
         </div>
+        <p className="text-xs mt-1 px-4" style={{ color: 'var(--muted)', maxWidth: 600 }}>
+          Un&rsquo;area è una direzione ampia su cui crescere (es. &ldquo;Autonomia nelle trattative&rdquo;). Sotto ogni area aggiungi obiettivi concreti (es. &ldquo;Chiudere 3 trattative senza supporto entro ottobre&rdquo;) per misurare i progressi.
+        </p>
       </div>
 
       {/* Add area form */}
@@ -417,7 +424,7 @@ export default function Growth() {
           type="text"
           value={newAreaTitle}
           onChange={e => setNewAreaTitle(e.target.value)}
-          placeholder="Nuova area di crescita..."
+          placeholder="Es: Autonomia nelle trattative, Public speaking, Gestione del tempo..."
           className="flex-1 px-3 py-2 rounded-lg text-sm"
           style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}
         />
@@ -436,8 +443,8 @@ export default function Growth() {
         {areas.length === 0 && (
           <div className="text-center py-12" style={{ color: 'var(--muted)' }}>
             <Target className="w-10 h-10 mx-auto mb-3" style={{ opacity: 0.4 }} />
-            <p className="text-sm">Nessuna area di crescita ancora definita.</p>
-            <p className="text-xs mt-1">Inizia aggiungendo un ambito su cui vuoi migliorare.</p>
+            <p className="text-sm">Ancora nessuna area.</p>
+            <p className="text-xs mt-1">Esempio: crea l&rsquo;area &ldquo;Autonomia nelle trattative&rdquo;, poi aggiungi l&rsquo;obiettivo &ldquo;Chiudere 3 trattative senza supporto entro ottobre&rdquo;.</p>
           </div>
         )}
 
@@ -471,7 +478,7 @@ export default function Growth() {
                 value={newObjByArea[area.id] ?? ''}
                 onChange={e => setNewObjByArea(prev => ({ ...prev, [area.id]: e.target.value }))}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddObjective(area.id) } }}
-                placeholder="Aggiungi obiettivo..."
+                placeholder="Es: Presentare a un cliente senza supervisione entro fine anno"
                 className="flex-1 px-3 py-1.5 rounded-lg text-sm"
                 style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--text)' }}
               />
@@ -484,6 +491,7 @@ export default function Growth() {
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
+            <p className="text-[10px] mt-1" style={{ color: 'var(--muted)' }}>Un traguardo concreto e verificabile.</p>
 
             {area.stato === 'condiviso' && <NotesThread areaId={area.id} />}
           </div>
