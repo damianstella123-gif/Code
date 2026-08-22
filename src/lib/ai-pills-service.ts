@@ -20,7 +20,6 @@ export interface AiPillReadWithProfile {
   user_id: string
   read_at: string
   nome?: string
-  cognome?: string
 }
 
 export async function fetchPills(): Promise<AiPill[]> {
@@ -41,9 +40,11 @@ export async function fetchMyReads(): Promise<AiPillRead[]> {
 }
 
 export async function markPillRead(pillId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
   const { error } = await supabase
     .from('ai_pill_reads')
-    .upsert({ pill_id: pillId }, { onConflict: 'pill_id,user_id' })
+    .upsert({ pill_id: pillId, user_id: user.id }, { onConflict: 'pill_id,user_id' })
   if (error) throw error
 }
 
@@ -74,16 +75,25 @@ export async function deletePill(id: string): Promise<void> {
 }
 
 export async function fetchAllReadsAdmin(): Promise<AiPillReadWithProfile[]> {
-  const { data, error } = await supabase
+  const { data: reads, error } = await supabase
     .from('ai_pill_reads')
-    .select('pill_id, user_id, read_at, profiles!user_id(nome, cognome)')
+    .select('pill_id, user_id, read_at')
     .order('read_at', { ascending: false })
   if (error) throw error
-  return (data ?? []).map((r: any) => ({
+  if (!reads || reads.length === 0) return []
+
+  const userIds = [...new Set(reads.map(r => r.user_id))]
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, nome')
+    .in('id', userIds)
+
+  const profileMap = new Map((profiles ?? []).map(p => [p.id, p.nome]))
+
+  return reads.map(r => ({
     pill_id: r.pill_id,
     user_id: r.user_id,
     read_at: r.read_at,
-    nome: r.profiles?.nome,
-    cognome: r.profiles?.cognome,
+    nome: profileMap.get(r.user_id) ?? undefined,
   }))
 }

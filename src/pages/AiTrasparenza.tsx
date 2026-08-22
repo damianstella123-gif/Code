@@ -69,7 +69,7 @@ export default function AiTrasparenza() {
         <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)', margin: 0 }}>AI & Trasparenza</h1>
       </div>
       <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 24, lineHeight: 1.5 }}>
-        Pillole formative su intelligenza artificiale e sicurezza informatica. Completale tutte per dimostrare la tua alfabetizzazione AI (Art. 4 AI Act).
+        Piccola cosa: la legge europea chiede a tutte le aziende che usano l'AI di tenere il team informato. Invece di darti un manuale da 100 pagine, abbiamo pensato di rendertela leggera. Due minuti a pillola, quando ti va.
       </p>
 
       {/* Progress */}
@@ -365,7 +365,7 @@ function RegisterModal({ pills, reads, loading, onClose }: RegisterModalProps) {
             <tbody>
               {reads.map((r, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid var(--line)' }}>
-                  <td style={tdStyle}>{r.nome ?? ''} {r.cognome ?? ''}</td>
+                  <td style={tdStyle}>{r.nome ?? 'Utente'}</td>
                   <td style={tdStyle}>{pillMap[r.pill_id] ?? r.pill_id}</td>
                   <td style={tdStyle}>{fmtLong(r.read_at)}</td>
                 </tr>
