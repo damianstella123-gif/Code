@@ -53,7 +53,8 @@ export function EventFormModal({ event, internalUsers, allClients, onSave, onCan
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!nome.trim() || !dataInizio || !location.trim()) return
+    if (event && !nome.trim()) return
+    if (!dataInizio || !location.trim()) return
     const newEvent: Event = {
       id: event?.id ?? `evt_${Date.now()}`,
       nome: nome.trim(),
@@ -93,11 +94,18 @@ export function EventFormModal({ event, internalUsers, allClients, onSave, onCan
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>Nome evento *</label>
-            <input type="text" value={nome} onChange={e => setNome(e.target.value)} required
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--muted)' }}>
+              {event ? 'Nome evento' : 'Nome evento'}
+            </label>
+            <input type="text" value={nome} onChange={e => setNome(e.target.value)}
               className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
               style={{ background: 'var(--panel)', border: '1px solid var(--line)', color: 'var(--text)' }}
-              placeholder="Es. Corporate Summit 2026" />
+              placeholder={event ? '' : 'Assegnato automaticamente (#001, #002...)'} />
+            {!event && (
+              <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
+                Se lasciato vuoto, verr\u00e0 assegnato il prossimo numero progressivo.
+              </p>
+            )}
           </div>
 
           <div>

@@ -7,6 +7,7 @@ import type { Event } from '@/data/events'
 interface EventRow {
   id: string
   title: string
+  event_number: number | null
   description: string
   client: string
   client_id: string | null
@@ -30,6 +31,7 @@ function rowToEvent(r: EventRow): Event {
   return {
     id: r.id,
     nome: r.title,
+    eventNumber: r.event_number ?? null,
     descrizione: r.description ?? '',
     cliente: r.client ?? '',
     clientId: r.client_id ?? null,
@@ -51,6 +53,7 @@ function eventToRow(e: Event): Omit<EventRow, 'created_at' | 'updated_at'> {
   return {
     id: e.id,
     title: e.nome,
+    event_number: e.eventNumber ?? null,
     description: e.descrizione ?? '',
     client: e.cliente ?? '',
     client_id: e.clientId ?? null,
