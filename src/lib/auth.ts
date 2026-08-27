@@ -110,7 +110,7 @@ const ALL_NAV: NavItem[] = [
   { name: 'Comunicazioni', href: '/comunicazioni' },
   { name: 'Workflow', href: '/workflow' },
   { name: 'Utenti', href: '/utenti' },
-  { name: 'Performance', href: '/performance' },
+  { name: 'Performance Team', href: '/performance' },
   { name: 'Area Personale', href: '/area-personale' },
   { name: 'Centro Sicurezza', href: '/centro-sicurezza' },
   { name: 'AI & Trasparenza', href: '/ai-trasparenza' },
