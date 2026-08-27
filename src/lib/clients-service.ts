@@ -315,8 +315,11 @@ export async function uploadCompanyLogo(companyName: string, file: File): Promis
     throw new Error('Errore durante il caricamento del logo.')
   }
 
-  const { data: urlData } = supabase.storage.from('company-logos').getPublicUrl(path)
-  return urlData.publicUrl
+  const { data: signedData, error: signErr } = await supabase.storage
+    .from('company-logos')
+    .createSignedUrl(path, 60 * 60)
+  if (signErr || !signedData?.signedUrl) throw new Error('Errore generazione URL logo.')
+  return signedData.signedUrl
 }
 
 export async function setCompanyLogo(companyName: string, logoUrl: string): Promise<boolean> {

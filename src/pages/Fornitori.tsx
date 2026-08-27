@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase'
 import type { Supplier, SupplierDetails, SalaMeeting, StatoContratto } from '@/data/suppliers'
 import { SUPPLIER_CATEGORIES } from '@/data/suppliers'
 import { SupplierPhotoGallery, useSupplierCoverPhoto } from '@/components/SupplierPhotoGallery'
+import { useSignedUrl } from '@/lib/storage-urls'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -186,8 +187,9 @@ function InteractiveStars({ rating, size = 'sm' }: { rating: number; size?: 'sm'
 
 function SupplierLogo({ supplier, size = 48 }: { supplier: Supplier; size?: number }) {
   const initials = supplier.nome.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-  if (supplier.logoUrl) {
-    return <img src={supplier.logoUrl} alt={supplier.nome} className="rounded-xl object-cover" style={{ width: size, height: size }} />
+  const resolvedUrl = useSignedUrl(supplier.logoUrl)
+  if (resolvedUrl) {
+    return <img src={resolvedUrl} alt={supplier.nome} className="rounded-xl object-cover" style={{ width: size, height: size }} />
   }
   return (
     <div className="rounded-xl flex items-center justify-center text-white font-bold"
@@ -1063,8 +1065,8 @@ function SupplierDetail({ supplier, onBack, onSave, onEdit, onDelete }: {
     const ext = file.name.split('.').pop() ?? 'png'
     const path = `${supplier.id}.${ext}`
     await supabase.storage.from('supplier-logos').upload(path, file, { upsert: true })
-    const { data } = supabase.storage.from('supplier-logos').getPublicUrl(path)
-    const logoUrl = data.publicUrl + '?t=' + Date.now()
+    const { data: signedData } = await supabase.storage.from('supplier-logos').createSignedUrl(path, 60 * 60)
+    const logoUrl = signedData?.signedUrl ?? ''
     await supabase.from('suppliers').update({ logo_url: logoUrl }).eq('id', supplier.id)
     onSave({ ...supplier, logoUrl })
     setUploading(false)

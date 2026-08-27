@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSignedUrl } from '@/lib/storage-urls'
 import {
   Users,
   Search,
@@ -121,13 +122,14 @@ function fmtK(value: number): string {
 }
 
 function CompanyLogo({ url, name, size, radius }: { url?: string; name: string; size: number; radius: number }) {
+  const resolvedUrl = useSignedUrl(url)
   const [imgError, setImgError] = useState(false)
   const initials = name.split(' ').map(w => w.charAt(0)).slice(0, 2).join('').toUpperCase()
 
-  if (url && !imgError) {
+  if (resolvedUrl && !imgError) {
     return (
       <img
-        src={url}
+        src={resolvedUrl}
         alt={name}
         loading="lazy"
         onError={() => setImgError(true)}
@@ -144,14 +146,15 @@ function CompanyLogo({ url, name, size, radius }: { url?: string; name: string; 
 }
 
 function CardLogoBanner({ url, name, status }: { url?: string; name: string; status: Client['stato'] }) {
+  const resolvedUrl = useSignedUrl(url)
   const [imgError, setImgError] = useState(false)
   const initials = name.split(' ').map(w => w.charAt(0)).slice(0, 2).join('').toUpperCase()
 
   return (
     <div style={{ height: '64px', background: 'var(--panel2)', borderRadius: '14px 14px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px', position: 'relative' }}>
-      {url && !imgError ? (
+      {resolvedUrl && !imgError ? (
         <img
-          src={url}
+          src={resolvedUrl}
           alt={name}
           loading="lazy"
           onError={() => setImgError(true)}

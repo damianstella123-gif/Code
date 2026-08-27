@@ -56,25 +56,17 @@ export function useSupplierCoverPhoto(supplierId: string | undefined) {
     if (!supplierId) return
     supabase
       .from('supplier_photos')
-      .select('public_url')
+      .select('storage_path')
       .eq('supplier_id', supplierId)
       .eq('is_cover', true)
       .limit(1)
       .maybeSingle()
-      .then(({ data }) => {
-        if (data?.public_url) setCoverUrl(data.public_url)
-        else {
-          supabase
-            .from('supplier_photos')
-            .select('public_url')
-            .eq('supplier_id', supplierId)
-            .order('ordine', { ascending: true })
-            .limit(1)
-            .maybeSingle()
-            .then(({ data: first }) => {
-              setCoverUrl(first?.public_url ?? null)
-            })
-        }
+      .then(async ({ data }) => {
+        const path = data?.storage_path
+          ?? (await supabase.from('supplier_photos').select('storage_path').eq('supplier_id', supplierId).order('ordine', { ascending: true }).limit(1).maybeSingle()).data?.storage_path
+        if (!path) { setCoverUrl(null); return }
+        const { data: signed } = await supabase.storage.from('supplier-photos').createSignedUrl(path, 3600)
+        setCoverUrl(signed?.signedUrl ?? null)
       })
   }, [supplierId])
 
@@ -103,7 +95,22 @@ export function SupplierPhotoGallery({ supplierId, supplierCategory }: { supplie
       .eq('supplier_id', supplierId)
       .order('ordine', { ascending: true })
       .order('created_at', { ascending: false })
-    setPhotos(data ?? [])
+    const rows = data ?? []
+    if (rows.length > 0) {
+      const paths = rows.map(r => r.storage_path).filter(Boolean)
+      if (paths.length > 0) {
+        const { data: signed } = await supabase.storage.from('supplier-photos').createSignedUrls(paths, 3600)
+        if (signed) {
+          const urlMap = new Map(signed.filter(s => !s.error).map(s => [s.path, s.signedUrl]))
+          for (const row of rows) {
+            if (row.storage_path && urlMap.has(row.storage_path)) {
+              row.public_url = urlMap.get(row.storage_path)!
+            }
+          }
+        }
+      }
+    }
+    setPhotos(rows)
     setLoading(false)
   }, [supplierId])
 
@@ -135,14 +142,14 @@ export function SupplierPhotoGallery({ supplierId, supplierCategory }: { supplie
         .upload(path, file)
       if (uploadErr) { showToast('Errore durante il caricamento della foto.'); continue }
 
-      const { data: urlData } = supabase.storage
+      const { data: signedData } = await supabase.storage
         .from('supplier-photos')
-        .getPublicUrl(path)
+        .createSignedUrl(path, 60 * 60)
 
       await supabase.from('supplier_photos').insert({
         supplier_id: supplierId,
         storage_path: path,
-        public_url: urlData.publicUrl,
+        public_url: signedData?.signedUrl ?? null,
         categoria: uploadCat,
         didascalia: uploadCaption || null,
         is_cover: uploadIsCover && i === 0,
