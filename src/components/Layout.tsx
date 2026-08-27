@@ -34,10 +34,11 @@ import {
   Sun,
   Moon,
   Archive,
-  HeartPulse,
   Shield,
   HelpCircle,
   Sparkles,
+  CircleUserRound,
+  TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
@@ -69,7 +70,8 @@ const iconMap: Record<string, React.ElementType> = {
   '/impostazioni': SlidersHorizontal,
   '/feedback-beta': MessageCircle,
   '/aiuto': HelpCircle,
-  '/wellness': HeartPulse,
+  '/area-personale': CircleUserRound,
+  '/performance': TrendingUp,
   '/centro-sicurezza': Shield,
   '/ai-trasparenza': Sparkles,
 }
@@ -79,8 +81,8 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
   { label: 'Operativo', paths: ['/eventi', '/task', '/calendario'] },
   { label: 'Business', paths: ['/network', '/amministrazione'] },
   { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
-  { label: 'Crescita', paths: ['/performance', '/growth', '/ai-trasparenza'] },
-  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/wellness', '/centro-sicurezza', '/impostazioni', '/feedback-beta', '/aiuto'] },
+  { label: 'Crescita', paths: ['/performance', '/area-personale', '/ai-trasparenza'] },
+  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/centro-sicurezza', '/impostazioni', '/feedback-beta', '/aiuto'] },
 ]
 
 interface SidebarProps {
@@ -729,7 +731,7 @@ function SentinelBadge() {
 }
 
 const PRIMARY_MOBILE_PATHS = ['/dashboard', '/eventi', '/task']
-const OVERFLOW_MOBILE_PATHS = ['/network', '/calendario', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/wellness', '/ai-trasparenza', '/aiuto']
+const OVERFLOW_MOBILE_PATHS = ['/network', '/calendario', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/area-personale', '/ai-trasparenza', '/aiuto']
 
 const mobileLabels: Record<string, string> = {
   '/dashboard': 'Home',

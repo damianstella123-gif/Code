@@ -28,13 +28,15 @@ const FeedbackBeta = lazy(() => import('./pages/FeedbackBeta'))
 const Help = lazy(() => import('./pages/Help'))
 const EventTimeline = lazy(() => import('./pages/EventTimeline'))
 const Performance = lazy(() => import('./pages/Performance'))
-const Wellness = lazy(() => import('./pages/Wellness'))
 const PublicRegistration = lazy(() => import('./pages/PublicRegistration'))
 const ManageRegistration = lazy(() => import('./pages/ManageRegistration'))
 const BadgeProgram = lazy(() => import('./pages/BadgeProgram'))
 const CentroSicurezza = lazy(() => import('./pages/CentroSicurezza'))
 const AiTrasparenza = lazy(() => import('./pages/AiTrasparenza'))
 const Growth = lazy(() => import('./pages/Growth'))
+const AreaPersonale = lazy(() => import('./pages/AreaPersonale'))
+const AreaPersonaleWellness = lazy(() => import('./pages/AreaPersonaleWellness'))
+const AreaPersonaleDocumenti = lazy(() => import('./pages/AreaPersonaleDocumenti'))
 
 function PageLoader() {
   return (
@@ -239,10 +241,16 @@ export default function App() {
       <Route path="/feedback-beta" element={<AuthGuard><Layout><LazyPage><FeedbackBeta /></LazyPage></Layout></AuthGuard>} />
       <Route path="/aiuto" element={<AuthGuard><Layout><LazyPage><Help /></LazyPage></Layout></AuthGuard>} />
       <Route path="/performance" element={<AuthGuard><Layout><LazyPage><Performance /></LazyPage></Layout></AuthGuard>} />
-      <Route path="/wellness" element={<AuthGuard><Layout><LazyPage><Wellness /></LazyPage></Layout></AuthGuard>} />
       <Route path="/centro-sicurezza" element={<AuthGuard><Layout><LazyPage><CentroSicurezza /></LazyPage></Layout></AuthGuard>} />
       <Route path="/ai-trasparenza" element={<AuthGuard><Layout><LazyPage><AiTrasparenza /></LazyPage></Layout></AuthGuard>} />
-      <Route path="/growth" element={<AuthGuard><Layout><LazyPage><Growth /></LazyPage></Layout></AuthGuard>} />
+      <Route path="/area-personale" element={<AuthGuard><Layout><LazyPage><AreaPersonale /></LazyPage></Layout></AuthGuard>}>
+        <Route path="impatto" element={<Performance />} />
+        <Route path="growth" element={<Growth />} />
+        <Route path="wellness" element={<AreaPersonaleWellness />} />
+        <Route path="documenti" element={<AreaPersonaleDocumenti />} />
+      </Route>
+      <Route path="/wellness" element={<Navigate to="/area-personale/wellness" replace />} />
+      <Route path="/growth" element={<Navigate to="/area-personale/growth" replace />} />
       <Route path="/timeline/:eventId" element={<AuthGuard><Layout><LazyPage><EventTimeline /></LazyPage></Layout></AuthGuard>} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
