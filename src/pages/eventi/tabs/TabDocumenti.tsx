@@ -155,15 +155,15 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
     const ext = doc.file_name.split('.').pop()?.toLowerCase() ?? ''
 
     if (IMAGE_EXTS.includes(ext)) {
-      const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path)
-      if (!data?.publicUrl) return
-      setPreviewUrl(data.publicUrl)
+      const { data } = await supabase.storage.from('documents').createSignedUrl(doc.file_path, 300)
+      if (!data?.signedUrl) return
+      setPreviewUrl(data.signedUrl)
       setPreviewType('image')
       setPreviewName(doc.nome || doc.file_name)
     } else if (ext === 'pdf') {
-      const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path)
-      if (!data?.publicUrl) return
-      setPreviewUrl(data.publicUrl)
+      const { data } = await supabase.storage.from('documents').createSignedUrl(doc.file_path, 300)
+      if (!data?.signedUrl) return
+      setPreviewUrl(data.signedUrl)
       setPreviewType('pdf')
       setPreviewName(doc.nome || doc.file_name)
     } else if (OFFICE_EXTS.includes(ext)) {
