@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Calendar, ChevronRight, ArrowLeft, Save, Loader2, FileText, History, Users } from 'lucide-react'
+import { Plus, Calendar, ChevronRight, ArrowLeft, Save, Loader2, FileText, History, Users, X } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
-import { fetchEvents } from '@/lib/events-service'
+import { fetchEvents, updateEvent } from '@/lib/events-service'
+import { fetchClients } from '@/lib/clients-service'
 import { fetchAllProfiles } from '@/lib/profiles'
 import {
   fetchMeetings, fetchMeetingById, fetchMeetingNotes,
@@ -13,6 +14,7 @@ import {
 import type { Event } from '@/data/events'
 
 const MANAGER_ROLES = ['Admin', 'Super Admin', 'Senior PM', 'Project Manager']
+const ADMIN_ROLES = ['Admin', 'Super Admin']
 
 function canManageMeetings(role?: string) {
   return !!role && MANAGER_ROLES.includes(role)
@@ -26,6 +28,24 @@ function meseLabel(dateStr: string) {
   return `${MESI[d.getMonth()]} ${d.getFullYear()}`
 }
 
+function formatDateCompact(start: string, end: string): string {
+  if (!start) return '-'
+  const s = new Date(start)
+  const sDay = s.getDate()
+  const sMon = MESI[s.getMonth()]
+  const sYear = s.getFullYear()
+  if (!end || start === end) return `${sDay} ${sMon} ${sYear}`
+  const e = new Date(end)
+  const eDay = e.getDate()
+  const eMon = MESI[e.getMonth()]
+  const eYear = e.getFullYear()
+  if (s.getMonth() === e.getMonth() && sYear === eYear) return `${sDay}-${eDay} ${sMon} ${sYear}`
+  if (sYear === eYear) return `${sDay} ${sMon} — ${eDay} ${eMon} ${sYear}`
+  return `${sDay} ${sMon} ${sYear} — ${eDay} ${eMon} ${eYear}`
+}
+
+interface ProfileEntry { id: string; first_name: string; last_name: string }
+
 export default function Riunioni() {
   const navigate = useNavigate()
   const user = loadUser()
@@ -33,17 +53,21 @@ export default function Riunioni() {
 
   const [view, setView] = useState<'overview' | 'new' | 'history' | 'detail'>('overview')
   const [events, setEvents] = useState<Event[]>([])
-  const [profiles, setProfiles] = useState<{ id: string; first_name: string; last_name: string }[]>([])
+  const [profiles, setProfiles] = useState<ProfileEntry[]>([])
+  const [clientMap, setClientMap] = useState<Record<string, string>>({})
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [loading, setLoading] = useState(true)
   const [detailMeetingId, setDetailMeetingId] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([fetchEvents(), fetchAllProfiles(), fetchMeetings()])
-      .then(([ev, pr, mt]) => {
+    Promise.all([fetchEvents(), fetchAllProfiles(), fetchMeetings(), fetchClients()])
+      .then(([ev, pr, mt, cl]) => {
         setEvents(ev)
         setProfiles(pr)
         setMeetings(mt)
+        const cm: Record<string, string> = {}
+        for (const c of cl) { cm[c.id] = c.nome }
+        setClientMap(cm)
       })
       .finally(() => setLoading(false))
   }, [])
@@ -59,7 +83,7 @@ export default function Riunioni() {
   }
 
   if (view === 'new') {
-    return <NewMeeting events={events} profileMap={profileMap} onDone={() => { setView('overview'); fetchMeetings().then(setMeetings) }} onCancel={() => setView('overview')} />
+    return <NewMeeting events={events} profiles={profiles} profileMap={profileMap} onDone={() => { setView('overview'); fetchMeetings().then(setMeetings) }} onCancel={() => setView('overview')} userRole={user?.role} />
   }
 
   if (view === 'history' || (view === 'detail' && detailMeetingId)) {
@@ -77,7 +101,6 @@ export default function Riunioni() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Area Riunioni</h1>
@@ -95,19 +118,21 @@ export default function Riunioni() {
         </div>
       </div>
 
-      {/* Events Table */}
-      <EventsTable events={events} profileMap={profileMap} onEventClick={id => navigate(`/eventi?id=${id}`)} />
+      <EventsTable events={events} profileMap={profileMap} clientMap={clientMap} onEventClick={id => navigate(`/eventi?id=${id}`)} />
     </div>
   )
 }
 
 // ─── Events Table ────────────────────────────────────────────────────────────
 
-function EventsTable({ events, profileMap, onEventClick }: { events: Event[]; profileMap: Record<string, string>; onEventClick: (id: string) => void }) {
+function EventsTable({ events, profileMap, clientMap, onEventClick }: {
+  events: Event[]; profileMap: Record<string, string>; clientMap: Record<string, string>; onEventClick: (id: string) => void
+}) {
   const [sortField, setSortField] = useState<string>('dataInizio')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [filterStatus, setFilterStatus] = useState('Tutti')
   const [filterMonth, setFilterMonth] = useState('')
+  const [teamPopover, setTeamPopover] = useState<string | null>(null)
 
   const sorted = useMemo(() => {
     let list = [...events]
@@ -129,6 +154,12 @@ function EventsTable({ events, profileMap, onEventClick }: { events: Event[]; pr
     else { setSortField(field); setSortDir('asc') }
   }
 
+  function resolveClientName(ev: Event): string {
+    if (ev.clientId && clientMap[ev.clientId]) return clientMap[ev.clientId]
+    if (ev.cliente && clientMap[ev.cliente]) return clientMap[ev.cliente]
+    return ev.cliente || '-'
+  }
+
   const SortHeader = ({ field, label }: { field: string; label: string }) => (
     <th onClick={() => toggleSort(field)} className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 select-none whitespace-nowrap">
       {label} {sortField === field && (sortDir === 'asc' ? '↑' : '↓')}
@@ -137,7 +168,6 @@ function EventsTable({ events, profileMap, onEventClick }: { events: Event[]; pr
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-      {/* Filters */}
       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex gap-3 flex-wrap items-center">
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
           <option value="Tutti">Tutti gli stati</option>
@@ -153,40 +183,53 @@ function EventsTable({ events, profileMap, onEventClick }: { events: Event[]; pr
         <span className="text-xs text-gray-400 ml-auto">{sorted.length} eventi</span>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-750">
             <tr>
-              <SortHeader field="eventNumber" label="N°" />
-              <SortHeader field="stato" label="Stato" />
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Mese</th>
-              <SortHeader field="dataInizio" label="Inizio" />
-              <SortHeader field="dataFine" label="Fine" />
-              <SortHeader field="cliente" label="Cliente" />
               <SortHeader field="nome" label="Evento" />
+              <SortHeader field="stato" label="Stato" />
+              <SortHeader field="dataInizio" label="Date" />
+              <SortHeader field="cliente" label="Cliente" />
               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Luogo</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Pax</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Team</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Responsabile</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {sorted.map(ev => (
               <tr key={ev.id} onClick={() => onEventClick(ev.id)} className="hover:bg-blue-50 dark:hover:bg-blue-900/10 cursor-pointer transition-colors">
-                <td className="px-3 py-2 font-mono text-xs text-gray-600 dark:text-gray-300">{ev.eventNumber ?? '-'}</td>
+                <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white max-w-[200px] truncate">{ev.nome || `#${ev.eventNumber ?? '-'}`}</td>
                 <td className="px-3 py-2"><StatusBadge stato={ev.stato} /></td>
-                <td className="px-3 py-2 text-xs text-gray-500">{meseLabel(ev.dataInizio)}</td>
-                <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300">{ev.dataInizio || '-'}</td>
-                <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300">{ev.dataFine || '-'}</td>
-                <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 max-w-[120px] truncate">{ev.cliente || '-'}</td>
-                <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white max-w-[180px] truncate">{ev.nome || '-'}</td>
+                <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatDateCompact(ev.dataInizio, ev.dataFine)}</td>
+                <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 max-w-[140px] truncate">{resolveClientName(ev)}</td>
                 <td className="px-3 py-2 text-xs text-gray-500 max-w-[120px] truncate">{ev.location || '-'}</td>
                 <td className="px-3 py-2 text-xs text-gray-500">{ev.partecipanti || '-'}</td>
+                <td className="px-3 py-2 relative">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setTeamPopover(teamPopover === ev.id ? null : ev.id) }}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                  >
+                    {ev.team?.length || 0}
+                  </button>
+                  {teamPopover === ev.id && ev.team?.length > 0 && (
+                    <div className="absolute z-20 top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-2 min-w-[160px]" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase">Team ({ev.team.length})</span>
+                        <button onClick={() => setTeamPopover(null)} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
+                      </div>
+                      {ev.team.map(uid => (
+                        <p key={uid} className="text-xs text-gray-700 dark:text-gray-300 py-0.5">{profileMap[uid] || uid}</p>
+                      ))}
+                    </div>
+                  )}
+                </td>
                 <td className="px-3 py-2 text-xs text-gray-500 max-w-[100px] truncate">{profileMap[ev.responsabile] || '-'}</td>
               </tr>
             ))}
             {sorted.length === 0 && (
-              <tr><td colSpan={10} className="px-4 py-8 text-center text-sm text-gray-400">Nessun evento trovato</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">Nessun evento trovato</td></tr>
             )}
           </tbody>
         </table>
@@ -206,9 +249,92 @@ function StatusBadge({ stato }: { stato: string }) {
   return <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${colors[stato] || colors.bozza}`}>{labels[stato] || stato}</span>
 }
 
+// ─── Profiles Autocomplete ───────────────────────────────────────────────────
+
+function ProfilesAutocomplete({ profiles, value, onChange }: { profiles: ProfileEntry[]; value: string; onChange: (v: string) => void }) {
+  const [query, setQuery] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [selectedNames, setSelectedNames] = useState<string[]>(() => value ? value.split(',').map(s => s.trim()).filter(Boolean) : [])
+  const inputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const suggestions = useMemo(() => {
+    if (!query || query.length < 1) return []
+    const q = query.toLowerCase()
+    return profiles
+      .map(p => `${p.first_name} ${p.last_name}`.trim())
+      .filter(name => name.toLowerCase().includes(q) && !selectedNames.includes(name))
+      .slice(0, 8)
+  }, [query, profiles, selectedNames])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setShowSuggestions(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  function addName(name: string) {
+    const next = [...selectedNames, name]
+    setSelectedNames(next)
+    onChange(next.join(', '))
+    setQuery('')
+    inputRef.current?.focus()
+  }
+
+  function removeName(name: string) {
+    const next = selectedNames.filter(n => n !== name)
+    setSelectedNames(next)
+    onChange(next.join(', '))
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Presenti</label>
+      <div className="flex flex-wrap gap-1 p-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 min-h-[38px]">
+        {selectedNames.map(name => (
+          <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 rounded text-xs">
+            {name}
+            <button type="button" onClick={() => removeName(name)} className="hover:text-blue-600"><X className="w-3 h-3" /></button>
+          </span>
+        ))}
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={e => { setQuery(e.target.value); setShowSuggestions(true) }}
+          onFocus={() => setShowSuggestions(true)}
+          placeholder={selectedNames.length ? '' : 'Cerca partecipanti...'}
+          className="flex-1 min-w-[120px] bg-transparent text-sm outline-none px-1"
+        />
+      </div>
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {suggestions.map(name => (
+            <button key={name} type="button" onClick={() => addName(name)} className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Event Status Options ────────────────────────────────────────────────────
+
+const EVENT_STATUS_OPTIONS: { value: Event['stato']; label: string }[] = [
+  { value: 'bozza', label: 'Bozza' },
+  { value: 'pianificazione', label: 'Pianificazione' },
+  { value: 'in_corso', label: 'In Corso' },
+  { value: 'completato', label: 'Completato' },
+]
+
 // ─── New Meeting ─────────────────────────────────────────────────────────────
 
-function NewMeeting({ events, onDone, onCancel }: { events: Event[]; profileMap: Record<string, string>; onDone: () => void; onCancel: () => void }) {
+function NewMeeting({ events: initialEvents, profiles, onDone, onCancel, userRole }: {
+  events: Event[]; profiles: ProfileEntry[]; profileMap: Record<string, string>; onDone: () => void; onCancel: () => void; userRole?: string
+}) {
   const [saving, setSaving] = useState(false)
   const [meetingId, setMeetingId] = useState<string | null>(null)
   const [presenti, setPresenti] = useState('')
@@ -219,7 +345,17 @@ function NewMeeting({ events, onDone, onCancel }: { events: Event[]; profileMap:
   const [notes, setNotes] = useState<Record<string, Partial<MeetingEventNote>>>({})
   const [recaps, setRecaps] = useState<Record<string, EventRecap>>({})
   const [loadingRecap, setLoadingRecap] = useState<string | null>(null)
+  const [eventStatuses, setEventStatuses] = useState<Record<string, Event['stato']>>({})
+  const [statusSaving, setStatusSaving] = useState<string | null>(null)
   const navigate = useNavigate()
+
+  const isAdminUser = !!userRole && ADMIN_ROLES.includes(userRole)
+
+  useEffect(() => {
+    const map: Record<string, Event['stato']> = {}
+    for (const ev of initialEvents) map[ev.id] = ev.stato
+    setEventStatuses(map)
+  }, [initialEvents])
 
   async function handleCreate() {
     setSaving(true)
@@ -248,6 +384,15 @@ function NewMeeting({ events, onDone, onCancel }: { events: Event[]; profileMap:
     setNotes(prev => ({ ...prev, [eventId]: { ...prev[eventId], [field]: value } }))
   }
 
+  async function handleStatusChange(eventId: string, newStatus: Event['stato']) {
+    setStatusSaving(eventId)
+    try {
+      await updateEvent(eventId, { stato: newStatus })
+      setEventStatuses(prev => ({ ...prev, [eventId]: newStatus }))
+    } catch {}
+    setStatusSaving(null)
+  }
+
   async function handleSave() {
     if (!meetingId) return
     setSaving(true)
@@ -271,8 +416,9 @@ function NewMeeting({ events, onDone, onCancel }: { events: Event[]; profileMap:
     setSaving(false)
   }
 
-  const activeEvent = events.find(e => e.id === activeNoteEvent)
-  const isClosedEvent = activeEvent?.stato === 'completato'
+  const activeEvent = initialEvents.find(e => e.id === activeNoteEvent)
+  const activeEventStatus = activeNoteEvent ? eventStatuses[activeNoteEvent] : undefined
+  const isClosedEvent = activeEventStatus === 'completato'
 
   return (
     <div className="space-y-6">
@@ -284,10 +430,7 @@ function NewMeeting({ events, onDone, onCancel }: { events: Event[]; profileMap:
 
       {!meetingId ? (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 max-w-md space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Presenti</label>
-            <input value={presenti} onChange={e => setPresenti(e.target.value)} placeholder="Nomi partecipanti..." className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm" />
-          </div>
+          <ProfilesAutocomplete profiles={profiles} value={presenti} onChange={setPresenti} />
           <button onClick={handleCreate} disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 flex items-center gap-2">
             {saving && <Loader2 className="w-4 h-4 animate-spin" />} Inizia Riunione
           </button>
@@ -300,7 +443,7 @@ function NewMeeting({ events, onDone, onCancel }: { events: Event[]; profileMap:
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Eventi da discutere</h3>
             </div>
             <div className="max-h-[60vh] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700">
-              {events.map(ev => (
+              {initialEvents.map(ev => (
                 <button key={ev.id} onClick={() => openEventNote(ev.id)}
                   className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition-colors ${
                     activeNoteEvent === ev.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
@@ -309,10 +452,9 @@ function NewMeeting({ events, onDone, onCancel }: { events: Event[]; profileMap:
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       {discussedEvents.has(ev.id) && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />}
-                      <span className="text-xs font-mono text-gray-400">#{ev.eventNumber}</span>
-                      <StatusBadge stato={ev.stato} />
+                      <StatusBadge stato={eventStatuses[ev.id] || ev.stato} />
                     </div>
-                    <p className="text-sm text-gray-900 dark:text-white truncate mt-0.5">{ev.nome || '-'}</p>
+                    <p className="text-sm text-gray-900 dark:text-white truncate mt-0.5">{ev.nome || `#${ev.eventNumber}`}</p>
                   </div>
                   <ChevronRight className="w-3 h-3 text-gray-400 shrink-0" />
                 </button>
@@ -325,15 +467,28 @@ function NewMeeting({ events, onDone, onCancel }: { events: Event[]; profileMap:
             {activeNoteEvent && activeEvent ? (
               <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                    #{activeEvent.eventNumber} — {activeEvent.nome}
-                  </h3>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">{activeEvent.nome || `#${activeEvent.eventNumber}`}</h3>
                   <button onClick={() => navigate(`/eventi?id=${activeEvent.id}`)} className="text-xs text-blue-500 hover:underline">Apri evento</button>
                 </div>
 
-                {/* Auto-prefilled status */}
+                {/* Status edit */}
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Stato evento:</label>
+                  <select
+                    value={activeEventStatus || activeEvent.stato}
+                    onChange={e => handleStatusChange(activeNoteEvent, e.target.value as Event['stato'])}
+                    disabled={statusSaving === activeNoteEvent}
+                    className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50"
+                  >
+                    {EVENT_STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  {statusSaving === activeNoteEvent && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
+                  {!isAdminUser && <span className="text-[10px] text-gray-400">(richiede accesso all'evento)</span>}
+                </div>
+
+                {/* Auto-prefilled recap */}
                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Stato (auto)</p>
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Riepilogo (auto)</p>
                   {loadingRecap === activeNoteEvent ? (
                     <div className="flex items-center gap-2 text-xs text-gray-400"><Loader2 className="w-3 h-3 animate-spin" /> Calcolo...</div>
                   ) : recaps[activeNoteEvent] ? (
@@ -343,7 +498,6 @@ function NewMeeting({ events, onDone, onCancel }: { events: Event[]; profileMap:
                   )}
                 </div>
 
-                {/* Structured fields */}
                 <NoteField label="Punti discussi" value={notes[activeNoteEvent]?.punti_discussi || ''} onChange={v => updateNote(activeNoteEvent, 'punti_discussi', v)} />
                 <NoteField label="Decisioni prese" value={notes[activeNoteEvent]?.decisioni || ''} onChange={v => updateNote(activeNoteEvent, 'decisioni', v)} />
                 <NoteField label="Azioni da fare (chi/cosa/quando)" value={notes[activeNoteEvent]?.azioni || ''} onChange={v => updateNote(activeNoteEvent, 'azioni', v)} />
@@ -359,14 +513,12 @@ function NewMeeting({ events, onDone, onCancel }: { events: Event[]; profileMap:
               </div>
             )}
 
-            {/* General meeting section */}
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-4">
               <h3 className="text-sm font-bold text-gray-900 dark:text-white">Sezione Generale</h3>
               <NoteField label="Temi generali" value={temiGenerali} onChange={setTemiGenerali} />
               <NoteField label="Decisioni trasversali" value={decisioniTrasversali} onChange={setDecisioniTrasversali} />
             </div>
 
-            {/* Save */}
             <div className="flex justify-end">
               <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 flex items-center gap-2">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -451,7 +603,7 @@ function MeetingHistory({ meetings, profileMap, events, detailId, onBack, onOpen
             return (
               <div key={note.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
                 <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">
-                  {ev ? `#${ev.eventNumber} — ${ev.nome}` : note.event_id}
+                  {ev ? (ev.nome || `#${ev.eventNumber}`) : note.event_id}
                 </h4>
                 {recap && <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 mb-3"><RecapDisplay recap={recap} /></div>}
                 {note.punti_discussi && <SavedField label="Punti discussi" value={note.punti_discussi} />}
