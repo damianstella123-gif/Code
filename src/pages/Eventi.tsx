@@ -13,6 +13,7 @@ import {
   Users,
   ShieldCheck,
   Loader2,
+  ArrowRightLeft,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { loadTasksFromStorage, cacheEventsSnapshot, loadWorkflowsFromStorage } from '@/lib/storage'
@@ -53,6 +54,8 @@ import type { SafetyDossierBundle } from '@/lib/safety-service'
 import { fetchEventMembers } from '@/lib/event-members-service'
 import { isAdmin } from '@/lib/auth'
 import { TabSafety } from './eventi/tabs/TabSafety'
+import { PassaConsegneModal } from '@/components/PassaConsegneModal'
+import type { Profile } from '@/lib/profiles'
 
 const STATI = ['Tutti', 'bozza', 'pianificazione', 'in_corso', 'completato']
 
@@ -146,6 +149,8 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const [eventTasks, setEventTasks] = useState<Task[]>([])
   const [showTeamPanel, setShowTeamPanel] = useState(false)
+  const [showHandover, setShowHandover] = useState(false)
+  const [handoverProfiles, setHandoverProfiles] = useState<Profile[]>([])
   const [safetyBundle, setSafetyBundle] = useState<SafetyDossierBundle | null | undefined>(undefined)
   const [canManageSafety, setCanManageSafety] = useState(false)
   const [activatingSafety, setActivatingSafety] = useState(false)
@@ -160,6 +165,12 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
   }
 
   useEffect(() => { fetchTasksByEvent(event.id).then(setEventTasks) }, [event.id])
+
+  useEffect(() => {
+    if (showHandover && handoverProfiles.length === 0) {
+      fetchAllProfiles().then(setHandoverProfiles)
+    }
+  }, [showHandover, handoverProfiles.length])
 
   // Safety: check membership permissions and dossier existence
   const loadSafety = useCallback(async () => {
@@ -290,6 +301,14 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => setShowHandover(true)}
+                  title="Passa consegne"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--blue)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
                 </button>
                 {isOver && (
                   <button onClick={() => onArchive(event)}
@@ -444,6 +463,16 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
           responsabileId={event.responsabile}
           isArchived={isArchived}
           onClose={() => setShowTeamPanel(false)}
+        />
+      )}
+
+      {showHandover && currentUser && (
+        <PassaConsegneModal
+          event={event}
+          profiles={handoverProfiles}
+          currentUserId={currentUser.id}
+          onClose={() => setShowHandover(false)}
+          onComplete={() => { setShowHandover(false); onBack() }}
         />
       )}
 
