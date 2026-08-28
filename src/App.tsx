@@ -34,6 +34,7 @@ const BadgeProgram = lazy(() => import('./pages/BadgeProgram'))
 const CentroSicurezza = lazy(() => import('./pages/CentroSicurezza'))
 const AiTrasparenza = lazy(() => import('./pages/AiTrasparenza'))
 const Growth = lazy(() => import('./pages/Growth'))
+const Riunioni = lazy(() => import('./pages/Riunioni'))
 const AreaPersonale = lazy(() => import('./pages/AreaPersonale'))
 const AreaPersonaleWellness = lazy(() => import('./pages/AreaPersonaleWellness'))
 const AreaPersonaleDocumenti = lazy(() => import('./pages/AreaPersonaleDocumenti'))
@@ -251,6 +252,7 @@ export default function App() {
       </Route>
       <Route path="/wellness" element={<Navigate to="/area-personale/wellness" replace />} />
       <Route path="/growth" element={<Navigate to="/area-personale/growth" replace />} />
+      <Route path="/riunioni" element={<AuthGuard><Layout><LazyPage><Riunioni /></LazyPage></Layout></AuthGuard>} />
       <Route path="/timeline/:eventId" element={<AuthGuard><Layout><LazyPage><EventTimeline /></LazyPage></Layout></AuthGuard>} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

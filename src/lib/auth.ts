@@ -106,6 +106,7 @@ const ALL_NAV: NavItem[] = [
   { name: 'Creative Studio', href: '/creative-studio' },
   { name: 'Presentazioni', href: '/presentazioni' },
   { name: 'Dossier', href: '/dossier' },
+  { name: 'Riunioni', href: '/riunioni' },
   { name: 'Archivio', href: '/archivio' },
   { name: 'Comunicazioni', href: '/comunicazioni' },
   { name: 'Workflow', href: '/workflow' },
@@ -130,19 +131,19 @@ export function getAllowedNavForRole(role: AppRole | string): NavItem[] {
 
   if (role === 'Regista') {
     return ALL_NAV.filter(item =>
-      ['/dashboard', '/eventi', '/task', '/calendario', '/network', '/comunicazioni', '/dossier', '/area-personale', '/ai-trasparenza', '/impostazioni', '/feedback-beta', '/aiuto'].includes(item.href)
+      ['/dashboard', '/eventi', '/task', '/calendario', '/network', '/comunicazioni', '/dossier', '/riunioni', '/area-personale', '/ai-trasparenza', '/impostazioni', '/feedback-beta', '/aiuto'].includes(item.href)
     )
   }
 
   if (role === 'Commerciale') {
     return ALL_NAV.filter(item =>
-      ['/dashboard', '/network', '/presentazioni', '/comunicazioni', '/calendario', '/dossier', '/creative-studio', '/area-personale', '/ai-trasparenza', '/impostazioni', '/feedback-beta', '/aiuto'].includes(item.href)
+      ['/dashboard', '/network', '/presentazioni', '/comunicazioni', '/calendario', '/dossier', '/riunioni', '/creative-studio', '/area-personale', '/ai-trasparenza', '/impostazioni', '/feedback-beta', '/aiuto'].includes(item.href)
     )
   }
 
   if (role === 'Amministrazione' || role === 'Finance') {
     return ALL_NAV.filter(item =>
-      ['/dashboard', '/amministrazione', '/eventi', '/calendario', '/area-personale', '/ai-trasparenza', '/impostazioni', '/feedback-beta', '/aiuto'].includes(item.href)
+      ['/dashboard', '/amministrazione', '/eventi', '/calendario', '/riunioni', '/area-personale', '/ai-trasparenza', '/impostazioni', '/feedback-beta', '/aiuto'].includes(item.href)
     )
   }
 

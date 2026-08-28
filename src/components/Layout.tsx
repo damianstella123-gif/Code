@@ -39,6 +39,7 @@ import {
   Sparkles,
   CircleUserRound,
   TrendingUp,
+  ClipboardList,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
@@ -72,6 +73,7 @@ const iconMap: Record<string, React.ElementType> = {
   '/aiuto': HelpCircle,
   '/area-personale': CircleUserRound,
   '/performance': TrendingUp,
+  '/riunioni': ClipboardList,
   '/centro-sicurezza': Shield,
   '/ai-trasparenza': Sparkles,
 }
