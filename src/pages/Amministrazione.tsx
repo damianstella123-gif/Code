@@ -55,6 +55,7 @@ import {
 import { approveLeaveRequest, rejectLeaveRequest } from '@/lib/leave-requests-service'
 import { LeaveRequestsPanel } from '@/components/LeaveRequestsPanel'
 import AdminPaymentRequests from '@/components/AdminPaymentRequests'
+import FascicoloDipendenti from '@/components/FascicoloDipendenti'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -401,7 +402,7 @@ function StatoBadge({ stato }: { stato: StatoPagamento }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-type TabId = 'dashboard' | 'entrate' | 'uscite' | 'fatture' | 'invoices' | 'documenti' | 'ferie' | 'richieste_pm'
+type TabId = 'dashboard' | 'entrate' | 'uscite' | 'fatture' | 'invoices' | 'documenti' | 'ferie' | 'richieste_pm' | 'fascicolo'
 
 export default function Amministrazione() {
   const currentUser = loadUser()
@@ -427,7 +428,7 @@ export default function Amministrazione() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     const paramTab = searchParams.get('tab')
-    if (paramTab === 'entrate' || paramTab === 'uscite' || paramTab === 'fatture' || paramTab === 'invoices' || paramTab === 'documenti' || paramTab === 'ferie' || paramTab === 'richieste_pm') return paramTab
+    if (paramTab === 'entrate' || paramTab === 'uscite' || paramTab === 'fatture' || paramTab === 'invoices' || paramTab === 'documenti' || paramTab === 'ferie' || paramTab === 'richieste_pm' || paramTab === 'fascicolo') return paramTab
     return 'dashboard'
   })
   const [entrate, setEntrate] = useState<Entrata[]>([])
@@ -843,6 +844,7 @@ export default function Amministrazione() {
     { id: 'documenti', label: `Documenti (${adminDocs.length})` },
     { id: 'ferie', label: 'Ferie & Permessi' },
     { id: 'richieste_pm', label: 'Richieste PM' },
+    { id: 'fascicolo', label: 'Fascicolo Dipendenti' },
   ]
 
   // ─── Shared styles ──────────────────────────────────────────────────────────
@@ -1684,6 +1686,10 @@ export default function Amministrazione() {
 
       {activeTab === 'richieste_pm' && (
         <AdminPaymentRequests />
+      )}
+
+      {activeTab === 'fascicolo' && (
+        <FascicoloDipendenti />
       )}
 
       {/* Invoice Form Modal */}
