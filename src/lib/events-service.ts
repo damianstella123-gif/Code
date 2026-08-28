@@ -148,6 +148,7 @@ export async function updateEvent(id: string, patch: Partial<Event>): Promise<Ev
   if (patch.partecipanti !== undefined) dbPatch.attendees = patch.partecipanti
   if (patch.responsabile !== undefined) dbPatch.project_manager_id = patch.responsabile
   if (patch.team !== undefined) dbPatch.team_member_ids = patch.team
+  if (patch.clientId !== undefined) dbPatch.client_id = patch.clientId
 
   const { data, error } = await supabase
     .from('events')

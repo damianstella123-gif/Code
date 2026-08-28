@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Calendar, ChevronDown, ChevronRight, ArrowLeft, Save, Loader2, History, Users, X } from 'lucide-react'
+import { Plus, Calendar, ChevronDown, ChevronRight, ArrowLeft, Save, Loader2, History, Users, X, Check } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { fetchEvents, updateEvent } from '@/lib/events-service'
 import { fetchClients } from '@/lib/clients-service'
@@ -18,6 +18,9 @@ const ADMIN_ROLES = ['Admin', 'Super Admin']
 
 function canManageMeetings(role?: string) {
   return !!role && MANAGER_ROLES.includes(role)
+}
+function isAdmin(role?: string) {
+  return !!role && ADMIN_ROLES.includes(role)
 }
 
 const MESI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic']
@@ -58,6 +61,32 @@ function resolveClientName(ev: Event, clientMap: Record<string, string>): string
 const CURRENT_YEAR = new Date().getFullYear()
 
 interface ProfileEntry { id: string; first_name: string; last_name: string }
+interface ClientEntry { id: string; nome: string }
+
+const STATUS_OPTIONS: { value: Event['stato']; label: string }[] = [
+  { value: 'bozza', label: 'Bozza' },
+  { value: 'pianificazione', label: 'Pianificazione' },
+  { value: 'in_corso', label: 'In Corso' },
+  { value: 'completato', label: 'Completato' },
+]
+
+
+function StatusBadge({ stato }: { stato: string }) {
+  const colorMap: Record<string, string> = {
+    bozza: 'badge-yellow',
+    pianificazione: 'badge-blue',
+    in_corso: 'badge-green',
+    completato: '',
+  }
+  const labels: Record<string, string> = { bozza: 'Bozza', pianificazione: 'Pianif.', in_corso: 'In Corso', completato: 'Completato' }
+  const cls = colorMap[stato] || ''
+  const fallbackStyle = !cls ? { background: 'var(--panel2)', color: 'var(--muted)' } : undefined
+  return (
+    <span className={`badge ${cls}`} style={{ padding: '2px 8px', fontSize: '11px', borderRadius: '6px', ...fallbackStyle }}>
+      {labels[stato] || stato}
+    </span>
+  )
+}
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
@@ -65,14 +94,20 @@ export default function Riunioni() {
   const navigate = useNavigate()
   const user = loadUser()
   const canManage = canManageMeetings(user?.role)
+  const adminUser = isAdmin(user?.role)
 
   const [view, setView] = useState<'overview' | 'new' | 'history' | 'detail'>('overview')
   const [events, setEvents] = useState<Event[]>([])
   const [profiles, setProfiles] = useState<ProfileEntry[]>([])
+  const [clients, setClients] = useState<ClientEntry[]>([])
   const [clientMap, setClientMap] = useState<Record<string, string>>({})
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [loading, setLoading] = useState(true)
   const [detailMeetingId, setDetailMeetingId] = useState<string | null>(null)
+
+  const reload = useCallback(() => {
+    return fetchEvents().then(setEvents)
+  }, [])
 
   useEffect(() => {
     Promise.all([fetchEvents(), fetchAllProfiles(), fetchMeetings(), fetchClients()])
@@ -80,6 +115,7 @@ export default function Riunioni() {
         setEvents(ev)
         setProfiles(pr)
         setMeetings(mt)
+        setClients(cl.map(c => ({ id: c.id, nome: c.nome })))
         const cm: Record<string, string> = {}
         for (const c of cl) { cm[c.id] = c.nome }
         setClientMap(cm)
@@ -94,19 +130,17 @@ export default function Riunioni() {
   }, [profiles])
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+    return <div className="flex items-center justify-center h-64"><Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--muted)' }} /></div>
   }
 
   if (view === 'new') {
-    return <NewMeeting events={events} profiles={profiles} profileMap={profileMap} clientMap={clientMap} onDone={() => { setView('overview'); fetchMeetings().then(setMeetings) }} onCancel={() => setView('overview')} userRole={user?.role} />
+    return <NewMeeting events={events} profiles={profiles} profileMap={profileMap} clientMap={clientMap} onDone={() => { setView('overview'); fetchMeetings().then(setMeetings); reload() }} onCancel={() => setView('overview')} userRole={user?.role} onEventsChange={reload} />
   }
 
   if (view === 'history' || (view === 'detail' && detailMeetingId)) {
     return (
       <MeetingHistory
-        meetings={meetings}
-        profileMap={profileMap}
-        events={events}
+        meetings={meetings} profileMap={profileMap} events={events}
         detailId={detailMeetingId}
         onBack={() => { setView('overview'); setDetailMeetingId(null) }}
         onOpenDetail={(id) => { setDetailMeetingId(id); setView('detail') }}
@@ -118,27 +152,27 @@ export default function Riunioni() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Area Riunioni</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Panoramica eventi e verbali riunioni settimanali</p>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text)' }}>Area Riunioni</h1>
+          <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: 4 }}>Panoramica eventi e verbali riunioni settimanali</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setView('history')} className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+          <button onClick={() => setView('history')} className="btn-ghost flex items-center gap-2" style={{ fontSize: '0.85rem' }}>
             <History className="w-4 h-4" /> Storico
           </button>
           {canManage && (
-            <button onClick={() => setView('new')} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+            <button onClick={() => setView('new')} className="btn-primary flex items-center gap-2" style={{ padding: '8px 16px', fontSize: '0.85rem', borderRadius: 'var(--radius-sm)' }}>
               <Plus className="w-4 h-4" /> Nuova Riunione
             </button>
           )}
         </div>
       </div>
 
-      <EventsOverviewTable events={events} profileMap={profileMap} clientMap={clientMap} onEventClick={id => navigate(`/eventi?id=${id}`)} />
+      <EventsTable events={events} profileMap={profileMap} clientMap={clientMap} clients={clients} profiles={profiles} adminEdit={adminUser} onEventClick={id => navigate(`/eventi?id=${id}`)} onEventsChange={reload} />
     </div>
   )
 }
 
-// ─── Shared filter + sort helpers ────────────────────────────────────────────
+// ─── Shared filter + sort hook ───────────────────────────────────────────────
 
 function useEventsFilters(events: Event[]) {
   const [sortField, setSortField] = useState<string>('dataInizio')
@@ -181,119 +215,334 @@ function useEventsFilters(events: Event[]) {
   return { sorted, sortField, sortDir, toggleSort, filterStatus, setFilterStatus, filterMonth, setFilterMonth, filterYear, setFilterYear, years, months }
 }
 
+// ─── Filter Bar ──────────────────────────────────────────────────────────────
+
 function FilterBar({ filterStatus, setFilterStatus, filterMonth, setFilterMonth, filterYear, setFilterYear, years, months, count }: {
   filterStatus: string; setFilterStatus: (v: string) => void
   filterMonth: string; setFilterMonth: (v: string) => void
   filterYear: number; setFilterYear: (v: number) => void
   years: number[]; months: string[]; count: number
 }) {
+  const selectStyle: React.CSSProperties = { fontSize: '0.8rem', padding: '4px 8px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--panel2)', color: 'var(--text)' }
   return (
-    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex gap-3 flex-wrap items-center">
-      <select value={filterYear} onChange={e => { setFilterYear(Number(e.target.value)); setFilterMonth('') }} className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+    <div className="flex gap-3 flex-wrap items-center" style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
+      <select value={filterYear} onChange={e => { setFilterYear(Number(e.target.value)); setFilterMonth('') }} style={selectStyle}>
         {years.map(y => <option key={y} value={y}>{y}</option>)}
       </select>
-      <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+      <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle}>
         <option value="Tutti">Tutti gli stati</option>
-        <option value="bozza">Bozza</option>
-        <option value="pianificazione">Pianificazione</option>
-        <option value="in_corso">In Corso</option>
-        <option value="completato">Completato</option>
+        {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+      <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} style={selectStyle}>
         <option value="">Tutti i mesi</option>
         {months.map(m => <option key={m} value={m}>{m}</option>)}
       </select>
-      <span className="text-xs text-gray-400 ml-auto">{count} eventi</span>
+      <span style={{ fontSize: '0.8rem', color: 'var(--muted)', marginLeft: 'auto' }}>{count} eventi</span>
     </div>
   )
 }
 
 function SortHeader({ field, label, sortField, sortDir, toggleSort }: { field: string; label: string; sortField: string; sortDir: string; toggleSort: (f: string) => void }) {
   return (
-    <th onClick={() => toggleSort(field)} className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 select-none whitespace-nowrap">
+    <th onClick={() => toggleSort(field)} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
       {label} {sortField === field && (sortDir === 'asc' ? '↑' : '↓')}
     </th>
   )
 }
 
-// ─── Overview Table (read-only, click navigates) ─────────────────────────────
+// ─── Inline Edit Cell ────────────────────────────────────────────────────────
 
-function EventsOverviewTable({ events, profileMap, clientMap, onEventClick }: {
-  events: Event[]; profileMap: Record<string, string>; clientMap: Record<string, string>; onEventClick: (id: string) => void
-}) {
-  const filters = useEventsFilters(events)
-  const [teamPopover, setTeamPopover] = useState<string | null>(null)
+function useCellSave(eventId: string, onSaved: () => void) {
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save(patch: Partial<Event>) {
+    setSaving(true); setError(null); setSaved(false)
+    try {
+      await updateEvent(eventId, patch)
+      setSaved(true)
+      onSaved()
+      setTimeout(() => setSaved(false), 1500)
+    } catch (e: any) {
+      setError(e?.message || 'Errore')
+      setTimeout(() => setError(null), 3000)
+      throw e
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return { saving, saved, error, save }
+}
+
+function SaveIndicator({ saving, saved, error }: { saving: boolean; saved: boolean; error: string | null }) {
+  if (saving) return <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--blue)' }} />
+  if (saved) return <Check className="w-3 h-3" style={{ color: 'var(--green)' }} />
+  if (error) return <span style={{ fontSize: '10px', color: 'var(--red)' }} title={error}>!</span>
+  return null
+}
+
+function EditableText({ value, eventId, field, onSaved, type = 'text' }: { value: string; eventId: string; field: string; onSaved: () => void; type?: string }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const { saving, saved, error, save } = useCellSave(eventId, onSaved)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { setDraft(value) }, [value])
+  useEffect(() => { if (editing) inputRef.current?.focus() }, [editing])
+
+  async function commit() {
+    setEditing(false)
+    if (draft === value) return
+    try {
+      await save({ [field]: type === 'number' ? Number(draft) || 0 : draft })
+    } catch { setDraft(value) }
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1 group" onClick={e => { e.stopPropagation(); setEditing(true) }} style={{ cursor: 'text', minHeight: 24 }}>
+        <span style={{ fontSize: '0.8rem', color: 'var(--text)' }} className="truncate">{value || '-'}</span>
+        <SaveIndicator saving={saving} saved={saved} error={error} />
+      </div>
+    )
+  }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <FilterBar {...filters} count={filters.sorted.length} />
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-750">
-            <tr>
-              <SortHeader field="nome" label="Evento" {...filters} />
-              <SortHeader field="stato" label="Stato" {...filters} />
-              <SortHeader field="dataInizio" label="Date" {...filters} />
-              <SortHeader field="cliente" label="Cliente" {...filters} />
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Luogo</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Pax</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Team</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Responsabile</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-            {filters.sorted.map(ev => (
-              <tr key={ev.id} onClick={() => onEventClick(ev.id)} className="hover:bg-blue-50 dark:hover:bg-blue-900/10 cursor-pointer transition-colors">
-                <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white max-w-[200px] truncate">{ev.nome || `#${ev.eventNumber ?? '-'}`}</td>
-                <td className="px-3 py-2"><StatusBadge stato={ev.stato} /></td>
-                <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatDateCompact(ev.dataInizio, ev.dataFine)}</td>
-                <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 max-w-[140px] truncate">{resolveClientName(ev, clientMap)}</td>
-                <td className="px-3 py-2 text-xs text-gray-500 max-w-[120px] truncate">{ev.location || '-'}</td>
-                <td className="px-3 py-2 text-xs text-gray-500">{ev.partecipanti || '-'}</td>
-                <TeamCell ev={ev} profileMap={profileMap} teamPopover={teamPopover} setTeamPopover={setTeamPopover} />
-                <td className="px-3 py-2 text-xs text-gray-500 max-w-[100px] truncate">{profileMap[ev.responsabile] || '-'}</td>
-              </tr>
-            ))}
-            {filters.sorted.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">Nessun evento trovato</td></tr>
-            )}
-          </tbody>
-        </table>
+    <input ref={inputRef} type={type} value={draft} onChange={e => setDraft(e.target.value)}
+      onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false) } }}
+      onClick={e => e.stopPropagation()}
+      style={{ fontSize: '0.8rem', padding: '2px 6px', width: '100%', border: '1px solid var(--blue)', borderRadius: 6, background: 'var(--panel-solid)', color: 'var(--text)', outline: 'none' }}
+    />
+  )
+}
+
+function EditableDate({ value, eventId, field, onSaved }: { value: string; eventId: string; field: string; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const { saving, saved, error, save } = useCellSave(eventId, onSaved)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { setDraft(value) }, [value])
+  useEffect(() => { if (editing) inputRef.current?.focus() }, [editing])
+
+  async function commit() {
+    setEditing(false)
+    if (draft === value) return
+    try { await save({ [field]: draft }) } catch { setDraft(value) }
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1" onClick={e => { e.stopPropagation(); setEditing(true) }} style={{ cursor: 'text' }}>
+        <span style={{ fontSize: '0.8rem', color: 'var(--text)' }}>{value || '-'}</span>
+        <SaveIndicator saving={saving} saved={saved} error={error} />
       </div>
+    )
+  }
+
+  return (
+    <input ref={inputRef} type="date" value={draft} onChange={e => setDraft(e.target.value)}
+      onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false) } }}
+      onClick={e => e.stopPropagation()}
+      style={{ fontSize: '0.8rem', padding: '2px 4px', border: '1px solid var(--blue)', borderRadius: 6, background: 'var(--panel-solid)', color: 'var(--text)', outline: 'none' }}
+    />
+  )
+}
+
+function EditableStatus({ value, eventId, onSaved }: { value: Event['stato']; eventId: string; onSaved: () => void }) {
+  const { saving, saved, error, save } = useCellSave(eventId, onSaved)
+
+  async function handleChange(newVal: string) {
+    if (newVal === value) return
+    try { await save({ stato: newVal as Event['stato'] }) } catch {}
+  }
+
+  return (
+    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+      <select value={value} onChange={e => handleChange(e.target.value)} disabled={saving}
+        style={{ fontSize: '0.75rem', padding: '2px 6px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer' }}>
+        {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <SaveIndicator saving={saving} saved={saved} error={error} />
     </div>
   )
 }
 
-function TeamCell({ ev, profileMap, teamPopover, setTeamPopover }: {
-  ev: Event; profileMap: Record<string, string>; teamPopover: string | null; setTeamPopover: (v: string | null) => void
-}) {
+function EditableClient({ value, clientId, eventId, clients, onSaved }: { value: string; clientId?: string | null; eventId: string; clients: ClientEntry[]; onSaved: () => void }) {
+  const currentId = clientId || clients.find(c => c.nome === value)?.id || ''
+  const { saving, saved, error, save } = useCellSave(eventId, onSaved)
+
+  async function handleChange(newId: string) {
+    if (newId === currentId) return
+    const cl = clients.find(c => c.id === newId)
+    try { await save({ clientId: newId || null, cliente: cl?.nome || '' } as any) } catch {}
+  }
+
   return (
-    <td className="px-3 py-2 relative">
-      <button onClick={(e) => { e.stopPropagation(); setTeamPopover(teamPopover === ev.id ? null : ev.id) }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">
+    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+      <select value={currentId} onChange={e => handleChange(e.target.value)} disabled={saving}
+        style={{ fontSize: '0.75rem', padding: '2px 4px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', maxWidth: 130 }}>
+        <option value="">—</option>
+        {clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+      </select>
+      <SaveIndicator saving={saving} saved={saved} error={error} />
+    </div>
+  )
+}
+
+function EditableResponsabile({ value, eventId, profiles, onSaved }: { value: string; eventId: string; profiles: ProfileEntry[]; onSaved: () => void }) {
+  const { saving, saved, error, save } = useCellSave(eventId, onSaved)
+
+  async function handleChange(newId: string) {
+    if (newId === value) return
+    try { await save({ responsabile: newId }) } catch {}
+  }
+
+  return (
+    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+      <select value={value} onChange={e => handleChange(e.target.value)} disabled={saving}
+        style={{ fontSize: '0.75rem', padding: '2px 4px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--panel2)', color: 'var(--text)', cursor: 'pointer', maxWidth: 110 }}>
+        <option value="">—</option>
+        {profiles.map(p => <option key={p.id} value={p.id}>{`${p.first_name} ${p.last_name}`.trim()}</option>)}
+      </select>
+      <SaveIndicator saving={saving} saved={saved} error={error} />
+    </div>
+  )
+}
+
+// ─── Team Popover + Editable ─────────────────────────────────────────────────
+
+function TeamCell({ ev, profileMap, teamPopover, setTeamPopover, adminEdit, profiles, onSaved }: {
+  ev: Event; profileMap: Record<string, string>; teamPopover: string | null; setTeamPopover: (v: string | null) => void
+  adminEdit: boolean; profiles: ProfileEntry[]; onSaved: () => void
+}) {
+  const { saving, saved, error, save } = useCellSave(ev.id, onSaved)
+  const [adding, setAdding] = useState(false)
+
+  async function removeMember(uid: string) {
+    const next = (ev.team || []).filter(u => u !== uid)
+    try { await save({ team: next }) } catch {}
+  }
+
+  async function addMember(uid: string) {
+    if (ev.team?.includes(uid)) return
+    const next = [...(ev.team || []), uid]
+    setAdding(false)
+    try { await save({ team: next }) } catch {}
+  }
+
+  return (
+    <td style={{ padding: '6px 12px', position: 'relative' }}>
+      <button onClick={(e) => { e.stopPropagation(); setTeamPopover(teamPopover === ev.id ? null : ev.id) }}
+        style={{ fontSize: '0.8rem', color: 'var(--blue)', fontWeight: 600, cursor: 'pointer', background: 'none', border: 'none' }}>
         {ev.team?.length || 0}
       </button>
-      {teamPopover === ev.id && ev.team?.length > 0 && (
-        <div className="absolute z-20 top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-2 min-w-[160px]" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-semibold text-gray-400 uppercase">Team ({ev.team.length})</span>
-            <button onClick={() => setTeamPopover(null)} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
+      <SaveIndicator saving={saving} saved={saved} error={error} />
+      {teamPopover === ev.id && (
+        <div className="panel" onClick={e => e.stopPropagation()}
+          style={{ position: 'absolute', zIndex: 20, top: '100%', left: 0, marginTop: 4, padding: 8, minWidth: 180, boxShadow: 'var(--shadow-md)' }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
+            <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Team ({ev.team?.length || 0})</span>
+            <button onClick={() => setTeamPopover(null)} style={{ color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}><X className="w-3 h-3" /></button>
           </div>
-          {ev.team.map(uid => <p key={uid} className="text-xs text-gray-700 dark:text-gray-300 py-0.5">{profileMap[uid] || uid}</p>)}
+          {(ev.team || []).map(uid => (
+            <div key={uid} className="flex items-center justify-between" style={{ padding: '2px 0' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text)' }}>{profileMap[uid] || uid}</span>
+              {adminEdit && <button onClick={() => removeMember(uid)} style={{ color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '10px' }}>rimuovi</button>}
+            </div>
+          ))}
+          {adminEdit && !adding && (
+            <button onClick={() => setAdding(true)} style={{ fontSize: '0.75rem', color: 'var(--blue)', marginTop: 4, background: 'none', border: 'none', cursor: 'pointer' }}>+ Aggiungi</button>
+          )}
+          {adminEdit && adding && (
+            <select autoFocus onChange={e => { if (e.target.value) addMember(e.target.value) }} onBlur={() => setAdding(false)}
+              style={{ fontSize: '0.75rem', marginTop: 4, width: '100%', padding: '2px 4px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--panel2)', color: 'var(--text)' }}>
+              <option value="">Seleziona...</option>
+              {profiles.filter(p => !ev.team?.includes(p.id)).map(p => (
+                <option key={p.id} value={p.id}>{`${p.first_name} ${p.last_name}`.trim()}</option>
+              ))}
+            </select>
+          )}
         </div>
       )}
     </td>
   )
 }
 
-function StatusBadge({ stato }: { stato: string }) {
-  const colors: Record<string, string> = {
-    bozza: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-    pianificazione: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-    in_corso: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-    completato: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-  }
-  const labels: Record<string, string> = { bozza: 'Bozza', pianificazione: 'Pianif.', in_corso: 'In Corso', completato: 'Completato' }
-  return <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${colors[stato] || colors.bozza}`}>{labels[stato] || stato}</span>
+// ─── Events Table (overview — with inline editing for admins) ────────────────
+
+function EventsTable({ events, profileMap, clientMap, clients, profiles, adminEdit, onEventClick, onEventsChange }: {
+  events: Event[]; profileMap: Record<string, string>; clientMap: Record<string, string>; clients: ClientEntry[]; profiles: ProfileEntry[]
+  adminEdit: boolean; onEventClick: (id: string) => void; onEventsChange: () => void
+}) {
+  const filters = useEventsFilters(events)
+  const [teamPopover, setTeamPopover] = useState<string | null>(null)
+
+  const thStyle: React.CSSProperties = { padding: '8px 12px', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', whiteSpace: 'nowrap', letterSpacing: '0.03em', textTransform: 'uppercase' }
+  const tdStyle: React.CSSProperties = { padding: '6px 12px', fontSize: '0.8rem', color: 'var(--text)' }
+  const tdMutedStyle: React.CSSProperties = { ...tdStyle, color: 'var(--muted)' }
+
+  return (
+    <div className="panel" style={{ overflow: 'hidden' }}>
+      <FilterBar {...filters} count={filters.sorted.length} />
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--line)' }}>
+              <SortHeader field="nome" label="Evento" {...filters} />
+              <SortHeader field="stato" label="Stato" {...filters} />
+              <SortHeader field="dataInizio" label="Inizio" {...filters} />
+              <SortHeader field="dataFine" label="Fine" {...filters} />
+              <SortHeader field="cliente" label="Cliente" {...filters} />
+              <th style={thStyle}>Luogo</th>
+              <th style={thStyle}>Pax</th>
+              <th style={thStyle}>Team</th>
+              <th style={thStyle}>Responsabile</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filters.sorted.map(ev => (
+              <tr key={ev.id} onClick={() => !adminEdit && onEventClick(ev.id)}
+                style={{ borderBottom: '1px solid var(--line)', cursor: adminEdit ? 'default' : 'pointer', transition: 'background var(--transition-fast)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--panel2)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <td style={{ ...tdStyle, fontWeight: 600, maxWidth: 200 }} className="truncate">
+                  {adminEdit ? <EditableText value={ev.nome} eventId={ev.id} field="nome" onSaved={onEventsChange} /> : (ev.nome || `#${ev.eventNumber ?? '-'}`)}
+                </td>
+                <td style={{ padding: '6px 12px' }}>
+                  {adminEdit ? <EditableStatus value={ev.stato} eventId={ev.id} onSaved={onEventsChange} /> : <StatusBadge stato={ev.stato} />}
+                </td>
+                <td style={tdStyle}>
+                  {adminEdit ? <EditableDate value={ev.dataInizio} eventId={ev.id} field="dataInizio" onSaved={onEventsChange} /> : <span style={{ whiteSpace: 'nowrap' }}>{ev.dataInizio || '-'}</span>}
+                </td>
+                <td style={tdStyle}>
+                  {adminEdit ? <EditableDate value={ev.dataFine} eventId={ev.id} field="dataFine" onSaved={onEventsChange} /> : <span style={{ whiteSpace: 'nowrap' }}>{ev.dataFine || '-'}</span>}
+                </td>
+                <td style={{ ...tdStyle, maxWidth: 140 }} className="truncate">
+                  {adminEdit ? <EditableClient value={resolveClientName(ev, clientMap)} clientId={ev.clientId} eventId={ev.id} clients={clients} onSaved={onEventsChange} /> : resolveClientName(ev, clientMap)}
+                </td>
+                <td style={{ ...tdMutedStyle, maxWidth: 120 }} className="truncate">
+                  {adminEdit ? <EditableText value={ev.location} eventId={ev.id} field="location" onSaved={onEventsChange} /> : (ev.location || '-')}
+                </td>
+                <td style={tdMutedStyle}>
+                  {adminEdit ? <EditableText value={String(ev.partecipanti || '')} eventId={ev.id} field="partecipanti" onSaved={onEventsChange} type="number" /> : (ev.partecipanti || '-')}
+                </td>
+                <TeamCell ev={ev} profileMap={profileMap} teamPopover={teamPopover} setTeamPopover={setTeamPopover} adminEdit={adminEdit} profiles={profiles} onSaved={onEventsChange} />
+                <td style={{ ...tdMutedStyle, maxWidth: 110 }} className="truncate">
+                  {adminEdit ? <EditableResponsabile value={ev.responsabile} eventId={ev.id} profiles={profiles} onSaved={onEventsChange} /> : (profileMap[ev.responsabile] || '-')}
+                </td>
+              </tr>
+            ))}
+            {filters.sorted.length === 0 && (
+              <tr><td colSpan={9} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>Nessun evento trovato</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 }
 
 // ─── Profiles Autocomplete ───────────────────────────────────────────────────
@@ -306,12 +555,10 @@ function ProfilesAutocomplete({ profiles, value, onChange }: { profiles: Profile
   const containerRef = useRef<HTMLDivElement>(null)
 
   const suggestions = useMemo(() => {
-    if (!query || query.length < 1) return []
+    if (!query) return []
     const q = query.toLowerCase()
-    return profiles
-      .map(p => `${p.first_name} ${p.last_name}`.trim())
-      .filter(name => name.toLowerCase().includes(q) && !selectedNames.includes(name))
-      .slice(0, 8)
+    return profiles.map(p => `${p.first_name} ${p.last_name}`.trim())
+      .filter(name => name.toLowerCase().includes(q) && !selectedNames.includes(name)).slice(0, 8)
   }, [query, profiles, selectedNames])
 
   useEffect(() => {
@@ -323,42 +570,32 @@ function ProfilesAutocomplete({ profiles, value, onChange }: { profiles: Profile
   }, [])
 
   function addName(name: string) {
-    const next = [...selectedNames, name]
-    setSelectedNames(next)
-    onChange(next.join(', '))
-    setQuery('')
-    inputRef.current?.focus()
+    const next = [...selectedNames, name]; setSelectedNames(next); onChange(next.join(', ')); setQuery(''); inputRef.current?.focus()
   }
-
   function removeName(name: string) {
-    const next = selectedNames.filter(n => n !== name)
-    setSelectedNames(next)
-    onChange(next.join(', '))
+    const next = selectedNames.filter(n => n !== name); setSelectedNames(next); onChange(next.join(', '))
   }
 
   return (
-    <div ref={containerRef} className="relative">
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Presenti</label>
-      <div className="flex flex-wrap gap-1 p-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 min-h-[38px]">
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>Presenti</label>
+      <div className="flex flex-wrap gap-1" style={{ padding: 6, border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', background: 'var(--panel-solid)', minHeight: 38 }}>
         {selectedNames.map(name => (
-          <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 rounded text-xs">
+          <span key={name} className="badge badge-blue flex items-center gap-1" style={{ padding: '2px 8px', fontSize: '0.8rem' }}>
             {name}
-            <button type="button" onClick={() => removeName(name)} className="hover:text-blue-600"><X className="w-3 h-3" /></button>
+            <button type="button" onClick={() => removeName(name)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}><X className="w-3 h-3" /></button>
           </span>
         ))}
-        <input
-          ref={inputRef}
-          value={query}
-          onChange={e => { setQuery(e.target.value); setShowSuggestions(true) }}
-          onFocus={() => setShowSuggestions(true)}
+        <input ref={inputRef} value={query} onChange={e => { setQuery(e.target.value); setShowSuggestions(true) }} onFocus={() => setShowSuggestions(true)}
           placeholder={selectedNames.length ? '' : 'Cerca partecipanti...'}
-          className="flex-1 min-w-[120px] bg-transparent text-sm outline-none px-1"
-        />
+          style={{ flex: 1, minWidth: 120, background: 'transparent', fontSize: '0.85rem', outline: 'none', border: 'none', color: 'var(--text)', padding: '0 4px' }} />
       </div>
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+        <div className="panel" style={{ position: 'absolute', zIndex: 30, top: '100%', left: 0, right: 0, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: 'var(--shadow-md)' }}>
           {suggestions.map(name => (
-            <button key={name} type="button" onClick={() => addName(name)} className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+            <button key={name} type="button" onClick={() => addName(name)}
+              style={{ width: '100%', textAlign: 'left', padding: '6px 12px', fontSize: '0.85rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--panel2)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               {name}
             </button>
           ))}
@@ -368,19 +605,11 @@ function ProfilesAutocomplete({ profiles, value, onChange }: { profiles: Profile
   )
 }
 
-// ─── Event Status Options ────────────────────────────────────────────────────
-
-const EVENT_STATUS_OPTIONS: { value: Event['stato']; label: string }[] = [
-  { value: 'bozza', label: 'Bozza' },
-  { value: 'pianificazione', label: 'Pianificazione' },
-  { value: 'in_corso', label: 'In Corso' },
-  { value: 'completato', label: 'Completato' },
-]
-
 // ─── New Meeting (full table + click-to-annotate) ────────────────────────────
 
-function NewMeeting({ events, profiles, profileMap, clientMap, onDone, onCancel, userRole }: {
-  events: Event[]; profiles: ProfileEntry[]; profileMap: Record<string, string>; clientMap: Record<string, string>; onDone: () => void; onCancel: () => void; userRole?: string
+function NewMeeting({ events, profiles, profileMap, clientMap, onDone, onCancel, userRole, onEventsChange }: {
+  events: Event[]; profiles: ProfileEntry[]; profileMap: Record<string, string>; clientMap: Record<string, string>
+  onDone: () => void; onCancel: () => void; userRole?: string; onEventsChange: () => void
 }) {
   const [saving, setSaving] = useState(false)
   const [meetingId, setMeetingId] = useState<string | null>(null)
@@ -396,15 +625,12 @@ function NewMeeting({ events, profiles, profileMap, clientMap, onDone, onCancel,
   const [teamPopover, setTeamPopover] = useState<string | null>(null)
   const navigate = useNavigate()
   const filters = useEventsFilters(events)
-
-  const isAdminUser = !!userRole && ADMIN_ROLES.includes(userRole)
+  const adminUser = isAdmin(userRole)
 
   const annotatedEventIds = useMemo(() => {
     const ids = new Set<string>()
     for (const [eid, note] of Object.entries(notes)) {
-      if (note.punti_discussi || note.decisioni || note.azioni || note.criticita || note.lezioni_imparate) {
-        ids.add(eid)
-      }
+      if (note.punti_discussi || note.decisioni || note.azioni || note.criticita || note.lezioni_imparate) ids.add(eid)
     }
     return ids
   }, [notes])
@@ -417,10 +643,7 @@ function NewMeeting({ events, profiles, profileMap, clientMap, onDone, onCancel,
 
   async function handleCreate() {
     setSaving(true)
-    try {
-      const m = await createMeeting({ meeting_date: new Date().toISOString().slice(0, 10), presenti })
-      if (m) setMeetingId(m.id)
-    } catch {}
+    try { const m = await createMeeting({ meeting_date: new Date().toISOString().slice(0, 10), presenti }); if (m) setMeetingId(m.id) } catch {}
     setSaving(false)
   }
 
@@ -444,10 +667,7 @@ function NewMeeting({ events, profiles, profileMap, clientMap, onDone, onCancel,
 
   async function handleStatusChange(eventId: string, newStatus: Event['stato']) {
     setStatusSaving(eventId)
-    try {
-      await updateEvent(eventId, { stato: newStatus })
-      setEventStatuses(prev => ({ ...prev, [eventId]: newStatus }))
-    } catch {}
+    try { await updateEvent(eventId, { stato: newStatus }); setEventStatuses(prev => ({ ...prev, [eventId]: newStatus })); onEventsChange() } catch {}
     setStatusSaving(null)
   }
 
@@ -458,110 +678,85 @@ function NewMeeting({ events, profiles, profileMap, clientMap, onDone, onCancel,
       await updateMeeting(meetingId, { presenti, temi_generali: temiGenerali, decisioni_trasversali: decisioniTrasversali })
       for (const eventId of annotatedEventIds) {
         const n = notes[eventId] || {}
-        await upsertEventNote({
-          meeting_id: meetingId,
-          event_id: eventId,
-          stato_snapshot: n.stato_snapshot || recaps[eventId] || null,
-          punti_discussi: n.punti_discussi || null,
-          decisioni: n.decisioni || null,
-          azioni: n.azioni || null,
-          criticita: n.criticita || null,
-          lezioni_imparate: n.lezioni_imparate || null,
-        })
+        await upsertEventNote({ meeting_id: meetingId, event_id: eventId, stato_snapshot: n.stato_snapshot || recaps[eventId] || null, punti_discussi: n.punti_discussi || null, decisioni: n.decisioni || null, azioni: n.azioni || null, criticita: n.criticita || null, lezioni_imparate: n.lezioni_imparate || null })
       }
       onDone()
     } catch {}
     setSaving(false)
   }
 
+  const thStyle: React.CSSProperties = { padding: '8px 12px', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', whiteSpace: 'nowrap', letterSpacing: '0.03em', textTransform: 'uppercase' }
+  const tdStyle: React.CSSProperties = { padding: '6px 12px', fontSize: '0.8rem', color: 'var(--text)' }
+  const tdMutedStyle: React.CSSProperties = { ...tdStyle, color: 'var(--muted)' }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <button onClick={onCancel} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><ArrowLeft className="w-4 h-4" /></button>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Nuova Riunione</h1>
-        <span className="text-sm text-gray-400">{new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+        <button onClick={onCancel} className="btn-ghost" style={{ padding: 8 }}><ArrowLeft className="w-4 h-4" /></button>
+        <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text)' }}>Nuova Riunione</h1>
+        <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>{new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
       </div>
 
       {!meetingId ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 max-w-md space-y-4">
+        <div className="panel" style={{ padding: 24, maxWidth: 420 }}>
           <ProfilesAutocomplete profiles={profiles} value={presenti} onChange={setPresenti} />
-          <button onClick={handleCreate} disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 flex items-center gap-2">
+          <button onClick={handleCreate} disabled={saving} className="btn-primary flex items-center gap-2" style={{ marginTop: 16, padding: '8px 16px', fontSize: '0.85rem', borderRadius: 'var(--radius-sm)' }}>
             {saving && <Loader2 className="w-4 h-4 animate-spin" />} Inizia Riunione
           </button>
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Full events table with expandable notes */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="panel" style={{ overflow: 'hidden' }}>
             <FilterBar {...filters} count={filters.sorted.length} />
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-750">
-                  <tr>
-                    <th className="px-3 py-2 w-8"></th>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                    <th style={{ ...thStyle, width: 32 }}></th>
                     <SortHeader field="nome" label="Evento" {...filters} />
                     <SortHeader field="stato" label="Stato" {...filters} />
                     <SortHeader field="dataInizio" label="Date" {...filters} />
                     <SortHeader field="cliente" label="Cliente" {...filters} />
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Luogo</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Pax</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Team</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Responsabile</th>
+                    <th style={thStyle}>Luogo</th>
+                    <th style={thStyle}>Pax</th>
+                    <th style={thStyle}>Team</th>
+                    <th style={thStyle}>Responsabile</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                <tbody>
                   {filters.sorted.map(ev => {
                     const isExpanded = expandedEvent === ev.id
                     const isAnnotated = annotatedEventIds.has(ev.id)
                     const evStatus = eventStatuses[ev.id] || ev.stato
                     const isClosed = evStatus === 'completato'
+                    const note = notes[ev.id] || {}
                     return (
-                      <MeetingEventRow
-                        key={ev.id}
-                        ev={ev}
-                        evStatus={evStatus}
-                        isExpanded={isExpanded}
-                        isAnnotated={isAnnotated}
-                        isClosed={isClosed}
-                        isAdminUser={isAdminUser}
-                        profileMap={profileMap}
-                        clientMap={clientMap}
-                        teamPopover={teamPopover}
-                        setTeamPopover={setTeamPopover}
-                        notes={notes}
-                        recaps={recaps}
-                        loadingRecap={loadingRecap}
-                        statusSaving={statusSaving}
-                        onToggle={() => toggleEventNote(ev.id)}
-                        onUpdateNote={(field, value) => updateNote(ev.id, field, value)}
-                        onStatusChange={(s) => handleStatusChange(ev.id, s)}
-                        onNavigate={() => navigate(`/eventi?id=${ev.id}`)}
-                      />
+                      <MeetingRow key={ev.id} ev={ev} evStatus={evStatus} isExpanded={isExpanded} isAnnotated={isAnnotated} isClosed={isClosed}
+                        adminUser={adminUser} profileMap={profileMap} clientMap={clientMap} teamPopover={teamPopover} setTeamPopover={setTeamPopover}
+                        note={note} recaps={recaps} loadingRecap={loadingRecap} statusSaving={statusSaving} profiles={profiles}
+                        onToggle={() => toggleEventNote(ev.id)} onUpdateNote={(f, v) => updateNote(ev.id, f, v)}
+                        onStatusChange={s => handleStatusChange(ev.id, s)} onNavigate={() => navigate(`/eventi?id=${ev.id}`)}
+                        tdStyle={tdStyle} tdMutedStyle={tdMutedStyle} onEventsChange={onEventsChange} />
                     )
                   })}
                   {filters.sorted.length === 0 && (
-                    <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-400">Nessun evento trovato</td></tr>
+                    <tr><td colSpan={9} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>Nessun evento trovato</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* General section */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-4">
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Sezione Generale</h3>
+          <div className="panel" style={{ padding: 20 }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Sezione Generale</h3>
             <NoteField label="Temi generali" value={temiGenerali} onChange={setTemiGenerali} />
             <NoteField label="Decisioni trasversali" value={decisioniTrasversali} onChange={setDecisioniTrasversali} />
           </div>
 
-          {/* Save */}
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400">
-              {annotatedEventIds.size > 0 ? `${annotatedEventIds.size} evento/i annotato/i` : 'Nessun evento annotato'}
-            </p>
-            <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 flex items-center gap-2">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Salva Riunione
+            <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{annotatedEventIds.size > 0 ? `${annotatedEventIds.size} evento/i annotato/i` : 'Nessun evento annotato'}</span>
+            <button onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2" style={{ padding: '10px 20px', fontSize: '0.85rem', borderRadius: 'var(--radius-sm)' }}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Salva Riunione
             </button>
           </div>
         </div>
@@ -570,72 +765,64 @@ function NewMeeting({ events, profiles, profileMap, clientMap, onDone, onCancel,
   )
 }
 
-function MeetingEventRow({ ev, evStatus, isExpanded, isAnnotated, isClosed, isAdminUser, profileMap, clientMap, teamPopover, setTeamPopover, notes, recaps, loadingRecap, statusSaving, onToggle, onUpdateNote, onStatusChange, onNavigate }: {
-  ev: Event; evStatus: string; isExpanded: boolean; isAnnotated: boolean; isClosed: boolean; isAdminUser: boolean
-  profileMap: Record<string, string>; clientMap: Record<string, string>
-  teamPopover: string | null; setTeamPopover: (v: string | null) => void
-  notes: Record<string, Partial<MeetingEventNote>>; recaps: Record<string, EventRecap>; loadingRecap: string | null; statusSaving: string | null
-  onToggle: () => void; onUpdateNote: (field: string, value: string) => void; onStatusChange: (s: Event['stato']) => void; onNavigate: () => void
+// ─── Meeting Event Row (expandable) ──────────────────────────────────────────
+
+function MeetingRow({ ev, evStatus, isExpanded, isAnnotated, isClosed, adminUser, profileMap, clientMap, teamPopover, setTeamPopover, note, recaps, loadingRecap, statusSaving, profiles, onToggle, onUpdateNote, onStatusChange, onNavigate, tdStyle, tdMutedStyle, onEventsChange }: {
+  ev: Event; evStatus: string; isExpanded: boolean; isAnnotated: boolean; isClosed: boolean; adminUser: boolean
+  profileMap: Record<string, string>; clientMap: Record<string, string>; teamPopover: string | null; setTeamPopover: (v: string | null) => void
+  note: Partial<MeetingEventNote>; recaps: Record<string, EventRecap>; loadingRecap: string | null; statusSaving: string | null; profiles: ProfileEntry[]
+  onToggle: () => void; onUpdateNote: (f: string, v: string) => void; onStatusChange: (s: Event['stato']) => void; onNavigate: () => void
+  tdStyle: React.CSSProperties; tdMutedStyle: React.CSSProperties; onEventsChange: () => void
 }) {
-  const note = notes[ev.id] || {}
   return (
     <>
-      <tr onClick={onToggle} className={`cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'}`}>
-        <td className="px-3 py-2 text-center">
-          <span className="inline-flex items-center gap-1">
-            {isAnnotated && <span className="w-1.5 h-1.5 rounded-full bg-green-500" />}
-            {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
+      <tr onClick={onToggle} style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--line)', cursor: 'pointer', background: isExpanded ? 'var(--panel2)' : 'transparent', transition: 'background var(--transition-fast)' }}
+        onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = 'var(--panel2)' }}
+        onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = 'transparent' }}>
+        <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+          <span className="flex items-center gap-1">
+            {isAnnotated && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />}
+            {isExpanded ? <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} /> : <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />}
           </span>
         </td>
-        <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white max-w-[200px] truncate">{ev.nome || `#${ev.eventNumber ?? '-'}`}</td>
-        <td className="px-3 py-2"><StatusBadge stato={evStatus} /></td>
-        <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatDateCompact(ev.dataInizio, ev.dataFine)}</td>
-        <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 max-w-[140px] truncate">{resolveClientName(ev, clientMap)}</td>
-        <td className="px-3 py-2 text-xs text-gray-500 max-w-[120px] truncate">{ev.location || '-'}</td>
-        <td className="px-3 py-2 text-xs text-gray-500">{ev.partecipanti || '-'}</td>
-        <TeamCell ev={ev} profileMap={profileMap} teamPopover={teamPopover} setTeamPopover={setTeamPopover} />
-        <td className="px-3 py-2 text-xs text-gray-500 max-w-[100px] truncate">{profileMap[ev.responsabile] || '-'}</td>
+        <td style={{ ...tdStyle, fontWeight: 600, maxWidth: 200 }} className="truncate">{ev.nome || `#${ev.eventNumber ?? '-'}`}</td>
+        <td style={{ padding: '6px 12px' }}><StatusBadge stato={evStatus} /></td>
+        <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{formatDateCompact(ev.dataInizio, ev.dataFine)}</td>
+        <td style={{ ...tdStyle, maxWidth: 140 }} className="truncate">{resolveClientName(ev, clientMap)}</td>
+        <td style={{ ...tdMutedStyle, maxWidth: 120 }} className="truncate">{ev.location || '-'}</td>
+        <td style={tdMutedStyle}>{ev.partecipanti || '-'}</td>
+        <TeamCell ev={ev} profileMap={profileMap} teamPopover={teamPopover} setTeamPopover={setTeamPopover} adminEdit={false} profiles={profiles} onSaved={onEventsChange} />
+        <td style={{ ...tdMutedStyle, maxWidth: 100 }} className="truncate">{profileMap[ev.responsabile] || '-'}</td>
       </tr>
       {isExpanded && (
         <tr>
-          <td colSpan={9} className="p-0">
-            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-750 border-t border-gray-200 dark:border-gray-600 space-y-4">
+          <td colSpan={9} style={{ padding: 0 }}>
+            <div style={{ padding: '16px 24px', background: 'var(--panel2)', borderBottom: '1px solid var(--line)' }} className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Stato evento:</label>
-                  <select
-                    value={evStatus}
-                    onChange={e => { e.stopPropagation(); onStatusChange(e.target.value as Event['stato']) }}
-                    disabled={statusSaving === ev.id}
-                    className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50"
-                  >
-                    {EVENT_STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--muted)' }}>Stato evento:</span>
+                  <select value={evStatus} onChange={e => { e.stopPropagation(); onStatusChange(e.target.value as Event['stato']) }} disabled={statusSaving === ev.id}
+                    style={{ fontSize: '0.8rem', padding: '3px 8px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--panel-solid)', color: 'var(--text)' }}>
+                    {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
-                  {statusSaving === ev.id && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
-                  {!isAdminUser && <span className="text-[10px] text-gray-400">(richiede accesso all'evento)</span>}
+                  {statusSaving === ev.id && <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--muted)' }} />}
+                  {!adminUser && <span style={{ fontSize: '10px', color: 'var(--muted)' }}>(richiede accesso)</span>}
                 </div>
-                <button onClick={onNavigate} className="text-xs text-blue-500 hover:underline">Apri evento</button>
+                <button onClick={onNavigate} style={{ fontSize: '0.8rem', color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer' }}>Apri evento</button>
               </div>
 
-              {/* Auto recap */}
-              <div className="bg-white dark:bg-gray-700/50 rounded-lg p-3">
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Riepilogo (auto)</p>
+              <div className="panel" style={{ padding: 12 }}>
+                <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Riepilogo (auto)</p>
                 {loadingRecap === ev.id ? (
-                  <div className="flex items-center gap-2 text-xs text-gray-400"><Loader2 className="w-3 h-3 animate-spin" /> Calcolo...</div>
-                ) : recaps[ev.id] ? (
-                  <RecapDisplay recap={recaps[ev.id]} />
-                ) : (
-                  <p className="text-xs text-gray-400">In attesa...</p>
-                )}
+                  <div className="flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--muted)' }} /><span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>Calcolo...</span></div>
+                ) : recaps[ev.id] ? <RecapDisplay recap={recaps[ev.id]} /> : <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>In attesa...</p>}
               </div>
 
               <NoteField label="Punti discussi" value={note.punti_discussi || ''} onChange={v => onUpdateNote('punti_discussi', v)} />
               <NoteField label="Decisioni prese" value={note.decisioni || ''} onChange={v => onUpdateNote('decisioni', v)} />
               <NoteField label="Azioni da fare (chi/cosa/quando)" value={note.azioni || ''} onChange={v => onUpdateNote('azioni', v)} />
               <NoteField label="Criticità / rischi" value={note.criticita || ''} onChange={v => onUpdateNote('criticita', v)} />
-              {isClosed && (
-                <NoteField label="Lezioni imparate (debrief)" value={note.lezioni_imparate || ''} onChange={v => onUpdateNote('lezioni_imparate', v)} placeholder="Cosa abbiamo imparato da questo evento?" />
-              )}
+              {isClosed && <NoteField label="Lezioni imparate (debrief)" value={note.lezioni_imparate || ''} onChange={v => onUpdateNote('lezioni_imparate', v)} placeholder="Cosa abbiamo imparato?" />}
             </div>
           </td>
         </tr>
@@ -647,17 +834,17 @@ function MeetingEventRow({ ev, evStatus, isExpanded, isAnnotated, isClosed, isAd
 function NoteField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</label>
+      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted)', marginBottom: 4 }}>{label}</label>
       <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder || `${label}...`} rows={3}
-        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm resize-none" />
+        style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', background: 'var(--panel-solid)', color: 'var(--text)', fontSize: '0.85rem', resize: 'none' }} />
     </div>
   )
 }
 
 function RecapDisplay({ recap }: { recap: EventRecap }) {
   return (
-    <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
-      <p>Task: {recap.tasks.total} totali, {recap.tasks.completed} completati, {recap.tasks.open} aperti{recap.tasks.overdue > 0 && <span className="text-red-500"> ({recap.tasks.overdue} in ritardo)</span>}</p>
+    <div style={{ fontSize: '0.8rem', color: 'var(--text)' }} className="space-y-1">
+      <p>Task: {recap.tasks.total} totali, {recap.tasks.completed} completati, {recap.tasks.open} aperti{recap.tasks.overdue > 0 && <span style={{ color: 'var(--red)' }}> ({recap.tasks.overdue} in ritardo)</span>}</p>
       {recap.budget && <p>Budget: {recap.budget.pctUsed}% utilizzato ({recap.budget.used.toLocaleString('it-IT')}€ / {recap.budget.total.toLocaleString('it-IT')}€)</p>}
       {recap.suppliers && <p>Fornitori: {recap.suppliers.confirmed} confermati / {recap.suppliers.total} totali</p>}
       <p>Documenti: {recap.documentsCount}</p>
@@ -691,58 +878,55 @@ function MeetingHistory({ meetings, profileMap, events, detailId, onBack, onOpen
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><ArrowLeft className="w-4 h-4" /></button>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">{detail ? 'Verbale Riunione' : 'Storico Riunioni'}</h1>
+        <button onClick={onBack} className="btn-ghost" style={{ padding: 8 }}><ArrowLeft className="w-4 h-4" /></button>
+        <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text)' }}>{detail ? 'Verbale Riunione' : 'Storico Riunioni'}</h1>
       </div>
 
       {loadingDetail ? (
-        <div className="flex items-center justify-center h-32"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+        <div className="flex items-center justify-center h-32"><Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--muted)' }} /></div>
       ) : detail ? (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-            <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300 mb-4">
+          <div className="panel" style={{ padding: 20 }}>
+            <div className="flex items-center gap-4" style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: 16 }}>
               <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {detail.meeting_date}</span>
               <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {profileMap[detail.created_by] || 'Sconosciuto'}</span>
             </div>
-            {detail.presenti && <p className="text-xs text-gray-500 mb-2"><strong>Presenti:</strong> {detail.presenti}</p>}
-            {detail.temi_generali && <div className="mb-3"><p className="text-xs font-semibold text-gray-500 mb-1">Temi generali</p><p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{detail.temi_generali}</p></div>}
-            {detail.decisioni_trasversali && <div><p className="text-xs font-semibold text-gray-500 mb-1">Decisioni trasversali</p><p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{detail.decisioni_trasversali}</p></div>}
+            {detail.presenti && <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginBottom: 8 }}><strong style={{ color: 'var(--text)' }}>Presenti:</strong> {detail.presenti}</p>}
+            {detail.temi_generali && <div style={{ marginBottom: 12 }}><p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Temi generali</p><p style={{ fontSize: '0.85rem', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{detail.temi_generali}</p></div>}
+            {detail.decisioni_trasversali && <div><p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Decisioni trasversali</p><p style={{ fontSize: '0.85rem', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{detail.decisioni_trasversali}</p></div>}
           </div>
 
-          {detailNotes.map(note => {
-            const ev = eventMap[note.event_id]
-            const recap = note.stato_snapshot as EventRecap | null
+          {detailNotes.map(noteItem => {
+            const ev = eventMap[noteItem.event_id]
+            const recap = noteItem.stato_snapshot as EventRecap | null
             return (
-              <div key={note.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-                <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">
-                  {ev ? (ev.nome || `#${ev.eventNumber}`) : note.event_id}
-                </h4>
-                {recap && <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 mb-3"><RecapDisplay recap={recap} /></div>}
-                {note.punti_discussi && <SavedField label="Punti discussi" value={note.punti_discussi} />}
-                {note.decisioni && <SavedField label="Decisioni" value={note.decisioni} />}
-                {note.azioni && <SavedField label="Azioni" value={note.azioni} />}
-                {note.criticita && <SavedField label="Criticità" value={note.criticita} />}
-                {note.lezioni_imparate && <SavedField label="Lezioni imparate" value={note.lezioni_imparate} />}
+              <div key={noteItem.id} className="panel" style={{ padding: 20 }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>{ev ? (ev.nome || `#${ev.eventNumber}`) : noteItem.event_id}</h4>
+                {recap && <div className="panel-2" style={{ padding: 12, marginBottom: 12 }}><RecapDisplay recap={recap} /></div>}
+                {noteItem.punti_discussi && <SavedField label="Punti discussi" value={noteItem.punti_discussi} />}
+                {noteItem.decisioni && <SavedField label="Decisioni" value={noteItem.decisioni} />}
+                {noteItem.azioni && <SavedField label="Azioni" value={noteItem.azioni} />}
+                {noteItem.criticita && <SavedField label="Criticità" value={noteItem.criticita} />}
+                {noteItem.lezioni_imparate && <SavedField label="Lezioni imparate" value={noteItem.lezioni_imparate} />}
               </div>
             )
           })}
-          {detailNotes.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Nessuna nota per gli eventi in questa riunione.</p>}
+          {detailNotes.length === 0 && <p style={{ textAlign: 'center', padding: '16px 0', fontSize: '0.85rem', color: 'var(--muted)' }}>Nessuna nota per gli eventi in questa riunione.</p>}
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="divide-y divide-gray-100 dark:divide-gray-700">
-            {meetings.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-gray-400">Nessuna riunione registrata.</p>
-            ) : meetings.map(m => (
-              <button key={m.id} onClick={() => onOpenDetail(m.id)} className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors">
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{m.meeting_date}</p>
-                  <p className="text-xs text-gray-500">{profileMap[m.created_by] || 'Sconosciuto'}{m.presenti ? ` — ${m.presenti}` : ''}</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              </button>
-            ))}
-          </div>
+        <div className="panel" style={{ overflow: 'hidden' }}>
+          {meetings.length === 0 ? (
+            <p style={{ padding: '32px 16px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--muted)' }}>Nessuna riunione registrata.</p>
+          ) : meetings.map(m => (
+            <button key={m.id} onClick={() => onOpenDetail(m.id)} className="flex items-center justify-between" style={{ width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', borderBottom: '1px solid var(--line)', cursor: 'pointer', transition: 'background var(--transition-fast)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--panel2)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <div>
+                <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text)' }}>{m.meeting_date}</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{profileMap[m.created_by] || 'Sconosciuto'}{m.presenti ? ` — ${m.presenti}` : ''}</p>
+              </div>
+              <ChevronRight className="w-4 h-4" style={{ color: 'var(--muted)' }} />
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -751,9 +935,9 @@ function MeetingHistory({ meetings, profileMap, events, detailId, onBack, onOpen
 
 function SavedField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mb-2">
-      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-0.5">{label}</p>
-      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{value}</p>
+    <div style={{ marginBottom: 8 }}>
+      <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+      <p style={{ fontSize: '0.85rem', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{value}</p>
     </div>
   )
 }
