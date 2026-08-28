@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Calendar, ChevronRight, ArrowLeft, Save, Loader2, FileText, History, Users, X } from 'lucide-react'
+import { Plus, Calendar, ChevronDown, ChevronRight, ArrowLeft, Save, Loader2, History, Users, X } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { fetchEvents, updateEvent } from '@/lib/events-service'
 import { fetchClients } from '@/lib/clients-service'
@@ -28,6 +28,11 @@ function meseLabel(dateStr: string) {
   return `${MESI[d.getMonth()]} ${d.getFullYear()}`
 }
 
+function yearOf(dateStr: string): number {
+  if (!dateStr) return 0
+  return new Date(dateStr).getFullYear()
+}
+
 function formatDateCompact(start: string, end: string): string {
   if (!start) return '-'
   const s = new Date(start)
@@ -44,7 +49,17 @@ function formatDateCompact(start: string, end: string): string {
   return `${sDay} ${sMon} ${sYear} — ${eDay} ${eMon} ${eYear}`
 }
 
+function resolveClientName(ev: Event, clientMap: Record<string, string>): string {
+  if (ev.clientId && clientMap[ev.clientId]) return clientMap[ev.clientId]
+  if (ev.cliente && clientMap[ev.cliente]) return clientMap[ev.cliente]
+  return ev.cliente || '-'
+}
+
+const CURRENT_YEAR = new Date().getFullYear()
+
 interface ProfileEntry { id: string; first_name: string; last_name: string }
+
+// ─── Main ────────────────────────────────────────────────────────────────────
 
 export default function Riunioni() {
   const navigate = useNavigate()
@@ -83,7 +98,7 @@ export default function Riunioni() {
   }
 
   if (view === 'new') {
-    return <NewMeeting events={events} profiles={profiles} profileMap={profileMap} onDone={() => { setView('overview'); fetchMeetings().then(setMeetings) }} onCancel={() => setView('overview')} userRole={user?.role} />
+    return <NewMeeting events={events} profiles={profiles} profileMap={profileMap} clientMap={clientMap} onDone={() => { setView('overview'); fetchMeetings().then(setMeetings) }} onCancel={() => setView('overview')} userRole={user?.role} />
   }
 
   if (view === 'history' || (view === 'detail' && detailMeetingId)) {
@@ -118,24 +133,35 @@ export default function Riunioni() {
         </div>
       </div>
 
-      <EventsTable events={events} profileMap={profileMap} clientMap={clientMap} onEventClick={id => navigate(`/eventi?id=${id}`)} />
+      <EventsOverviewTable events={events} profileMap={profileMap} clientMap={clientMap} onEventClick={id => navigate(`/eventi?id=${id}`)} />
     </div>
   )
 }
 
-// ─── Events Table ────────────────────────────────────────────────────────────
+// ─── Shared filter + sort helpers ────────────────────────────────────────────
 
-function EventsTable({ events, profileMap, clientMap, onEventClick }: {
-  events: Event[]; profileMap: Record<string, string>; clientMap: Record<string, string>; onEventClick: (id: string) => void
-}) {
+function useEventsFilters(events: Event[]) {
   const [sortField, setSortField] = useState<string>('dataInizio')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [filterStatus, setFilterStatus] = useState('Tutti')
   const [filterMonth, setFilterMonth] = useState('')
-  const [teamPopover, setTeamPopover] = useState<string | null>(null)
+  const [filterYear, setFilterYear] = useState<number>(CURRENT_YEAR)
+
+  const years = useMemo(() => {
+    const s = new Set<number>()
+    for (const e of events) { const y = yearOf(e.dataInizio); if (y) s.add(y) }
+    if (!s.has(CURRENT_YEAR)) s.add(CURRENT_YEAR)
+    return [...s].sort((a, b) => b - a)
+  }, [events])
+
+  const months = useMemo(() => {
+    const filtered = events.filter(e => yearOf(e.dataInizio) === filterYear)
+    return [...new Set(filtered.map(e => meseLabel(e.dataInizio)).filter(Boolean))]
+  }, [events, filterYear])
 
   const sorted = useMemo(() => {
     let list = [...events]
+    list = list.filter(e => yearOf(e.dataInizio) === filterYear)
     if (filterStatus !== 'Tutti') list = list.filter(e => e.stato === filterStatus)
     if (filterMonth) list = list.filter(e => meseLabel(e.dataInizio) === filterMonth)
     list.sort((a, b) => {
@@ -145,52 +171,70 @@ function EventsTable({ events, profileMap, clientMap, onEventClick }: {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return list
-  }, [events, filterStatus, filterMonth, sortField, sortDir])
-
-  const months = useMemo(() => [...new Set(events.map(e => meseLabel(e.dataInizio)).filter(Boolean))], [events])
+  }, [events, filterStatus, filterMonth, filterYear, sortField, sortDir])
 
   function toggleSort(field: string) {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortField(field); setSortDir('asc') }
   }
 
-  function resolveClientName(ev: Event): string {
-    if (ev.clientId && clientMap[ev.clientId]) return clientMap[ev.clientId]
-    if (ev.cliente && clientMap[ev.cliente]) return clientMap[ev.cliente]
-    return ev.cliente || '-'
-  }
+  return { sorted, sortField, sortDir, toggleSort, filterStatus, setFilterStatus, filterMonth, setFilterMonth, filterYear, setFilterYear, years, months }
+}
 
-  const SortHeader = ({ field, label }: { field: string; label: string }) => (
+function FilterBar({ filterStatus, setFilterStatus, filterMonth, setFilterMonth, filterYear, setFilterYear, years, months, count }: {
+  filterStatus: string; setFilterStatus: (v: string) => void
+  filterMonth: string; setFilterMonth: (v: string) => void
+  filterYear: number; setFilterYear: (v: number) => void
+  years: number[]; months: string[]; count: number
+}) {
+  return (
+    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex gap-3 flex-wrap items-center">
+      <select value={filterYear} onChange={e => { setFilterYear(Number(e.target.value)); setFilterMonth('') }} className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+        {years.map(y => <option key={y} value={y}>{y}</option>)}
+      </select>
+      <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+        <option value="Tutti">Tutti gli stati</option>
+        <option value="bozza">Bozza</option>
+        <option value="pianificazione">Pianificazione</option>
+        <option value="in_corso">In Corso</option>
+        <option value="completato">Completato</option>
+      </select>
+      <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+        <option value="">Tutti i mesi</option>
+        {months.map(m => <option key={m} value={m}>{m}</option>)}
+      </select>
+      <span className="text-xs text-gray-400 ml-auto">{count} eventi</span>
+    </div>
+  )
+}
+
+function SortHeader({ field, label, sortField, sortDir, toggleSort }: { field: string; label: string; sortField: string; sortDir: string; toggleSort: (f: string) => void }) {
+  return (
     <th onClick={() => toggleSort(field)} className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 select-none whitespace-nowrap">
       {label} {sortField === field && (sortDir === 'asc' ? '↑' : '↓')}
     </th>
   )
+}
+
+// ─── Overview Table (read-only, click navigates) ─────────────────────────────
+
+function EventsOverviewTable({ events, profileMap, clientMap, onEventClick }: {
+  events: Event[]; profileMap: Record<string, string>; clientMap: Record<string, string>; onEventClick: (id: string) => void
+}) {
+  const filters = useEventsFilters(events)
+  const [teamPopover, setTeamPopover] = useState<string | null>(null)
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex gap-3 flex-wrap items-center">
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-          <option value="Tutti">Tutti gli stati</option>
-          <option value="bozza">Bozza</option>
-          <option value="pianificazione">Pianificazione</option>
-          <option value="in_corso">In Corso</option>
-          <option value="completato">Completato</option>
-        </select>
-        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-          <option value="">Tutti i mesi</option>
-          {months.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
-        <span className="text-xs text-gray-400 ml-auto">{sorted.length} eventi</span>
-      </div>
-
+      <FilterBar {...filters} count={filters.sorted.length} />
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-750">
             <tr>
-              <SortHeader field="nome" label="Evento" />
-              <SortHeader field="stato" label="Stato" />
-              <SortHeader field="dataInizio" label="Date" />
-              <SortHeader field="cliente" label="Cliente" />
+              <SortHeader field="nome" label="Evento" {...filters} />
+              <SortHeader field="stato" label="Stato" {...filters} />
+              <SortHeader field="dataInizio" label="Date" {...filters} />
+              <SortHeader field="cliente" label="Cliente" {...filters} />
               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Luogo</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Pax</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Team</th>
@@ -198,43 +242,46 @@ function EventsTable({ events, profileMap, clientMap, onEventClick }: {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-            {sorted.map(ev => (
+            {filters.sorted.map(ev => (
               <tr key={ev.id} onClick={() => onEventClick(ev.id)} className="hover:bg-blue-50 dark:hover:bg-blue-900/10 cursor-pointer transition-colors">
                 <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white max-w-[200px] truncate">{ev.nome || `#${ev.eventNumber ?? '-'}`}</td>
                 <td className="px-3 py-2"><StatusBadge stato={ev.stato} /></td>
                 <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatDateCompact(ev.dataInizio, ev.dataFine)}</td>
-                <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 max-w-[140px] truncate">{resolveClientName(ev)}</td>
+                <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 max-w-[140px] truncate">{resolveClientName(ev, clientMap)}</td>
                 <td className="px-3 py-2 text-xs text-gray-500 max-w-[120px] truncate">{ev.location || '-'}</td>
                 <td className="px-3 py-2 text-xs text-gray-500">{ev.partecipanti || '-'}</td>
-                <td className="px-3 py-2 relative">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setTeamPopover(teamPopover === ev.id ? null : ev.id) }}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                  >
-                    {ev.team?.length || 0}
-                  </button>
-                  {teamPopover === ev.id && ev.team?.length > 0 && (
-                    <div className="absolute z-20 top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-2 min-w-[160px]" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-semibold text-gray-400 uppercase">Team ({ev.team.length})</span>
-                        <button onClick={() => setTeamPopover(null)} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
-                      </div>
-                      {ev.team.map(uid => (
-                        <p key={uid} className="text-xs text-gray-700 dark:text-gray-300 py-0.5">{profileMap[uid] || uid}</p>
-                      ))}
-                    </div>
-                  )}
-                </td>
+                <TeamCell ev={ev} profileMap={profileMap} teamPopover={teamPopover} setTeamPopover={setTeamPopover} />
                 <td className="px-3 py-2 text-xs text-gray-500 max-w-[100px] truncate">{profileMap[ev.responsabile] || '-'}</td>
               </tr>
             ))}
-            {sorted.length === 0 && (
+            {filters.sorted.length === 0 && (
               <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">Nessun evento trovato</td></tr>
             )}
           </tbody>
         </table>
       </div>
     </div>
+  )
+}
+
+function TeamCell({ ev, profileMap, teamPopover, setTeamPopover }: {
+  ev: Event; profileMap: Record<string, string>; teamPopover: string | null; setTeamPopover: (v: string | null) => void
+}) {
+  return (
+    <td className="px-3 py-2 relative">
+      <button onClick={(e) => { e.stopPropagation(); setTeamPopover(teamPopover === ev.id ? null : ev.id) }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">
+        {ev.team?.length || 0}
+      </button>
+      {teamPopover === ev.id && ev.team?.length > 0 && (
+        <div className="absolute z-20 top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-2 min-w-[160px]" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase">Team ({ev.team.length})</span>
+            <button onClick={() => setTeamPopover(null)} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
+          </div>
+          {ev.team.map(uid => <p key={uid} className="text-xs text-gray-700 dark:text-gray-300 py-0.5">{profileMap[uid] || uid}</p>)}
+        </div>
+      )}
+    </td>
   )
 }
 
@@ -330,32 +377,43 @@ const EVENT_STATUS_OPTIONS: { value: Event['stato']; label: string }[] = [
   { value: 'completato', label: 'Completato' },
 ]
 
-// ─── New Meeting ─────────────────────────────────────────────────────────────
+// ─── New Meeting (full table + click-to-annotate) ────────────────────────────
 
-function NewMeeting({ events: initialEvents, profiles, onDone, onCancel, userRole }: {
-  events: Event[]; profiles: ProfileEntry[]; profileMap: Record<string, string>; onDone: () => void; onCancel: () => void; userRole?: string
+function NewMeeting({ events, profiles, profileMap, clientMap, onDone, onCancel, userRole }: {
+  events: Event[]; profiles: ProfileEntry[]; profileMap: Record<string, string>; clientMap: Record<string, string>; onDone: () => void; onCancel: () => void; userRole?: string
 }) {
   const [saving, setSaving] = useState(false)
   const [meetingId, setMeetingId] = useState<string | null>(null)
   const [presenti, setPresenti] = useState('')
   const [temiGenerali, setTemiGenerali] = useState('')
   const [decisioniTrasversali, setDecisioniTrasversali] = useState('')
-  const [discussedEvents, setDiscussedEvents] = useState<Set<string>>(new Set())
-  const [activeNoteEvent, setActiveNoteEvent] = useState<string | null>(null)
+  const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
   const [notes, setNotes] = useState<Record<string, Partial<MeetingEventNote>>>({})
   const [recaps, setRecaps] = useState<Record<string, EventRecap>>({})
   const [loadingRecap, setLoadingRecap] = useState<string | null>(null)
   const [eventStatuses, setEventStatuses] = useState<Record<string, Event['stato']>>({})
   const [statusSaving, setStatusSaving] = useState<string | null>(null)
+  const [teamPopover, setTeamPopover] = useState<string | null>(null)
   const navigate = useNavigate()
+  const filters = useEventsFilters(events)
 
   const isAdminUser = !!userRole && ADMIN_ROLES.includes(userRole)
 
+  const annotatedEventIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const [eid, note] of Object.entries(notes)) {
+      if (note.punti_discussi || note.decisioni || note.azioni || note.criticita || note.lezioni_imparate) {
+        ids.add(eid)
+      }
+    }
+    return ids
+  }, [notes])
+
   useEffect(() => {
     const map: Record<string, Event['stato']> = {}
-    for (const ev of initialEvents) map[ev.id] = ev.stato
+    for (const ev of events) map[ev.id] = ev.stato
     setEventStatuses(map)
-  }, [initialEvents])
+  }, [events])
 
   async function handleCreate() {
     setSaving(true)
@@ -366,9 +424,9 @@ function NewMeeting({ events: initialEvents, profiles, onDone, onCancel, userRol
     setSaving(false)
   }
 
-  async function openEventNote(eventId: string) {
-    setDiscussedEvents(prev => new Set([...prev, eventId]))
-    setActiveNoteEvent(eventId)
+  async function toggleEventNote(eventId: string) {
+    if (expandedEvent === eventId) { setExpandedEvent(null); return }
+    setExpandedEvent(eventId)
     if (!recaps[eventId]) {
       setLoadingRecap(eventId)
       try {
@@ -398,7 +456,7 @@ function NewMeeting({ events: initialEvents, profiles, onDone, onCancel, userRol
     setSaving(true)
     try {
       await updateMeeting(meetingId, { presenti, temi_generali: temiGenerali, decisioni_trasversali: decisioniTrasversali })
-      for (const eventId of discussedEvents) {
+      for (const eventId of annotatedEventIds) {
         const n = notes[eventId] || {}
         await upsertEventNote({
           meeting_id: meetingId,
@@ -416,10 +474,6 @@ function NewMeeting({ events: initialEvents, profiles, onDone, onCancel, userRol
     setSaving(false)
   }
 
-  const activeEvent = initialEvents.find(e => e.id === activeNoteEvent)
-  const activeEventStatus = activeNoteEvent ? eventStatuses[activeNoteEvent] : undefined
-  const isClosedEvent = activeEventStatus === 'completato'
-
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -436,99 +490,157 @@ function NewMeeting({ events: initialEvents, profiles, onDone, onCancel, userRol
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: events list */}
-          <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Eventi da discutere</h3>
-            </div>
-            <div className="max-h-[60vh] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700">
-              {initialEvents.map(ev => (
-                <button key={ev.id} onClick={() => openEventNote(ev.id)}
-                  className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition-colors ${
-                    activeNoteEvent === ev.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      {discussedEvents.has(ev.id) && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />}
-                      <StatusBadge stato={eventStatuses[ev.id] || ev.stato} />
-                    </div>
-                    <p className="text-sm text-gray-900 dark:text-white truncate mt-0.5">{ev.nome || `#${ev.eventNumber}`}</p>
-                  </div>
-                  <ChevronRight className="w-3 h-3 text-gray-400 shrink-0" />
-                </button>
-              ))}
+        <div className="space-y-6">
+          {/* Full events table with expandable notes */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <FilterBar {...filters} count={filters.sorted.length} />
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-750">
+                  <tr>
+                    <th className="px-3 py-2 w-8"></th>
+                    <SortHeader field="nome" label="Evento" {...filters} />
+                    <SortHeader field="stato" label="Stato" {...filters} />
+                    <SortHeader field="dataInizio" label="Date" {...filters} />
+                    <SortHeader field="cliente" label="Cliente" {...filters} />
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Luogo</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Pax</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Team</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Responsabile</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {filters.sorted.map(ev => {
+                    const isExpanded = expandedEvent === ev.id
+                    const isAnnotated = annotatedEventIds.has(ev.id)
+                    const evStatus = eventStatuses[ev.id] || ev.stato
+                    const isClosed = evStatus === 'completato'
+                    return (
+                      <MeetingEventRow
+                        key={ev.id}
+                        ev={ev}
+                        evStatus={evStatus}
+                        isExpanded={isExpanded}
+                        isAnnotated={isAnnotated}
+                        isClosed={isClosed}
+                        isAdminUser={isAdminUser}
+                        profileMap={profileMap}
+                        clientMap={clientMap}
+                        teamPopover={teamPopover}
+                        setTeamPopover={setTeamPopover}
+                        notes={notes}
+                        recaps={recaps}
+                        loadingRecap={loadingRecap}
+                        statusSaving={statusSaving}
+                        onToggle={() => toggleEventNote(ev.id)}
+                        onUpdateNote={(field, value) => updateNote(ev.id, field, value)}
+                        onStatusChange={(s) => handleStatusChange(ev.id, s)}
+                        onNavigate={() => navigate(`/eventi?id=${ev.id}`)}
+                      />
+                    )
+                  })}
+                  {filters.sorted.length === 0 && (
+                    <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-400">Nessun evento trovato</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
 
-          {/* Right: note form */}
-          <div className="lg:col-span-2 space-y-4">
-            {activeNoteEvent && activeEvent ? (
-              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">{activeEvent.nome || `#${activeEvent.eventNumber}`}</h3>
-                  <button onClick={() => navigate(`/eventi?id=${activeEvent.id}`)} className="text-xs text-blue-500 hover:underline">Apri evento</button>
-                </div>
+          {/* General section */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-4">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Sezione Generale</h3>
+            <NoteField label="Temi generali" value={temiGenerali} onChange={setTemiGenerali} />
+            <NoteField label="Decisioni trasversali" value={decisioniTrasversali} onChange={setDecisioniTrasversali} />
+          </div>
 
-                {/* Status edit */}
-                <div className="flex items-center gap-3">
-                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Stato evento:</label>
-                  <select
-                    value={activeEventStatus || activeEvent.stato}
-                    onChange={e => handleStatusChange(activeNoteEvent, e.target.value as Event['stato'])}
-                    disabled={statusSaving === activeNoteEvent}
-                    className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50"
-                  >
-                    {EVENT_STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                  {statusSaving === activeNoteEvent && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
-                  {!isAdminUser && <span className="text-[10px] text-gray-400">(richiede accesso all'evento)</span>}
-                </div>
-
-                {/* Auto-prefilled recap */}
-                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Riepilogo (auto)</p>
-                  {loadingRecap === activeNoteEvent ? (
-                    <div className="flex items-center gap-2 text-xs text-gray-400"><Loader2 className="w-3 h-3 animate-spin" /> Calcolo...</div>
-                  ) : recaps[activeNoteEvent] ? (
-                    <RecapDisplay recap={recaps[activeNoteEvent]} />
-                  ) : (
-                    <p className="text-xs text-gray-400">In attesa...</p>
-                  )}
-                </div>
-
-                <NoteField label="Punti discussi" value={notes[activeNoteEvent]?.punti_discussi || ''} onChange={v => updateNote(activeNoteEvent, 'punti_discussi', v)} />
-                <NoteField label="Decisioni prese" value={notes[activeNoteEvent]?.decisioni || ''} onChange={v => updateNote(activeNoteEvent, 'decisioni', v)} />
-                <NoteField label="Azioni da fare (chi/cosa/quando)" value={notes[activeNoteEvent]?.azioni || ''} onChange={v => updateNote(activeNoteEvent, 'azioni', v)} />
-                <NoteField label="Criticità / rischi" value={notes[activeNoteEvent]?.criticita || ''} onChange={v => updateNote(activeNoteEvent, 'criticita', v)} />
-                {isClosedEvent && (
-                  <NoteField label="Lezioni imparate (debrief)" value={notes[activeNoteEvent]?.lezioni_imparate || ''} onChange={v => updateNote(activeNoteEvent, 'lezioni_imparate', v)} placeholder="Cosa abbiamo imparato da questo evento?" />
-                )}
-              </div>
-            ) : (
-              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 flex flex-col items-center text-center text-gray-400">
-                <FileText className="w-8 h-8 mb-2" />
-                <p className="text-sm">Seleziona un evento dalla lista per aggiungere le note</p>
-              </div>
-            )}
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-4">
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white">Sezione Generale</h3>
-              <NoteField label="Temi generali" value={temiGenerali} onChange={setTemiGenerali} />
-              <NoteField label="Decisioni trasversali" value={decisioniTrasversali} onChange={setDecisioniTrasversali} />
-            </div>
-
-            <div className="flex justify-end">
-              <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 flex items-center gap-2">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Salva Riunione
-              </button>
-            </div>
+          {/* Save */}
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-400">
+              {annotatedEventIds.size > 0 ? `${annotatedEventIds.size} evento/i annotato/i` : 'Nessun evento annotato'}
+            </p>
+            <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 flex items-center gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Salva Riunione
+            </button>
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+function MeetingEventRow({ ev, evStatus, isExpanded, isAnnotated, isClosed, isAdminUser, profileMap, clientMap, teamPopover, setTeamPopover, notes, recaps, loadingRecap, statusSaving, onToggle, onUpdateNote, onStatusChange, onNavigate }: {
+  ev: Event; evStatus: string; isExpanded: boolean; isAnnotated: boolean; isClosed: boolean; isAdminUser: boolean
+  profileMap: Record<string, string>; clientMap: Record<string, string>
+  teamPopover: string | null; setTeamPopover: (v: string | null) => void
+  notes: Record<string, Partial<MeetingEventNote>>; recaps: Record<string, EventRecap>; loadingRecap: string | null; statusSaving: string | null
+  onToggle: () => void; onUpdateNote: (field: string, value: string) => void; onStatusChange: (s: Event['stato']) => void; onNavigate: () => void
+}) {
+  const note = notes[ev.id] || {}
+  return (
+    <>
+      <tr onClick={onToggle} className={`cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'}`}>
+        <td className="px-3 py-2 text-center">
+          <span className="inline-flex items-center gap-1">
+            {isAnnotated && <span className="w-1.5 h-1.5 rounded-full bg-green-500" />}
+            {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
+          </span>
+        </td>
+        <td className="px-3 py-2 text-xs font-medium text-gray-900 dark:text-white max-w-[200px] truncate">{ev.nome || `#${ev.eventNumber ?? '-'}`}</td>
+        <td className="px-3 py-2"><StatusBadge stato={evStatus} /></td>
+        <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatDateCompact(ev.dataInizio, ev.dataFine)}</td>
+        <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 max-w-[140px] truncate">{resolveClientName(ev, clientMap)}</td>
+        <td className="px-3 py-2 text-xs text-gray-500 max-w-[120px] truncate">{ev.location || '-'}</td>
+        <td className="px-3 py-2 text-xs text-gray-500">{ev.partecipanti || '-'}</td>
+        <TeamCell ev={ev} profileMap={profileMap} teamPopover={teamPopover} setTeamPopover={setTeamPopover} />
+        <td className="px-3 py-2 text-xs text-gray-500 max-w-[100px] truncate">{profileMap[ev.responsabile] || '-'}</td>
+      </tr>
+      {isExpanded && (
+        <tr>
+          <td colSpan={9} className="p-0">
+            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-750 border-t border-gray-200 dark:border-gray-600 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Stato evento:</label>
+                  <select
+                    value={evStatus}
+                    onChange={e => { e.stopPropagation(); onStatusChange(e.target.value as Event['stato']) }}
+                    disabled={statusSaving === ev.id}
+                    className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50"
+                  >
+                    {EVENT_STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  {statusSaving === ev.id && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
+                  {!isAdminUser && <span className="text-[10px] text-gray-400">(richiede accesso all'evento)</span>}
+                </div>
+                <button onClick={onNavigate} className="text-xs text-blue-500 hover:underline">Apri evento</button>
+              </div>
+
+              {/* Auto recap */}
+              <div className="bg-white dark:bg-gray-700/50 rounded-lg p-3">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Riepilogo (auto)</p>
+                {loadingRecap === ev.id ? (
+                  <div className="flex items-center gap-2 text-xs text-gray-400"><Loader2 className="w-3 h-3 animate-spin" /> Calcolo...</div>
+                ) : recaps[ev.id] ? (
+                  <RecapDisplay recap={recaps[ev.id]} />
+                ) : (
+                  <p className="text-xs text-gray-400">In attesa...</p>
+                )}
+              </div>
+
+              <NoteField label="Punti discussi" value={note.punti_discussi || ''} onChange={v => onUpdateNote('punti_discussi', v)} />
+              <NoteField label="Decisioni prese" value={note.decisioni || ''} onChange={v => onUpdateNote('decisioni', v)} />
+              <NoteField label="Azioni da fare (chi/cosa/quando)" value={note.azioni || ''} onChange={v => onUpdateNote('azioni', v)} />
+              <NoteField label="Criticità / rischi" value={note.criticita || ''} onChange={v => onUpdateNote('criticita', v)} />
+              {isClosed && (
+                <NoteField label="Lezioni imparate (debrief)" value={note.lezioni_imparate || ''} onChange={v => onUpdateNote('lezioni_imparate', v)} placeholder="Cosa abbiamo imparato da questo evento?" />
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   )
 }
 
