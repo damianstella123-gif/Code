@@ -80,9 +80,9 @@ const iconMap: Record<string, React.ElementType> = {
 
 const NAV_GROUPS: { label: string; paths: string[] }[] = [
   { label: '', paths: ['/dashboard'] },
-  { label: 'Operativo', paths: ['/eventi', '/task', '/calendario'] },
+  { label: 'Operativo', paths: ['/eventi', '/task', '/calendario', '/riunioni'] },
   { label: 'Business', paths: ['/network', '/amministrazione'] },
-  { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio'] },
+  { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio', '/presentazioni'] },
   { label: 'Crescita', paths: ['/performance', '/area-personale', '/ai-trasparenza'] },
   { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/centro-sicurezza', '/impostazioni', '/feedback-beta', '/aiuto'] },
 ]
@@ -733,7 +733,7 @@ function SentinelBadge() {
 }
 
 const PRIMARY_MOBILE_PATHS = ['/dashboard', '/eventi', '/task']
-const OVERFLOW_MOBILE_PATHS = ['/network', '/calendario', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/area-personale', '/ai-trasparenza', '/aiuto']
+const OVERFLOW_MOBILE_PATHS = ['/network', '/calendario', '/riunioni', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/presentazioni', '/area-personale', '/ai-trasparenza', '/archivio', '/centro-sicurezza', '/performance', '/aiuto']
 
 const mobileLabels: Record<string, string> = {
   '/dashboard': 'Home',
