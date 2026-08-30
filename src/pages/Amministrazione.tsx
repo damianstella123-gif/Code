@@ -35,7 +35,7 @@ import type { Supplier } from '@/data/suppliers'
 import type { Event } from '@/data/events'
 import { fetchEvents, fetchAllEventNames } from '@/lib/events-service'
 import { fetchSuppliers } from '@/lib/suppliers-service'
-import { fetchClients } from '@/lib/clients-service'
+import { fetchClients, getUniqueCompanies } from '@/lib/clients-service'
 import {
   fetchInvoices, upsertInvoice, deleteInvoice,
   fetchAdminDocuments, upsertAdminDocument, deleteAdminDocument, uploadAdminFile,
@@ -509,7 +509,7 @@ export default function Amministrazione() {
       if (cancelled) return
       setEvents(ev)
       setSuppliers(sp)
-      setClients(cl.map(c => ({ id: c.id, nome: c.nome })))
+      setClients(getUniqueCompanies(cl))
       setInvoices(inv)
       setAdminDocs(docs)
       setFatture(fat)

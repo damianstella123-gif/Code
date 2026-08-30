@@ -334,3 +334,24 @@ export async function setCompanyLogo(companyName: string, logoUrl: string): Prom
   }
   return true
 }
+
+export interface UniqueCompany {
+  id: string
+  nome: string
+}
+
+/**
+ * Deduplicates a Client[] list by company name (same grouping logic as CRM's
+ * buildGroups). Returns one entry per company, sorted alphabetically.
+ * The representative `id` is the first row found for that company — stable
+ * because fetchClients() sorts by created_at desc, so this picks the newest.
+ */
+export function getUniqueCompanies(clients: Client[]): UniqueCompany[] {
+  const seen = new Map<string, UniqueCompany>()
+  for (const c of clients) {
+    const key = (c.nome || '').trim().toUpperCase()
+    if (!key || seen.has(key)) continue
+    seen.set(key, { id: c.id, nome: c.nome })
+  }
+  return [...seen.values()].sort((a, b) => a.nome.localeCompare(b.nome))
+}

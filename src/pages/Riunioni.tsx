@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Calendar, ChevronDown, ChevronRight, ArrowLeft, Save, Loader2, History, Users, X, Check } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { fetchEvents, updateEvent } from '@/lib/events-service'
-import { fetchClients } from '@/lib/clients-service'
+import { fetchClients, getUniqueCompanies, type UniqueCompany } from '@/lib/clients-service'
 import { fetchAllProfiles } from '@/lib/profiles'
 import {
   fetchMeetings, fetchMeetingById, fetchMeetingNotes,
@@ -61,7 +61,7 @@ function resolveClientName(ev: Event, clientMap: Record<string, string>): string
 const CURRENT_YEAR = new Date().getFullYear()
 
 interface ProfileEntry { id: string; first_name: string; last_name: string }
-interface ClientEntry { id: string; nome: string }
+
 
 const STATUS_OPTIONS: { value: Event['stato']; label: string }[] = [
   { value: 'bozza', label: 'Bozza' },
@@ -99,7 +99,7 @@ export default function Riunioni() {
   const [view, setView] = useState<'overview' | 'new' | 'history' | 'detail'>('overview')
   const [events, setEvents] = useState<Event[]>([])
   const [profiles, setProfiles] = useState<ProfileEntry[]>([])
-  const [clients, setClients] = useState<ClientEntry[]>([])
+  const [clients, setClients] = useState<UniqueCompany[]>([])
   const [clientMap, setClientMap] = useState<Record<string, string>>({})
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [loading, setLoading] = useState(true)
@@ -115,7 +115,7 @@ export default function Riunioni() {
         setEvents(ev)
         setProfiles(pr)
         setMeetings(mt)
-        setClients(cl.map(c => ({ id: c.id, nome: c.nome })))
+        setClients(getUniqueCompanies(cl))
         const cm: Record<string, string> = {}
         for (const c of cl) { cm[c.id] = c.nome }
         setClientMap(cm)
@@ -370,7 +370,7 @@ function EditableStatus({ value, eventId, onSaved }: { value: Event['stato']; ev
   )
 }
 
-function EditableClient({ value, clientId, eventId, clients, onSaved }: { value: string; clientId?: string | null; eventId: string; clients: ClientEntry[]; onSaved: () => void }) {
+function EditableClient({ value, clientId, eventId, clients, onSaved }: { value: string; clientId?: string | null; eventId: string; clients: UniqueCompany[]; onSaved: () => void }) {
   const currentId = clientId || clients.find(c => c.nome === value)?.id || ''
   const { saving, saved, error, save } = useCellSave(eventId, onSaved)
 
@@ -474,7 +474,7 @@ function TeamCell({ ev, profileMap, teamPopover, setTeamPopover, adminEdit, prof
 // ─── Events Table (overview — with inline editing for admins) ────────────────
 
 function EventsTable({ events, profileMap, clientMap, clients, profiles, adminEdit, onEventClick, onEventsChange }: {
-  events: Event[]; profileMap: Record<string, string>; clientMap: Record<string, string>; clients: ClientEntry[]; profiles: ProfileEntry[]
+  events: Event[]; profileMap: Record<string, string>; clientMap: Record<string, string>; clients: UniqueCompany[]; profiles: ProfileEntry[]
   adminEdit: boolean; onEventClick: (id: string) => void; onEventsChange: () => void
 }) {
   const filters = useEventsFilters(events)
