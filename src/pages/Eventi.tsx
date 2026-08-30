@@ -224,6 +224,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
   const [handoverProfiles, setHandoverProfiles] = useState<Profile[]>([])
   const [safetyBundle, setSafetyBundle] = useState<SafetyDossierBundle | null | undefined>(undefined)
   const [canManageSafety, setCanManageSafety] = useState(false)
+  const [canEditEvent, setCanEditEvent] = useState(false)
   const [activatingSafety, setActivatingSafety] = useState(false)
   const [showSafetyConfirm, setShowSafetyConfirm] = useState(false)
   const currentUser = loadUser()
@@ -243,17 +244,20 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
     }
   }, [showHandover, handoverProfiles.length])
 
-  // Safety: check membership permissions and dossier existence
+  // Safety + edit permission: check membership and dossier existence
   const loadSafety = useCallback(async () => {
     const adminBypass = isAdmin(currentUser)
     const isResponsabile = currentUser?.id === event.responsabile
-    let hasPermission = adminBypass || isResponsabile
-    if (!hasPermission && currentUser?.id) {
+    let safetyPermission = adminBypass || isResponsabile
+    let isMember = adminBypass || isResponsabile
+    if ((!safetyPermission || !isMember) && currentUser?.id) {
       const { data: members } = await fetchEventMembers(event.id)
       const me = members.find(m => m.user_id === currentUser.id)
-      if (me?.can_manage_safety) hasPermission = true
+      if (me) isMember = true
+      if (me?.can_manage_safety) safetyPermission = true
     }
-    setCanManageSafety(hasPermission)
+    setCanEditEvent(isMember)
+    setCanManageSafety(safetyPermission)
     try {
       const bundle = await fetchSafetyDossier(event.id)
       setSafetyBundle(bundle)
@@ -346,81 +350,6 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
             }}>
               {countdownLabel}
             </span>
-            {!isArchived && (
-              <>
-                <button onClick={() => setShowTeamPanel(true)}
-                  title="Team evento"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
-                >
-                  <Users className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => onEdit(event)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => onDelete(event)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => setShowHandover(true)}
-                  title="Passa consegne"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--blue)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
-                >
-                  <ArrowRightLeft className="w-3.5 h-3.5" />
-                </button>
-                {isOver && (
-                  <button onClick={() => onArchive(event)}
-                    title="Archivia evento"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
-                  >
-                    <Archive className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                {canManageSafety && safetyBundle === null && (
-                  <button onClick={() => setShowSafetyConfirm(true)}
-                    title="Attiva Safety & PGE"
-                    disabled={activatingSafety}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s', opacity: activatingSafety ? 0.5 : 1 }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--green)' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </>
-            )}
-            {isArchived && (
-              <>
-              <button onClick={() => setShowTeamPanel(true)}
-                title="Team evento"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red2)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
-              >
-                <Users className="w-3.5 h-3.5" />
-              </button>
-              <button onClick={() => { restoreEvent(event.id).then(() => { onBack() }) }}
-                title="Ripristina"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '10px', transition: 'color 0.12s' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--green)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)' }}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-              </>
-            )}
           </div>
         </div>
 
@@ -440,6 +369,74 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
           {responsabileObj && <span>{' \u00B7 '}{responsabileObj.nome}</span>}
           {totalTasks > 0 && <span>{' \u00B7 '}{progress}% completato</span>}
         </div>
+
+        {/* Action bar */}
+        {canEditEvent && (
+          <div style={{ marginTop: '14px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
+            {!isArchived && (
+              <>
+                <button onClick={() => onEdit(event)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)' }}
+                >
+                  <Edit3 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Modifica</span>
+                </button>
+                <button onClick={() => setShowTeamPanel(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)' }}
+                >
+                  <Users className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Team</span>
+                </button>
+                <button onClick={() => setShowHandover(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)' }}
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Passa consegne</span>
+                </button>
+                {canManageSafety && safetyBundle === null && (
+                  <button onClick={() => setShowSafetyConfirm(true)} disabled={activatingSafety} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px solid color-mix(in srgb, var(--green) 40%, transparent)', background: 'color-mix(in srgb, var(--green) 6%, var(--panel-solid))', color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap', opacity: activatingSafety ? 0.5 : 1 }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--green) 12%, var(--panel-solid))' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--green) 6%, var(--panel-solid))' }}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Attiva Safety</span>
+                  </button>
+                )}
+                <div style={{ flex: 1, minWidth: '16px' }} />
+                {isOver && (
+                  <button onClick={() => onArchive(event)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px solid color-mix(in srgb, var(--red2) 30%, transparent)', background: 'color-mix(in srgb, var(--red2) 6%, var(--panel-solid))', color: 'var(--red2)', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--red2) 12%, var(--panel-solid))' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--red2) 6%, var(--panel-solid))' }}
+                  >
+                    <Archive className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Archivia</span>
+                  </button>
+                )}
+                <button onClick={() => onDelete(event)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px solid color-mix(in srgb, var(--red2) 30%, transparent)', background: 'color-mix(in srgb, var(--red2) 6%, var(--panel-solid))', color: 'var(--red2)', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--red2) 12%, var(--panel-solid))' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--red2) 6%, var(--panel-solid))' }}
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Elimina</span>
+                </button>
+              </>
+            )}
+            {isArchived && (
+              <>
+                <button onClick={() => setShowTeamPanel(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)' }}
+                >
+                  <Users className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Team</span>
+                </button>
+                <div style={{ flex: 1, minWidth: '16px' }} />
+                <button onClick={() => { restoreEvent(event.id).then(() => { onBack() }) }} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px solid color-mix(in srgb, var(--green) 40%, transparent)', background: 'color-mix(in srgb, var(--green) 6%, var(--panel-solid))', color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--green) 12%, var(--panel-solid))' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--green) 6%, var(--panel-solid))' }}
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Ripristina</span>
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Status change strip */}
         {!isArchived && (
