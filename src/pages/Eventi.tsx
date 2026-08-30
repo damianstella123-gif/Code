@@ -122,8 +122,42 @@ function EventStatusBar({ event, days, isLive, isOver, progressPct, totalTasks, 
 
 // ─── BudgetTabContainer ──────────────────────────────────────────────────────
 
-function BudgetTabContainer({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
-  return <TabBudget event={event} suppliers={suppliers} />
+type EconomiaSubTab = 'budget' | 'pagamenti'
+
+function TabEconomia({ event, suppliers, clients }: { event: Event; suppliers: Supplier[]; clients: Client[] }) {
+  const [sub, setSub] = useState<EconomiaSubTab>('budget')
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: 'var(--line)' }}>
+        <button
+          onClick={() => setSub('budget')}
+          className="flex-1 px-4 py-2.5 text-sm font-medium transition-colors"
+          style={{
+            background: sub === 'budget' ? 'var(--text)' : 'var(--panel-solid)',
+            color: sub === 'budget' ? 'var(--panel-solid)' : 'var(--muted)',
+          }}
+        >
+          Budget
+        </button>
+        <button
+          onClick={() => setSub('pagamenti')}
+          className="flex-1 px-4 py-2.5 text-sm font-medium transition-colors"
+          style={{
+            background: sub === 'pagamenti' ? 'var(--text)' : 'var(--panel-solid)',
+            color: sub === 'pagamenti' ? 'var(--panel-solid)' : 'var(--muted)',
+            borderLeft: '1px solid var(--line)',
+          }}
+        >
+          Pagamenti
+        </button>
+      </div>
+      {sub === 'budget' ? (
+        <TabBudget event={event} suppliers={suppliers} />
+      ) : (
+        <TabPagamenti event={event} suppliers={suppliers} clients={clients} />
+      )}
+    </div>
+  )
 }
 
 // ─── EventDetail ─────────────────────────────────────────────────────────────
@@ -214,8 +248,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
   const tabs: { id: TabId; label: string }[] = [
     { id: 'overview', label: 'Panoramica' },
     { id: 'fornitori', label: `Fornitori${eventSuppliers.length > 0 ? ` (${eventSuppliers.length})` : ''}` },
-    { id: 'budget', label: 'Budget' },
-    { id: 'pagamenti', label: 'Pagamenti' },
+    { id: 'economia', label: 'Budget & Pagamenti' },
     { id: 'comunicazioni', label: 'Comunicazioni' },
     { id: 'documenti', label: 'Documenti' },
     { id: 'registrazioni', label: 'Registrazioni' },
@@ -432,8 +465,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
           <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} clients={clients} onClientClick={navigateToCrm} internalUsers={internalUsers} comunicazioni={eventComunicazioni} />
         )}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} onSuppliersChanged={onSuppliersChanged} />}
-        {activeTab === 'budget' && <BudgetTabContainer event={event} suppliers={suppliers} />}
-        {activeTab === 'pagamenti' && <TabPagamenti event={event} suppliers={suppliers} clients={clients} />}
+        {activeTab === 'economia' && <TabEconomia event={event} suppliers={suppliers} clients={clients} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} isArchived={isArchived} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} />}
         {activeTab === 'registrazioni' && (
