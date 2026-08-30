@@ -14,8 +14,10 @@ import {
   ShieldCheck,
   Loader2,
   ArrowRightLeft,
+  Leaf,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
 import { loadTasksFromStorage, cacheEventsSnapshot, loadWorkflowsFromStorage } from '@/lib/storage'
 import { fetchEvents, upsertEvent, updateEvent as updateEventRemote, deleteEvent as deleteEventRemote, archiveEvent, restoreEvent, fetchEventById } from '@/lib/events-service'
 import { fetchTasksByEvent } from '@/lib/tasks-service'
@@ -227,6 +229,9 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
   const [canEditEvent, setCanEditEvent] = useState(false)
   const [activatingSafety, setActivatingSafety] = useState(false)
   const [showSafetyConfirm, setShowSafetyConfirm] = useState(false)
+  const [greenActivated, setGreenActivated] = useState(false)
+  const [activatingGreen, setActivatingGreen] = useState(false)
+  const [showGreenConfirm, setShowGreenConfirm] = useState(false)
   const currentUser = loadUser()
   const { showToast } = useToast()
   const navigateRouter = useNavigate()
@@ -264,6 +269,8 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
     } catch {
       setSafetyBundle(null)
     }
+    const { count } = await supabase.from('event_green_data').select('id', { count: 'exact', head: true }).eq('event_id', event.id)
+    setGreenActivated((count ?? 0) > 0)
   }, [event.id, currentUser?.id, currentUser?.role, event.responsabile])
 
   useEffect(() => { loadSafety() }, [loadSafety])
@@ -294,7 +301,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
     { id: 'scambi', label: 'Comunicazioni & Documenti' },
     { id: 'registrazioni', label: 'Registrazioni' },
     { id: 'onsite', label: 'On Site' },
-    { id: 'green', label: 'Green Report' },
+    ...(greenActivated ? [{ id: 'green' as TabId, label: 'Green Report' }] : []),
     ...(safetyBundle ? [{ id: 'safety' as TabId, label: 'Safety & PGE' }] : []),
   ]
 
@@ -393,6 +400,14 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
                 >
                   <ArrowRightLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Passa consegne</span>
                 </button>
+                {canEditEvent && !greenActivated && (
+                  <button onClick={() => setShowGreenConfirm(true)} disabled={activatingGreen} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px solid color-mix(in srgb, var(--green) 40%, transparent)', background: 'color-mix(in srgb, var(--green) 6%, var(--panel-solid))', color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap', opacity: activatingGreen ? 0.5 : 1 }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--green) 12%, var(--panel-solid))' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--green) 6%, var(--panel-solid))' }}
+                  >
+                    <Leaf className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Attiva Green</span>
+                  </button>
+                )}
                 {canManageSafety && safetyBundle === null && (
                   <button onClick={() => setShowSafetyConfirm(true)} disabled={activatingSafety} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px solid color-mix(in srgb, var(--green) 40%, transparent)', background: 'color-mix(in srgb, var(--green) 6%, var(--panel-solid))', color: 'var(--green)', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s', whiteSpace: 'nowrap', opacity: activatingSafety ? 0.5 : 1 }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--green) 12%, var(--panel-solid))' }}
@@ -538,6 +553,67 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
           onClose={() => setShowHandover(false)}
           onComplete={() => { setShowHandover(false); onBack() }}
         />
+      )}
+
+      {/* Green Report activation confirmation */}
+      {showGreenConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }}>
+          <div style={{
+            background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 10,
+            padding: 24, maxWidth: 420, width: '100%',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <Leaf className="w-5 h-5" style={{ color: 'var(--green)' }} />
+              <h4 style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+                Attiva Green Report
+              </h4>
+            </div>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Verrà attivato il modulo Green Report per questo evento con calcolo emissioni CO2, scoring fornitori e report ambientale.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowGreenConfirm(false)} disabled={activatingGreen}
+                style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 11, padding: '8px 16px',
+                  borderRadius: 6, border: '1px solid var(--line)', background: 'var(--panel)',
+                  color: 'var(--muted)', cursor: 'pointer', minHeight: 44,
+                }}
+              >
+                Annulla
+              </button>
+              <button
+                onClick={async () => {
+                  setActivatingGreen(true)
+                  try {
+                    await supabase.from('event_green_data').insert({ event_id: event.id })
+                    showToast('Green Report attivato', 'success')
+                    setShowGreenConfirm(false)
+                    setGreenActivated(true)
+                    setActiveTab('green')
+                  } catch (e: unknown) {
+                    showToast(e instanceof Error ? e.message : 'Errore durante l\'attivazione.', 'error')
+                  } finally {
+                    setActivatingGreen(false)
+                  }
+                }}
+                disabled={activatingGreen}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  fontFamily: 'var(--font-mono)', fontSize: 11, padding: '8px 16px',
+                  borderRadius: 6, background: 'var(--green)', color: 'white',
+                  border: 'none', cursor: 'pointer', minHeight: 44,
+                  opacity: activatingGreen ? 0.6 : 1,
+                }}
+              >
+                {activatingGreen && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {activatingGreen ? 'Attivazione...' : 'Conferma attivazione'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Safety activation confirmation */}
