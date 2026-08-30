@@ -5,10 +5,15 @@ import OnsiteLiveProgram from '@/components/OnsiteLiveProgram'
 import OnsiteIncidentsManager from '@/components/OnsiteIncidentsManager'
 import OnsiteOperationsOverview from '@/components/OnsiteOperationsOverview'
 import TransportOperationsModule from '@/components/TransportOperationsModule'
+import { TabProgramma } from '@/pages/eventi/tabs/TabProgramma'
+import type { Event } from '@/data/events'
+import type { Supplier } from '@/data/suppliers'
 
 interface Props {
   eventId: string
   eventName: string
+  event: Event
+  suppliers: Supplier[]
   isArchived?: boolean
 }
 
@@ -17,19 +22,22 @@ type PermState =
   | { kind: 'denied' }
   | { kind: 'granted'; canOnsite: boolean; canRegistration: boolean }
 
-type Tab = 'panoramica' | 'checkin' | 'trasporti' | 'regia' | 'criticita'
+type Tab = 'panoramica' | 'checkin' | 'trasporti' | 'programma' | 'criticita'
 
 const TAB_LABELS: Record<Tab, string> = {
   panoramica: 'Panoramica',
   checkin: 'Check-in',
   trasporti: 'Trasporti',
-  regia: 'Regia Live',
+  programma: 'Programma',
   criticita: 'Criticità',
 }
 
-export default function EventOnsitePanel({ eventId, eventName, isArchived }: Props) {
+type ProgrammaView = 'pianifica' | 'live'
+
+export default function EventOnsitePanel({ eventId, eventName, event, suppliers, isArchived }: Props) {
   const [perm, setPerm] = useState<PermState>({ kind: 'loading' })
   const [activeTab, setActiveTab] = useState<Tab>('panoramica')
+  const [programmaView, setProgrammaView] = useState<ProgrammaView>('pianifica')
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -81,7 +89,7 @@ export default function EventOnsitePanel({ eventId, eventName, isArchived }: Pro
   const checkinEnabled = !archived && (canOnsite || canRegistration)
   const editEnabled = !archived && canOnsite
 
-  const tabs: Tab[] = ['panoramica', 'checkin', 'trasporti', 'regia', 'criticita']
+  const tabs: Tab[] = ['panoramica', 'checkin', 'trasporti', 'programma', 'criticita']
 
   return (
     <div className="flex flex-col w-full max-w-2xl mx-auto px-4 py-6 gap-5" style={{ fontSize: '14px' }}>
@@ -142,8 +150,38 @@ export default function EventOnsitePanel({ eventId, eventName, isArchived }: Pro
           <TransportOperationsModule eventId={eventId} disabled={archived} />
         )}
 
-        {activeTab === 'regia' && (
-          <OnsiteLiveProgram eventId={eventId} disabled={!editEnabled} />
+        {activeTab === 'programma' && (
+          <div className="flex flex-col gap-4">
+            <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: 'var(--line)' }}>
+              <button
+                onClick={() => setProgrammaView('pianifica')}
+                className="flex-1 px-4 py-2.5 text-sm font-medium transition-colors"
+                style={{
+                  background: programmaView === 'pianifica' ? 'var(--text)' : 'var(--panel-solid)',
+                  color: programmaView === 'pianifica' ? 'var(--panel-solid)' : 'var(--muted)',
+                }}
+              >
+                Pianifica
+              </button>
+              <button
+                onClick={() => setProgrammaView('live')}
+                className="flex-1 px-4 py-2.5 text-sm font-medium transition-colors"
+                style={{
+                  background: programmaView === 'live' ? 'var(--text)' : 'var(--panel-solid)',
+                  color: programmaView === 'live' ? 'var(--panel-solid)' : 'var(--muted)',
+                  borderLeft: '1px solid var(--line)',
+                }}
+              >
+                Regia Live
+              </button>
+            </div>
+
+            {programmaView === 'pianifica' ? (
+              <TabProgramma event={event} suppliers={suppliers} />
+            ) : (
+              <OnsiteLiveProgram eventId={eventId} disabled={!editEnabled} />
+            )}
+          </div>
         )}
 
         {activeTab === 'criticita' && (

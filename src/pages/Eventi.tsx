@@ -44,7 +44,6 @@ import { EventFormModal } from './eventi/EventFormModal'
 import { DeleteConfirm } from './eventi/DeleteConfirm'
 import { TabOverview } from './eventi/tabs/TabOverview'
 import { TabFornitori } from './eventi/tabs/TabFornitori'
-import { TabProgramma } from './eventi/tabs/TabProgramma'
 import { TabDocumenti } from './eventi/tabs/TabDocumenti'
 import { TabComunicazioni } from './eventi/tabs/TabComunicazioni'
 import { TabGreenReport } from './eventi/tabs/TabGreenReport'
@@ -215,7 +214,6 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
   const tabs: { id: TabId; label: string }[] = [
     { id: 'overview', label: 'Panoramica' },
     { id: 'fornitori', label: `Fornitori${eventSuppliers.length > 0 ? ` (${eventSuppliers.length})` : ''}` },
-    { id: 'programma', label: 'Programma' },
     { id: 'budget', label: 'Budget' },
     { id: 'pagamenti', label: 'Pagamenti' },
     { id: 'comunicazioni', label: 'Comunicazioni' },
@@ -438,7 +436,6 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
         {activeTab === 'pagamenti' && <TabPagamenti event={event} suppliers={suppliers} clients={clients} />}
         {activeTab === 'documenti' && <TabDocumenti event={event} isArchived={isArchived} />}
         {activeTab === 'comunicazioni' && <TabComunicazioni event={event} />}
-        {activeTab === 'programma' && <TabProgramma event={event} suppliers={suppliers} />}
         {activeTab === 'registrazioni' && (
           <EventRegistrationManager
             eventId={event.id}
@@ -450,6 +447,8 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
           <EventOnsitePanel
             eventId={event.id}
             eventName={event.nome}
+            event={event}
+            suppliers={suppliers}
             isArchived={isArchived}
           />
         )}

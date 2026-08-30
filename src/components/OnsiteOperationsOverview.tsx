@@ -4,7 +4,7 @@ import { fetchOnsiteProgram, type MergedProgramItem } from '@/lib/onsite-operati
 import { fetchOnsiteIncidents } from '@/lib/onsite-operations-service'
 import { fetchEventRegistrations, getRegistrationStats } from '@/lib/registration-participants-service'
 
-type NavTab = 'checkin' | 'regia' | 'criticita'
+type NavTab = 'checkin' | 'programma' | 'criticita'
 
 interface Props {
   eventId: string
@@ -175,7 +175,7 @@ export default function OnsiteOperationsOverview({ eventId, onNavigate }: Props)
       {/* Quick navigation */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
         <NavButton onClick={() => onNavigate('checkin')} icon={<QrCode className="w-5 h-5" />} label="Vai a Check-in" />
-        <NavButton onClick={() => onNavigate('regia')} icon={<Radio className="w-5 h-5" />} label="Vai a Regia Live" />
+        <NavButton onClick={() => onNavigate('programma')} icon={<Radio className="w-5 h-5" />} label="Vai a Programma" />
         <NavButton onClick={() => onNavigate('criticita')} icon={<AlertTriangle className="w-5 h-5" />} label="Vai a Criticità" />
       </div>
     </div>
