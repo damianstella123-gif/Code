@@ -160,6 +160,44 @@ function TabEconomia({ event, suppliers, clients }: { event: Event; suppliers: S
   )
 }
 
+type ScambiSubTab = 'comunicazioni' | 'documenti'
+
+function TabScambi({ event, isArchived }: { event: Event; isArchived?: boolean }) {
+  const [sub, setSub] = useState<ScambiSubTab>('comunicazioni')
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: 'var(--line)' }}>
+        <button
+          onClick={() => setSub('comunicazioni')}
+          className="flex-1 px-4 py-2.5 text-sm font-medium transition-colors"
+          style={{
+            background: sub === 'comunicazioni' ? 'var(--text)' : 'var(--panel-solid)',
+            color: sub === 'comunicazioni' ? 'var(--panel-solid)' : 'var(--muted)',
+          }}
+        >
+          Comunicazioni
+        </button>
+        <button
+          onClick={() => setSub('documenti')}
+          className="flex-1 px-4 py-2.5 text-sm font-medium transition-colors"
+          style={{
+            background: sub === 'documenti' ? 'var(--text)' : 'var(--panel-solid)',
+            color: sub === 'documenti' ? 'var(--panel-solid)' : 'var(--muted)',
+            borderLeft: '1px solid var(--line)',
+          }}
+        >
+          Documenti
+        </button>
+      </div>
+      {sub === 'comunicazioni' ? (
+        <TabComunicazioni event={event} />
+      ) : (
+        <TabDocumenti event={event} isArchived={isArchived} />
+      )}
+    </div>
+  )
+}
+
 // ─── EventDetail ─────────────────────────────────────────────────────────────
 
 interface EventDetailProps {
@@ -249,8 +287,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
     { id: 'overview', label: 'Panoramica' },
     { id: 'fornitori', label: `Fornitori${eventSuppliers.length > 0 ? ` (${eventSuppliers.length})` : ''}` },
     { id: 'economia', label: 'Budget & Pagamenti' },
-    { id: 'comunicazioni', label: 'Comunicazioni' },
-    { id: 'documenti', label: 'Documenti' },
+    { id: 'scambi', label: 'Comunicazioni & Documenti' },
     { id: 'registrazioni', label: 'Registrazioni' },
     { id: 'onsite', label: 'On Site' },
     { id: 'green', label: 'Green Report' },
@@ -466,8 +503,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
         )}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} onSuppliersChanged={onSuppliersChanged} />}
         {activeTab === 'economia' && <TabEconomia event={event} suppliers={suppliers} clients={clients} />}
-        {activeTab === 'documenti' && <TabDocumenti event={event} isArchived={isArchived} />}
-        {activeTab === 'comunicazioni' && <TabComunicazioni event={event} />}
+        {activeTab === 'scambi' && <TabScambi event={event} isArchived={isArchived} />}
         {activeTab === 'registrazioni' && (
           <EventRegistrationManager
             eventId={event.id}

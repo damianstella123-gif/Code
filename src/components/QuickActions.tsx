@@ -54,8 +54,8 @@ export default function QuickActions() {
 
     if (isEventDetail) return [
       { icon: <CheckSquare size={16} />, label: 'Nuovo task', onClick: () => { navigate(`/task?event=${eventId}&new=true`); setOpen(false) } },
-      { icon: <MessageCircle size={16} />, label: 'Messaggio team', onClick: () => { window.dispatchEvent(new CustomEvent('set-event-tab', { detail: 'comunicazioni' })); setOpen(false) } },
-      { icon: <Paperclip size={16} />, label: 'Documento', onClick: () => { window.dispatchEvent(new CustomEvent('set-event-tab', { detail: 'documenti' })); setOpen(false) } },
+      { icon: <MessageCircle size={16} />, label: 'Messaggio team', onClick: () => { window.dispatchEvent(new CustomEvent('set-event-tab', { detail: 'scambi' })); setOpen(false) } },
+      { icon: <Paperclip size={16} />, label: 'Documento', onClick: () => { window.dispatchEvent(new CustomEvent('set-event-tab', { detail: 'scambi' })); setOpen(false) } },
       fly,
     ]
 
