@@ -11,6 +11,25 @@ interface Profile {
   is_active: boolean
 }
 
+const sLabel: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--text)',
+  display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+}
+
+const sInput: React.CSSProperties = {
+  width: '100%', padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 8,
+  background: 'var(--panel-solid)', color: 'var(--text)', fontFamily: 'var(--font-mono)',
+  fontSize: 12, outline: 'none',
+}
+
+const sToggle = (active: boolean, accent: string): React.CSSProperties => ({
+  flex: 1, padding: '8px 12px', borderRadius: 8, fontFamily: 'var(--font-mono)', fontSize: 12,
+  fontWeight: 500, cursor: 'pointer', transition: 'all 0.12s', border: '1px solid',
+  borderColor: active ? `color-mix(in srgb, var(${accent}) 50%, transparent)` : 'var(--line)',
+  background: active ? `color-mix(in srgb, var(${accent}) 8%, var(--panel-solid))` : 'var(--panel-solid)',
+  color: active ? `var(${accent})` : 'var(--muted)',
+})
+
 export function PassaConsegneModal({ event, profiles, currentUserId, onClose, onComplete }: {
   event: Event
   profiles: Profile[]
@@ -67,98 +86,102 @@ export function PassaConsegneModal({ event, profiles, currentUserId, onClose, on
   const selectedUser = profiles.find(p => p.id === toUserId)
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}
+      onClick={onClose}
+    >
       <div
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 12, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between rounded-t-xl z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
-              <ArrowRightLeft className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+        <div style={{ position: 'sticky', top: 0, background: 'var(--panel-solid)', borderBottom: '1px solid var(--line)', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '12px 12px 0 0', zIndex: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 8, background: 'color-mix(in srgb, var(--blue) 10%, var(--panel-solid))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ArrowRightLeft className="w-5 h-5" style={{ color: 'var(--blue)' }} />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Passa consegne</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{event.nome || `Evento #${event.eventNumber}`}</p>
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 17, fontWeight: 600, color: 'var(--text)', margin: 0 }}>Passa consegne</h2>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', margin: 0 }}>{event.nome || `Evento #${event.eventNumber}`}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, borderRadius: 6, color: 'var(--muted)', transition: 'color 0.12s' }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)' }}
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-6">
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
           {success ? (
-            <div className="flex flex-col items-center py-8 gap-3">
-              <CheckCircle2 className="w-12 h-12 text-green-500" />
-              <p className="text-lg font-medium text-gray-900 dark:text-white">Consegna completata!</p>
-              <p className="text-sm text-gray-500">Il collega è stato notificato.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 0', gap: 12 }}>
+              <CheckCircle2 className="w-12 h-12" style={{ color: 'var(--green)' }} />
+              <p style={{ fontFamily: 'var(--font-serif)', fontSize: 17, fontWeight: 600, color: 'var(--text)', margin: 0 }}>Consegna completata!</p>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)', margin: 0 }}>Il collega è stato notificato.</p>
             </div>
           ) : (
             <>
               {/* Step 1: Select colleague */}
               <section>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <Users className="w-4 h-4" /> Seleziona collega
-                </h3>
+                <h3 style={sLabel}><Users className="w-4 h-4" /> Seleziona collega</h3>
                 <input
                   type="text"
                   placeholder="Cerca per nome..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm mb-2"
+                  style={{ ...sInput, marginBottom: 8 }}
                 />
                 {!toUserId ? (
-                  <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg divide-y divide-gray-100 dark:divide-gray-700">
+                  <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8 }}>
                     {eligibleUsers.length === 0 ? (
-                      <p className="px-3 py-2 text-sm text-gray-400">Nessun utente trovato</p>
+                      <p style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)', margin: 0 }}>Nessun utente trovato</p>
                     ) : (
                       eligibleUsers.slice(0, 20).map(u => (
                         <button
                           key={u.id}
                           onClick={() => setToUserId(u.id)}
-                          className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center justify-between transition-colors"
+                          style={{ width: '100%', padding: '8px 12px', background: 'none', border: 'none', borderBottom: '1px solid var(--line)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'background 0.12s' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in srgb, var(--blue) 6%, transparent)' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
                         >
-                          <span className="text-sm text-gray-900 dark:text-white">{u.first_name} {u.last_name}</span>
-                          <span className="text-xs text-gray-400">{u.role}</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)' }}>{u.first_name} {u.last_name}</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>{u.role}</span>
                         </button>
                       ))
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
-                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'color-mix(in srgb, var(--blue) 8%, var(--panel-solid))', border: '1px solid color-mix(in srgb, var(--blue) 30%, transparent)', padding: '8px 12px', borderRadius: 8 }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--blue)' }}>
                       {selectedUser?.first_name} {selectedUser?.last_name}
                     </span>
-                    <button onClick={() => setToUserId('')} className="text-xs text-blue-500 hover:underline">Cambia</button>
+                    <button onClick={() => setToUserId('')} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Cambia</button>
                   </div>
                 )}
               </section>
 
               {/* Step 2: Recap */}
               <section>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FileText className="w-4 h-4" /> Riepilogo stato evento
-                </h3>
+                <h3 style={sLabel}><FileText className="w-4 h-4" /> Riepilogo stato evento</h3>
                 {loading ? (
-                  <div className="flex items-center gap-2 py-4 text-sm text-gray-400">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 0', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>
                     <Loader2 className="w-4 h-4 animate-spin" /> Calcolo in corso...
                   </div>
                 ) : recap ? (
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 space-y-3 text-sm">
+                  <div style={{ background: 'color-mix(in srgb, var(--text) 3%, var(--panel-solid))', border: '1px solid var(--line)', borderRadius: 8, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {/* Tasks */}
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: 'var(--muted)', marginTop: 2 }} />
                       <div>
-                        <p className="text-gray-700 dark:text-gray-300">
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)', margin: 0 }}>
                           <strong>Task:</strong> {recap.tasks.total} totali — {recap.tasks.completed} completati, {recap.tasks.open} aperti
-                          {recap.tasks.overdue > 0 && <span className="text-red-600 dark:text-red-400 font-medium">, {recap.tasks.overdue} in ritardo</span>}
+                          {recap.tasks.overdue > 0 && <span style={{ color: 'var(--red2)', fontWeight: 600 }}>, {recap.tasks.overdue} in ritardo</span>}
                         </p>
                         {recap.tasks.overdueList.length > 0 && (
-                          <ul className="mt-1 ml-2 text-xs text-red-600 dark:text-red-400 space-y-0.5">
+                          <ul style={{ margin: '4px 0 0 8px', padding: 0, listStyle: 'none' }}>
                             {recap.tasks.overdueList.map((t, i) => (
-                              <li key={i}>- {t.title} (scad. {t.dueDate})</li>
+                              <li key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--red2)' }}>- {t.title} (scad. {t.dueDate})</li>
                             ))}
                           </ul>
                         )}
@@ -167,13 +190,13 @@ export function PassaConsegneModal({ event, profiles, currentUserId, onClose, on
 
                     {/* Upcoming deadlines */}
                     {recap.upcomingDeadlines.length > 0 && (
-                      <div className="flex items-start gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <Calendar className="w-4 h-4 shrink-0" style={{ color: 'var(--muted)', marginTop: 2 }} />
                         <div>
-                          <p className="text-gray-700 dark:text-gray-300"><strong>Prossime scadenze:</strong></p>
-                          <ul className="mt-1 ml-2 text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
+                          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)', margin: 0 }}><strong>Prossime scadenze:</strong></p>
+                          <ul style={{ margin: '4px 0 0 8px', padding: 0, listStyle: 'none' }}>
                             {recap.upcomingDeadlines.map((d, i) => (
-                              <li key={i}>- {d.title} ({d.dueDate})</li>
+                              <li key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>- {d.title} ({d.dueDate})</li>
                             ))}
                           </ul>
                         </div>
@@ -182,9 +205,9 @@ export function PassaConsegneModal({ event, profiles, currentUserId, onClose, on
 
                     {/* Budget */}
                     {recap.budget && (
-                      <div className="flex items-center gap-2">
-                        <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
-                        <p className="text-gray-700 dark:text-gray-300">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Wallet className="w-4 h-4 shrink-0" style={{ color: 'var(--muted)' }} />
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)', margin: 0 }}>
                           <strong>Budget:</strong> {recap.budget.pctUsed}% utilizzato ({recap.budget.used.toLocaleString('it-IT')}€ / {recap.budget.total.toLocaleString('it-IT')}€)
                         </p>
                       </div>
@@ -192,65 +215,51 @@ export function PassaConsegneModal({ event, profiles, currentUserId, onClose, on
 
                     {/* Suppliers */}
                     {recap.suppliers && (
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-gray-400 shrink-0" />
-                        <p className="text-gray-700 dark:text-gray-300">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Users className="w-4 h-4 shrink-0" style={{ color: 'var(--muted)' }} />
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)', margin: 0 }}>
                           <strong>Fornitori:</strong> {recap.suppliers.total} totali — {recap.suppliers.confirmed} confermati, {recap.suppliers.pending} in attesa
                         </p>
                       </div>
                     )}
 
                     {/* Documents */}
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-gray-400 shrink-0" />
-                      <p className="text-gray-700 dark:text-gray-300">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <FileText className="w-4 h-4 shrink-0" style={{ color: 'var(--muted)' }} />
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text)', margin: 0 }}>
                         <strong>Documenti:</strong> {recap.documentsCount}
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400">Impossibile calcolare il riepilogo.</p>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)', margin: 0 }}>Impossibile calcolare il riepilogo.</p>
                 )}
               </section>
 
               {/* Step 3: Note */}
               <section>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Nota (opzionale)</h3>
+                <h3 style={sLabel}>Nota (opzionale)</h3>
                 <textarea
                   value={note}
                   onChange={e => setNote(e.target.value)}
                   placeholder="Aggiungi indicazioni per il collega..."
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm resize-none"
+                  style={{ ...sInput, resize: 'none' }}
                 />
               </section>
 
               {/* Step 4: Access options */}
-              <section className="space-y-4">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Opzioni accesso</h3>
+              <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <h3 style={sLabel}>Opzioni accesso</h3>
 
                 {/* Your access */}
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">Il tuo accesso all'evento:</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setStayInTeam(true)}
-                      className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                        stayInTeam
-                          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
-                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', margin: '0 0 6px' }}>Il tuo accesso all'evento:</p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setStayInTeam(true)} style={sToggle(stayInTeam, '--blue')}>
                       Resto nel team
                     </button>
-                    <button
-                      onClick={() => setStayInTeam(false)}
-                      className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                        !stayInTeam
-                          ? 'bg-orange-50 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300'
-                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
+                    <button onClick={() => setStayInTeam(false)} style={sToggle(!stayInTeam, '--yellow')}>
                       Esco dall'evento
                     </button>
                   </div>
@@ -258,35 +267,21 @@ export function PassaConsegneModal({ event, profiles, currentUserId, onClose, on
 
                 {/* Colleague's role */}
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">Ruolo del collega:</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setMakeResponsible(true)}
-                      className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                        makeResponsible
-                          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
-                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', margin: '0 0 6px' }}>Ruolo del collega:</p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setMakeResponsible(true)} style={sToggle(makeResponsible, '--blue')}>
                       Diventa responsabile
                     </button>
-                    <button
-                      onClick={() => setMakeResponsible(false)}
-                      className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                        !makeResponsible
-                          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
-                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
+                    <button onClick={() => setMakeResponsible(false)} style={sToggle(!makeResponsible, '--blue')}>
                       Aggiungi al team
                     </button>
                   </div>
                 </div>
 
                 {!stayInTeam && !makeResponsible && (
-                  <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'color-mix(in srgb, var(--yellow) 8%, var(--panel-solid))', border: '1px solid color-mix(in srgb, var(--yellow) 40%, transparent)', borderRadius: 8, padding: '8px 12px' }}>
+                    <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: 'var(--yellow)', marginTop: 2 }} />
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--yellow)', margin: 0, lineHeight: 1.5 }}>
                       Stai uscendo dall'evento senza assegnare un nuovo responsabile. Il collega verrà aggiunto al team ma l'attuale responsabile rimarrà te — considera di trasferire la responsabilità.
                     </p>
                   </div>
@@ -295,23 +290,23 @@ export function PassaConsegneModal({ event, profiles, currentUserId, onClose, on
 
               {/* Error */}
               {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
-                  <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+                <div style={{ background: 'color-mix(in srgb, var(--red2) 8%, var(--panel-solid))', border: '1px solid color-mix(in srgb, var(--red2) 30%, transparent)', borderRadius: 8, padding: '8px 12px' }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--red2)', margin: 0 }}>{error}</p>
                 </div>
               )}
 
               {/* Submit */}
-              <div className="flex justify-end gap-3 pt-2">
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '8px 16px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--panel-solid)', color: 'var(--muted)', cursor: 'pointer', minHeight: 40 }}
                 >
                   Annulla
                 </button>
                 <button
                   onClick={handleSubmit}
                   disabled={!toUserId || submitting || loading}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, padding: '8px 16px', borderRadius: 6, border: 'none', background: 'var(--blue)', color: 'white', cursor: !toUserId || submitting || loading ? 'not-allowed' : 'pointer', minHeight: 40, opacity: !toUserId || submitting || loading ? 0.5 : 1, transition: 'opacity 0.12s' }}
                 >
                   {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   Conferma consegna
