@@ -40,6 +40,7 @@ import {
   CircleUserRound,
   TrendingUp,
   ClipboardList,
+  Presentation,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
@@ -76,15 +77,16 @@ const iconMap: Record<string, React.ElementType> = {
   '/riunioni': ClipboardList,
   '/centro-sicurezza': Shield,
   '/ai-trasparenza': Sparkles,
+  '/presentazioni': Presentation,
 }
 
 const NAV_GROUPS: { label: string; paths: string[] }[] = [
-  { label: '', paths: ['/dashboard'] },
-  { label: 'Operativo', paths: ['/eventi', '/task', '/calendario', '/riunioni'] },
-  { label: 'Business', paths: ['/network', '/amministrazione'] },
-  { label: 'Contenuti', paths: ['/comunicazioni', '/creative-studio', '/presentazioni'] },
-  { label: 'Crescita', paths: ['/performance', '/area-personale', '/ai-trasparenza'] },
-  { label: 'Sistema', paths: ['/workflow', '/dossier', '/archivio', '/utenti', '/centro-sicurezza', '/impostazioni', '/feedback-beta', '/aiuto'] },
+  { label: '', paths: ['/dashboard', '/calendario'] },
+  { label: 'Lavoro', paths: ['/eventi', '/task', '/riunioni', '/workflow'] },
+  { label: 'Business', paths: ['/network', '/comunicazioni', '/amministrazione'] },
+  { label: 'Contenuti', paths: ['/creative-studio', '/presentazioni', '/dossier'] },
+  { label: 'Persone', paths: ['/area-personale', '/performance'] },
+  { label: 'Sistema', paths: ['/utenti', '/centro-sicurezza', '/ai-trasparenza', '/archivio', '/impostazioni', '/feedback-beta', '/aiuto'] },
 ]
 
 interface SidebarProps {
@@ -733,7 +735,7 @@ function SentinelBadge() {
 }
 
 const PRIMARY_MOBILE_PATHS = ['/dashboard', '/eventi', '/task']
-const OVERFLOW_MOBILE_PATHS = ['/network', '/calendario', '/riunioni', '/amministrazione', '/comunicazioni', '/workflow', '/dossier', '/utenti', '/impostazioni', '/feedback-beta', '/creative-studio', '/presentazioni', '/area-personale', '/ai-trasparenza', '/archivio', '/centro-sicurezza', '/performance', '/aiuto']
+const OVERFLOW_MOBILE_PATHS = ['/calendario', '/riunioni', '/workflow', '/network', '/comunicazioni', '/amministrazione', '/creative-studio', '/presentazioni', '/dossier', '/area-personale', '/performance', '/utenti', '/centro-sicurezza', '/ai-trasparenza', '/archivio', '/impostazioni', '/feedback-beta', '/aiuto']
 
 const mobileLabels: Record<string, string> = {
   '/dashboard': 'Home',
@@ -764,23 +766,36 @@ function BottomNav() {
             style={{ background: 'var(--panel-solid)', backdropFilter: 'none', WebkitBackdropFilter: 'none', border: '1px solid var(--line)', boxShadow: '0 -8px 32px rgba(0,0,0,0.12)' }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="grid grid-cols-4 gap-1 p-3">
-              {overflowItems.map(item => {
-                const Icon = iconMap[item.href] ?? LayoutDashboard
-                const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/')
+            <div className="p-3" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              {NAV_GROUPS.map(group => {
+                const groupOverflow = overflowItems.filter(item => group.paths.includes(item.href))
+                if (groupOverflow.length === 0) return null
                 return (
-                  <Link
-                    key={item.href}
-                    to={item.href}
-                    onClick={() => { setMoreOpen(false) }}
-                    className="mobile-touch-target flex flex-col items-center gap-1 py-3 px-1 rounded-xl transition-colors"
-                    style={{ background: isActive ? 'rgba(208,0,58,0.08)' : 'transparent' }}
-                  >
-                    <Icon className="w-5 h-5" style={{ color: isActive ? 'var(--red2)' : 'var(--muted)' }} />
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: isActive ? 'var(--red2)' : 'var(--muted)', textAlign: 'center', lineHeight: 1.2 }}>
-                      {item.name}
-                    </span>
-                  </Link>
+                  <div key={group.label || '_root'} style={{ marginBottom: 8 }}>
+                    {group.label && (
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.1em', color: 'var(--muted)', padding: '6px 4px 4px', margin: 0 }}>{group.label.toUpperCase()}</p>
+                    )}
+                    <div className="grid grid-cols-4 gap-1">
+                      {groupOverflow.map(item => {
+                        const Icon = iconMap[item.href] ?? LayoutDashboard
+                        const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/')
+                        return (
+                          <Link
+                            key={item.href}
+                            to={item.href}
+                            onClick={() => { setMoreOpen(false) }}
+                            className="mobile-touch-target flex flex-col items-center gap-1 py-3 px-1 rounded-xl transition-colors"
+                            style={{ background: isActive ? 'rgba(208,0,58,0.08)' : 'transparent' }}
+                          >
+                            <Icon className="w-5 h-5" style={{ color: isActive ? 'var(--red2)' : 'var(--muted)' }} />
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: isActive ? 'var(--red2)' : 'var(--muted)', textAlign: 'center', lineHeight: 1.2 }}>
+                              {item.name}
+                            </span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </div>
                 )
               })}
             </div>
