@@ -7,7 +7,7 @@ import { cloneBudgetVersion } from '@/lib/budget-versions-service'
 import { calcRowEconomics, normalizzaImporto, calcRowCommission } from '@/lib/event-economics'
 import { isSupportedTable } from '@/lib/economic-lines-service'
 import BudgetLineEditModal from '@/components/BudgetLineEditModal'
-import { fmtDate as fmtDateCentral } from '@/lib/format'
+import { fmtDate as fmtDateCentral, friendlyError } from '@/lib/format'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import type { Event } from '@/data/events'
 import jsPDF from 'jspdf'
@@ -114,14 +114,16 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     setSavingFee(true)
     setFeePct(newPct)
     setEditingFee(false)
-    await supabase.from('events').update({ fee_agenzia_pct: newPct }).eq('id', event.id)
+    const { error } = await supabase.from('events').update({ fee_agenzia_pct: newPct }).eq('id', event.id)
     setSavingFee(false)
+    if (error) showToast(friendlyError(error), 'error')
   }
 
   async function saveTarget(newTarget: number) {
     setMargineTarget(newTarget)
     setEditingTarget(false)
-    await supabase.from('events').update({ margine_target: newTarget }).eq('id', event.id)
+    const { error } = await supabase.from('events').update({ margine_target: newTarget }).eq('id', event.id)
+    if (error) showToast(friendlyError(error), 'error')
   }
 
   // ─── Budget Versions ───────────────────────────────────────

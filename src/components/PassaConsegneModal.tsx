@@ -278,12 +278,27 @@ export function PassaConsegneModal({ event, profiles, currentUserId, onClose, on
                   </div>
                 </div>
 
-                {!stayInTeam && !makeResponsible && (
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'color-mix(in srgb, var(--yellow) 8%, var(--panel-solid))', border: '1px solid color-mix(in srgb, var(--yellow) 40%, transparent)', borderRadius: 8, padding: '8px 12px' }}>
-                    <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: 'var(--yellow)', marginTop: 2 }} />
-                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--yellow)', margin: 0, lineHeight: 1.5 }}>
-                      Stai uscendo dall'evento senza assegnare un nuovo responsabile. Il collega verrà aggiunto al team ma l'attuale responsabile rimarrà te — considera di trasferire la responsabilità.
-                    </p>
+                {!stayInTeam && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'color-mix(in srgb, var(--red2) 8%, var(--panel-solid))', border: '1px solid color-mix(in srgb, var(--red2) 40%, transparent)', borderRadius: 8, padding: '12px 14px' }}>
+                      <AlertTriangle className="w-5 h-5 shrink-0" style={{ color: 'var(--red2)', marginTop: 1 }} />
+                      <div>
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--red2)', margin: '0 0 4px', lineHeight: 1.4 }}>
+                          Attenzione: perderai l'accesso a questo evento
+                        </p>
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--red2)', margin: 0, lineHeight: 1.5, opacity: 0.85 }}>
+                          Uscendo dall'evento non potrai più visualizzarlo né modificarlo. Per rientrare, un membro del team o un amministratore dovrà riaggiunterti manualmente.
+                        </p>
+                      </div>
+                    </div>
+                    {!makeResponsible && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'color-mix(in srgb, var(--yellow) 8%, var(--panel-solid))', border: '1px solid color-mix(in srgb, var(--yellow) 40%, transparent)', borderRadius: 8, padding: '8px 12px' }}>
+                        <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: 'var(--yellow)', marginTop: 2 }} />
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--yellow)', margin: 0, lineHeight: 1.5 }}>
+                          Stai uscendo senza assegnare un nuovo responsabile. Il collega verrà aggiunto al team ma l'attuale responsabile rimarrà te.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </section>

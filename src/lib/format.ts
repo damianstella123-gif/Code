@@ -178,6 +178,12 @@ export const CITY_TO_REGION: Record<string, string> = {
   'Potenza': 'Basilicata', 'Matera': 'Basilicata',
 }
 
+export function friendlyError(error: { message?: string; code?: string }): string {
+  if (error.code === '42501')
+    return 'Non fai (più) parte di questo evento, quindi non puoi modificarlo. Chiedi a un membro del team o a un amministratore di aggiungerti.'
+  return error.message || 'Errore sconosciuto'
+}
+
 export function inferRegion(city: string, region: string): string {
   if (region) return region
   if (!city) return ''

@@ -7,6 +7,7 @@ import { detectSupplierCategory, isDmcFromArray, SupplierCategoryPanel, type Cat
 import { SupplierFormModal } from '@/pages/Fornitori'
 import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
+import { friendlyError } from '@/lib/format'
 import { LINK_CATEGORIES, STATO_CONFERMA_CONFIG } from '../supplier-details-types'
 import { DistanceLogistics } from './fornitori/DistanceLogistics'
 import { AddSupplierPanel } from './fornitori/AddSupplierPanel'
@@ -26,6 +27,7 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
   const [contactForm, setContactForm] = useState({ contatto_operativo: '', telefono_operativo: '', email_operativo: '' })
   const [showNewSupplier, setShowNewSupplier] = useState(false)
   const [createdToast, setCreatedToast] = useState<string | null>(null)
+  const [linkError, setLinkError] = useState<string | null>(null)
 
   const linkedIds = links.map(l => l.supplier_id)
 
@@ -39,13 +41,13 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
     const { error } = await supabase
       .from('event_suppliers')
       .insert({ event_id: event.id, supplier_id: pendingLink, service_category: linkCategory })
-    if (!error) {
-      setAdding(false)
-      setSearch('')
-      setPendingLink(null)
-      setLinkCategory('')
-      await reload()
-    }
+    if (error) { setLinkError(friendlyError(error)); return }
+    setAdding(false)
+    setSearch('')
+    setPendingLink(null)
+    setLinkCategory('')
+    setLinkError(null)
+    await reload()
   }
 
   async function handleUnlink(supplierId: string) {
@@ -60,13 +62,12 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
     ]
     await Promise.all(tables.map(t => supabase.from(t).delete().eq('event_id', event.id).eq('supplier_id', supplierId)))
     const { error } = await supabase.from('event_suppliers').delete().eq('event_id', event.id).eq('supplier_id', supplierId)
-    if (!error) {
-      if (toastTimer) clearTimeout(toastTimer)
-      setToast({ supplierId, nome: sup?.nome ?? '' })
-      const timer = setTimeout(() => setToast(null), 5000)
-      setToastTimer(timer)
-      await reload()
-    }
+    if (error) { setLinkError(friendlyError(error)); return }
+    if (toastTimer) clearTimeout(toastTimer)
+    setToast({ supplierId, nome: sup?.nome ?? '' })
+    const timer = setTimeout(() => setToast(null), 5000)
+    setToastTimer(timer)
+    await reload()
   }
 
   async function handleUndoUnlink(supplierId: string) {
@@ -115,6 +116,12 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
 
   return (
     <div className="space-y-4">
+      {linkError && (
+        <div className="p-3 rounded-lg text-sm font-medium" style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }}>
+          {linkError}
+          <button onClick={() => setLinkError(null)} className="ml-3 underline text-xs">Chiudi</button>
+        </div>
+      )}
       {/* Summary bar */}
       {linkedSuppliers.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

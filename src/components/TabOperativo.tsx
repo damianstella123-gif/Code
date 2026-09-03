@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Plus, Edit3, Trash2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { fmtDate } from '@/lib/format'
+import { fmtDate, friendlyError } from '@/lib/format'
 
 
 export type CategoryType = 'hotel' | 'transfer' | 'ristorante' | 'experience' | 'catering' | 'audio_video' | 'allestimenti' | 'staff_interno' | 'staff_esterno' | 'grafica_stampa' | 'assicurazioni' | 'agenzia_viaggi' | 'varie'
@@ -359,7 +359,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
     }
     setSaving(false)
     if (error) {
-      setSaveError(error.message)
+      setSaveError(friendlyError(error))
       return
     }
     setShowForm(false); setEditingId(null)
@@ -420,7 +420,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
       error = res.error
     }
     setSaving(false)
-    if (error) { setSaveError(error.message); return }
+    if (error) { setSaveError(friendlyError(error)); return }
     setShowExtraForm(false); setEditingExtraId(null)
     await loadItems()
   }

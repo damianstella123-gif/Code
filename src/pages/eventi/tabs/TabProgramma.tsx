@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Plus, Printer } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/lib/toast'
+import { friendlyError } from '@/lib/format'
 import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
 import type { ProgramEntry, ManualProgramRow } from './programma/types'
@@ -159,17 +160,22 @@ export function TabProgramma({ event, suppliers }: { event: Event; suppliers: Su
       servizio: formData.servizio.trim(),
     }
 
+    let error
     if (editingId) {
-      await supabase.from('event_program').update(payload).eq('id', editingId)
+      const res = await supabase.from('event_program').update(payload).eq('id', editingId)
+      error = res.error
     } else {
-      await supabase.from('event_program').insert(payload)
+      const res = await supabase.from('event_program').insert(payload)
+      error = res.error
     }
+    if (error) { showToast(friendlyError(error), 'error'); return }
     resetForm()
     await loadAll()
   }
 
   async function handleDelete(id: string) {
-    await supabase.from('event_program').delete().eq('id', id)
+    const { error } = await supabase.from('event_program').delete().eq('id', id)
+    if (error) { showToast(friendlyError(error), 'error'); return }
     await loadAll()
   }
 
