@@ -6,8 +6,13 @@ export async function logError(
   error: unknown,
   dettaglio?: Record<string, unknown>
 ): Promise<void> {
-  const messaggio = error instanceof Error ? error.message : String(error)
-  console.error(`[${pagina}] ${azione}:`, messaggio)
+  const err = error as any
+  const messaggio = err?.message ?? (typeof error === 'string' ? error : JSON.stringify(error))
+  const pgFields: Record<string, unknown> = {}
+  if (err?.code) pgFields.code = err.code
+  if (err?.details) pgFields.details = err.details
+  if (err?.hint) pgFields.hint = err.hint
+  console.error(`[${pagina}] ${azione}:`, messaggio, Object.keys(pgFields).length ? pgFields : '')
 
   try {
     const { data: { session } } = await supabase.auth.getSession()
@@ -16,7 +21,7 @@ export async function logError(
       pagina,
       azione,
       messaggio,
-      dettaglio: dettaglio ?? {},
+      dettaglio: { ...(dettaglio ?? {}), ...pgFields },
     })
   } catch {
     // If logging itself fails, don't crash the app

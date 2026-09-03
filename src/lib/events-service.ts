@@ -4,6 +4,14 @@ import { logError } from './error-log'
 import { getCached, setCache, invalidateCache } from './cache'
 import type { Event } from '@/data/events'
 
+function formatPgError(error: { message: string; code?: string; details?: string; hint?: string }): string {
+  let msg = error.message
+  if (error.code) msg += ` [${error.code}]`
+  if (error.details) msg += ` — ${error.details}`
+  if (error.hint) msg += ` (${error.hint})`
+  return msg
+}
+
 interface EventRow {
   id: string
   title: string
@@ -82,7 +90,7 @@ export async function fetchEvents(): Promise<Event[]> {
     .limit(500)
   if (error) {
     logError('events-service', 'fetchEvents', error)
-    throw new Error(error.message)
+    throw new Error(formatPgError(error))
   }
   const result = ((data ?? []) as EventRow[]).map(rowToEvent)
   setCache('events_list', result)
@@ -111,7 +119,7 @@ export async function createEvent(event: Event): Promise<Event | null> {
     .maybeSingle()
   if (error) {
     logError('events-service', 'createEvent', error)
-    throw new Error(error.message)
+    throw new Error(formatPgError(error))
   }
   invalidateCache('events_list')
   return data ? rowToEvent(data as EventRow) : null
@@ -126,7 +134,7 @@ export async function upsertEvent(event: Event): Promise<Event | null> {
     .maybeSingle()
   if (error) {
     logError('events-service', 'upsertEvent', error)
-    throw new Error(error.message)
+    throw new Error(formatPgError(error))
   }
   invalidateCache('events_list')
   return data ? rowToEvent(data as EventRow) : null
@@ -158,7 +166,7 @@ export async function updateEvent(id: string, patch: Partial<Event>): Promise<Ev
     .maybeSingle()
   if (error) {
     logError('events-service', 'updateEvent', error)
-    throw new Error(error.message)
+    throw new Error(formatPgError(error))
   }
   invalidateCache('events_list')
   return data ? rowToEvent(data as EventRow) : null
@@ -168,7 +176,7 @@ export async function deleteEvent(id: string): Promise<boolean> {
   const { error } = await supabase.from('events').delete().eq('id', id)
   if (error) {
     logError('events-service', 'deleteEvent', error)
-    throw new Error(error.message)
+    throw new Error(formatPgError(error))
   }
   invalidateCache('events_list')
   return true
@@ -185,7 +193,7 @@ export async function fetchArchivedEvents(): Promise<ArchivedEvent[]> {
     .limit(500)
   if (error) {
     logError('events-service', 'fetchArchivedEvents', error)
-    throw new Error(error.message)
+    throw new Error(formatPgError(error))
   }
   return ((data ?? []) as EventRow[]).map(r => ({ ...rowToEvent(r), archiviato_da: r.archiviato_da ?? null }))
 }
@@ -197,7 +205,7 @@ export async function archiveEvent(id: string, userId: string): Promise<void> {
     .eq('id', id)
   if (error) {
     logError('events-service', 'archiveEvent', error)
-    throw new Error(error.message)
+    throw new Error(formatPgError(error))
   }
   invalidateCache('events_list')
 }
@@ -209,7 +217,7 @@ export async function restoreEvent(id: string): Promise<void> {
     .eq('id', id)
   if (error) {
     logError('events-service', 'restoreEvent', error)
-    throw new Error(error.message)
+    throw new Error(formatPgError(error))
   }
   invalidateCache('events_list')
 }
@@ -222,7 +230,7 @@ export async function fetchAllEventNames(): Promise<{ id: string; nome: string }
     .limit(5000)
   if (error) {
     logError('events-service', 'fetchAllEventNames', error)
-    throw new Error(error.message)
+    throw new Error(formatPgError(error))
   }
   return ((data ?? []) as { id: string; title: string }[]).map(r => ({ id: r.id, nome: r.title }))
 }
@@ -244,7 +252,7 @@ export async function fetchEventsByClientName(clientName: string): Promise<Event
     .limit(50)
   if (error) {
     logError('events-service', 'fetchEventsByClientName', error)
-    throw new Error(error.message)
+    throw new Error(formatPgError(error))
   }
   return ((data ?? []) as EventRow[]).map(rowToEvent)
 }
