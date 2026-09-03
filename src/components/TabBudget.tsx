@@ -210,7 +210,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     const vFilter = activeVersion
     const bvq = (table: string) => {
       let q = supabase.from(table as any).select('*').eq('event_id', event.id)
-      if (vFilter) q = q.eq('budget_version_id', vFilter)
+      if (vFilter) q = q.or(`budget_version_id.eq.${vFilter},budget_version_id.is.null`)
       return q
     }
     const [linksRes, svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes] = await Promise.all([

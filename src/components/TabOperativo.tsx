@@ -142,6 +142,12 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deletingExtraId, setDeletingExtraId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [defaultBudgetVersionId, setDefaultBudgetVersionId] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.from('budget_versions').select('id').eq('event_id', event.id).order('created_at', { ascending: true }).limit(1)
+      .then(({ data }) => { setDefaultBudgetVersionId(data?.[0]?.id ?? null) })
+  }, [event.id])
 
   const catMeta = CATEGORIES.find(c => c.key === category)!
   const showExtras = category !== 'varie'
@@ -354,6 +360,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
       error = res.error
     } else {
       record.id = crypto.randomUUID()
+      record.budget_version_id = defaultBudgetVersionId
       const res = await supabase.from(catMeta.table).insert(record)
       error = res.error
     }
@@ -416,6 +423,7 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
       error = res.error
     } else {
       record.id = crypto.randomUUID()
+      record.budget_version_id = defaultBudgetVersionId
       const res = await supabase.from('event_supplier_services').insert(record)
       error = res.error
     }
