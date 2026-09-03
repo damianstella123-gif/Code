@@ -51,22 +51,24 @@ function categoriaColor(c: string | null | undefined) {
 }
 
 function getVisibleTasks(allTasks: Task[], ruolo: string, userId: string, eventsList: { id: string; nome: string; team?: string[]; responsabile?: string }[]): Task[] {
+  function isMyEvent(eventId: string | null): boolean {
+    if (!eventId) return false
+    const evt = eventsList.find(e => e.id === eventId)
+    return !!evt && (evt.team?.includes(userId) || evt.responsabile === userId)
+  }
+
   switch (ruolo) {
+    case 'Super Admin':
     case 'Admin':
-    case 'Partner':
-    case 'Manager':
       return allTasks
-    case 'Finance':
+    case 'Senior PM':
+    case 'Project Manager':
+    case 'Regista':
+      return allTasks.filter(t => t.assegnatario === userId || isMyEvent(t.evento))
     case 'Amministrazione':
-      return allTasks.filter(t => {
-        const evt = t.evento ? eventsList.find(e => e.id === t.evento) : null
-        return t.assegnatario === userId || (evt && ((evt as any).team?.includes(userId) || (evt as any).responsabile === userId))
-      })
+      return allTasks.filter(t => t.assegnatario === userId || isMyEvent(t.evento))
     case 'Commerciale':
       return allTasks.filter(t => t.assegnatario === userId || t.evento === null)
-    case 'Operativo':
-    case 'Fornitore':
-      return allTasks.filter(t => t.assegnatario === userId)
     default:
       return allTasks.filter(t => t.assegnatario === userId)
   }
@@ -239,7 +241,7 @@ export default function TaskPage() {
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [allUsers, setAllUsers] = useState<Profile[]>([])
-  const [allEvents, setAllEvents] = useState<{ id: string; nome: string }[]>([])
+  const [allEvents, setAllEvents] = useState<{ id: string; nome: string; team?: string[]; responsabile?: string }[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -264,7 +266,7 @@ export default function TaskPage() {
 
   useEffect(() => {
     let cancelled = false
-    fetchEvents().then(evts => { if (!cancelled) setAllEvents(evts.map(e => ({ id: e.id, nome: e.nome }))) })
+    fetchEvents().then(evts => { if (!cancelled) setAllEvents(evts.map(e => ({ id: e.id, nome: e.nome, team: e.team, responsabile: e.responsabile }))) })
     return () => { cancelled = true }
   }, [])
 
