@@ -375,7 +375,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     // TRANSFER
     for (const s of (svcRes.data ?? []) as Record<string, unknown>[]) {
       const { venduto, costo } = calcRowEconomics(s, 'transfer')
-      if (!venduto && !costo) continue
       const qty = (s.quantita as number) ?? 1
       pushLine(s, resolveCat(s.supplier_id as string, 'TRANSFER'), 'event_supplier_services', {
         descrizione: (s.titolo as string) || 'Transfer', qty, venduto, costo,
@@ -396,7 +395,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         : fmtDate(h.data)
 
       const { venduto, costo } = calcRowEconomics(h, 'hotel')
-      if (!venduto && !costo) continue
 
       if (tipo === 'pernottamento' && paymentMode) {
         const totalRoomsQty = roomsClient + roomsSimmetria || 1
@@ -426,7 +424,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     for (const r of (restRes.data ?? []) as Record<string, unknown>[]) {
       const pax = (r.pax_confermati as number) ?? (r.pax_previsti as number) ?? 1
       const { venduto, costo } = calcRowEconomics(r, 'ristorante')
-      if (!venduto && !costo) continue
       pushLine(r, resolveCat(r.supplier_id as string, 'RISTORANTE'), 'event_restaurant_details', {
         descrizione: (r.tipologia_servizio as string) || 'Ristorante', qty: pax, venduto, costo,
         dateLabel: fmtDate(r.data),
@@ -437,7 +434,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     for (const e of (expRes.data ?? []) as Record<string, unknown>[]) {
       const pax = (e.pax as number) ?? 1
       const { venduto, costo } = calcRowEconomics(e, 'experience')
-      if (!venduto && !costo) continue
       pushLine(e, resolveCat(e.supplier_id as string, 'LOCATION / EXPERIENCE'), 'event_experience_details', {
         descrizione: (e.nome_attivita as string) || 'Experience', qty: pax, venduto, costo,
         dateLabel: fmtDate(e.data),
@@ -448,7 +444,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     for (const c of (catRes.data ?? []) as Record<string, unknown>[]) {
       const pax = (c.pax as number) ?? 1
       const { venduto, costo } = calcRowEconomics(c, 'catering')
-      if (!venduto && !costo) continue
       pushLine(c, resolveCat(c.supplier_id as string, 'CATERING'), 'event_catering_details', {
         descrizione: (c.tipologia as string) || 'Catering', qty: pax, venduto, costo,
         dateLabel: fmtDate(c.data),
@@ -459,7 +454,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     for (const si of (staffIntRes.data ?? []) as Record<string, unknown>[]) {
       const qty = (si.quantita as number) ?? 1
       const { venduto, costo } = calcRowEconomics(si, 'staff_interno')
-      if (!venduto && !costo) continue
       const nome = [(si.nome as string), (si.cognome as string)].filter(Boolean).join(' ') || (si.risorsa as string)
       pushLine(si, resolveCat(si.supplier_id as string, 'STAFF'), 'event_staff_interno_details', {
         descrizione: nome ? `${nome} - ${(si.ruolo as string) || 'Staff'}` : (si.ruolo as string) || 'Staff Simmetria',
@@ -472,7 +466,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     for (const se of (staffExtRes.data ?? []) as Record<string, unknown>[]) {
       const qty = (se.quantita as number) ?? 1
       const { venduto, costo } = calcRowEconomics(se, 'staff_esterno')
-      if (!venduto && !costo) continue
       const nome = [(se.nome as string), (se.cognome as string)].filter(Boolean).join(' ')
       pushLine(se, resolveCat(se.supplier_id as string, 'STAFF'), 'event_staff_esterno_details', {
         descrizione: nome ? `${nome} - ${(se.ruolo as string) || 'Staff'}` : (se.ruolo as string) || 'Staff Esterno',
@@ -485,7 +478,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     for (const av of (avRes.data ?? []) as Record<string, unknown>[]) {
       const qty = (av.quantita as number) ?? 1
       const { venduto, costo } = calcRowEconomics(av, 'audio_video')
-      if (!venduto && !costo) continue
       const avDates: string[] = []
       if (av.data_montaggio) avDates.push(`Mont. ${fmtDate(av.data_montaggio)}`)
       if (av.data_prove) avDates.push(`Prove ${fmtDate(av.data_prove)}`)
@@ -501,7 +493,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     for (const al of (allestRes.data ?? []) as Record<string, unknown>[]) {
       const qty = (al.quantita as number) ?? 1
       const { venduto, costo } = calcRowEconomics(al, 'allestimenti')
-      if (!venduto && !costo) continue
       const alDates: string[] = []
       if (al.data_montaggio) alDates.push(`Mont. ${fmtDate(al.data_montaggio)}`)
       if (al.data_smontaggio) alDates.push(`Smont. ${fmtDate(al.data_smontaggio)}`)
@@ -515,7 +506,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     for (const g of (graficaRes.data ?? []) as Record<string, unknown>[]) {
       const qty = (g.quantita as number) ?? 1
       const { venduto, costo } = calcRowEconomics(g, 'grafica_stampa')
-      if (!venduto && !costo) continue
       pushLine(g, resolveCat(g.supplier_id as string, 'GRAFICA'), 'event_grafica_stampa_details', {
         descrizione: (g.tipo_materiale as string) || (g.descrizione as string) || 'Grafica', qty, venduto, costo,
         dateLabel: fmtDate(g.data_consegna),
@@ -526,7 +516,6 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     for (const v of (varieRes.data ?? []) as Record<string, unknown>[]) {
       const qty = (v.quantita as number) ?? 1
       const { venduto, costo } = calcRowEconomics(v, 'varie')
-      if (!venduto && !costo) continue
       pushLine(v, resolveCat(v.supplier_id as string, 'VARIE'), 'event_varie_details', {
         descrizione: (v.tipologia as string) ? `${v.tipologia} — ${(v.descrizione as string) || 'Voce'}` : (v.descrizione as string) || 'Voce varia', qty, venduto, costo,
         dateLabel: fmtDate(v.data),
