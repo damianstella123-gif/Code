@@ -1,11 +1,12 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, Clock, ShieldCheck, Lock, Plus, Pencil } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { loadUser } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
 import { cloneBudgetVersion } from '@/lib/budget-versions-service'
-import { calcRowEconomics, normalizzaImporto, calcRowCommission } from '@/lib/event-economics'
-import { isSupportedTable } from '@/lib/economic-lines-service'
+import { calcRowEconomics, normalizzaImporto, calcRowCommission, calcRowNetto } from '@/lib/event-economics'
+import { isSupportedTable, fetchLineRecord, recordToEditableData, saveLine, hasSupplierField } from '@/lib/economic-lines-service'
+import type { EditableLineData } from '@/lib/economic-lines-service'
 import BudgetLineEditModal from '@/components/BudgetLineEditModal'
 import { fmtDate as fmtDateCentral, friendlyError } from '@/lib/format'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
@@ -109,6 +110,78 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
   const [editingLine, setEditingLine] = useState<{ id: string; table: string; categoria: string } | null>(null)
   const [cloning, setCloning] = useState(false)
+
+  // ─── Inline editing state ─────────────────────────────────
+  const [inlineEdit, setInlineEdit] = useState<{ id: string; table: string; data: EditableLineData; original: BudgetLine } | null>(null)
+  const [inlineError, setInlineError] = useState<string | null>(null)
+  const [inlineSaving, setInlineSaving] = useState(false)
+  const inlineRowRef = useRef<HTMLDivElement | null>(null)
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  async function startInlineEdit(item: BudgetLine) {
+    if (!isSupportedTable(item.table)) return
+    if (inlineEdit?.id === item.id) return
+    setInlineError(null)
+    const record = await fetchLineRecord(item.table, item.id)
+    if (!record) return
+    const data = recordToEditableData(item.table, record)
+    if (!data) return
+    setInlineEdit({ id: item.id, table: item.table, data, original: item })
+  }
+
+  function cancelInlineEdit() {
+    setInlineEdit(null)
+    setInlineError(null)
+  }
+
+  async function commitInlineEdit() {
+    if (!inlineEdit || inlineSaving) return
+    setInlineSaving(true)
+    setInlineError(null)
+    const result = await saveLine(inlineEdit.data)
+    setInlineSaving(false)
+    if (!result.success) {
+      setInlineError(result.error || 'Errore durante il salvataggio')
+      return
+    }
+    setInlineEdit(null)
+    loadData()
+    showToast('Voce economica aggiornata', 'success')
+  }
+
+  function updateInlineField(field: keyof EditableLineData, value: string | number) {
+    if (!inlineEdit) return
+    setInlineEdit(prev => prev ? { ...prev, data: { ...prev.data, [field]: value } } : null)
+  }
+
+  function getInlinePreview(data: EditableLineData) {
+    const fakeRow: Record<string, unknown> = {
+      aliquota_iva_venduto: data.aliquotaIvaVenduto,
+      iva_inclusa_venduto: data.ivaInclusaVenduto,
+      aliquota_iva_costo: data.aliquotaIvaCosto,
+      iva_inclusa_costo: data.ivaInclusaCosto,
+      commissione_pct: data.commissionePct,
+      commissione_importo: data.commissioneImporto,
+    }
+    const { vendutoNetto, costoNetto } = calcRowNetto(fakeRow, data.vendutoTotale, data.costoTotale)
+    calcRowCommission(fakeRow, costoNetto)
+    const margine = vendutoNetto - costoNetto
+    const marginePct = vendutoNetto > 0 ? (margine / vendutoNetto) * 100 : 0
+    return { margine, marginePct }
+  }
+
+  function handleInlineBlur() {
+    if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
+    blurTimerRef.current = setTimeout(() => {
+      if (inlineRowRef.current && !inlineRowRef.current.contains(document.activeElement)) {
+        commitInlineEdit()
+      }
+    }, 200)
+  }
+
+  function handleInlineFocus() {
+    if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
+  }
 
   async function saveFee(newPct: number) {
     setSavingFee(true)
@@ -911,6 +984,102 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     const isExpanded = expandedId === item.id
     const statoConf = STATO_CONFIG[item.stato_conferma]
     const Icon = statoConf.icon
+    const isInlineEditing = inlineEdit?.id === item.id
+    const canInlineEdit = isSupportedTable(item.table)
+
+    if (isInlineEditing && inlineEdit) {
+      const preview = getInlinePreview(inlineEdit.data)
+      const hasSupplier = hasSupplierField(item.table)
+      const onKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') { e.preventDefault(); commitInlineEdit() }
+        if (e.key === 'Escape') { e.preventDefault(); cancelInlineEdit() }
+      }
+      const inputCls = "bg-transparent border rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1"
+      const inputStyle = { color: 'var(--text)', borderColor: 'var(--line)', '--tw-ring-color': 'var(--accent)' } as React.CSSProperties
+      return (
+        <div key={item.id} ref={inlineRowRef} className="group relative" style={{ borderBottom: '1px solid var(--line)', background: 'rgba(255,255,255,0.02)' }} onBlur={handleInlineBlur} onFocus={handleInlineFocus}>
+          <div className="w-full text-left pl-4 pr-11 md:px-4 py-2 flex items-center gap-3">
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform flex-shrink-0 ${isExpanded ? '' : '-rotate-90'}`} style={{ color: 'var(--muted)' }} />
+            <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: statoConf.color }} />
+            <div className="flex-1 min-w-0">
+              <input
+                autoFocus
+                className={inputCls + " w-full font-medium"}
+                style={inputStyle}
+                value={inlineEdit.data.descrizione}
+                onChange={e => updateInlineField('descrizione', e.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder="Descrizione"
+              />
+              {item.dateLabel && <span className="text-[10px] truncate block mt-0.5" style={{ color: 'var(--muted)' }}>{item.dateLabel}</span>}
+            </div>
+            {hasSupplier ? (
+              <select
+                className={inputCls + " w-24 hidden md:block"}
+                style={inputStyle}
+                value={inlineEdit.data.supplierId}
+                onChange={e => updateInlineField('supplierId', e.target.value)}
+                onKeyDown={onKeyDown}
+              >
+                <option value="">-</option>
+                {suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+              </select>
+            ) : (
+              <span className="w-24 text-xs truncate hidden md:block" style={{ color: 'var(--muted)' }}>{item.fornitore || '-'}</span>
+            )}
+            <input
+              className={inputCls + " w-10 text-right"}
+              style={inputStyle}
+              type="number"
+              min={0}
+              value={inlineEdit.data.quantita}
+              onChange={e => updateInlineField('quantita', parseFloat(e.target.value) || 0)}
+              onKeyDown={onKeyDown}
+            />
+            <input
+              className={inputCls + " w-20 text-right"}
+              style={inputStyle}
+              type="number"
+              step="0.01"
+              value={inlineEdit.data.vendutoTotale}
+              onChange={e => updateInlineField('vendutoTotale', parseFloat(e.target.value) || 0)}
+              onKeyDown={onKeyDown}
+            />
+            <input
+              className={inputCls + " w-20 text-right"}
+              style={{ ...inputStyle, color: 'var(--yellow)' }}
+              type="number"
+              step="0.01"
+              value={inlineEdit.data.costoTotale}
+              onChange={e => updateInlineField('costoTotale', parseFloat(e.target.value) || 0)}
+              onKeyDown={onKeyDown}
+            />
+            {item.commissione_pct != null && item.commissione_pct > 0 ? (
+              <span className="w-14 text-[10px] text-right" style={{ color: 'var(--green)' }}>+{item.commissione_pct}%</span>
+            ) : (
+              <span className="w-14" />
+            )}
+            <span className="w-20 text-xs text-right font-medium" style={{ color: preview.margine >= 0 ? 'var(--green)' : 'var(--red2)', opacity: 0.75 }} title="Anteprima non salvata">
+              {fmt(preview.margine)} <span className="text-[8px]">{'\u2022'}</span>
+            </span>
+            <span className="w-10 text-xs text-right font-medium" style={{ color: preview.marginePct >= margineTarget ? 'var(--green)' : preview.marginePct >= 0 ? 'var(--yellow)' : 'var(--red2)', opacity: 0.75 }} title="Anteprima non salvata">
+              {preview.marginePct.toFixed(0)}% <span className="text-[8px]">{'\u2022'}</span>
+            </span>
+          </div>
+          {inlineError && (
+            <p className="text-[11px] px-4 pb-1.5" style={{ color: 'var(--red2)' }}>{inlineError}</p>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); setEditingLine({ id: item.id, table: item.table, categoria: item.categoria }) }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 md:p-1 md:top-2.5 md:translate-y-0 rounded transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-white/10"
+            style={{ background: 'var(--panel2)' }}
+            title="Modifica voce economica"
+          >
+            <Pencil className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+          </button>
+        </div>
+      )
+    }
 
     return (
       <div key={item.id} className="group relative" style={{ borderBottom: '1px solid var(--line)' }}>
@@ -921,7 +1090,12 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
           <ChevronDown className={`w-3.5 h-3.5 transition-transform flex-shrink-0 ${isExpanded ? '' : '-rotate-90'}`} style={{ color: 'var(--muted)' }} />
           <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: statoConf.color }} />
           <div className="flex-1 min-w-0">
-            <span className="text-xs font-medium truncate block" style={{ color: 'var(--text)' }}>{item.descrizione}</span>
+            <span
+              className="text-xs font-medium truncate block"
+              style={{ color: 'var(--text)', cursor: canInlineEdit ? 'text' : undefined }}
+              onClick={canInlineEdit ? (e) => { e.stopPropagation(); startInlineEdit(item) } : undefined}
+              title={canInlineEdit ? 'Clicca per modificare inline' : undefined}
+            >{item.descrizione}</span>
             {item.dateLabel && <span className="text-[10px] truncate block" style={{ color: 'var(--muted)' }}>{item.dateLabel}</span>}
           </div>
           <span className="w-24 text-xs truncate hidden md:block" style={{ color: 'var(--muted)' }}>{item.fornitore || '-'}</span>
