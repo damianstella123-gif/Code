@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
   Search,
@@ -476,9 +477,109 @@ function SectionHeader({ label, icon: Icon, color }: { label: string; icon: type
   )
 }
 
+// ─── Fly Floating Window ──────────────────────────────────────────────────────
+
+function FlyFloatingWindow({ question, onClose }: { question: string; onClose: () => void }) {
+  const windowRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const dragState = useRef<{ startX: number; startY: number; startTop: number; startLeft: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
+
+  const clamp = useCallback((top: number, left: number) => {
+    const w = windowRef.current
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const ww = w?.offsetWidth ?? 380
+    const minVisible = 40
+    return {
+      top: Math.max(-vh + minVisible, Math.min(top, vh - minVisible)),
+      left: Math.max(-vw + minVisible + ww, Math.min(left, vw - minVisible)),
+    }
+  }, [])
+
+  useEffect(() => {
+    const onMove = (cx: number, cy: number) => {
+      const d = dragState.current
+      if (!d) return
+      const dx = cx - d.startX
+      const dy = cy - d.startY
+      setPos(clamp(d.startTop + dy, d.startLeft + dx))
+    }
+    const onMouseMove = (e: MouseEvent) => onMove(e.clientX, e.clientY)
+    const onTouchMove = (e: TouchEvent) => { if (e.touches[0]) onMove(e.touches[0].clientX, e.touches[0].clientY) }
+    const onEnd = () => { dragState.current = null; setDragging(false) }
+    if (dragging) {
+      window.addEventListener('mousemove', onMouseMove)
+      window.addEventListener('mouseup', onEnd)
+      window.addEventListener('touchmove', onTouchMove, { passive: true })
+      window.addEventListener('touchend', onEnd)
+      window.addEventListener('touchcancel', onEnd)
+    }
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onEnd)
+      window.removeEventListener('touchmove', onTouchMove)
+      window.removeEventListener('touchend', onEnd)
+      window.removeEventListener('touchcancel', onEnd)
+    }
+  }, [dragging, clamp])
+
+  const startDrag = useCallback((cx: number, cy: number) => {
+    const el = windowRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    dragState.current = { startX: cx, startY: cy, startTop: rect.top, startLeft: rect.left }
+    setDragging(true)
+    if (!pos) setPos({ top: rect.top, left: rect.left })
+  }, [pos])
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && windowRef.current?.contains(document.activeElement)) {
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
+  const posStyle: React.CSSProperties = pos
+    ? { position: 'fixed', top: pos.top, left: pos.left, right: 'auto', bottom: 'auto' }
+    : { position: 'fixed', right: 24, bottom: 24, top: 'auto', left: 'auto' }
+
+  return createPortal(
+    <div
+      ref={windowRef}
+      style={{
+        ...posStyle,
+        width: 380,
+        maxWidth: 'calc(100vw - 16px)',
+        maxHeight: 520,
+        zIndex: 9999,
+        background: 'var(--panel-solid, var(--panel))',
+        border: '1px solid var(--line)',
+        borderRadius: 16,
+        boxShadow: '0 8px 32px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        userSelect: dragging ? 'none' : 'auto',
+      }}
+    >
+      <FlyChat question={question} onClose={onClose} onDragStart={startDrag} isDragging={dragging} />
+    </div>,
+    document.body,
+  )
+}
+
 // ─── Fly AI Chat ──────────────────────────────────────────────────────────────
 
-function FlyChat({ question, onClose }: { question: string; onClose: () => void }) {
+function FlyChat({ question, onClose, onDragStart, isDragging }: {
+  question: string
+  onClose: () => void
+  onDragStart?: (cx: number, cy: number) => void
+  isDragging?: boolean
+}) {
   const [flyQuestion, setFlyQuestion] = useState(question)
   const [flyAnswer, setFlyAnswer] = useState('')
   const [flyLoading, setFlyLoading] = useState(false)
@@ -586,14 +687,23 @@ function FlyChat({ question, onClose }: { question: string; onClose: () => void 
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 400 }}>
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-2.5"
-        style={{ borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      {/* Draggable Header */}
+      <div
+        className="flex items-center gap-2 px-4 py-2.5"
+        style={{
+          borderBottom: '1px solid var(--line)',
+          flexShrink: 0,
+          cursor: isDragging ? 'grabbing' : 'grab',
+          touchAction: 'none',
+        }}
+        onMouseDown={e => { if (e.button === 0 && onDragStart) onDragStart(e.clientX, e.clientY) }}
+        onTouchStart={e => { if (e.touches[0] && onDragStart) onDragStart(e.touches[0].clientX, e.touches[0].clientY) }}
+      >
         <PawPrint className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
         <span className="text-xs font-semibold" style={{ color: 'var(--red2)' }}>Fly AI</span>
         <button
-          onMouseDown={e => { e.preventDefault(); onClose() }}
+          onMouseDown={e => { e.stopPropagation(); e.preventDefault(); onClose() }}
           className="ml-auto p-1 rounded hover:bg-white/10 transition-all"
         >
           <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
@@ -699,6 +809,7 @@ export default function GlobalSearch() {
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(0)
   const [flyMode, setFlyMode] = useState<string | null>(null)
+  const [flyKey, setFlyKey] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
 
@@ -725,31 +836,36 @@ export default function GlobalSearch() {
   }, [query])
 
   // Total selectable items: search results + 1 for "Ask Fly" row when query is present
-  const hasFlyRow = query.trim().length > 0 && !flyMode
+  const hasFlyRow = query.trim().length > 0
   const totalItems = displayed.length + (hasFlyRow ? 1 : 0)
   const flyRowIdx = hasFlyRow ? displayed.length : -1
 
+  const openFly = useCallback((text: string) => {
+    setFlyMode(text)
+    setFlyKey(k => k + 1)
+    setOpen(false)
+    inputRef.current?.blur()
+  }, [])
+
   const handleKey = useCallback((e: React.KeyboardEvent) => {
-    if (!open || flyMode) return
+    if (!open) return
     if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, totalItems - 1)) }
     if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)) }
     if (e.key === 'Enter') {
       e.preventDefault()
       if (activeIdx === flyRowIdx && hasFlyRow) {
-        setFlyMode(query.trim())
+        openFly(query.trim())
       } else if (displayed[activeIdx]) {
         navigate(displayed[activeIdx].route)
         setOpen(false)
         setQuery('')
         inputRef.current?.blur()
       } else if (hasFlyRow && displayed.length === 0) {
-        setFlyMode(query.trim())
+        openFly(query.trim())
       }
     }
-    if (e.key === 'Escape') {
-      if (flyMode) { setFlyMode(null) } else { setOpen(false); inputRef.current?.blur() }
-    }
-  }, [open, displayed, activeIdx, navigate, flyMode, query, totalItems, flyRowIdx, hasFlyRow])
+    if (e.key === 'Escape') { setOpen(false); inputRef.current?.blur() }
+  }, [open, displayed, activeIdx, navigate, query, totalItems, flyRowIdx, hasFlyRow, openFly])
 
   // Cmd+K shortcut
   useEffect(() => {
@@ -779,18 +895,11 @@ export default function GlobalSearch() {
     navigate(route)
     setOpen(false)
     setQuery('')
-    setFlyMode(null)
     inputRef.current?.blur()
   }
 
   function closeFly() {
     setFlyMode(null)
-  }
-
-  function closeDropdown() {
-    setOpen(false)
-    setFlyMode(null)
-    inputRef.current?.blur()
   }
 
   return (
@@ -809,9 +918,9 @@ export default function GlobalSearch() {
           ref={inputRef}
           type="text"
           value={query}
-          onChange={e => { setQuery(e.target.value); setOpen(true); setFlyMode(null) }}
+          onChange={e => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => { if (!flyMode) closeDropdown() }, 150)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
           onKeyDown={handleKey}
           placeholder="Chiedi a Fly o cerca qualsiasi cosa..."
           style={{
@@ -825,7 +934,7 @@ export default function GlobalSearch() {
           }}
         />
         {query && (
-          <button onMouseDown={e => { e.preventDefault(); setQuery(''); setFlyMode(null) }}
+          <button onMouseDown={e => { e.preventDefault(); setQuery('') }}
             className="p-0.5 rounded hover:bg-white/10 flex-shrink-0 transition-all">
             <X className="w-3 h-3" style={{ color: 'var(--muted)' }} />
           </button>
@@ -845,13 +954,9 @@ export default function GlobalSearch() {
             boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
             zIndex: 100,
             maxHeight: 480,
-            overflowY: flyMode ? 'hidden' : 'auto',
+            overflowY: 'auto',
           }}
         >
-          {/* ─── Fly AI Chat Mode ──────────────────────────────────── */}
-          {flyMode ? (
-            <FlyChat question={flyMode} onClose={closeFly} />
-          ) : (
             <>
               {/* Smart suggestions header (no query) */}
               {!query.trim() && suggestions.length > 0 && (
@@ -935,7 +1040,7 @@ export default function GlobalSearch() {
               {/* "Ask Fly" row — shown when there is a query */}
               {hasFlyRow && (
                 <button
-                  onMouseDown={e => { e.preventDefault(); setFlyMode(query.trim()) }}
+                  onMouseDown={e => { e.preventDefault(); openFly(query.trim()) }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all"
                   style={{
                     background: activeIdx === flyRowIdx ? 'rgba(208,0,58,0.07)' : 'transparent',
@@ -980,8 +1085,12 @@ export default function GlobalSearch() {
                 </div>
               )}
             </>
-          )}
         </div>
+      )}
+
+      {/* Fly AI floating window — rendered via portal, independent of dropdown */}
+      {flyMode && (
+        <FlyFloatingWindow key={flyKey} question={flyMode} onClose={closeFly} />
       )}
     </div>
   )
