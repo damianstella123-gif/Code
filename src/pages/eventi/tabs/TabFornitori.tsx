@@ -3,7 +3,7 @@ import { Plus, Truck, AlertTriangle, User, Edit3, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useEventServices } from '@/lib/use-event-services'
 import { upsertSupplier } from '@/lib/suppliers-service'
-import { detectSupplierCategory, isDmcFromArray, SupplierCategoryPanel, type CategoryType } from '@/components/TabOperativo'
+import { detectSupplierCategory, isDmcFromArray, SupplierCategoryPanel, CATEGORIES, type CategoryType } from '@/components/TabOperativo'
 import { SupplierFormModal } from '@/pages/Fornitori'
 import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
@@ -42,6 +42,34 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
       .from('event_suppliers')
       .insert({ event_id: event.id, supplier_id: pendingLink, service_category: linkCategory })
     if (error) { setLinkError(friendlyError(error)); return }
+
+    // Create a starter budget line in the category's detail table
+    const catEntry = CATEGORIES.find(c => c.key === linkCategory)
+    const detailTable = catEntry?.table
+    if (detailTable) {
+      try {
+        const { data: bvData } = await supabase
+          .from('budget_versions')
+          .select('id')
+          .eq('event_id', event.id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+        const budgetVersionId = bvData?.[0]?.id ?? null
+        const record: Record<string, unknown> = {
+          id: crypto.randomUUID(),
+          event_id: event.id,
+          supplier_id: pendingLink,
+          budget_version_id: budgetVersionId,
+        }
+        if (detailTable === 'event_hotel_details') record.tipo = ''
+        if (detailTable === 'event_supplier_services') record.titolo = ''
+        const { error: insertErr } = await supabase.from(detailTable as any).insert(record)
+        if (insertErr) console.warn('[TabFornitori] starter row insert failed', insertErr)
+      } catch (e) {
+        console.warn('[TabFornitori] starter row insert error', e)
+      }
+    }
+
     setAdding(false)
     setSearch('')
     setPendingLink(null)

@@ -6,7 +6,7 @@ import { fmtDate, friendlyError } from '@/lib/format'
 
 export type CategoryType = 'hotel' | 'transfer' | 'ristorante' | 'experience' | 'catering' | 'audio_video' | 'allestimenti' | 'staff_interno' | 'staff_esterno' | 'grafica_stampa' | 'assicurazioni' | 'agenzia_viaggi' | 'varie'
 
-const CATEGORIES: { key: CategoryType; label: string; table: string }[] = [
+export const CATEGORIES: { key: CategoryType; label: string; table: string }[] = [
   { key: 'hotel', label: 'Hotel', table: 'event_hotel_details' },
   { key: 'transfer', label: 'Transfer', table: 'event_supplier_services' },
   { key: 'ristorante', label: 'Ristorante', table: 'event_restaurant_details' },
