@@ -128,7 +128,7 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Users className="w-4 h-4" style={{ color: 'var(--red2)' }} />
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Team evento</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>({members.length})</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)' }}>({members.length + (responsabileId && !members.some(m => m.user_id === responsabileId) ? 1 : 0)})</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {effectiveCanManage && (
@@ -159,10 +159,35 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
                 Riprova
               </button>
             </div>
-          ) : members.length === 0 ? (
+          ) : (() => {
+            const responsabileInMembers = members.some(m => m.user_id === responsabileId)
+            const responsabileProfile = profileMap.get(responsabileId)
+            const showStandaloneResponsabile = !responsabileInMembers && responsabileId && responsabileProfile
+            const totalCount = members.length + (showStandaloneResponsabile ? 1 : 0)
+            return totalCount === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)' }}>Nessun membro assegnato.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {showStandaloneResponsabile && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'color-mix(in srgb, var(--red2) 4%, transparent)', transition: 'background 0.12s' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 600, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                    {responsabileProfile.first_name[0]}{responsabileProfile.last_name[0]}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{responsabileProfile.first_name} {responsabileProfile.last_name}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--red2)', background: 'color-mix(in srgb, var(--red2) 10%, transparent)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                        Responsabile
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span>{responsabileProfile.email}</span>
+                      <span style={{ opacity: 0.5 }}>&middot;</span>
+                      <span>{responsabileProfile.role}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
               {members.map(m => {
                 const profile = profileMap.get(m.user_id)
                 const memberIsOwner = isOwner(m.user_id)
@@ -253,7 +278,9 @@ export default function EventTeamManager({ eventId, responsabileId, isArchived, 
                 )
               })}
             </div>
-          )}
+          )
+          })()
+          }
         </div>
 
         {/* Add/Edit Form */}
@@ -398,7 +425,7 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* User selection (only for add) */}
         {!editing && (
-          <div>
+          <div style={{ position: 'relative', zIndex: 20 }}>
             <label style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6, display: 'block' }}>
               Utente
             </label>
@@ -418,11 +445,12 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Cerca per nome o email..."
+                    autoFocus
                     style={{ border: 'none', background: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text)', width: '100%' }}
                   />
                 </div>
                 {search.length > 0 && availableProfiles.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 8, maxHeight: 180, overflowY: 'auto', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
+                  <div style={{ marginTop: 4, background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 8, maxHeight: 180, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
                     {availableProfiles.slice(0, 8).map(p => (
                       <button
                         key={p.id}
@@ -443,7 +471,7 @@ function MemberForm({ eventId, editing, profiles, existingMemberIds, callerPerms
                   </div>
                 )}
                 {search.length > 1 && availableProfiles.length === 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 8, padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)' }}>
+                  <div style={{ marginTop: 4, background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: 8, padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--muted)' }}>
                     Nessun utente disponibile.
                   </div>
                 )}
