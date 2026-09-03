@@ -53,15 +53,15 @@ export default function QuickActions() {
     }
 
     if (isEventDetail) return [
-      { icon: <CheckSquare size={16} />, label: 'Nuovo task', onClick: () => { navigate(`/task?event=${eventId}&new=true`); setOpen(false) } },
+      { icon: <CheckSquare size={16} />, label: 'Nuovo task', onClick: () => { window.dispatchEvent(new CustomEvent('global-new-task', { detail: { eventId } })); setOpen(false) } },
       { icon: <MessageCircle size={16} />, label: 'Messaggio team', onClick: () => { window.dispatchEvent(new CustomEvent('set-event-tab', { detail: 'scambi' })); setOpen(false) } },
       { icon: <Paperclip size={16} />, label: 'Documento', onClick: () => { window.dispatchEvent(new CustomEvent('set-event-tab', { detail: 'scambi' })); setOpen(false) } },
       fly,
     ]
 
     if (location.pathname === '/dashboard') return [
-      { icon: <Building2 size={16} />, label: 'Nuovo evento', onClick: () => { navigate('/eventi?new=true'); setOpen(false) } },
-      { icon: <CheckSquare size={16} />, label: 'Nuovo task', onClick: () => { navigate('/task?new=true'); setOpen(false) } },
+      { icon: <Building2 size={16} />, label: 'Nuovo evento', onClick: () => { window.dispatchEvent(new CustomEvent('global-new-event')); setOpen(false) } },
+      { icon: <CheckSquare size={16} />, label: 'Nuovo task', onClick: () => { window.dispatchEvent(new CustomEvent('global-new-task')); setOpen(false) } },
       { icon: <Palmtree size={16} />, label: 'Richiesta ferie', onClick: () => { navigate('/calendario?leave=true'); setOpen(false) } },
       fly,
     ]
@@ -72,8 +72,8 @@ export default function QuickActions() {
     ]
 
     return [
-      { icon: <Building2 size={16} />, label: 'Nuovo evento', onClick: () => { navigate('/eventi?new=true'); setOpen(false) } },
-      { icon: <CheckSquare size={16} />, label: 'Nuovo task', onClick: () => { navigate('/task?new=true'); setOpen(false) } },
+      { icon: <Building2 size={16} />, label: 'Nuovo evento', onClick: () => { window.dispatchEvent(new CustomEvent('global-new-event')); setOpen(false) } },
+      { icon: <CheckSquare size={16} />, label: 'Nuovo task', onClick: () => { window.dispatchEvent(new CustomEvent('global-new-task')); setOpen(false) } },
       { icon: <Calendar size={16} />, label: 'Calendario', onClick: () => { navigate('/calendario'); setOpen(false) } },
       fly,
     ]

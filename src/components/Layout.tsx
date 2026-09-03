@@ -3,6 +3,7 @@ import GlobalSearch from '@/components/GlobalSearch'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import Onboarding from '@/components/Onboarding'
 import QuickActions from '@/components/QuickActions'
+import GlobalFormModals from '@/components/GlobalFormModals'
 import { RadioPlayer } from '@/components/RadioPlayer'
 import BreakReminder from '@/components/BreakReminder'
 import { OnlineUsers } from '@/components/OnlineUsers'
@@ -902,6 +903,7 @@ return (
         <BreakReminder />
         <PinnedChats />
         <QuickActions />
+        <GlobalFormModals />
         {showOnboarding && (
           <Onboarding
             onComplete={() => setShowOnboarding(false)}
