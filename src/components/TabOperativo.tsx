@@ -356,13 +356,17 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
 
     let error: { message: string } | null = null
     if (editingId) {
+      console.log('[TabOperativo] Attempting update', { table: catMeta.table, id: editingId, record })
       const res = await supabase.from(catMeta.table).update(record).eq('id', editingId)
       error = res.error
+      console.log('[TabOperativo] Update result', { error, table: catMeta.table })
     } else {
       record.id = crypto.randomUUID()
       record.budget_version_id = defaultBudgetVersionId
+      console.log('[TabOperativo] Attempting insert', { table: catMeta.table, record })
       const res = await supabase.from(catMeta.table).insert(record)
       error = res.error
+      console.log('[TabOperativo] Insert result', { error, table: catMeta.table })
     }
     setSaving(false)
     if (error) {
@@ -419,13 +423,17 @@ export function SupplierCategoryPanel({ event, supplierId, category, isDmc, othe
     }
     let error: { message: string } | null = null
     if (editingExtraId) {
+      console.log('[TabOperativo] Attempting update', { table: 'event_supplier_services', id: editingExtraId, record })
       const res = await supabase.from('event_supplier_services').update(record).eq('id', editingExtraId)
       error = res.error
+      console.log('[TabOperativo] Update result', { error, table: 'event_supplier_services' })
     } else {
       record.id = crypto.randomUUID()
       record.budget_version_id = defaultBudgetVersionId
+      console.log('[TabOperativo] Attempting insert', { table: 'event_supplier_services', record })
       const res = await supabase.from('event_supplier_services').insert(record)
       error = res.error
+      console.log('[TabOperativo] Insert result', { error, table: 'event_supplier_services' })
     }
     setSaving(false)
     if (error) { setSaveError(friendlyError(error)); return }
