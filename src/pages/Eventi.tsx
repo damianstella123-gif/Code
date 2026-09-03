@@ -230,6 +230,14 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
   const [activatingSafety, setActivatingSafety] = useState(false)
   const [showSafetyConfirm, setShowSafetyConfirm] = useState(false)
   const [greenActivated, setGreenActivated] = useState(false)
+  const [supplierLinkCount, setSupplierLinkCount] = useState(0)
+
+  async function fetchSupplierLinkCount() {
+    const { count } = await supabase.from('event_suppliers').select('id', { count: 'exact', head: true }).eq('event_id', event.id)
+    setSupplierLinkCount(count ?? 0)
+  }
+
+  useEffect(() => { fetchSupplierLinkCount() }, [event.id])
   const [activatingGreen, setActivatingGreen] = useState(false)
   const [showGreenConfirm, setShowGreenConfirm] = useState(false)
   const currentUser = loadUser()
@@ -282,7 +290,6 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
   }, [])
 
   const eventComunicazioni = comunicazioni.filter(m => m.eventoId === event.id)
-  const eventSuppliers = suppliers.filter(s => s.eventiId.includes(event.id))
 
   const completedTasks = eventTasks.filter(t => t.stato === 'completato').length
   const totalTasks = eventTasks.length
@@ -296,7 +303,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'overview', label: 'Panoramica' },
-    { id: 'fornitori', label: `Fornitori${eventSuppliers.length > 0 ? ` (${eventSuppliers.length})` : ''}` },
+    { id: 'fornitori', label: `Fornitori${supplierLinkCount > 0 ? ` (${supplierLinkCount})` : ''}` },
     { id: 'economia', label: 'Budget & Pagamenti' },
     { id: 'scambi', label: 'Comunicazioni & Documenti' },
     { id: 'registrazioni', label: 'Registrazioni' },
@@ -506,14 +513,14 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
       </div>
 
       {/* Event Status Bar */}
-      <EventStatusBar event={event} days={days} isLive={isLive} isOver={isOver} progressPct={progress} totalTasks={totalTasks} suppliersCount={eventSuppliers.length} />
+      <EventStatusBar event={event} days={days} isLive={isLive} isOver={isOver} progressPct={progress} totalTasks={totalTasks} suppliersCount={supplierLinkCount} />
 
       {/* Tab Content */}
       <div key={activeTab} className="animate-fade-in">
         {activeTab === 'overview' && (
           <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} clients={clients} onClientClick={navigateToCrm} internalUsers={internalUsers} comunicazioni={eventComunicazioni} />
         )}
-        {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} onSuppliersChanged={onSuppliersChanged} />}
+        {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} onSuppliersChanged={() => { onSuppliersChanged(); fetchSupplierLinkCount() }} />}
         {activeTab === 'economia' && <TabEconomia event={event} suppliers={suppliers} clients={clients} />}
         {activeTab === 'scambi' && <TabScambi event={event} isArchived={isArchived} />}
         {activeTab === 'registrazioni' && (

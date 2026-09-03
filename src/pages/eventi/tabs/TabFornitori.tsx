@@ -76,6 +76,7 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
     setLinkCategory('')
     setLinkError(null)
     await reload()
+    onSuppliersChanged()
   }
 
   async function handleUnlink(supplierId: string) {
@@ -96,6 +97,7 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
     const timer = setTimeout(() => setToast(null), 5000)
     setToastTimer(timer)
     await reload()
+    onSuppliersChanged()
   }
 
   async function handleUndoUnlink(supplierId: string) {
@@ -103,6 +105,7 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
     setToast(null)
     await supabase.from('event_suppliers').insert({ event_id: event.id, supplier_id: supplierId })
     await reload()
+    onSuppliersChanged()
   }
 
   async function saveContact(linkId: string) {
