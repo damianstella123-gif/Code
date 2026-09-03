@@ -1,7 +1,9 @@
 export function daysLeft(iso: string): number {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  return Math.ceil((new Date(iso).getTime() - today.getTime()) / 86400000)
+  const parts = iso.slice(0, 10).split('-')
+  const due = new Date(+parts[0], +parts[1] - 1, +parts[2])
+  return Math.round((due.getTime() - today.getTime()) / 86400000)
 }
 
 export function fmtDate(iso: string): string {

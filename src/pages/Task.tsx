@@ -692,15 +692,23 @@ function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus,
         )}
       </div>
 
-      {/* Assignee avatar */}
+      {/* Assignee avatar + name */}
       {task.assegnatario ? (
-        <div title={getFullName(task.assegnatario)} style={{
-          width: '24px', height: '24px', borderRadius: '50%', flexShrink: 0,
-          background: 'var(--panel2)', border: '1px solid var(--line)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 700, color: 'var(--text)',
-        }}>
-          {getInitials(task.assegnatario)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, minWidth: 0, maxWidth: '140px' }}>
+          <div title={getFullName(task.assegnatario)} style={{
+            width: '24px', height: '24px', borderRadius: '50%', flexShrink: 0,
+            background: 'var(--panel2)', border: '1px solid var(--line)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 700, color: 'var(--text)',
+          }}>
+            {getInitials(task.assegnatario)}
+          </div>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {getFullName(task.assegnatario)}
+          </span>
         </div>
       ) : (
         <div style={{ width: '24px', height: '24px', flexShrink: 0 }} />
