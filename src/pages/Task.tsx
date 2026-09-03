@@ -26,6 +26,7 @@ import { daysLeft, toISO, fmtLong } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Task } from '@/data/tasks'
 import type { Profile } from '@/lib/profiles'
+import { users as seedUsers } from '@/data/users'
 
 function prioritaColor(p: string) {
   switch (p) {
@@ -370,13 +371,20 @@ export default function TaskPage() {
   function getProfileInitials(userId: string): string {
     const p = allUsers.find(u => u.id === userId)
     if (p) return `${p.first_name?.[0] ?? ''}${p.last_name?.[0] ?? ''}`.toUpperCase()
-    return userId.slice(0, 2).toUpperCase()
+    const legacy = seedUsers.find(u => u.id === userId)
+    if (legacy) {
+      const parts = legacy.nome.split(' ')
+      return `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
+    }
+    return '??'
   }
 
   function getProfileName(userId: string): string {
     const p = allUsers.find(u => u.id === userId)
     if (p) return `${p.first_name} ${p.last_name}`.trim()
-    return userId
+    const legacy = seedUsers.find(u => u.id === userId)
+    if (legacy) return legacy.nome
+    return 'Utente sconosciuto'
   }
 
   function cycleStatus(task: Task) {
