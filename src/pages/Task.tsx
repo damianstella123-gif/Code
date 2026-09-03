@@ -541,11 +541,10 @@ export default function TaskPage() {
               <>
                 <div className="wire-section-title">DA FARE ({sorted.open.length})</div>
                 <div className="wire-list-container">
-                  {sorted.open.map((task, i) => (
+                  {sorted.open.map((task) => (
                     <TaskRow
                       key={task.id}
                       task={task}
-                      index={i}
                       events={allEvents}
                       getInitials={getProfileInitials}
                       getFullName={getProfileName}
@@ -562,11 +561,10 @@ export default function TaskPage() {
               <>
                 <div className="wire-section-title">COMPLETATI ({sorted.done.length})</div>
                 <div className="wire-list-container">
-                  {sorted.done.map((task, i) => (
+                  {sorted.done.map((task) => (
                     <TaskRow
                       key={task.id}
                       task={task}
-                      index={sorted.open.length + i}
                       events={allEvents}
                       getInitials={getProfileInitials}
                       getFullName={getProfileName}
@@ -606,9 +604,8 @@ export default function TaskPage() {
 
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus, onRowClick, onNavigateEvent, isCompleting }: {
+function TaskRow({ task, events, getInitials, getFullName, onCycleStatus, onRowClick, onNavigateEvent, isCompleting }: {
   task: Task
-  index: number
   events: { id: string; nome: string }[]
   getInitials: (id: string) => string
   getFullName: (id: string) => string
@@ -620,7 +617,7 @@ function TaskRow({ task, index, events, getInitials, getFullName, onCycleStatus,
   const evento = task.evento ? events.find(e => e.id === task.evento) : null
   const dl = deadlineLabel(task.scadenza, task.stato)
   const isCompleted = task.stato === 'completato'
-  const code = `Q${String(index + 1).padStart(2, '0')}`
+  const code = task.priorita === 'alta' ? 'ALT' : task.priorita === 'bassa' ? 'BAS' : 'MED'
 
   return (
     <div
