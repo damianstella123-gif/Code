@@ -716,6 +716,7 @@ export default function Eventi() {
   const [isViewingArchived, setIsViewingArchived] = useState(false)
   const [search, setSearch] = useState('')
   const [filterStato, setFilterStato] = useState('Tutti')
+  const [showMyEvents, setShowMyEvents] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingEvent, setEditingEvent] = useState<Event | undefined>(undefined)
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null)
@@ -903,13 +904,17 @@ export default function Eventi() {
 
   const filtered = useMemo(() => {
     return visibleEvents.filter(e => {
+      if (showMyEvents && currentUser) {
+        const isMine = e.responsabile === currentUser.id || (e.team || []).includes(currentUser.id)
+        if (!isMine) return false
+      }
       const matchSearch = search === '' ||
         e.nome.toLowerCase().includes(search.toLowerCase()) ||
         e.location.toLowerCase().includes(search.toLowerCase())
       const matchStato = filterStato === 'Tutti' || e.stato === filterStato
       return matchSearch && matchStato
     }).sort((a, b) => (a.dataInizio || '').localeCompare(b.dataInizio || ''))
-  }, [visibleEvents, search, filterStato])
+  }, [visibleEvents, search, filterStato, showMyEvents, currentUser])
 
   const overlays = (
     <>
@@ -1014,10 +1019,33 @@ export default function Eventi() {
         </div>
 
         <div className="wire-ticker" style={{ marginTop: 8 }}>
-          <span><strong>{visibleEvents.length}</strong> totali</span>
-          <span><strong>{visibleEvents.filter(e => e.stato === 'in_corso').length}</strong> in corso</span>
-          <span><strong>{visibleEvents.filter(e => e.stato === 'pianificazione').length}</strong> in pianificazione</span>
-          <span><strong>{visibleEvents.filter(e => e.stato === 'completato').length}</strong> completati</span>
+          <span><strong>{filtered.length}</strong> totali</span>
+          <span><strong>{filtered.filter(e => e.stato === 'in_corso').length}</strong> in corso</span>
+          <span><strong>{filtered.filter(e => e.stato === 'pianificazione').length}</strong> in pianificazione</span>
+          <span><strong>{filtered.filter(e => e.stato === 'completato').length}</strong> completati</span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: 12, background: 'var(--surface)', borderRadius: '8px', padding: '3px', width: 'fit-content', border: '1px solid var(--border)' }}>
+          <button
+            onClick={() => setShowMyEvents(true)}
+            style={{
+              padding: '5px 14px', borderRadius: '6px', fontSize: '11px', fontFamily: 'var(--font-mono)',
+              fontWeight: showMyEvents ? 600 : 400, cursor: 'pointer', border: 'none', transition: 'all 0.2s',
+              background: showMyEvents ? 'var(--red2)' : 'transparent',
+              color: showMyEvents ? '#fff' : 'var(--muted)',
+            }}>
+            I miei eventi
+          </button>
+          <button
+            onClick={() => setShowMyEvents(false)}
+            style={{
+              padding: '5px 14px', borderRadius: '6px', fontSize: '11px', fontFamily: 'var(--font-mono)',
+              fontWeight: !showMyEvents ? 600 : 400, cursor: 'pointer', border: 'none', transition: 'all 0.2s',
+              background: !showMyEvents ? 'var(--red2)' : 'transparent',
+              color: !showMyEvents ? '#fff' : 'var(--muted)',
+            }}>
+            Tutti gli eventi
+          </button>
         </div>
 
         <div className="wire-tabs" style={{ flexWrap: 'wrap', alignItems: 'center', gap: '16px', marginTop: 12 }}>
@@ -1048,7 +1076,18 @@ export default function Eventi() {
       {filtered.length === 0 ? (
         <div className="wire-empty">
           <Calendar className="w-8 h-8 mx-auto mb-3 opacity-30" />
-          <p>Nessun evento trovato</p>
+          {showMyEvents ? (
+            <>
+              <p>Non fai parte di nessun evento al momento.</p>
+              <button
+                onClick={() => setShowMyEvents(false)}
+                style={{ marginTop: '10px', padding: '6px 16px', borderRadius: '6px', fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 600, cursor: 'pointer', border: 'none', background: 'var(--red2)', color: '#fff' }}>
+                Passa a "Tutti gli eventi"
+              </button>
+            </>
+          ) : (
+            <p>Nessun evento trovato</p>
+          )}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px', marginTop: '18px' }}>
