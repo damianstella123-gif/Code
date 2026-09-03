@@ -18,6 +18,8 @@ import {
   TrendingUp,
   Lock,
   PawPrint,
+  Send,
+  Loader2,
 } from 'lucide-react'
 import { loadClientsFromStorage } from '@/lib/storage'
 import { suppliers } from '@/data/suppliers'
@@ -26,6 +28,7 @@ import { messaggi } from '@/data/comunicazioni'
 import { loadUser } from '@/lib/auth'
 import { loadWorkflowsFromStorage, loadEventsFromStorage, loadTasksFromStorage } from '@/lib/storage'
 import { daysLeft, fmtDate, fmtLong } from '@/lib/format'
+import { supabase } from '@/lib/supabase'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -473,12 +476,229 @@ function SectionHeader({ label, icon: Icon, color }: { label: string; icon: type
   )
 }
 
+// ─── Fly AI Chat ──────────────────────────────────────────────────────────────
+
+function FlyChat({ question, onClose }: { question: string; onClose: () => void }) {
+  const [flyQuestion, setFlyQuestion] = useState(question)
+  const [flyAnswer, setFlyAnswer] = useState('')
+  const [flyLoading, setFlyLoading] = useState(false)
+  const [flyError, setFlyError] = useState<string | null>(null)
+  const [followUp, setFollowUp] = useState('')
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const followUpRef = useRef<HTMLInputElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  const askFly = useCallback(async (text: string) => {
+    if (!text.trim() || flyLoading) return
+    if (!navigator.onLine) {
+      setFlyError('Fly non è disponibile offline. Riconnettiti per usarla.')
+      return
+    }
+
+    setFlyQuestion(text.trim())
+    setFlyAnswer('')
+    setFlyError(null)
+    setFlyLoading(true)
+
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Non autenticato')
+
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fly-gateway`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ message: text.trim() }),
+        signal: controller.signal,
+      })
+
+      if (!res.ok) {
+        const errBody = await res.text()
+        let errMsg = 'Errore di connessione con Fly'
+        try { errMsg = JSON.parse(errBody).error || errMsg } catch {}
+        throw new Error(errMsg)
+      }
+
+      const reader = res.body?.getReader()
+      if (!reader) throw new Error('Stream non disponibile')
+
+      const decoder = new TextDecoder()
+      let accumulated = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const payload = line.slice(6)
+          if (payload === '[DONE]') break
+
+          try {
+            const parsed = JSON.parse(payload)
+            if (parsed.type === 'text') {
+              accumulated += parsed.content
+              setFlyAnswer(accumulated)
+            }
+          } catch {}
+        }
+      }
+
+      if (!accumulated) setFlyAnswer('Fly non ha fornito una risposta.')
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      setFlyError(err instanceof Error ? err.message : 'Errore imprevisto')
+    } finally {
+      setFlyLoading(false)
+    }
+  }, [flyLoading])
+
+  useEffect(() => {
+    askFly(question)
+    return () => { abortRef.current?.abort() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+  }, [flyAnswer, flyError])
+
+  useEffect(() => {
+    if (!flyLoading && !flyError) followUpRef.current?.focus()
+  }, [flyLoading, flyError])
+
+  const handleFollowUp = () => {
+    if (!followUp.trim() || flyLoading) return
+    const q = followUp.trim()
+    setFollowUp('')
+    askFly(q)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 400 }}>
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-2.5"
+        style={{ borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+        <PawPrint className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+        <span className="text-xs font-semibold" style={{ color: 'var(--red2)' }}>Fly AI</span>
+        <button
+          onMouseDown={e => { e.preventDefault(); onClose() }}
+          className="ml-auto p-1 rounded hover:bg-white/10 transition-all"
+        >
+          <X className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
+        </button>
+      </div>
+
+      {/* Chat body */}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+        {/* User question */}
+        <div className="flex items-start gap-2 mb-3">
+          <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ background: 'var(--panel2)', border: '1px solid var(--line)', marginTop: 1 }}>
+            <span style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 600 }}>Tu</span>
+          </div>
+          <p className="text-sm" style={{ color: 'var(--text)', lineHeight: 1.5 }}>{flyQuestion}</p>
+        </div>
+
+        {/* Loading state */}
+        {flyLoading && !flyAnswer && (
+          <div className="flex items-center gap-2 py-3">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--red2)' }} />
+            <span className="text-xs" style={{ color: 'var(--muted)' }}>Fly sta pensando...</span>
+          </div>
+        )}
+
+        {/* Error */}
+        {flyError && (
+          <div className="flex items-start gap-2 py-2 px-3 rounded-lg mb-2"
+            style={{ background: 'rgba(208,0,58,0.06)', border: '1px solid rgba(208,0,58,0.15)' }}>
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--red2)' }} />
+            <p className="text-xs" style={{ color: 'var(--red2)', lineHeight: 1.5 }}>{flyError}</p>
+          </div>
+        )}
+
+        {/* Assistant answer */}
+        {flyAnswer && (
+          <div className="flex items-start gap-2">
+            <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(208,0,58,0.1)', border: '1px solid rgba(208,0,58,0.2)', marginTop: 1 }}>
+              <PawPrint className="w-2.5 h-2.5" style={{ color: 'var(--red2)' }} />
+            </div>
+            <p className="text-sm" style={{
+              color: 'var(--text)',
+              lineHeight: 1.6,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}>
+              {flyAnswer}
+              {flyLoading && (
+                <span className="inline-block w-1.5 h-3.5 ml-0.5 animate-pulse rounded-sm"
+                  style={{ background: 'var(--red2)', verticalAlign: 'text-bottom' }} />
+              )}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Follow-up input */}
+      {!flyError && (
+        <div className="flex items-center gap-2 px-3 py-2.5"
+          style={{ borderTop: '1px solid var(--line)', flexShrink: 0 }}>
+          <input
+            ref={followUpRef}
+            type="text"
+            value={followUp}
+            onChange={e => setFollowUp(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleFollowUp() } }}
+            placeholder="Chiedi ancora a Fly..."
+            disabled={flyLoading}
+            style={{
+              flex: 1,
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              color: 'var(--text)',
+              fontSize: 12,
+              minWidth: 0,
+              opacity: flyLoading ? 0.5 : 1,
+            }}
+          />
+          <button
+            onMouseDown={e => { e.preventDefault(); handleFollowUp() }}
+            disabled={flyLoading || !followUp.trim()}
+            className="p-1.5 rounded-lg transition-all"
+            style={{
+              background: followUp.trim() && !flyLoading ? 'rgba(208,0,58,0.1)' : 'transparent',
+              opacity: followUp.trim() && !flyLoading ? 1 : 0.3,
+              cursor: followUp.trim() && !flyLoading ? 'pointer' : 'default',
+            }}
+          >
+            <Send className="w-3 h-3" style={{ color: 'var(--red2)' }} />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main GlobalSearch ────────────────────────────────────────────────────────
 
 export default function GlobalSearch() {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(0)
+  const [flyMode, setFlyMode] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
 
@@ -504,18 +724,32 @@ export default function GlobalSearch() {
     setActiveIdx(0)
   }, [query])
 
+  // Total selectable items: search results + 1 for "Ask Fly" row when query is present
+  const hasFlyRow = query.trim().length > 0 && !flyMode
+  const totalItems = displayed.length + (hasFlyRow ? 1 : 0)
+  const flyRowIdx = hasFlyRow ? displayed.length : -1
+
   const handleKey = useCallback((e: React.KeyboardEvent) => {
-    if (!open) return
-    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, displayed.length - 1)) }
+    if (!open || flyMode) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, totalItems - 1)) }
     if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)) }
-    if (e.key === 'Enter' && displayed[activeIdx]) {
-      navigate(displayed[activeIdx].route)
-      setOpen(false)
-      setQuery('')
-      inputRef.current?.blur()
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (activeIdx === flyRowIdx && hasFlyRow) {
+        setFlyMode(query.trim())
+      } else if (displayed[activeIdx]) {
+        navigate(displayed[activeIdx].route)
+        setOpen(false)
+        setQuery('')
+        inputRef.current?.blur()
+      } else if (hasFlyRow && displayed.length === 0) {
+        setFlyMode(query.trim())
+      }
     }
-    if (e.key === 'Escape') { setOpen(false); inputRef.current?.blur() }
-  }, [open, displayed, activeIdx, navigate])
+    if (e.key === 'Escape') {
+      if (flyMode) { setFlyMode(null) } else { setOpen(false); inputRef.current?.blur() }
+    }
+  }, [open, displayed, activeIdx, navigate, flyMode, query, totalItems, flyRowIdx, hasFlyRow])
 
   // Cmd+K shortcut
   useEffect(() => {
@@ -545,6 +779,17 @@ export default function GlobalSearch() {
     navigate(route)
     setOpen(false)
     setQuery('')
+    setFlyMode(null)
+    inputRef.current?.blur()
+  }
+
+  function closeFly() {
+    setFlyMode(null)
+  }
+
+  function closeDropdown() {
+    setOpen(false)
+    setFlyMode(null)
     inputRef.current?.blur()
   }
 
@@ -564,9 +809,9 @@ export default function GlobalSearch() {
           ref={inputRef}
           type="text"
           value={query}
-          onChange={e => { setQuery(e.target.value); setOpen(true) }}
+          onChange={e => { setQuery(e.target.value); setOpen(true); setFlyMode(null) }}
           onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onBlur={() => setTimeout(() => { if (!flyMode) closeDropdown() }, 150)}
           onKeyDown={handleKey}
           placeholder="Chiedi a Fly o cerca qualsiasi cosa..."
           style={{
@@ -580,7 +825,7 @@ export default function GlobalSearch() {
           }}
         />
         {query && (
-          <button onMouseDown={e => { e.preventDefault(); setQuery('') }}
+          <button onMouseDown={e => { e.preventDefault(); setQuery(''); setFlyMode(null) }}
             className="p-0.5 rounded hover:bg-white/10 flex-shrink-0 transition-all">
             <X className="w-3 h-3" style={{ color: 'var(--muted)' }} />
           </button>
@@ -600,109 +845,141 @@ export default function GlobalSearch() {
             boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
             zIndex: 100,
             maxHeight: 480,
-            overflowY: 'auto',
+            overflowY: flyMode ? 'hidden' : 'auto',
           }}
         >
-          {/* Smart suggestions header (no query) */}
-          {!query.trim() && suggestions.length > 0 && (
-            <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid var(--line)' }}>
-              <Zap className="w-3.5 h-3.5" style={{ color: 'var(--yellow)' }} />
-              <span className="text-xs font-semibold" style={{ color: 'var(--yellow)' }}>Suggerimenti Fly</span>
-              <span className="text-xs ml-auto" style={{ color: 'var(--muted)' }}>Priorità operativa</span>
-            </div>
-          )}
+          {/* ─── Fly AI Chat Mode ──────────────────────────────────── */}
+          {flyMode ? (
+            <FlyChat question={flyMode} onClose={closeFly} />
+          ) : (
+            <>
+              {/* Smart suggestions header (no query) */}
+              {!query.trim() && suggestions.length > 0 && (
+                <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid var(--line)' }}>
+                  <Zap className="w-3.5 h-3.5" style={{ color: 'var(--yellow)' }} />
+                  <span className="text-xs font-semibold" style={{ color: 'var(--yellow)' }}>Suggerimenti Fly</span>
+                  <span className="text-xs ml-auto" style={{ color: 'var(--muted)' }}>Priorità operativa</span>
+                </div>
+              )}
 
-          {/* Results header (with query) */}
-          {query.trim() && results.length > 0 && (
-            <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--line)' }}>
-              <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                {results.length} risultat{results.length === 1 ? 'o' : 'i'} per "<span style={{ color: 'var(--text)' }}>{query}</span>"
-              </span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs" style={{ color: 'var(--muted)' }}>↑↓ naviga</span>
-                <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--panel2)', color: 'var(--muted)', border: '1px solid var(--line)', fontSize: 10 }}>↵</span>
-              </div>
-            </div>
-          )}
-
-          {/* Empty state */}
-          {isEmpty && query.trim() && (
-            <div className="py-10 text-center">
-              <Hash className="w-8 h-8 mx-auto mb-2 opacity-20" style={{ color: 'var(--muted)' }} />
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun risultato per "{query}"</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--muted)', opacity: 0.6 }}>Prova con un termine diverso</p>
-            </div>
-          )}
-
-          {/* Empty state — no suggestions */}
-          {!query.trim() && suggestions.length === 0 && (
-            <div className="py-8 text-center">
-              <Search className="w-7 h-7 mx-auto mb-2 opacity-20" style={{ color: 'var(--muted)' }} />
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>Inizia a digitare per cercare</p>
-            </div>
-          )}
-
-          {/* Grouped results */}
-          {!query.trim()
-            ? /* Suggestions flat */
-              flatDisplayed.map((result, i) => (
-                <ResultItem
-                  key={result.type + result.id}
-                  result={result}
-                  query={query}
-                  isActive={i === activeIdx}
-                  onClick={() => navigate_(result.route)}
-                />
-              ))
-            : /* Search results grouped by type */
-              Object.entries(grouped).map(([type, typeResults]) => {
-                const Icon = typeIcon(type as ResultType)
-                const color = typeColor(type as ResultType)
-                return (
-                  <div key={type}>
-                    <SectionHeader
-                      label={typeLabel(type as ResultType) + (typeResults.length > 1 ? `s (${typeResults.length})` : '')}
-                      icon={Icon}
-                      color={color}
-                    />
-                    {typeResults.map(result => {
-                      const globalIdx = flatDisplayed.findIndex(r => r.id === result.id && r.type === result.type)
-                      return (
-                        <ResultItem
-                          key={result.type + result.id}
-                          result={result}
-                          query={query}
-                          isActive={globalIdx === activeIdx}
-                          onClick={() => navigate_(result.route)}
-                        />
-                      )
-                    })}
+              {/* Results header (with query) */}
+              {query.trim() && results.length > 0 && (
+                <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--line)' }}>
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                    {results.length} risultat{results.length === 1 ? 'o' : 'i'} per "<span style={{ color: 'var(--text)' }}>{query}</span>"
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>↑↓ naviga</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--panel2)', color: 'var(--muted)', border: '1px solid var(--line)', fontSize: 10 }}>↵</span>
                   </div>
-                )
-              })
-          }
+                </div>
+              )}
 
-          {/* Footer */}
-          {displayed.length > 0 && (
-            <div className="px-4 py-2.5 flex items-center gap-3 flex-wrap"
-              style={{ borderTop: '1px solid var(--line)', background: 'rgba(255,255,255,0.01)' }}>
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-3 h-3" style={{ color: 'var(--muted)' }} />
-                <span className="text-xs" style={{ color: 'var(--muted)' }}>Risultati in tempo reale</span>
-              </div>
-              {ruolo !== 'Admin' && (
-                <div className="flex items-center gap-1 ml-auto">
-                  <Lock className="w-3 h-3" style={{ color: 'var(--muted)' }} />
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>Filtrato per {ruolo}</span>
+              {/* Empty state */}
+              {isEmpty && query.trim() && (
+                <div className="py-6 text-center">
+                  <Hash className="w-8 h-8 mx-auto mb-2 opacity-20" style={{ color: 'var(--muted)' }} />
+                  <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun risultato per "{query}"</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--muted)', opacity: 0.6 }}>Prova a chiedere a Fly qui sotto</p>
                 </div>
               )}
-              {ruolo === 'Admin' && (
-                <div className="flex items-center gap-1 ml-auto">
-                  <TrendingUp className="w-3 h-3" style={{ color: 'var(--muted)' }} />
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>Accesso completo</span>
+
+              {/* Empty state — no suggestions */}
+              {!query.trim() && suggestions.length === 0 && (
+                <div className="py-8 text-center">
+                  <Search className="w-7 h-7 mx-auto mb-2 opacity-20" style={{ color: 'var(--muted)' }} />
+                  <p className="text-sm" style={{ color: 'var(--muted)' }}>Inizia a digitare per cercare</p>
                 </div>
               )}
-            </div>
+
+              {/* Grouped results */}
+              {!query.trim()
+                ? /* Suggestions flat */
+                  flatDisplayed.map((result, i) => (
+                    <ResultItem
+                      key={result.type + result.id}
+                      result={result}
+                      query={query}
+                      isActive={i === activeIdx}
+                      onClick={() => navigate_(result.route)}
+                    />
+                  ))
+                : /* Search results grouped by type */
+                  Object.entries(grouped).map(([type, typeResults]) => {
+                    const Icon = typeIcon(type as ResultType)
+                    const color = typeColor(type as ResultType)
+                    return (
+                      <div key={type}>
+                        <SectionHeader
+                          label={typeLabel(type as ResultType) + (typeResults.length > 1 ? `s (${typeResults.length})` : '')}
+                          icon={Icon}
+                          color={color}
+                        />
+                        {typeResults.map(result => {
+                          const globalIdx = flatDisplayed.findIndex(r => r.id === result.id && r.type === result.type)
+                          return (
+                            <ResultItem
+                              key={result.type + result.id}
+                              result={result}
+                              query={query}
+                              isActive={globalIdx === activeIdx}
+                              onClick={() => navigate_(result.route)}
+                            />
+                          )
+                        })}
+                      </div>
+                    )
+                  })
+              }
+
+              {/* "Ask Fly" row — shown when there is a query */}
+              {hasFlyRow && (
+                <button
+                  onMouseDown={e => { e.preventDefault(); setFlyMode(query.trim()) }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all"
+                  style={{
+                    background: activeIdx === flyRowIdx ? 'rgba(208,0,58,0.07)' : 'transparent',
+                    borderLeft: activeIdx === flyRowIdx ? '2px solid var(--red2)' : '2px solid transparent',
+                    borderTop: '1px solid var(--line)',
+                  }}
+                >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'rgba(208,0,58,0.08)', border: '1px solid rgba(208,0,58,0.2)' }}>
+                    <PawPrint className="w-3.5 h-3.5" style={{ color: 'var(--red2)' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--red2)' }}>
+                      Chiedi a Fly: "{query.length > 40 ? query.slice(0, 40) + '...' : query}"
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Rispondi con l'intelligenza artificiale</p>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--red2)', opacity: 0.6 }} />
+                </button>
+              )}
+
+              {/* Footer */}
+              {displayed.length > 0 && !hasFlyRow && (
+                <div className="px-4 py-2.5 flex items-center gap-3 flex-wrap"
+                  style={{ borderTop: '1px solid var(--line)', background: 'rgba(255,255,255,0.01)' }}>
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-3 h-3" style={{ color: 'var(--muted)' }} />
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>Risultati in tempo reale</span>
+                  </div>
+                  {ruolo !== 'Admin' && (
+                    <div className="flex items-center gap-1 ml-auto">
+                      <Lock className="w-3 h-3" style={{ color: 'var(--muted)' }} />
+                      <span className="text-xs" style={{ color: 'var(--muted)' }}>Filtrato per {ruolo}</span>
+                    </div>
+                  )}
+                  {ruolo === 'Admin' && (
+                    <div className="flex items-center gap-1 ml-auto">
+                      <TrendingUp className="w-3 h-3" style={{ color: 'var(--muted)' }} />
+                      <span className="text-xs" style={{ color: 'var(--muted)' }}>Accesso completo</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
