@@ -817,7 +817,13 @@ export default function Eventi() {
 
   const handleSave = useCallback(async (event: Event) => {
     const isEdit = eventList.some(e => e.id === event.id)
-    const saved = await upsertEvent(event)
+    let saved: Event | null = null
+    try {
+      saved = await upsertEvent(event)
+    } catch (err: any) {
+      setErrorMessage(`${isEdit ? 'Salvataggio modifica fallito' : 'Creazione evento fallita'}: ${err?.message || 'Errore sconosciuto'}`)
+      return
+    }
     if (!saved) {
       setErrorMessage(isEdit ? 'Salvataggio modifica fallito. Riprova.' : 'Creazione evento fallita. Riprova.')
       return
@@ -835,7 +841,13 @@ export default function Eventi() {
   }, [eventList, refreshEvents, selectedEvent])
 
   const handleDelete = useCallback(async (event: Event) => {
-    const ok = await deleteEventRemote(event.id)
+    let ok = false
+    try {
+      ok = await deleteEventRemote(event.id)
+    } catch (err: any) {
+      setErrorMessage(`Eliminazione evento fallita: ${err?.message || 'Errore sconosciuto'}`)
+      return
+    }
     if (!ok) {
       setErrorMessage('Eliminazione evento fallita. Riprova.')
       return
@@ -846,7 +858,13 @@ export default function Eventi() {
   }, [refreshEvents])
 
   const handleStatusChange = useCallback(async (event: Event, newStato: StatoEvento) => {
-    const remote = await updateEventRemote(event.id, { stato: newStato })
+    let remote: Event | null = null
+    try {
+      remote = await updateEventRemote(event.id, { stato: newStato })
+    } catch (err: any) {
+      setErrorMessage(`Aggiornamento stato fallito: ${err?.message || 'Errore sconosciuto'}`)
+      return
+    }
     if (!remote) {
       setErrorMessage('Aggiornamento stato fallito. Riprova.')
       return
@@ -867,7 +885,12 @@ export default function Eventi() {
     if (!user) return
     const allowedRoles = ['Project Manager', 'Senior PM', 'Admin', 'Super Admin']
     if (!allowedRoles.includes(user.role)) return
-    await archiveEvent(event.id, user.id)
+    try {
+      await archiveEvent(event.id, user.id)
+    } catch (err: any) {
+      setErrorMessage(`Archiviazione fallita: ${err?.message || 'Errore sconosciuto'}`)
+      return
+    }
     showToast('Evento archiviato', 'success')
     setSelectedEvent(null)
     refreshEvents()
