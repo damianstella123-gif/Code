@@ -233,6 +233,8 @@ export default function TaskPage() {
   const [filterPriorita, setFilterPriorita] = useState('Tutte')
   const [filterAssegnatario, setFilterAssegnatario] = useState('Tutti')
   const [filterCategoria, setFilterCategoria] = useState('Tutte')
+  const [showMyTasks, setShowMyTasks] = useState(true)
+  const [employeeFilter, setEmployeeFilter] = useState('Tutti')
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -283,6 +285,12 @@ export default function TaskPage() {
 
   const filtered = useMemo(() => {
     return visibleTasks.filter(t => {
+      if (showMyTasks && currentUser) {
+        if (t.assegnatario !== currentUser.id) return false
+      }
+      if (!showMyTasks && employeeFilter !== 'Tutti') {
+        if (t.assegnatario !== employeeFilter) return false
+      }
       const matchSearch = search === '' || t.titolo.toLowerCase().includes(search.toLowerCase()) || t.descrizione.toLowerCase().includes(search.toLowerCase())
       const matchPriorita = filterPriorita === 'Tutte' || t.priorita === filterPriorita
       const matchAssegnatario = filterAssegnatario === 'Tutti' || t.assegnatario === filterAssegnatario
@@ -290,7 +298,7 @@ export default function TaskPage() {
       const matchCategoria = filterCategoria === 'Tutte' || t.categoria === filterCategoria
       return matchSearch && matchPriorita && matchAssegnatario && matchStato && matchCategoria
     })
-  }, [visibleTasks, search, filterPriorita, filterAssegnatario, filterStato, filterCategoria])
+  }, [visibleTasks, search, filterPriorita, filterAssegnatario, filterStato, filterCategoria, showMyTasks, employeeFilter, currentUser])
 
   const sorted = useMemo(() => {
     const open = filtered.filter(t => t.stato !== 'completato')
@@ -400,6 +408,49 @@ export default function TaskPage() {
           <span><strong>{highPriCount}</strong> alta priorita</span>
         </div>
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: 12, background: 'var(--surface)', borderRadius: '8px', padding: '3px', width: 'fit-content', border: '1px solid var(--border)' }}>
+          <button
+            onClick={() => { setShowMyTasks(true); setEmployeeFilter('Tutti') }}
+            style={{
+              padding: '5px 14px', borderRadius: '6px', fontSize: '11px', fontFamily: 'var(--font-mono)',
+              fontWeight: showMyTasks ? 600 : 400, cursor: 'pointer', border: 'none', transition: 'all 0.2s',
+              background: showMyTasks ? 'var(--red2)' : 'transparent',
+              color: showMyTasks ? '#fff' : 'var(--muted)',
+            }}>
+            I miei task
+          </button>
+          <button
+            onClick={() => setShowMyTasks(false)}
+            style={{
+              padding: '5px 14px', borderRadius: '6px', fontSize: '11px', fontFamily: 'var(--font-mono)',
+              fontWeight: !showMyTasks ? 600 : 400, cursor: 'pointer', border: 'none', transition: 'all 0.2s',
+              background: !showMyTasks ? 'var(--red2)' : 'transparent',
+              color: !showMyTasks ? '#fff' : 'var(--muted)',
+            }}>
+            Tutti i task
+          </button>
+        </div>
+
+        {!showMyTasks && (
+          <div style={{ marginTop: 8 }}>
+            <select
+              value={employeeFilter}
+              onChange={e => setEmployeeFilter(e.target.value)}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: '11px',
+                padding: '5px 10px', borderRadius: '6px',
+                background: 'var(--panel2)', border: '1px solid var(--line)',
+                color: employeeFilter !== 'Tutti' ? 'var(--text)' : 'var(--muted)',
+                cursor: 'pointer',
+              }}>
+              <option value="Tutti">Tutti i dipendenti</option>
+              {allUsers.map(u => (
+                <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="wire-tabs" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginTop: 12 }}>
           <div style={{ display: 'flex', gap: '16px', overflowX: 'auto' }}>
             {(['Tutti', 'da_fare', 'in_corso', 'completato'] as const).map(s => (
@@ -460,7 +511,19 @@ export default function TaskPage() {
           </div>
         ) : sorted.open.length === 0 && sorted.done.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: 1.7 }}>
-            Niente da fare &mdash; o e un gran giorno<br/>o e il momento di pianificare il prossimo evento
+            {showMyTasks ? (
+              <>
+                Non hai task assegnati al momento.
+                <br />
+                <button
+                  onClick={() => setShowMyTasks(false)}
+                  style={{ marginTop: '10px', padding: '6px 16px', borderRadius: '6px', fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 600, cursor: 'pointer', border: 'none', background: 'var(--red2)', color: '#fff' }}>
+                  Passa a "Tutti i task"
+                </button>
+              </>
+            ) : (
+              <>Niente da fare &mdash; o e un gran giorno<br/>o e il momento di pianificare il prossimo evento</>
+            )}
           </div>
         ) : (
           <>
