@@ -144,13 +144,13 @@ export async function executeHandover(params: HandoverParams): Promise<{ error: 
     .maybeSingle()
   const fromName = fromProfile ? `${fromProfile.first_name} ${fromProfile.last_name}`.trim() : 'Un collega'
 
-  await supabase.from('notifications').insert({
-    user_id: toUserId,
-    title: 'Passaggio di consegne',
-    message: `${fromName} ti ha passato l'evento "${ev.title}"${note ? ` — Nota: ${note}` : ''}`,
-    type: 'event_handover',
-    related_entity_type: 'event',
-    related_entity_id: eventId,
+  await supabase.rpc('create_notification_for_user', {
+    p_user_id: toUserId,
+    p_title: 'Passaggio di consegne',
+    p_message: `${fromName} ti ha passato l'evento "${ev.title}"${note ? ` — Nota: ${note}` : ''}`,
+    p_type: 'event_handover',
+    p_entity_type: 'event',
+    p_entity_id: eventId,
   })
 
   await supabase.from('audit_log').insert({
