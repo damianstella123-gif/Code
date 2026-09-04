@@ -1018,7 +1018,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
               </select>
             ) : (
-              <span className="w-24 text-xs truncate hidden md:block" style={{ color: 'var(--muted)' }}>{item.fornitore || '-'}</span>
+              <span className="w-32 text-xs truncate hidden md:block" style={{ color: 'var(--muted)' }} title={item.fornitore || undefined}>{item.fornitore || '-'}</span>
             )}
             <input
               className={inputCls + " w-10 text-right"}
@@ -1091,7 +1091,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
             >{item.descrizione}</span>
             {item.dateLabel && <span className="text-[10px] truncate block" style={{ color: 'var(--muted)' }}>{item.dateLabel}</span>}
           </div>
-          <span className={`w-24 text-xs truncate hidden md:block${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--muted)' }}>{item.fornitore || '-'}</span>
+          <span className={`w-32 text-xs truncate hidden md:block${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--muted)' }} title={item.fornitore || undefined}>{item.fornitore || '-'}</span>
           <span className={`w-10 text-xs text-right${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--text)' }}>{item.qty}</span>
           <span className={`w-20 text-xs text-right${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--text)' }}>{fmt(item.venduto)}</span>
           <span className={`w-20 text-xs text-right${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--yellow)' }}>{fmt(item.costo)}</span>
