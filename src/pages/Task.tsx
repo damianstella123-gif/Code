@@ -86,7 +86,7 @@ function deadlineLabel(scadenza: string, stato: string): { text: string; color: 
 
 // ─── Task Form Modal ──────────────────────────────────────────────────────────
 
-function TaskFormModal({ task, onSave, onClose, users, events }: {
+export function TaskFormModal({ task, onSave, onClose, users, events }: {
   task?: Task; onSave: (t: Task) => void; onClose: () => void; users: Profile[]; events: { id: string; nome: string }[]
 }) {
   const [titolo, setTitolo] = useState(task?.titolo ?? '')
@@ -604,7 +604,7 @@ export default function TaskPage() {
 
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, events, getInitials, getFullName, onCycleStatus, onRowClick, onNavigateEvent, isCompleting }: {
+export function TaskRow({ task, events, getInitials, getFullName, onCycleStatus, onRowClick, onNavigateEvent, isCompleting }: {
   task: Task
   events: { id: string; nome: string }[]
   getInitials: (id: string) => string
@@ -732,7 +732,7 @@ function TaskRow({ task, events, getInitials, getFullName, onCycleStatus, onRowC
 
 // ─── Task Detail Panel ────────────────────────────────────────────────────────
 
-function TaskDetailPanel({ task, events, getInitials, getFullName, onClose, onEdit, onDelete, onStatusChange, onNavigateEvent }: {
+export function TaskDetailPanel({ task, events, getInitials, getFullName, onClose, onEdit, onDelete, onStatusChange, onNavigateEvent }: {
   task: Task
   events: { id: string; nome: string }[]
   getInitials: (id: string) => string

@@ -56,6 +56,7 @@ import type { SafetyDossierBundle } from '@/lib/safety-service'
 import { fetchEventMembers } from '@/lib/event-members-service'
 import { isAdmin } from '@/lib/auth'
 import { TabSafety } from './eventi/tabs/TabSafety'
+import { TabTask } from './eventi/tabs/TabTask'
 import { PassaConsegneModal } from '@/components/PassaConsegneModal'
 import type { Profile } from '@/lib/profiles'
 
@@ -315,6 +316,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
   const tabs: { id: TabId; label: string }[] = [
     { id: 'overview', label: 'Panoramica' },
     { id: 'fornitori', label: `Fornitori${supplierLinkCount > 0 ? ` (${supplierLinkCount})` : ''}` },
+    { id: 'task', label: `Task${totalTasks > 0 ? ` (${totalTasks})` : ''}` },
     { id: 'economia', label: 'Budget & Pagamenti' },
     { id: 'scambi', label: 'Comunicazioni & Documenti' },
     { id: 'registrazioni', label: 'Registrazioni' },
@@ -536,6 +538,7 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
           <TabOverview event={event} progress={progress} completedTasks={completedTasks} totalTasks={totalTasks} budgets={budgets} clients={clients} onClientClick={navigateToCrm} internalUsers={internalUsers} comunicazioni={eventComunicazioni} />
         )}
         {activeTab === 'fornitori' && <TabFornitori event={event} suppliers={suppliers} onSuppliersChanged={() => { onSuppliersChanged(); fetchSupplierLinkCount() }} />}
+        {activeTab === 'task' && <TabTask event={event} internalUsers={internalUsers} />}
         {activeTab === 'economia' && <TabEconomia event={event} suppliers={suppliers} clients={clients} />}
         {activeTab === 'scambi' && <TabScambi event={event} isArchived={isArchived} />}
         {activeTab === 'registrazioni' && (
