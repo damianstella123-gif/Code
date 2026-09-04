@@ -15,6 +15,7 @@ import {
   Loader2,
   ArrowRightLeft,
   Leaf,
+  User,
 } from 'lucide-react'
 import { loadUser } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
@@ -380,7 +381,11 @@ function EventDetail({ event, isArchived, onBack, onEdit, onDelete, onArchive, o
 
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
           <span style={{ color: 'var(--text)', fontWeight: 600 }}>{'\u20AC'}{event.budget.toLocaleString('it-IT')}</span>
-          {responsabileObj && <span>{' \u00B7 '}{responsabileObj.nome}</span>}
+          {responsabileObj && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              {' \u00B7 '}<User className="w-3 h-3" /> Responsabile: {responsabileObj.nome}
+            </span>
+          )}
           {totalTasks > 0 && <span>{' \u00B7 '}{progress}% completato</span>}
         </div>
 
@@ -1100,6 +1105,7 @@ export default function Eventi() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px', marginTop: '18px' }}>
           {filtered.map((event) => {
             const cliente = clientsList.find(c => c.id === event.cliente)
+            const responsabileObj = internalUsers.find(u => u.id === event.responsabile)
             const allTasks = loadTasksFromStorage()
             const eventTaskList = allTasks.filter(t => t.evento === event.id)
             const completedCount = eventTaskList.filter(t => t.stato === 'completato').length
@@ -1165,6 +1171,12 @@ export default function Eventi() {
                 <p style={{ fontSize: '13px', color: 'var(--muted)', margin: 0, lineHeight: 1.4 }}>
                   {event.location}{cliente ? ` · ${cliente.nome}` : ''}
                 </p>
+
+                {responsabileObj && (
+                  <p style={{ fontSize: '12px', color: 'var(--muted)', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <User className="w-3 h-3" /> {responsabileObj.nome}
+                  </p>
+                )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--muted)' }}>
                   <span>{fmtShort(event.dataInizio)}{event.dataFine && event.dataFine !== event.dataInizio ? ` - ${fmtShort(event.dataFine)}` : ''}</span>
