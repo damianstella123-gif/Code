@@ -1084,17 +1084,17 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
           <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: statoConf.color }} />
           <div className="flex-1 min-w-0">
             <span
-              className="text-xs font-medium truncate block"
+              className={`text-xs font-medium truncate block${canInlineEdit ? ' editable-field' : ''}`}
               style={{ color: 'var(--text)', cursor: canInlineEdit ? 'text' : undefined }}
               onClick={canInlineEdit ? (e) => { e.stopPropagation(); startInlineEdit(item) } : undefined}
               title={canInlineEdit ? 'Clicca per modificare inline' : undefined}
             >{item.descrizione}</span>
             {item.dateLabel && <span className="text-[10px] truncate block" style={{ color: 'var(--muted)' }}>{item.dateLabel}</span>}
           </div>
-          <span className="w-24 text-xs truncate hidden md:block" style={{ color: 'var(--muted)' }}>{item.fornitore || '-'}</span>
-          <span className="w-10 text-xs text-right" style={{ color: 'var(--text)' }}>{item.qty}</span>
-          <span className="w-20 text-xs text-right" style={{ color: 'var(--text)' }}>{fmt(item.venduto)}</span>
-          <span className="w-20 text-xs text-right" style={{ color: 'var(--yellow)' }}>{fmt(item.costo)}</span>
+          <span className={`w-24 text-xs truncate hidden md:block${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--muted)' }}>{item.fornitore || '-'}</span>
+          <span className={`w-10 text-xs text-right${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--text)' }}>{item.qty}</span>
+          <span className={`w-20 text-xs text-right${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--text)' }}>{fmt(item.venduto)}</span>
+          <span className={`w-20 text-xs text-right${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--yellow)' }}>{fmt(item.costo)}</span>
           {item.commissione_pct != null && item.commissione_pct > 0 && (
             <span className="w-14 text-[10px] text-right" style={{ color: 'var(--green)' }} title="Commissione hotel sul costo">+{item.commissione_pct}%</span>
           )}

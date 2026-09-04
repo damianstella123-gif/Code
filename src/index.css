@@ -152,6 +152,14 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   filter: invert(1);
 }
 
+.editable-field {
+  border-bottom: 1px dashed var(--line);
+  transition: border-color 0.15s;
+}
+.editable-field:hover {
+  border-bottom: 1px dashed var(--muted);
+}
+
 @media print {
   .shell-header, .shell-sidebar, .mobile-bottom-nav, .no-print, .wire-masthead, .wire-tabs, .wire-ticker { display: none !important; }
   .calendario-print { font-family: 'Montserrat', sans-serif; color: #1a1a1a; }
