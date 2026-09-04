@@ -63,3 +63,20 @@ export async function adminUpdateUser(input: UpdateUserInput): Promise<void> {
 export async function adminResetPassword(userId: string, newPassword: string): Promise<void> {
   await call('reset-password', 'POST', { user_id: userId, new_password: newPassword })
 }
+
+export async function adminDeleteUser(userId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${EDGE_URL}?action=delete-user`, { method: 'POST', headers, body: JSON.stringify({ user_id: userId }) })
+  const json = await res.json()
+  if (!res.ok) {
+    if (json.error === 'MFA_REQUIRED') {
+      throw new Error('Questa operazione richiede l\u2019autenticazione a due fattori. Attiva la 2FA sul tuo account e accedi con essa, poi riprova.')
+    }
+    if (json.error === 'HAS_LINKED_DATA') {
+      const err = new Error(json.message ?? 'Questo utente ha dati collegati.')
+      ;(err as any).code = 'HAS_LINKED_DATA'
+      throw err
+    }
+    throw new Error(json.error ?? `Errore ${res.status}`)
+  }
+}

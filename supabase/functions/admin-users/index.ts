@@ -15,6 +15,7 @@ const VALID_ACTIONS = new Set([
   "create-user",
   "update-user",
   "reset-password",
+  "delete-user",
 ]);
 
 const VALID_APP_ROLES = new Set([
@@ -115,7 +116,7 @@ Deno.serve(async (req: Request) => {
     // (aal2) session. Role changes are gated per-action below. Routine edits
     // (name, avatar, activation) and read-only listing stay open so normal
     // admin work is not blocked during the 2FA grace period.
-    if (action === "reset-password" && auth.aal !== "aal2") {
+    if ((action === "reset-password" || action === "delete-user") && auth.aal !== "aal2") {
       return jsonResp({ error: "MFA_REQUIRED" }, 403);
     }
 
@@ -372,6 +373,64 @@ Deno.serve(async (req: Request) => {
         .from("profiles")
         .update({ force_password_change: true })
         .eq("id", user_id);
+
+      return jsonResp({ success: true });
+    }
+
+    // ─── DELETE USER ───────────────────────────────────────────
+    if (action === "delete-user") {
+      const user_id = safeStr(body.user_id);
+      if (!user_id || !UUID_RE.test(user_id)) {
+        return jsonResp({ error: "INVALID_INPUT" }, 400);
+      }
+
+      // Call the RPC through the caller's own authenticated client so the
+      // internal auth.uid() check inside the function applies.
+      const authHeader = req.headers.get("Authorization") ?? "";
+      const callerToken = authHeader.replace(/^Bearer\s+/i, "");
+      const callerClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        {
+          global: { headers: { Authorization: `Bearer ${callerToken}` } },
+          auth: { autoRefreshToken: false, persistSession: false },
+        }
+      );
+
+      const { error: rpcError } = await callerClient.rpc(
+        "admin_delete_user_cascade",
+        { p_user_id: user_id }
+      );
+
+      if (rpcError) {
+        const msg = rpcError.message ?? "";
+        if (msg.startsWith("HAS_LINKED_DATA")) {
+          return jsonResp(
+            {
+              error: "HAS_LINKED_DATA",
+              message:
+                "Questo utente ha dati collegati che non possono essere rimossi automaticamente. Disattivalo invece di eliminarlo.",
+              detail: msg,
+            },
+            409
+          );
+        }
+        if (msg.includes("NOT_AUTHORIZED")) {
+          return jsonResp({ error: "ROLE_NOT_ALLOWED" }, 403);
+        }
+        if (msg.includes("CANNOT_DELETE_SELF")) {
+          return jsonResp({ error: "CANNOT_DELETE_SELF", message: "Non puoi eliminare il tuo stesso account." }, 400);
+        }
+        return jsonResp({ error: "INTERNAL_ERROR", detail: msg }, 500);
+      }
+
+      // Profile deleted — now remove the auth account
+      const { error: authDeleteError } =
+        await adminClient.auth.admin.deleteUser(user_id);
+
+      if (authDeleteError) {
+        return jsonResp({ error: "INTERNAL_ERROR" }, 500);
+      }
 
       return jsonResp({ success: true });
     }

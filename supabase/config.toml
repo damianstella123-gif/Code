@@ -1,0 +1,29 @@
+[functions."admin-users"]
+verify_jwt = true
+
+[functions."cleanup"]
+verify_jwt = true
+
+[functions."creative-generate-pptx"]
+verify_jwt = true
+
+[functions."document-ingest"]
+verify_jwt = true
+
+[functions."fly-gateway"]
+verify_jwt = true
+
+[functions."get-fly-memory"]
+verify_jwt = true
+
+[functions."morning-edition"]
+verify_jwt = true
+
+[functions."registration-email-worker"]
+verify_jwt = true
+
+[functions."retention-job"]
+verify_jwt = true
+
+[functions."sentinel"]
+verify_jwt = true

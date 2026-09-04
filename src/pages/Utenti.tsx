@@ -8,6 +8,7 @@ import {
   X,
   Check,
   AlertCircle,
+  Trash2,
   User,
   Mail,
   Camera,
@@ -21,6 +22,7 @@ import {
   adminCreateUser,
   adminUpdateUser,
   adminResetPassword,
+  adminDeleteUser,
 } from '@/lib/users-service'
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -247,6 +249,26 @@ export default function Utenti() {
     }
   }
 
+  const handleDeleteUser = async (user: Profile) => {
+    setConfirmAction({
+      message: `Sei sicuro di voler eliminare definitivamente questo utente?\nL'azione non è reversibile.\n\n${user.first_name} ${user.last_name} (${user.email})`,
+      onConfirm: async () => {
+        setConfirmAction(null)
+        try {
+          await adminDeleteUser(user.id)
+          setUsers(prev => prev.filter(u => u.id !== user.id))
+          setSuccess('Utente eliminato definitivamente')
+        } catch (err: any) {
+          if (err?.code === 'HAS_LINKED_DATA') {
+            setError(err.message)
+          } else {
+            setError(err instanceof Error ? err.message : 'Errore durante l\'eliminazione')
+          }
+        }
+      },
+    })
+  }
+
   const handleToggleActive = async (user: Profile) => {
     const action = user.is_active ? 'disattivare' : 'riattivare'
     setConfirmAction({
@@ -438,6 +460,7 @@ export default function Utenti() {
                 onToggle={() => setExpandedUser(expandedUser === u.id ? null : u.id)}
                 onEdit={() => openEdit(u)}
                 onToggleActive={() => handleToggleActive(u)}
+                onDelete={() => handleDeleteUser(u)}
                 onResetPassword={() => { setResetUser(u); setNewPassword('') }}
               />
             ))}
@@ -612,7 +635,7 @@ export default function Utenti() {
 
 // ─── USER CARD COMPONENT ──────────────────────────────────────────────────────
 
-function UserCard({ user, isPartner, canResetPw, isSelf, delay, expanded, onToggle, onEdit, onToggleActive, onResetPassword }: {
+function UserCard({ user, isPartner, canResetPw, isSelf, delay, expanded, onToggle, onEdit, onToggleActive, onDelete, onResetPassword }: {
   user: Profile
   isPartner: boolean
   canResetPw: boolean
@@ -622,6 +645,7 @@ function UserCard({ user, isPartner, canResetPw, isSelf, delay, expanded, onTogg
   onToggle: () => void
   onEdit: () => void
   onToggleActive: () => void
+  onDelete: () => void
   onResetPassword: () => void
 }) {
   const color = roleColor(user.role)
@@ -820,6 +844,32 @@ function UserCard({ user, isPartner, canResetPw, isSelf, delay, expanded, onTogg
               >
                 {user.is_active ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
                 {user.is_active ? 'DISATTIVA' : 'RIATTIVA'}
+              </button>
+            )}
+            {!isSelf && (
+              <button
+                onClick={e => { e.stopPropagation(); onDelete() }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  fontWeight: 500,
+                  color: 'var(--red2)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
+              >
+                <Trash2 className="w-3 h-3" />
+                ELIMINA
               </button>
             )}
           </div>
