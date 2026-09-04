@@ -81,6 +81,16 @@ function statoLabel(stato: string) {
   }
 }
 
+const RECENT_EVENTS_KEY = 'recent_events_viewed'
+function recordRecentEvent(eventId: string) {
+  try {
+    const raw = localStorage.getItem(RECENT_EVENTS_KEY)
+    const list: string[] = raw ? JSON.parse(raw) : []
+    const updated = [eventId, ...list.filter(id => id !== eventId)].slice(0, 5)
+    localStorage.setItem(RECENT_EVENTS_KEY, JSON.stringify(updated))
+  } catch { /* ignore storage errors */ }
+}
+
 function getVisibleEvents(_ruolo: string, _userId: string, eventList: Event[]): Event[] {
   return eventList
 }
@@ -1127,7 +1137,7 @@ export default function Eventi() {
             return (
               <div
                 key={event.id}
-                onClick={() => setSelectedEvent(event)}
+                onClick={() => { recordRecentEvent(event.id); setSelectedEvent(event) }}
                 style={{
                   background: 'var(--panel-solid)',
                   border: '1px solid var(--line)',

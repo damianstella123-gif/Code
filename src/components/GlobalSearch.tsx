@@ -48,6 +48,34 @@ interface SearchResult {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+const RECENT_EVENTS_KEY = 'recent_events_viewed'
+const RECENT_SEARCHES_KEY = 'recent_searches'
+
+function recordRecentSearch(q: string) {
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY)
+    const list: string[] = raw ? JSON.parse(raw) : []
+    const trimmed = q.trim()
+    if (!trimmed) return
+    const updated = [trimmed, ...list.filter(s => s.toLowerCase() !== trimmed.toLowerCase())].slice(0, 5)
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated))
+  } catch { /* ignore storage errors */ }
+}
+
+function getRecentEventIds(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_EVENTS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function getRecentSearches(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
 function eventColor(stato: string): string {
   switch (stato) {
     case 'in_corso': return 'var(--red2)'
@@ -892,6 +920,7 @@ export default function GlobalSearch() {
   const flatDisplayed = useMemo(() => displayed, [displayed])
 
   function navigate_(route: string) {
+    if (query.trim()) recordRecentSearch(query)
     navigate(route)
     setOpen(false)
     setQuery('')
@@ -989,13 +1018,65 @@ export default function GlobalSearch() {
                 </div>
               )}
 
-              {/* Empty state — no suggestions */}
-              {!query.trim() && suggestions.length === 0 && (
-                <div className="py-8 text-center">
-                  <Search className="w-7 h-7 mx-auto mb-2 opacity-20" style={{ color: 'var(--muted)' }} />
-                  <p className="text-sm" style={{ color: 'var(--muted)' }}>Inizia a digitare per cercare</p>
-                </div>
-              )}
+              {/* Empty state — recent events/searches or fallback */}
+              {!query.trim() && suggestions.length === 0 && (() => {
+                const allEvents = loadEventsFromStorage()
+                const recentIds = getRecentEventIds()
+                const recentEvents = recentIds.map(id => allEvents.find(e => e.id === id)).filter(Boolean) as typeof allEvents
+                const recentSearches = getRecentSearches()
+                const hasAnything = recentEvents.length > 0 || recentSearches.length > 0
+
+                if (!hasAnything) return (
+                  <div className="py-8 text-center">
+                    <Search className="w-7 h-7 mx-auto mb-2 opacity-20" style={{ color: 'var(--muted)' }} />
+                    <p className="text-sm" style={{ color: 'var(--muted)' }}>Inizia a digitare per cercare</p>
+                  </div>
+                )
+
+                return (
+                  <div className="py-2">
+                    {recentEvents.length > 0 && (
+                      <div className="mb-2">
+                        <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>Eventi recenti</p>
+                        {recentEvents.map(ev => (
+                          <button
+                            key={ev.id}
+                            onMouseDown={e => { e.preventDefault(); navigate_(`/eventi?id=${ev.id}`) }}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all"
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text)' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hover)' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                          >
+                            <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: eventColor((ev as any).stato || '') }} />
+                            <div style={{ minWidth: 0 }}>
+                              <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{(ev as any).nome || ev.id}</p>
+                              {(ev as any).location && <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{(ev as any).location}</p>}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {recentSearches.length > 0 && (
+                      <div>
+                        <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>Ricerche recenti</p>
+                        {recentSearches.map(s => (
+                          <button
+                            key={s}
+                            onMouseDown={e => { e.preventDefault(); setQuery(s) }}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all"
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text)' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hover)' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                          >
+                            <Clock className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--muted)' }} />
+                            <span className="text-sm truncate">{s}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Grouped results */}
               {!query.trim()
