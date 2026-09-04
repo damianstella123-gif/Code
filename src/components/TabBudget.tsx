@@ -1088,13 +1088,13 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
               style={{ color: 'var(--text)', cursor: canInlineEdit ? 'text' : undefined }}
               onClick={canInlineEdit ? (e) => { e.stopPropagation(); startInlineEdit(item) } : undefined}
               title={canInlineEdit ? 'Clicca per modificare inline' : undefined}
-            >{item.descrizione}</span>
+            >{item.descrizione || <span style={{ color: 'var(--muted)', fontStyle: 'italic' }}>Descrizione...</span>}</span>
             {item.dateLabel && <span className="text-[10px] truncate block" style={{ color: 'var(--muted)' }}>{item.dateLabel}</span>}
           </div>
-          <span className={`w-32 text-xs truncate hidden md:block${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--muted)' }} title={item.fornitore || undefined}>{item.fornitore || '-'}</span>
-          <span className={`w-10 text-xs text-right${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--text)' }}>{item.qty}</span>
-          <span className={`w-20 text-xs text-right${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--text)' }}>{fmt(item.venduto)}</span>
-          <span className={`w-20 text-xs text-right${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--yellow)' }}>{fmt(item.costo)}</span>
+          <span className={`w-32 text-xs truncate hidden md:block${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--muted)', cursor: canInlineEdit ? 'text' : undefined }} onClick={canInlineEdit ? (e) => { e.stopPropagation(); startInlineEdit(item) } : undefined} title={canInlineEdit ? 'Clicca per modificare inline' : (item.fornitore || undefined)}>{item.fornitore || '-'}</span>
+          <span className={`w-10 text-xs text-right${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--text)', cursor: canInlineEdit ? 'text' : undefined }} onClick={canInlineEdit ? (e) => { e.stopPropagation(); startInlineEdit(item) } : undefined} title={canInlineEdit ? 'Clicca per modificare inline' : undefined}>{item.qty}</span>
+          <span className={`w-20 text-xs text-right${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--text)', cursor: canInlineEdit ? 'text' : undefined }} onClick={canInlineEdit ? (e) => { e.stopPropagation(); startInlineEdit(item) } : undefined} title={canInlineEdit ? 'Clicca per modificare inline' : undefined}>{fmt(item.venduto)}</span>
+          <span className={`w-20 text-xs text-right${canInlineEdit ? ' editable-field' : ''}`} style={{ color: 'var(--yellow)', cursor: canInlineEdit ? 'text' : undefined }} onClick={canInlineEdit ? (e) => { e.stopPropagation(); startInlineEdit(item) } : undefined} title={canInlineEdit ? 'Clicca per modificare inline' : undefined}>{fmt(item.costo)}</span>
           {item.commissione_pct != null && item.commissione_pct > 0 && (
             <span className="w-14 text-[10px] text-right" style={{ color: 'var(--green)' }} title="Commissione hotel sul costo">+{item.commissione_pct}%</span>
           )}
