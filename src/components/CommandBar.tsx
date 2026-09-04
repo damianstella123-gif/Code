@@ -381,17 +381,17 @@ export default function CommandBar({ events, tasks, clients }: CommandBarProps) 
           break
         }
         case 'comunicazioni': {
-          const { data: threads } = await supabase.from('comunicazioni_threads')
-            .select('id, oggetto, stato, event_id, events(title)')
+          const { data: threads } = await supabase.from('comunicazioni_thread')
+            .select('id, titolo, stato, event_id, events(title)')
             .eq('stato', 'aperto')
             .order('updated_at', { ascending: false })
             .limit(5)
           for (const t of threads || []) {
             const evName = (t as any).events?.title || ''
-            if (!cmd.search || t.oggetto.toLowerCase().includes(cmd.search.toLowerCase()) || evName.toLowerCase().includes(cmd.search.toLowerCase())) {
+            if (!cmd.search || t.titolo.toLowerCase().includes(cmd.search.toLowerCase()) || evName.toLowerCase().includes(cmd.search.toLowerCase())) {
               results.push({
                 type: 'comunicazioni', id: t.id,
-                title: t.oggetto,
+                title: t.titolo,
                 meta: `${evName} \u00B7 ${t.stato}`,
                 actions: [
                   { label: 'Apri', fn: () => { navigate(`/eventi?id=${t.event_id}&tab=comunicazioni`); closeBar() } },
