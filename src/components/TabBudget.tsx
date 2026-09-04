@@ -871,17 +871,21 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     rows.push([`Preventivo al ${fmtDateCentral(new Date().toISOString())}`])
     rows.push([])
     rows.push([])
-    rows.push(['CATEGORIA', 'DESCRIZIONE', 'FORNITORE', 'STATO', 'QTY', 'VENDUTO NETTO', 'COSTO NETTO', `FEE ${feePct}%`, 'MARGINE NETTO', 'MARGINE %'])
+
+    const header = ['DESCRIZIONE', 'FORNITORE', 'STATO', 'Qty', 'Prezzo Unit. Venduto', 'Totale Venduto', 'Qty', 'Costo Unit.', 'Totale Costo', 'Margine', 'Margine %']
 
     for (const cat of exportGroups) {
-      rows.push([cat.label, '', '', '', '', '', '', '', '', ''])
+      rows.push([cat.label, '', '', '', '', '', '', '', '', '', ''])
+      rows.push(header)
       for (const item of cat.items) {
         const itemFee = item.vendutoNetto * feePct / 100
         const itemRicavi = item.vendutoNetto + itemFee + item.commissione
         const itemMargine = itemRicavi - item.costoNetto
         const itemMp = itemRicavi > 0 ? ((itemMargine / itemRicavi) * 100) : 0
         const statoLabel = STATO_CONFIG[item.stato_conferma].label
-        rows.push(['', item.descrizione, item.fornitore || '', statoLabel, item.qty, item.vendutoNetto, item.costoNetto, itemFee, itemMargine, itemMp / 100])
+        const vendutoUnit = item.qty > 0 ? item.vendutoNetto / item.qty : item.vendutoNetto
+        const costoUnit = item.qty > 0 ? item.costoNetto / item.qty : item.costoNetto
+        rows.push([item.descrizione, item.fornitore || '', statoLabel, item.qty, vendutoUnit, item.vendutoNetto, item.qty, costoUnit, item.costoNetto, itemMargine, itemMp / 100])
       }
       const catV = cat.items.reduce((s, i) => s + i.vendutoNetto, 0)
       const catC = cat.items.reduce((s, i) => s + i.costoNetto, 0)
@@ -890,27 +894,27 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const catRicavi = catV + catFee + catComm
       const catM = catRicavi - catC
       const catMp = catRicavi > 0 ? catM / catRicavi : 0
-      rows.push(['', `Totale ${cat.label}`, '', '', '', catV, catC, catFee, catM, catMp])
+      rows.push([`Totale ${cat.label}`, '', '', '', '', catV, '', '', catC, catM, catMp])
       rows.push([])
     }
 
     rows.push([])
-    rows.push(['RIEPILOGO (netto IVA)', '', '', '', '', 'VENDUTO', 'COSTI', 'FEE', 'MARGINE', ''])
+    rows.push(['RIEPILOGO (netto IVA)', '', '', '', '', 'VENDUTO', '', '', 'COSTI', 'MARGINE', ''])
     for (const cat of exportGroups) {
       const cv = cat.items.reduce((s, i) => s + i.vendutoNetto, 0)
       const cc = cat.items.reduce((s, i) => s + i.costoNetto, 0)
       const catComm = cat.items.reduce((s, i) => s + i.commissione, 0)
       const cf = cv * feePct / 100
       const cm = cv + cf + catComm - cc
-      rows.push([cat.label, '', '', '', '', cv, cc, cf, cm, ''])
+      rows.push([cat.label, '', '', '', '', cv, '', '', cc, cm, ''])
     }
-    rows.push(['TOTALE EVENTO', '', '', '', '', totals.venduto, totals.costo, totals.fee, totals.margine, totals.marginePct / 100])
+    rows.push(['TOTALE EVENTO', '', '', '', '', totals.venduto, '', '', totals.costo, totals.margine, totals.marginePct / 100])
     if (totals.commissioni > 0) {
-      rows.push(['COMMISSIONI (interno)', '', '', '', '', '', '', '', totals.commissioni, ''])
+      rows.push(['COMMISSIONI (interno)', '', '', '', '', '', '', '', '', totals.commissioni, ''])
     }
 
     const ws = XLSX.utils.aoa_to_sheet(rows)
-    ws['!cols'] = [{ wch: 22 }, { wch: 40 }, { wch: 20 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 12 }]
+    ws['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Budget Interno')
     const filename = `${sanitizeFilename(evName)}_${sanitizeFilename(clientName)}_Budget_Interno.xlsx`
