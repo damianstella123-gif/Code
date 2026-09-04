@@ -1479,6 +1479,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
                   <span className="w-10 text-right">Qty</span>
                   <span className="w-20 text-right">Venduto</span>
                   <span className="w-20 text-right">Costo</span>
+                  <span className="w-14" />
                   <span className="w-20 text-right">Margine</span>
                   <span className="w-10 text-right">M%</span>
                 </div>
