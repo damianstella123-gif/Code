@@ -263,11 +263,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         setVersions(data || [])
-        if (data?.length) {
-          const approved = data.filter(v => v.tipo === 'preventivo' && v.stato === 'approvato')
-          const defaultVersion = approved.length > 0 ? approved[approved.length - 1] : data[data.length - 1]
-          setActiveVersion(defaultVersion.id)
-        }
+        if (data?.length) setActiveVersion(data[data.length - 1].id)
       })
   }, [event.id])
 
