@@ -7,18 +7,32 @@ export function EventEconomicSummary({ event }: { event: Event }) {
 
   useEffect(() => {
     async function load() {
+      const { data: versions } = await supabase
+        .from('budget_versions')
+        .select('id')
+        .eq('event_id', event.id)
+        .order('created_at', { ascending: true })
+      const verId: string | null = versions?.length ? versions[versions.length - 1].id : null
+
+      function q(table: string, cols: string) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let query = supabase.from(table as any).select(cols).eq('event_id', event.id)
+        if (verId) query = query.eq('budget_version_id', verId)
+        return query as any
+      }
+
       const [svcRes, hotelRes, restRes, expRes, catRes, staffIntRes, staffExtRes, varieRes, avRes, allestRes, graficaRes] = await Promise.all([
-        supabase.from('event_supplier_services').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
-        supabase.from('event_hotel_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
-        supabase.from('event_restaurant_details').select('budget_per_persona,budget_totale,costo_per_persona,costo_totale_reale,pax_confermati,pax_previsti').eq('event_id', event.id),
-        supabase.from('event_experience_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,pax').eq('event_id', event.id),
-        supabase.from('event_catering_details').select('venduto_per_persona,venduto_totale,costo_per_persona,costo_totale,pax').eq('event_id', event.id),
-        supabase.from('event_staff_interno_details').select('venduto_unitario,venduto_totale,costo_giornaliero,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
-        supabase.from('event_staff_esterno_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
-        supabase.from('event_varie_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
-        supabase.from('event_audio_video_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
-        supabase.from('event_allestimenti_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
-        supabase.from('event_grafica_stampa_details').select('venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita').eq('event_id', event.id),
+        q('event_supplier_services', 'venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita'),
+        q('event_hotel_details', 'venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita'),
+        q('event_restaurant_details', 'budget_per_persona,budget_totale,costo_per_persona,costo_totale_reale,pax_confermati,pax_previsti'),
+        q('event_experience_details', 'venduto_unitario,venduto_totale,costo_unitario,costo_totale,pax'),
+        q('event_catering_details', 'venduto_per_persona,venduto_totale,costo_per_persona,costo_totale,pax'),
+        q('event_staff_interno_details', 'venduto_unitario,venduto_totale,costo_giornaliero,costo_unitario,costo_totale,quantita'),
+        q('event_staff_esterno_details', 'venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita'),
+        q('event_varie_details', 'venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita'),
+        q('event_audio_video_details', 'venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita'),
+        q('event_allestimenti_details', 'venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita'),
+        q('event_grafica_stampa_details', 'venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita'),
       ])
       let venduto = 0, costo = 0
       for (const s of (svcRes.data ?? [])) {

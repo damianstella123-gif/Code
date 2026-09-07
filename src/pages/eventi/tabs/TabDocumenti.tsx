@@ -100,6 +100,8 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
   const [movingDoc, setMovingDoc] = useState<string | null>(null)
   const [docMenuOpen, setDocMenuOpen] = useState<string | null>(null)
   const docMenuRef = useRef<HTMLDivElement>(null)
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
+  const [dragOverBreadcrumb, setDragOverBreadcrumb] = useState<string | null>(null)
 
   async function loadFolders() {
     const { data } = await supabase
@@ -446,8 +448,12 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
         <nav className="flex items-center gap-1 text-xs flex-wrap" style={{ color: 'var(--muted)' }}>
           <button
             onClick={() => setCurrentFolderId(null)}
+            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+            onDragEnter={() => setDragOverBreadcrumb('root')}
+            onDragLeave={() => setDragOverBreadcrumb(null)}
+            onDrop={e => { e.preventDefault(); setDragOverBreadcrumb(null); const docId = e.dataTransfer.getData('text/document-id'); if (docId) handleMoveDoc(docId, null) }}
             className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-[var(--line)] transition-colors"
-            style={{ color: 'var(--text)' }}>
+            style={{ color: 'var(--text)', ...(dragOverBreadcrumb === 'root' ? { background: 'color-mix(in srgb, var(--blue) 18%, transparent)', outline: '1.5px dashed var(--blue)', outlineOffset: '-1px' } : {}) }}>
             <Home className="w-3.5 h-3.5" />
             Documenti
           </button>
@@ -455,12 +461,22 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
             <span key={f.id} className="flex items-center gap-1">
               <ChevronRight className="w-3 h-3" style={{ color: 'var(--muted)' }} />
               {i === folderPath.length - 1 ? (
-                <span className="px-1.5 py-0.5 font-medium" style={{ color: 'var(--text)' }}>{f.nome}</span>
+                <span
+                  onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                  onDragEnter={() => setDragOverBreadcrumb(f.id)}
+                  onDragLeave={() => setDragOverBreadcrumb(null)}
+                  onDrop={e => { e.preventDefault(); setDragOverBreadcrumb(null); const docId = e.dataTransfer.getData('text/document-id'); if (docId) handleMoveDoc(docId, f.id) }}
+                  className="px-1.5 py-0.5 font-medium rounded transition-colors"
+                  style={{ color: 'var(--text)', ...(dragOverBreadcrumb === f.id ? { background: 'color-mix(in srgb, var(--blue) 18%, transparent)', outline: '1.5px dashed var(--blue)', outlineOffset: '-1px' } : {}) }}>{f.nome}</span>
               ) : (
                 <button
                   onClick={() => setCurrentFolderId(f.id)}
+                  onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                  onDragEnter={() => setDragOverBreadcrumb(f.id)}
+                  onDragLeave={() => setDragOverBreadcrumb(null)}
+                  onDrop={e => { e.preventDefault(); setDragOverBreadcrumb(null); const docId = e.dataTransfer.getData('text/document-id'); if (docId) handleMoveDoc(docId, f.id) }}
                   className="px-1.5 py-0.5 rounded hover:bg-[var(--line)] transition-colors"
-                  style={{ color: 'var(--text)' }}>
+                  style={{ color: 'var(--text)', ...(dragOverBreadcrumb === f.id ? { background: 'color-mix(in srgb, var(--blue) 18%, transparent)', outline: '1.5px dashed var(--blue)', outlineOffset: '-1px' } : {}) }}>
                   {f.nome}
                 </button>
               )}
@@ -507,8 +523,12 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
               <div
                 key={folder.id}
                 className="panel p-3 cursor-pointer group transition-all hover:ring-1"
-                style={{ '--tw-ring-color': 'var(--blue)' } as React.CSSProperties}
+                style={{ '--tw-ring-color': 'var(--blue)', ...(dragOverFolderId === folder.id ? { background: 'color-mix(in srgb, var(--blue) 14%, transparent)', borderColor: 'var(--blue)', boxShadow: '0 0 0 2px color-mix(in srgb, var(--blue) 30%, transparent)' } : {}) } as React.CSSProperties}
                 onClick={() => { if (!isRenaming) setCurrentFolderId(folder.id) }}
+                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                onDragEnter={e => { e.preventDefault(); setDragOverFolderId(folder.id) }}
+                onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverFolderId(null) }}
+                onDrop={e => { e.preventDefault(); setDragOverFolderId(null); const docId = e.dataTransfer.getData('text/document-id'); if (docId) handleMoveDoc(docId, folder.id) }}
               >
                 <div className="flex items-start justify-between gap-1">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -579,8 +599,13 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
       ) : (
         <div className="space-y-2">
           {currentDocs.map(doc => (
-            <DocumentRow
+            <div
               key={doc.id}
+              draggable
+              onDragStart={e => { e.dataTransfer.setData('text/document-id', doc.id); e.dataTransfer.effectAllowed = 'move' }}
+              style={{ cursor: 'grab' }}
+            >
+            <DocumentRow
               doc={doc}
               canManageDocs={canManageDocs}
               isArchived={isArchived}
@@ -599,6 +624,7 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
               formatAnalyzedAt={formatAnalyzedAt}
               OFFICE_EXTS={OFFICE_EXTS}
             />
+            </div>
           ))}
         </div>
       )}
