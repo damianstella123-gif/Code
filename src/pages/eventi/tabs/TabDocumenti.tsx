@@ -884,6 +884,17 @@ function DocumentRow({
                   <span className="hidden sm:inline">Rianalizza</span>
                 </button>
               )}
+              {status === 'non_supportato' && (
+                <button
+                  onClick={() => onAnalyze(doc.id, true)}
+                  disabled={isProcessing || !!processingDocId}
+                  aria-label="Riprova analisi documento"
+                  className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-[var(--line)] disabled:opacity-40"
+                  style={{ color: 'var(--orange, #e67e22)' }}>
+                  {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  <span className="hidden sm:inline">Riprova analisi</span>
+                </button>
+              )}
               {status === 'in_elaborazione' && (
                 <span className="flex items-center gap-1 px-2 py-1.5 text-xs" style={{ color: 'var(--orange, #e67e22)' }}>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
