@@ -12,6 +12,8 @@ export interface PublicRegistrationField {
   placeholder: string | null
   help_text: string | null
   sort_order: number
+  section: string | null
+  section_description: string | null
 }
 
 export interface PublicRegistrationSite {

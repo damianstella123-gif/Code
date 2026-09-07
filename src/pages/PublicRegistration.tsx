@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react'
+import { useState, useEffect, useMemo, FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { buildBadgeUrl } from '@/lib/badge-qr'
@@ -179,6 +179,7 @@ export default function PublicRegistration() {
   const [marketingConsent, setMarketingConsent] = useState(false)
   const [honeypot, setHoneypot] = useState('')
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!slug) {
@@ -211,6 +212,37 @@ export default function PublicRegistration() {
     setCustomAnswers((prev) => ({ ...prev, [key]: val }))
   }
 
+  const fieldSections = useMemo(() => {
+    if (!site?.fields?.length) return []
+    const sorted = [...site.fields].sort((a, b) => a.sort_order - b.sort_order)
+    const map = new Map<string, { name: string; description: string | null; fields: typeof sorted }>()
+    const order: string[] = []
+    for (const f of sorted) {
+      const key = f.section || ''
+      if (!map.has(key)) {
+        map.set(key, { name: f.section || '', description: f.section_description || null, fields: [] })
+        order.push(key)
+      }
+      map.get(key)!.fields.push(f)
+    }
+    return order.map(k => map.get(k)!)
+  }, [site?.fields])
+
+  useEffect(() => {
+    if (fieldSections.length > 0) {
+      setOpenSections(new Set([fieldSections[0].name]))
+    }
+  }, [fieldSections])
+
+  function toggleSection(name: string) {
+    setOpenSections(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
   function validate(): boolean {
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
       setValidationError('Nome, cognome ed email sono obbligatori.')
@@ -221,20 +253,25 @@ export default function PublicRegistration() {
       return false
     }
     if (site?.fields) {
+      const sectionsToOpen = new Set<string>()
+      let firstError: string | null = null
       for (const field of site.fields) {
         if (!field.required) continue
         const val = customAnswers[field.field_key]
-        if (field.field_type === 'checkbox') {
-          if (val !== true) {
-            setValidationError(`Il campo "${field.label}" è obbligatorio.`)
-            return false
-          }
-        } else {
-          if (!val || (typeof val === 'string' && !val.trim())) {
-            setValidationError(`Il campo "${field.label}" è obbligatorio.`)
-            return false
-          }
+        const missing = field.field_type === 'checkbox' ? val !== true : !val || (typeof val === 'string' && !val.trim())
+        if (missing) {
+          sectionsToOpen.add(field.section || '')
+          if (!firstError) firstError = `Il campo "${field.label}" è obbligatorio.`
         }
+      }
+      if (firstError) {
+        setOpenSections(prev => {
+          const next = new Set(prev)
+          sectionsToOpen.forEach(s => next.add(s))
+          return next
+        })
+        setValidationError(firstError)
+        return false
       }
     }
     setValidationError(null)
@@ -588,18 +625,60 @@ export default function PublicRegistration() {
             />
           </div>
 
-          {site.fields.length > 0 && (
-            <div className="space-y-4 pt-2 border-t border-gray-100">
-              {site.fields
-                .sort((a, b) => a.sort_order - b.sort_order)
-                .map((field) => (
-                  <DynamicField
-                    key={field.id}
-                    field={field}
-                    value={customAnswers[field.field_key]}
-                    onChange={handleCustomChange}
-                  />
-                ))}
+          {fieldSections.length > 0 && (
+            <div className="space-y-3 pt-2 border-t border-gray-100">
+              {fieldSections.map((sec) => {
+                const isOpen = openSections.has(sec.name)
+                const hasSectionName = sec.name.length > 0
+                if (!hasSectionName) {
+                  return sec.fields.map((field) => (
+                    <DynamicField
+                      key={field.id}
+                      field={field}
+                      value={customAnswers[field.field_key]}
+                      onChange={handleCustomChange}
+                    />
+                  ))
+                }
+                return (
+                  <div key={sec.name} className="rounded-xl border border-gray-200 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(sec.name)}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <span className="pr-label text-sm font-semibold block">{sec.name}</span>
+                        {sec.description && (
+                          <span className="pr-muted text-xs block mt-0.5">{sec.description}</span>
+                        )}
+                      </div>
+                      <svg
+                        className="w-5 h-5 shrink-0 pr-muted transition-transform duration-200"
+                        style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {isOpen && (
+                      <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
+                        {sec.fields.map((field) => (
+                          <DynamicField
+                            key={field.id}
+                            field={field}
+                            value={customAnswers[field.field_key]}
+                            onChange={handleCustomChange}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
 
