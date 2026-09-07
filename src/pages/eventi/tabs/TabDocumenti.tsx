@@ -256,7 +256,10 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
     const uploadedDocIds: string[] = []
 
     for (const file of files) {
-      const storagePath = `${event.id}/${Date.now()}_${file.name}`
+      const safeName = file.name
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9._-]/g, '_')
+      const storagePath = `${event.id}/${Date.now()}_${safeName}`
 
       const { error: uploadError } = await supabase.storage
         .from('documents')
