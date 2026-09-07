@@ -54,6 +54,8 @@ function getFileLabel(mimeType: string): string {
     'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PPTX',
     'application/vnd.ms-powerpoint': 'PPT',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+    'application/vnd.ms-outlook': 'Email',
+    'message/rfc822': 'Email',
   }
   if (FILE_ICONS[mimeType]) return FILE_ICONS[mimeType]
   if (mimeType.startsWith('image/')) return 'IMG'
@@ -448,7 +450,7 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
               <Upload className="w-3.5 h-3.5" />
               {uploading ? 'Caricamento...' : 'Carica'}
               <input type="file" className="hidden" onChange={handleUpload} multiple disabled={uploading}
-                accept=".pdf,.xlsx,.xls,.pptx,.ppt,.docx,.jpg,.jpeg,.png" />
+                accept=".pdf,.xlsx,.xls,.pptx,.ppt,.docx,.jpg,.jpeg,.png,.msg,.eml" />
             </label>
           </div>
         )}
