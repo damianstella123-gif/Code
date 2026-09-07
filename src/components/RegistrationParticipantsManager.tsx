@@ -149,6 +149,8 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
       'Nome', 'Cognome', 'Email', 'Telefono', 'Azienda', 'Ruolo',
       'Stato', 'Data registrazione', 'Data check-in',
       'Esigenze alimentari', 'Requisiti accessibilità',
+      'Data di nascita', 'Luogo di nascita', 'Tipo documento', 'Numero documento',
+      'Luogo di rilascio', 'Notte 29', 'Notte 30', 'Notte 1',
     ]
     const rows = filtered.map((r) => [
       escapeCsv(r.first_name),
@@ -162,6 +164,14 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
       escapeCsv(formatDate(r.checked_in_at)),
       escapeCsv(r.dietary_requirements),
       escapeCsv(r.accessibility_requirements),
+      escapeCsv(String(r.custom_answers?.['data_nascita'] ?? '')),
+      escapeCsv(String(r.custom_answers?.['luogo_nascita'] ?? '')),
+      escapeCsv(String(r.custom_answers?.['doc_tipo'] ?? '')),
+      escapeCsv(String(r.custom_answers?.['doc_numero'] ?? '')),
+      escapeCsv(String(r.custom_answers?.['doc_rilascio_luogo'] ?? '')),
+      escapeCsv(r.custom_answers?.['pernottamento_domenica29'] ? 'Sì' : 'No'),
+      escapeCsv(r.custom_answers?.['pernottamento_lunedi30'] ? 'Sì' : 'No'),
+      escapeCsv(r.custom_answers?.['pernottamento_martedi01'] ? 'Sì' : 'No'),
     ])
     const csv = BOM + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -264,9 +274,9 @@ export default function RegistrationParticipantsManager({ eventId, siteId, readO
           onClick={exportCsv}
           className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors whitespace-nowrap"
           style={{ fontSize: '13px' }}
-          aria-label="Esporta CSV"
+          aria-label="Esporta CSV (con dati check-in hotel)"
         >
-          Esporta CSV
+          Esporta CSV (con dati check-in hotel)
         </button>
       </div>
 
