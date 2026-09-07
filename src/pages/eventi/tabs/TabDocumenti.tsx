@@ -6,6 +6,7 @@ import {
   MoreVertical, Pencil
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import BudgetImportReview from '@/components/BudgetImportReview'
 import { trackAction } from '@/lib/impact-tracker'
 import { fmtLong } from '@/lib/format'
 import { checkEventPermission } from '@/lib/event-members-service'
@@ -101,6 +102,8 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
   const [renameFolderName, setRenameFolderName] = useState('')
   const [movingDoc, setMovingDoc] = useState<string | null>(null)
   const [docMenuOpen, setDocMenuOpen] = useState<string | null>(null)
+  const [extractingBudgetDocId, setExtractingBudgetDocId] = useState<string | null>(null)
+  const [reviewProposalId, setReviewProposalId] = useState<string | null>(null)
   const docMenuRef = useRef<HTMLDivElement>(null)
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
   const [dragOverBreadcrumb, setDragOverBreadcrumb] = useState<string | null>(null)
@@ -652,6 +655,29 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
               onDelete={setDeletingDoc}
               onAnalyze={handleAnalyze}
               onMove={setMovingDoc}
+              extractingBudgetDocId={extractingBudgetDocId}
+              onExtractBudget={async (docId: string) => {
+                setExtractingBudgetDocId(docId)
+                try {
+                  const { data: { session } } = await supabase.auth.getSession()
+                  const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/budget-extract-proposal`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+                    body: JSON.stringify({ document_id: docId, event_id: event.id }),
+                  })
+                  const result = await resp.json()
+                  if (result.proposal_id) {
+                    showToast(`Proposta creata: ${result.lines_found} voci trovate`, 'success')
+                    setReviewProposalId(result.proposal_id)
+                  } else {
+                    showToast(result.error || 'Errore estrazione budget', 'error')
+                  }
+                } catch {
+                  showToast('Errore di rete durante l\'estrazione', 'error')
+                } finally {
+                  setExtractingBudgetDocId(null)
+                }
+              }}
               getActionLabel={getActionLabel}
               formatAnalyzedAt={formatAnalyzedAt}
               OFFICE_EXTS={OFFICE_EXTS}
@@ -679,6 +705,15 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
       )}
 
       {/* Delete doc modal */}
+      {reviewProposalId && (
+        <BudgetImportReview
+          proposalId={reviewProposalId}
+          eventId={event.id}
+          onClose={() => setReviewProposalId(null)}
+          onApplied={() => {}}
+        />
+      )}
+
       {deletingDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDeletingDoc(null)}>
           <div className="panel p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
@@ -730,6 +765,7 @@ function DocumentRow({
   doc, canManageDocs, isArchived, processingDocId, expandedSummary,
   setExpandedSummary, docMenuOpen, setDocMenuOpen, docMenuRef,
   onPreview, onDownload, onDelete, onAnalyze, onMove,
+  extractingBudgetDocId, onExtractBudget,
   getActionLabel, formatAnalyzedAt, OFFICE_EXTS,
 }: {
   doc: EventDocument
@@ -746,6 +782,8 @@ function DocumentRow({
   onDelete: (id: string) => void
   onAnalyze: (id: string, force: boolean) => void
   onMove: (id: string) => void
+  extractingBudgetDocId: string | null
+  onExtractBudget: (id: string) => void
   getActionLabel: (doc: EventDocument) => string
   formatAnalyzedAt: (d: string | null) => string
   OFFICE_EXTS: string[]
@@ -866,6 +904,18 @@ function DocumentRow({
               {docMenuOpen === doc.id && (
                 <div className="absolute right-0 top-full mt-1 z-30 min-w-[140px] rounded-lg py-1 shadow-lg"
                   style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+                  {doc.file_type.includes('spreadsheetml') && (
+                    <button
+                      onClick={() => { setDocMenuOpen(null); onExtractBudget(doc.id) }}
+                      disabled={extractingBudgetDocId === doc.id}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[var(--line)] transition-colors disabled:opacity-50"
+                      style={{ color: 'var(--text)' }}>
+                      {extractingBudgetDocId === doc.id
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--green)' }} />
+                        : <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--green)' }} />}
+                      {extractingBudgetDocId === doc.id ? 'Estrazione in corso…' : 'Estrai budget con AI'}
+                    </button>
+                  )}
                   <button
                     onClick={() => { setDocMenuOpen(null); onMove(doc.id) }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[var(--line)] transition-colors"
