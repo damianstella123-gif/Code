@@ -1369,6 +1369,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Kpi label="Totale Venduto Servizi" value={fmt(totals.venduto)} color="var(--text)" />
+            <Kpi label="Totale con Fee (fatturato cliente)" value={fmt(totals.venduto + (totals.venduto * feePct / 100))} color="var(--text)" />
             <div className="text-center">
               <p className="text-xs flex items-center justify-center gap-1" style={{ color: 'var(--muted)' }}>
                 Fee Simmetria

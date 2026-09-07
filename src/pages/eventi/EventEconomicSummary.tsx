@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import type { Event } from '@/data/events'
 
 export function EventEconomicSummary({ event }: { event: Event }) {
-  const [totals, setTotals] = useState({ venduto: 0, costo: 0, margine: 0, marginePct: 0 })
+  const [totals, setTotals] = useState({ venduto: 0, costo: 0, fee: 0, margine: 0, marginePct: 0 })
 
   useEffect(() => {
     async function load() {
@@ -34,6 +34,8 @@ export function EventEconomicSummary({ event }: { event: Event }) {
         q('event_allestimenti_details', 'venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita'),
         q('event_grafica_stampa_details', 'venduto_unitario,venduto_totale,costo_unitario,costo_totale,quantita'),
       ])
+      const { data: evRow } = await supabase.from('events').select('fee_agenzia_pct').eq('id', event.id).maybeSingle()
+      const feePct: number = evRow?.fee_agenzia_pct ?? 0
       let venduto = 0, costo = 0
       for (const s of (svcRes.data ?? [])) {
         const qty = s.quantita ?? 1
@@ -90,9 +92,10 @@ export function EventEconomicSummary({ event }: { event: Event }) {
         venduto += g.venduto_totale ?? (g.venduto_unitario ? g.venduto_unitario * qty : 0)
         costo += g.costo_totale ?? (g.costo_unitario ? g.costo_unitario * qty : 0)
       }
-      const margine = venduto - costo
-      const marginePct = venduto > 0 ? (margine / venduto) * 100 : 0
-      setTotals({ venduto, costo, margine, marginePct })
+      const fee = venduto * feePct / 100
+      const margine = venduto + fee - costo
+      const marginePct = (venduto + fee) > 0 ? (margine / (venduto + fee)) * 100 : 0
+      setTotals({ venduto, costo, fee, margine, marginePct })
     }
     load()
   }, [event.id])
@@ -109,10 +112,14 @@ export function EventEconomicSummary({ event }: { event: Event }) {
   return (
     <div className="md:col-span-2" style={{ background: 'var(--panel-solid)', border: '1px solid var(--line)', borderRadius: '14px', padding: '20px' }}>
       <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: '16px' }}>Controllo Economico</p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>VENDUTO</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>VENDUTO SERVIZI</p>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', fontWeight: 700, color: 'var(--text)', marginTop: '4px' }}>{'\u20AC'}{totals.venduto.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</p>
+        </div>
+        <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>FEE SIMMETRIA</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', fontWeight: 700, color: 'var(--blue)', marginTop: '4px' }}>{'€'}{totals.fee.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</p>
         </div>
         <div className="text-center p-3 rounded-xl" style={{ background: 'var(--panel)', border: '1px solid var(--line)' }}>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>COSTI</p>
