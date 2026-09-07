@@ -3,7 +3,7 @@ import {
   FileText, Upload, Download, Eye, Trash2, X, ExternalLink, Sparkles,
   RefreshCw, ChevronDown, ChevronUp, AlertCircle, Clock, CheckCircle2,
   Loader2, FolderPlus, Folder, FolderOpen, ChevronRight, Home, MoveRight,
-  MoreVertical, Pencil
+  MoreVertical, Pencil, Play, Pause
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import BudgetImportReview from '@/components/BudgetImportReview'
@@ -104,6 +104,8 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
   const [docMenuOpen, setDocMenuOpen] = useState<string | null>(null)
   const [extractingBudgetDocId, setExtractingBudgetDocId] = useState<string | null>(null)
   const [reviewProposalId, setReviewProposalId] = useState<string | null>(null)
+  const [playingDocId, setPlayingDocId] = useState<string | null>(null)
+  const [playingUrl, setPlayingUrl] = useState<string | null>(null)
   const docMenuRef = useRef<HTMLDivElement>(null)
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
   const [dragOverBreadcrumb, setDragOverBreadcrumb] = useState<string | null>(null)
@@ -655,6 +657,22 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
               onDelete={setDeletingDoc}
               onAnalyze={handleAnalyze}
               onMove={setMovingDoc}
+              playingDocId={playingDocId}
+              playingUrl={playingUrl}
+              onPlayToggle={async (d: EventDocument) => {
+                if (playingDocId === d.id) {
+                  setPlayingDocId(null)
+                  setPlayingUrl(null)
+                  return
+                }
+                const { data } = await supabase.storage.from('documents').createSignedUrl(d.file_path, 3600)
+                if (data?.signedUrl) {
+                  setPlayingDocId(d.id)
+                  setPlayingUrl(data.signedUrl)
+                } else {
+                  showToast('Impossibile caricare l\'audio', 'error')
+                }
+              }}
               extractingBudgetDocId={extractingBudgetDocId}
               onExtractBudget={async (docId: string) => {
                 setExtractingBudgetDocId(docId)
@@ -765,6 +783,7 @@ function DocumentRow({
   doc, canManageDocs, isArchived, processingDocId, expandedSummary,
   setExpandedSummary, docMenuOpen, setDocMenuOpen, docMenuRef,
   onPreview, onDownload, onDelete, onAnalyze, onMove,
+  playingDocId, playingUrl, onPlayToggle,
   extractingBudgetDocId, onExtractBudget,
   getActionLabel, formatAnalyzedAt, OFFICE_EXTS,
 }: {
@@ -782,14 +801,19 @@ function DocumentRow({
   onDelete: (id: string) => void
   onAnalyze: (id: string, force: boolean) => void
   onMove: (id: string) => void
+  playingDocId: string | null
+  playingUrl: string | null
+  onPlayToggle: (doc: EventDocument) => void
   extractingBudgetDocId: string | null
   onExtractBudget: (id: string) => void
   getActionLabel: (doc: EventDocument) => string
   formatAnalyzedAt: (d: string | null) => string
   OFFICE_EXTS: string[]
 }) {
-  const label = getFileLabel(doc.file_type)
-  const labelColor = label === 'PDF' ? 'var(--red2)' : label === 'XLSX' || label === 'XLS' ? 'var(--green)' : label === 'PPTX' || label === 'PPT' ? '#e67e22' : label === 'DOCX' ? 'var(--blue)' : 'var(--muted)'
+  const isAudio = doc.file_type.startsWith('audio/')
+  const isPlaying = playingDocId === doc.id
+  const label = isAudio ? 'AUDIO' : getFileLabel(doc.file_type)
+  const labelColor = isAudio ? 'var(--accent)' : label === 'PDF' ? 'var(--red2)' : label === 'XLSX' || label === 'XLS' ? 'var(--green)' : label === 'PPTX' || label === 'PPT' ? '#e67e22' : label === 'DOCX' ? 'var(--blue)' : 'var(--muted)'
   const status = (doc.analysis_status || 'non_elaborato') as AnalysisStatus
   const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.non_elaborato
   const isProcessing = processingDocId === doc.id
@@ -880,6 +904,13 @@ function DocumentRow({
             </button>
           )}
 
+          {isAudio && (
+            <button onClick={() => onPlayToggle(doc)} title={isPlaying ? 'Pausa' : 'Riproduci'}
+              className="p-2 rounded-lg transition-all hover:bg-[var(--line)]"
+              style={{ color: 'var(--accent)' }}>
+              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            </button>
+          )}
           <button onClick={() => onPreview(doc)} title={getActionLabel(doc)}
             className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-[var(--line)]"
             style={{ color: 'var(--green)' }}>
@@ -952,6 +983,19 @@ function DocumentRow({
           <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'color-mix(in srgb, var(--muted) 8%, transparent)', color: 'var(--muted)' }}>
             {doc.analysis_error}
           </p>
+        </div>
+      )}
+
+      {/* Inline audio player */}
+      {isAudio && isPlaying && playingUrl && (
+        <div className="px-4 pb-3">
+          <audio
+            controls
+            autoPlay
+            src={playingUrl}
+            style={{ width: '100%', borderRadius: 8 }}
+            onEnded={() => onPlayToggle(doc)}
+          />
         </div>
       )}
 
