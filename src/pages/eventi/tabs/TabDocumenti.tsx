@@ -121,7 +121,7 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
       .from('documents')
       .select('id, nome, categoria, event_id, file_path, file_name, file_type, file_size, uploaded_by, created_at, analysis_status, analysis_error, analyzed_at, summary, analysis_metadata, folder_id')
       .eq('event_id', event.id)
-      .order('created_at', { ascending: false })
+      .order('nome', { ascending: true })
     setDocs((data ?? []) as EventDocument[])
     setLoading(false)
   }
