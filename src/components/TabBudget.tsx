@@ -970,6 +970,9 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       rows.push([cat.label, '', '', '', '', cv, '', '', cc, cm, ''])
     }
     rows.push(['TOTALE EVENTO', '', '', '', '', totals.venduto, '', '', totals.costo, totals.margine, totals.marginePct / 100])
+    const feeFinale = totals.venduto * feePct / 100
+    rows.push([`SIMMETRIA Fee (${feePct}%)`, '', '', '', '', feeFinale, '', '', '', '', ''])
+    rows.push(['TOTALE FINALE (Venduto + Fee)', '', '', '', '', totals.venduto + feeFinale, '', '', '', '', ''])
     if (totals.commissioni > 0) {
       rows.push(['COMMISSIONI (interno)', '', '', '', '', '', '', '', '', totals.commissioni, ''])
     }
