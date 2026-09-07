@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, Clock, ShieldCheck, Lock, Plus, Pencil } from 'lucide-react'
+import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, Clock, ShieldCheck, Lock, Plus, Pencil, Paperclip, Trash2, FileText, ExternalLink } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { loadUser } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
@@ -111,6 +111,12 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   const [editingLine, setEditingLine] = useState<{ id: string; table: string; categoria: string } | null>(null)
   const [cloning, setCloning] = useState(false)
 
+  // ─── Version attachments ──────────────────────────────────
+  const [versionDocs, setVersionDocs] = useState<any[]>([])
+  const [docsLoading, setDocsLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [uploading, setUploading] = useState(false)
+
   // ─── Inline editing state ─────────────────────────────────
   const [inlineEdit, setInlineEdit] = useState<{ id: string; table: string; data: EditableLineData; original: BudgetLine } | null>(null)
   const [inlineError, setInlineError] = useState<string | null>(null)
@@ -199,6 +205,53 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     const { error } = await supabase.from('events').update({ margine_target: newTarget }).eq('id', event.id)
     if (error) showToast(friendlyError(error), 'error')
   }
+
+  // ─── Version attachments helpers ──────────────────────────
+  const loadVersionDocs = useCallback(async (versionId: string | null) => {
+    if (!versionId) { setVersionDocs([]); return }
+    setDocsLoading(true)
+    const { data } = await supabase.from('event_documents').select('*').eq('budget_version_id', versionId).order('created_at', { ascending: false })
+    setVersionDocs(data || [])
+    setDocsLoading(false)
+  }, [])
+
+  async function uploadVersionDoc(file: File) {
+    if (!activeVersion || !user) return
+    setUploading(true)
+    const path = `${event.id}/${activeVersion}/${Date.now()}_${file.name}`
+    const { error: storageErr } = await supabase.storage.from('event-documents').upload(path, file)
+    if (storageErr) { showToast(`Errore upload: ${storageErr.message}`, 'error'); setUploading(false); return }
+    const { error: dbErr } = await supabase.from('event_documents').insert({
+      event_id: event.id,
+      budget_version_id: activeVersion,
+      file_name: file.name,
+      file_type: file.type,
+      file_size: file.size,
+      storage_path: path,
+      uploaded_by: user.id,
+      uploaded_by_name: [user.nome, user.cognome].filter(Boolean).join(' ') || user.email || 'Utente',
+    })
+    setUploading(false)
+    if (dbErr) { showToast(`Errore salvataggio: ${dbErr.message}`, 'error'); return }
+    showToast('Documento allegato', 'success')
+    loadVersionDocs(activeVersion)
+  }
+
+  async function downloadVersionDoc(storagePath: string) {
+    const { data, error } = await supabase.storage.from('event-documents').createSignedUrl(storagePath, 60)
+    if (error || !data?.signedUrl) { showToast('Errore generazione link', 'error'); return }
+    window.open(data.signedUrl, '_blank')
+  }
+
+  async function deleteVersionDoc(doc: any) {
+    if (!window.confirm(`Eliminare "${doc.file_name}"?`)) return
+    await supabase.storage.from('event-documents').remove([doc.storage_path])
+    await supabase.from('event_documents').delete().eq('id', doc.id)
+    showToast('Documento rimosso', 'success')
+    loadVersionDocs(activeVersion)
+  }
+
+  useEffect(() => { loadVersionDocs(activeVersion) }, [activeVersion, loadVersionDocs])
 
   // ─── Budget Versions ───────────────────────────────────────
   useEffect(() => { setUser(loadUser()) }, [])
@@ -1228,36 +1281,65 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
         const v = versions.find(x => x.id === activeVersion)
         if (!v) return null
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--panel2)', borderRadius: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, flex: 1, color: 'var(--text)', minWidth: 100 }}>
-              {v.nome}
-            </span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 8px', borderRadius: 4,
-              background: v.stato === 'approvato' ? 'rgba(47,168,107,0.1)' : 'var(--panel)',
-              color: v.stato === 'approvato' ? 'var(--green)' : 'var(--muted)',
-              border: '1px solid var(--line)' }}>
-              {v.stato?.toUpperCase()}
-            </span>
-            {v.tipo === 'preventivo' && (
-              <>
-                {v.stato !== 'approvato' && (
-                  <button onClick={() => approveVersion(v.id)} disabled={cloning}
-                    style={{ padding: '5px 12px', borderRadius: 8, cursor: cloning ? 'not-allowed' : 'pointer', border: '1px solid var(--green)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--green)', opacity: cloning ? 0.5 : 1 }}>
-                    Approva
+          <div style={{ background: 'var(--panel2)', borderRadius: 10, padding: '8px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, flex: 1, color: 'var(--text)', minWidth: 100 }}>
+                {v.nome}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 8px', borderRadius: 4,
+                background: v.stato === 'approvato' ? 'rgba(47,168,107,0.1)' : 'var(--panel)',
+                color: v.stato === 'approvato' ? 'var(--green)' : 'var(--muted)',
+                border: '1px solid var(--line)' }}>
+                {v.stato?.toUpperCase()}
+              </span>
+              {v.tipo === 'preventivo' && (
+                <>
+                  {v.stato !== 'approvato' && (
+                    <button onClick={() => approveVersion(v.id)} disabled={cloning}
+                      style={{ padding: '5px 12px', borderRadius: 8, cursor: cloning ? 'not-allowed' : 'pointer', border: '1px solid var(--green)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--green)', opacity: cloning ? 0.5 : 1 }}>
+                      Approva
+                    </button>
+                  )}
+                  {v.stato === 'approvato' && !versions.some(x => x.tipo === 'consuntivo' && x.source_version_id === v.id) && (
+                    <button onClick={() => createConsuntivo(v.id)} disabled={cloning}
+                      style={{ padding: '5px 12px', borderRadius: 8, cursor: cloning ? 'not-allowed' : 'pointer', border: '1px solid var(--blue)', background: 'rgba(58,123,213,0.08)', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--blue)', opacity: cloning ? 0.5 : 1 }}>
+                      {cloning ? 'Clonazione...' : 'Crea consuntivo'}
+                    </button>
+                  )}
+                  <button onClick={() => duplicateVersion(v.id)} disabled={cloning}
+                    style={{ padding: '5px 12px', borderRadius: 8, cursor: cloning ? 'not-allowed' : 'pointer', border: '1px solid var(--line)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', opacity: cloning ? 0.5 : 1 }}>
+                    {cloning ? 'Clonazione...' : 'Duplica'}
                   </button>
-                )}
-                {v.stato === 'approvato' && !versions.some(x => x.tipo === 'consuntivo' && x.source_version_id === v.id) && (
-                  <button onClick={() => createConsuntivo(v.id)} disabled={cloning}
-                    style={{ padding: '5px 12px', borderRadius: 8, cursor: cloning ? 'not-allowed' : 'pointer', border: '1px solid var(--blue)', background: 'rgba(58,123,213,0.08)', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--blue)', opacity: cloning ? 0.5 : 1 }}>
-                    {cloning ? 'Clonazione...' : 'Crea consuntivo'}
+                </>
+              )}
+            </div>
+
+            {/* ── Allegati versione ── */}
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+              <input ref={fileInputRef} type="file" accept="application/pdf,image/*" hidden
+                onChange={e => { const f = e.target.files?.[0]; if (f) uploadVersionDoc(f); e.target.value = '' }} />
+              <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1 }}>
+                <Paperclip className="w-3 h-3" /> {uploading ? 'Upload...' : '+ Allega documento'}
+              </button>
+
+              {docsLoading && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>Caricamento...</span>}
+
+              {versionDocs.map(doc => (
+                <div key={doc.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 6, background: 'var(--panel)', border: '1px solid var(--line)', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text)', maxWidth: 260 }}>
+                  <FileText className="w-3 h-3 shrink-0" style={{ color: 'var(--muted)' }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={doc.file_name}>{doc.file_name}</span>
+                  <button onClick={() => downloadVersionDoc(doc.storage_path)} title="Scarica"
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--blue)', display: 'flex' }}>
+                    <ExternalLink className="w-3 h-3" />
                   </button>
-                )}
-                <button onClick={() => duplicateVersion(v.id)} disabled={cloning}
-                  style={{ padding: '5px 12px', borderRadius: 8, cursor: cloning ? 'not-allowed' : 'pointer', border: '1px solid var(--line)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', opacity: cloning ? 0.5 : 1 }}>
-                  {cloning ? 'Clonazione...' : 'Duplica'}
-                </button>
-              </>
-            )}
+                  <button onClick={() => deleteVersionDoc(doc)} title="Elimina"
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--red2)', display: 'flex' }}>
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )
       })()}
