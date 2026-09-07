@@ -146,6 +146,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     }
     setInlineEdit(null)
     loadData()
+    console.log('[TabBudget] commitInlineEdit: loadData triggered')
     showToast('Voce economica aggiornata', 'success')
   }
 
@@ -280,6 +281,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   }
 
   const loadData = useCallback(async () => {
+    console.log('[TabBudget] loadData called', { eventId: event.id, activeVersion })
     const vFilter = activeVersion
     const bvq = (table: string) => {
       let q = supabase.from(table as any).select('*').eq('event_id', event.id)
@@ -522,6 +524,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       })
     }
 
+    console.log('[TabBudget] loadData finished, lines count:', all.length, 'sample:', all.slice(0, 3))
     setLines(all)
     setLoading(false)
   }, [event.id, suppliers, activeVersion])
@@ -608,6 +611,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       if (!map[l.categoria]) map[l.categoria] = []
       map[l.categoria].push(l)
     }
+    console.log('[TabBudget] grouped recomputed', { categoriesCount: CATEGORY_ORDER.filter(cat => map[cat] && map[cat].length > 0).length })
     return CATEGORY_ORDER
       .filter(cat => map[cat] && map[cat].length > 0)
       .map(cat => ({ label: cat, items: map[cat] }))
