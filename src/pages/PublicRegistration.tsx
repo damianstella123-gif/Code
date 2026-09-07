@@ -516,7 +516,11 @@ export default function PublicRegistration() {
           )}
           <h1 className="text-2xl sm:text-3xl font-bold">{site.title}</h1>
           {site.subtitle && <p className="pr-muted text-lg mt-2">{site.subtitle}</p>}
-          {site.description && <p className="pr-muted text-sm mt-3 leading-relaxed">{site.description}</p>}
+          {site.description && (
+            <p className="pr-muted text-sm mt-3 leading-relaxed" style={{ whiteSpace: 'pre-line' }}>
+              {site.description}
+            </p>
+          )}
         </div>
 
         {/* Content sections */}
