@@ -12,8 +12,8 @@ export interface MfaState {
   daysLeft: number
 }
 
-export function roleRequiresMfa(role?: string | null): boolean {
-  return !!role && (ROLES_REQUIRING_MFA as readonly string[]).includes(role)
+export function roleRequiresMfa(_role?: string | null): boolean {
+  return true
 }
 
 export async function getVerifiedTotpFactorId(): Promise<string | null> {
