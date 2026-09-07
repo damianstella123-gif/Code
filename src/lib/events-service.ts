@@ -57,11 +57,10 @@ function rowToEvent(r: EventRow): Event {
   }
 }
 
-function eventToRow(e: Event): Omit<EventRow, 'created_at' | 'updated_at'> {
+function eventToRow(e: Event): Omit<EventRow, 'created_at' | 'updated_at' | 'event_number'> {
   return {
     id: e.id,
     title: e.nome,
-    event_number: e.eventNumber ?? null,
     description: e.descrizione ?? '',
     client: e.cliente ?? '',
     client_id: e.clientId ?? null,
