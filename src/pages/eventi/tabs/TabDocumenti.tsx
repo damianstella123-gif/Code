@@ -102,6 +102,8 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
   const docMenuRef = useRef<HTMLDivElement>(null)
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
   const [dragOverBreadcrumb, setDragOverBreadcrumb] = useState<string | null>(null)
+  const [externalDragOver, setExternalDragOver] = useState(false)
+  const externalDragCounter = useRef(0)
 
   async function loadFolders() {
     const { data } = await supabase
@@ -245,14 +247,13 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
     showToast('Documento spostato', 'success')
   }
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files
-    if (!files || files.length === 0) return
+  async function handleUploadFiles(files: File[], targetFolderId: string | null) {
+    if (files.length === 0) return
     setUploading(true)
 
     const uploadedDocIds: string[] = []
 
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       const storagePath = `${event.id}/${Date.now()}_${file.name}`
 
       const { error: uploadError } = await supabase.storage
@@ -275,7 +276,7 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
         file_type: file.type || 'application/octet-stream',
         uploaded_by: user?.id ?? '',
         is_participant_data: isParticipantData,
-        folder_id: currentFolderId,
+        folder_id: targetFolderId,
       }).select('id').maybeSingle()
 
       if (inserted?.id) uploadedDocIds.push(inserted.id)
@@ -284,11 +285,21 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
 
     await loadDocs()
     setUploading(false)
-    e.target.value = ''
 
     for (const docId of uploadedDocIds) {
       triggerAnalysis(docId)
     }
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    await handleUploadFiles(Array.from(files), currentFolderId)
+    e.target.value = ''
+  }
+
+  function hasExternalFiles(e: React.DragEvent): boolean {
+    return e.dataTransfer.types.includes('Files')
   }
 
   async function triggerAnalysis(docId: string) {
@@ -448,10 +459,10 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
         <nav className="flex items-center gap-1 text-xs flex-wrap" style={{ color: 'var(--muted)' }}>
           <button
             onClick={() => setCurrentFolderId(null)}
-            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = hasExternalFiles(e) ? 'copy' : 'move' }}
             onDragEnter={() => setDragOverBreadcrumb('root')}
             onDragLeave={() => setDragOverBreadcrumb(null)}
-            onDrop={e => { e.preventDefault(); setDragOverBreadcrumb(null); const docId = e.dataTransfer.getData('text/document-id'); if (docId) handleMoveDoc(docId, null) }}
+            onDrop={async e => { e.preventDefault(); setDragOverBreadcrumb(null); const docId = e.dataTransfer.getData('text/document-id'); if (docId) { handleMoveDoc(docId, null); return }; const files = Array.from(e.dataTransfer.files || []); if (files.length > 0) await handleUploadFiles(files, null) }}
             className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-[var(--line)] transition-colors"
             style={{ color: 'var(--text)', ...(dragOverBreadcrumb === 'root' ? { background: 'color-mix(in srgb, var(--blue) 18%, transparent)', outline: '1.5px dashed var(--blue)', outlineOffset: '-1px' } : {}) }}>
             <Home className="w-3.5 h-3.5" />
@@ -462,19 +473,19 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
               <ChevronRight className="w-3 h-3" style={{ color: 'var(--muted)' }} />
               {i === folderPath.length - 1 ? (
                 <span
-                  onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                  onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = hasExternalFiles(e) ? 'copy' : 'move' }}
                   onDragEnter={() => setDragOverBreadcrumb(f.id)}
                   onDragLeave={() => setDragOverBreadcrumb(null)}
-                  onDrop={e => { e.preventDefault(); setDragOverBreadcrumb(null); const docId = e.dataTransfer.getData('text/document-id'); if (docId) handleMoveDoc(docId, f.id) }}
+                  onDrop={async e => { e.preventDefault(); setDragOverBreadcrumb(null); const docId = e.dataTransfer.getData('text/document-id'); if (docId) { handleMoveDoc(docId, f.id); return }; const files = Array.from(e.dataTransfer.files || []); if (files.length > 0) await handleUploadFiles(files, f.id) }}
                   className="px-1.5 py-0.5 font-medium rounded transition-colors"
                   style={{ color: 'var(--text)', ...(dragOverBreadcrumb === f.id ? { background: 'color-mix(in srgb, var(--blue) 18%, transparent)', outline: '1.5px dashed var(--blue)', outlineOffset: '-1px' } : {}) }}>{f.nome}</span>
               ) : (
                 <button
                   onClick={() => setCurrentFolderId(f.id)}
-                  onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                  onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = hasExternalFiles(e) ? 'copy' : 'move' }}
                   onDragEnter={() => setDragOverBreadcrumb(f.id)}
                   onDragLeave={() => setDragOverBreadcrumb(null)}
-                  onDrop={e => { e.preventDefault(); setDragOverBreadcrumb(null); const docId = e.dataTransfer.getData('text/document-id'); if (docId) handleMoveDoc(docId, f.id) }}
+                  onDrop={async e => { e.preventDefault(); setDragOverBreadcrumb(null); const docId = e.dataTransfer.getData('text/document-id'); if (docId) { handleMoveDoc(docId, f.id); return }; const files = Array.from(e.dataTransfer.files || []); if (files.length > 0) await handleUploadFiles(files, f.id) }}
                   className="px-1.5 py-0.5 rounded hover:bg-[var(--line)] transition-colors"
                   style={{ color: 'var(--text)', ...(dragOverBreadcrumb === f.id ? { background: 'color-mix(in srgb, var(--blue) 18%, transparent)', outline: '1.5px dashed var(--blue)', outlineOffset: '-1px' } : {}) }}>
                   {f.nome}
@@ -525,10 +536,10 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
                 className="panel p-3 cursor-pointer group transition-all hover:ring-1"
                 style={{ '--tw-ring-color': 'var(--blue)', ...(dragOverFolderId === folder.id ? { background: 'color-mix(in srgb, var(--blue) 14%, transparent)', borderColor: 'var(--blue)', boxShadow: '0 0 0 2px color-mix(in srgb, var(--blue) 30%, transparent)' } : {}) } as React.CSSProperties}
                 onClick={() => { if (!isRenaming) setCurrentFolderId(folder.id) }}
-                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = hasExternalFiles(e) ? 'copy' : 'move' }}
                 onDragEnter={e => { e.preventDefault(); setDragOverFolderId(folder.id) }}
                 onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverFolderId(null) }}
-                onDrop={e => { e.preventDefault(); setDragOverFolderId(null); const docId = e.dataTransfer.getData('text/document-id'); if (docId) handleMoveDoc(docId, folder.id) }}
+                onDrop={async e => { e.preventDefault(); setDragOverFolderId(null); const docId = e.dataTransfer.getData('text/document-id'); if (docId) { handleMoveDoc(docId, folder.id); return }; const files = Array.from(e.dataTransfer.files || []); if (files.length > 0) await handleUploadFiles(files, folder.id) }}
               >
                 <div className="flex items-start justify-between gap-1">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -581,18 +592,33 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
       )}
 
       {/* Documents in current folder */}
+      <div
+        className="relative"
+        onDragOver={e => { if (hasExternalFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' } }}
+        onDragEnter={e => { if (hasExternalFiles(e)) { externalDragCounter.current++; setExternalDragOver(true) } }}
+        onDragLeave={e => { if (hasExternalFiles(e)) { externalDragCounter.current--; if (externalDragCounter.current <= 0) { externalDragCounter.current = 0; setExternalDragOver(false) } } }}
+        onDrop={async e => { if (!hasExternalFiles(e)) return; e.preventDefault(); externalDragCounter.current = 0; setExternalDragOver(false); const files = Array.from(e.dataTransfer.files || []); if (files.length > 0) await handleUploadFiles(files, currentFolderId) }}
+      >
+        {externalDragOver && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl pointer-events-none" style={{ border: '2px dashed var(--blue)', background: 'color-mix(in srgb, var(--blue) 8%, transparent)' }}>
+            <div className="flex flex-col items-center gap-2">
+              <Upload className="w-8 h-8" style={{ color: 'var(--blue)' }} />
+              <span className="text-sm font-medium" style={{ color: 'var(--blue)' }}>Rilascia qui per caricare</span>
+            </div>
+          </div>
+        )}
       {currentDocs.length === 0 && currentFolders.length === 0 ? (
         <div className="panel p-10 text-center" style={{ color: 'var(--muted)' }}>
           <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
           {currentFolderId ? (
             <>
               <p>Questa cartella e vuota</p>
-              <p className="text-xs mt-1">Carica documenti o sposta file esistenti qui</p>
+              <p className="text-xs mt-1">Carica documenti o trascina file qui</p>
             </>
           ) : (
             <>
               <p>Nessun documento caricato per questo evento</p>
-              <p className="text-xs mt-1">Carica PDF, Excel, PowerPoint, Word o immagini</p>
+              <p className="text-xs mt-1">Carica PDF, Excel, PowerPoint, Word o trascina file qui</p>
             </>
           )}
         </div>
@@ -628,6 +654,7 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
           ))}
         </div>
       )}
+      </div>
 
       {/* Delete folder modal */}
       {deletingFolder && (
