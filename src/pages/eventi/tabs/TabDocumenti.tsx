@@ -264,6 +264,7 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
 
       if (uploadError) {
         console.error('Upload error:', uploadError.message)
+        showToast(`Impossibile caricare "${file.name}": ${uploadError.message}`, 'error')
         continue
       }
 
