@@ -834,6 +834,17 @@ export default function Eventi() {
     return () => clearTimeout(t)
   }, [errorMessage])
 
+  useEffect(() => {
+    if (!selectedEvent) return
+    async function sendHeartbeat() {
+      if (document.visibilityState !== 'visible') return
+      await supabase.rpc('record_event_time_heartbeat', { p_event_id: selectedEvent!.id })
+    }
+    sendHeartbeat()
+    const interval = setInterval(sendHeartbeat, 60000)
+    return () => clearInterval(interval)
+  }, [selectedEvent?.id])
+
   const refreshEvents = useCallback(async () => {
     const remote = await fetchEvents()
     setEventList(remote)
