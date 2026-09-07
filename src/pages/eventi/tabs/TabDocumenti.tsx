@@ -343,7 +343,7 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewName, setPreviewName] = useState('')
-  const [previewType, setPreviewType] = useState<'image' | 'pdf' | null>(null)
+  const [previewType, setPreviewType] = useState<'image' | 'pdf' | 'office' | null>(null)
 
   const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']
   const OFFICE_EXTS = ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt']
@@ -366,9 +366,12 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
     } else if (OFFICE_EXTS.includes(ext)) {
       const { data } = await supabase.storage
         .from('documents')
-        .createSignedUrl(doc.file_path, 300)
+        .createSignedUrl(doc.file_path, 600)
       if (data?.signedUrl) {
-        window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+        const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(data.signedUrl)}`
+        setPreviewUrl(viewerUrl)
+        setPreviewType('office')
+        setPreviewName(doc.nome || doc.file_name)
       } else {
         handleDownload(doc)
       }
@@ -380,7 +383,7 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
   function getActionLabel(doc: EventDocument): string {
     const ext = doc.file_name.split('.').pop()?.toLowerCase() ?? ''
     if (IMAGE_EXTS.includes(ext) || ext === 'pdf') return 'Anteprima'
-    if (OFFICE_EXTS.includes(ext)) return 'Apri'
+    if (OFFICE_EXTS.includes(ext)) return 'Anteprima'
     return 'Scarica'
   }
 
@@ -771,6 +774,9 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
             )}
             {previewType === 'pdf' && (
               <iframe src={previewUrl} style={{ width: '100%', height: '85vh', border: 'none', borderRadius: 12, maxWidth: 900 }} title={previewName} />
+            )}
+            {previewType === 'office' && (
+              <iframe src={previewUrl!} title={previewName} className="w-full rounded-lg" style={{ height: '85vh', border: 'none', maxWidth: 900 }} />
             )}
           </div>
         </div>
