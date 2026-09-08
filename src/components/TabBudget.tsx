@@ -1644,7 +1644,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
             {totals.commissioni > 0 && (
               <Kpi label="Commissioni" value={fmt(totals.commissioni)} color="var(--green)" />
             )}
-            <Kpi label="Totale Ricavi" value={fmt(totals.ricavi)} color="var(--text)" />
+            <Kpi label="Totale Fatturato Cliente" value={fmt(totals.ricavi)} color="var(--text)" />
           </div>
           <p className="text-[10px] text-right" style={{ color: 'var(--muted)' }}>Importi economici al netto IVA</p>
           <div className="h-px" style={{ background: 'var(--line)' }} />
