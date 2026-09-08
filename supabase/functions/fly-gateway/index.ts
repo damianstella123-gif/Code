@@ -1765,7 +1765,23 @@ RISPONDI SOLO con JSON valido (senza markdown, senza backtick) con questa strutt
         relevance: row.rank,
       }));
 
-      return JSON.stringify({ found: true, result_count: sources.length, sources });
+      const sourcesWithUrls = await Promise.all(
+        sources.map(async (s) => {
+          try {
+            const matchRow = data.find((r: Record<string, unknown>) => r.document_id === s.document_id) as Record<string, unknown> | undefined;
+            const filePath = (matchRow?.file_path as string) ?? '';
+            if (!filePath) return { ...s, signed_url: null };
+            const { data: urlData } = await adminClient.storage
+              .from('documents')
+              .createSignedUrl(filePath, 600);
+            return { ...s, signed_url: urlData?.signedUrl ?? null };
+          } catch {
+            return { ...s, signed_url: null };
+          }
+        })
+      );
+
+      return JSON.stringify({ found: true, result_count: sourcesWithUrls.length, sources: sourcesWithUrls });
     }
 
     case "prepare_participant_import": {
@@ -2808,6 +2824,7 @@ REGOLE DOCUMENTI:
 - Formato citazione con pagina: [Fonte: <file_name>, pag. <page_number>]
 - Formato citazione senza pagina: [Fonte: <file_name>, contenuto <chunk_index>]
 - Non inventare numeri di pagina, nomi di sezione o citazioni.
+- Quando citi documenti trovati con search_documents, elenca i file trovati con il loro nome alla fine della risposta nel formato: SOURCES_JSON:[{"document_id":"...","file_name":"...","signed_url":"..."}] — questo blocco verrà renderizzato come chip cliccabili dall'interfaccia, non mostrato come testo. Includi solo documenti unici (deduplica per document_id). Il signed_url viene dal campo signed_url restituito dal tool.
 - Distingui chiaramente fatti dalle deduzioni.
 - Se i risultati non bastano: "Non trovo questa informazione nei documenti accessibili."
 - Non colmare lacune con conoscenza generale salvo esplicito avviso che si tratta di un suggerimento generico.

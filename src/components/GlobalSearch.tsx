@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Lock,
   PawPrint,
+  Paperclip,
   Send,
   Loader2,
 } from 'lucide-react'
@@ -613,6 +614,7 @@ function FlyChat({ question, onClose, onDragStart, isDragging }: {
   const [flyAnswer, setFlyAnswer] = useState('')
   const [flyLoading, setFlyLoading] = useState(false)
   const [flyError, setFlyError] = useState<string | null>(null)
+  const [flySources, setFlySources] = useState<{ document_id: string; file_name: string; signed_url: string | null }[]>([])
   const [flyHistory, setFlyHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [followUp, setFollowUp] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -629,6 +631,7 @@ function FlyChat({ question, onClose, onDragStart, isDragging }: {
     setFlyQuestion(text.trim())
     setFlyAnswer('')
     setFlyError(null)
+    setFlySources([])
     setFlyLoading(true)
 
     abortRef.current?.abort()
@@ -695,7 +698,15 @@ function FlyChat({ question, onClose, onDragStart, isDragging }: {
       if (!accumulated) {
         setFlyAnswer('Fly non ha fornito una risposta.')
       } else {
-        setFlyHistory(prev => [...prev, { role: 'user' as const, content: text.trim() }, { role: 'assistant' as const, content: accumulated }])
+        const sourcesMatch = accumulated.match(/SOURCES_JSON:\s*(\[.*?\])/s)
+        if (sourcesMatch) {
+          try { setFlySources(JSON.parse(sourcesMatch[1])) } catch { setFlySources([]) }
+        } else {
+          setFlySources([])
+        }
+        const cleanAnswer = accumulated.replace(/SOURCES_JSON:\s*\[.*?\]/s, '').trim()
+        setFlyAnswer(cleanAnswer)
+        setFlyHistory(prev => [...prev, { role: 'user' as const, content: text.trim() }, { role: 'assistant' as const, content: cleanAnswer }])
       }
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') return
@@ -797,6 +808,29 @@ function FlyChat({ question, onClose, onDragStart, isDragging }: {
                   style={{ background: 'var(--red2)', verticalAlign: 'text-bottom' }} />
               )}
             </p>
+            {flySources.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {flySources.map((s) => (
+                  <a
+                    key={s.document_id}
+                    href={s.signed_url ?? '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
+                    style={{
+                      background: 'color-mix(in srgb, var(--red2) 8%, transparent)',
+                      color: 'var(--red2)',
+                      border: '1px solid color-mix(in srgb, var(--red2) 20%, transparent)',
+                      pointerEvents: s.signed_url ? 'auto' : 'none',
+                      opacity: s.signed_url ? 1 : 0.5,
+                    }}
+                  >
+                    <Paperclip className="w-3 h-3" />
+                    {s.file_name}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

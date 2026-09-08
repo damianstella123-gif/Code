@@ -41,11 +41,20 @@ interface DocumentFolder {
   created_at: string
 }
 
-const DOC_CATEGORIE = [
-  'Budget', 'Contratti', 'Preventivi', 'Hotel', 'Transfer', 'Ristoranti',
-  'Fornitori', 'Rooming List', 'Presentazioni', 'Materiali Evento',
-  'Foto / Video', 'Fatture', 'Varie',
-]
+function getCategoriaFromFolder(folderNome: string | null): string {
+  if (!folderNome) return 'Materiali Evento'
+  const n = folderNome.toLowerCase()
+  if (n.includes('budget') || n.includes('preventiv') || n.includes('cliente') || n.includes('staff')) return 'Budget'
+  if (n.includes('contratt')) return 'Contratti'
+  if (n.includes('hotel') || n.includes('albergo') || n.includes('rooming')) return 'Hotel'
+  if (n.includes('transfer') || n.includes('trasport')) return 'Transfer'
+  if (n.includes('operativ')) return 'Operativo'
+  if (n.includes('presentaz') || n.includes('slide')) return 'Presentazioni'
+  if (n.includes('foto') || n.includes('video') || n.includes('immagin')) return 'Foto / Video'
+  if (n.includes('fattur') || n.includes('invoice')) return 'Fatture'
+  if (n.includes('fornitore') || n.includes('supplier')) return 'Fornitori'
+  return 'Materiali Evento'
+}
 
 function getFileLabel(mimeType: string): string {
   const FILE_ICONS: Record<string, string> = {
@@ -84,7 +93,6 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
   const [folders, setFolders] = useState<DocumentFolder[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
-  const [docCategoria, setDocCategoria] = useState('Materiali Evento')
   const [isParticipantData, setIsParticipantData] = useState(false)
   const [deletingDoc, setDeletingDoc] = useState<string | null>(null)
   const [canManageDocs, setCanManageDocs] = useState(false)
@@ -279,7 +287,7 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
       const { data: { user } } = await supabase.auth.getUser()
       const { data: inserted } = await supabase.from('documents').insert({
         nome: file.name.replace(/\.[^/.]+$/, ''),
-        categoria: docCategoria,
+        categoria: getCategoriaFromFolder(folders.find(f => f.id === currentFolderId)?.nome ?? null),
         event_id: event.id,
         file_path: storagePath,
         file_name: file.name,
@@ -446,10 +454,6 @@ export function TabDocumenti({ event, isArchived }: { event: Event; isArchived?:
               />
               Contiene dati personali dei partecipanti (nome, contatti, allergie)
             </label>
-            <select value={docCategoria} onChange={e => setDocCategoria(e.target.value)}
-              className="px-2 py-1.5 rounded-lg text-xs" style={{ background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--text)' }}>
-              {DOC_CATEGORIE.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
             <button
               onClick={() => { setCreatingFolder(true); setNewFolderName('') }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
