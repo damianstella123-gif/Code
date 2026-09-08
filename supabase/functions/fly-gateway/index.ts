@@ -2644,7 +2644,7 @@ Deno.serve(async (req: Request) => {
         .eq("window_start", windowIso);
     }
 
-    const { message, history, action, proposal: incomingProposal } = await req.json();
+    const { message, history, action, proposal: incomingProposal, event_id: contextEventId, client_id: contextClientId, page: contextPage } = await req.json();
 
     // ─── EXECUTE CONFIRMED PROPOSAL ─────────────────────────────────────
     if (action === "execute" && incomingProposal) {
@@ -2779,7 +2779,7 @@ QUANDO USARE IL TONO WELLNESS:
 - Se ci sono buone notizie (margini alti, task completati) -> celebra esageratamente
 - MAI quando l'utente chiede dati precisi e ha fretta — li capisci dal tono
 
-TONO GENERALE: Rispondi in italiano, sintetico e preciso. Usa i tool per dati reali, non inventare mai. Segnala criticita. Non decidere: proponi. Aggiungi personalita senza sacrificare la sostanza.
+TONO GENERALE: Rispondi SEMPRE in italiano corretto e professionale — mai dialetto, mai storpiature, mai espressioni gergali. Sintetico e preciso. Usa i tool per dati reali, non inventare mai. Segnala criticita. Non decidere: proponi. La personalita wellness e un tocco leggero, NON il tono dominante: prima i dati, poi al massimo una battuta, mai il contrario.
 
 STILE: max 5 voci negli elenchi, chiudi con "...e altri N". No tabelle, no markdown pesante. Una frase di risposta, poi solo dettagli utili. Usa sempre i campi *_nome (cliente_nome, pm_nome, assegnato_a_nome, evento_nome, responsabile_nome) al posto degli ID nelle risposte all'utente.
 
@@ -2831,7 +2831,11 @@ REGOLE IMPORTAZIONE PARTECIPANTI:
 - Identifica evento, file e foglio prima di proporre l'importazione.
 - La conferma esplicita dell'utente e OBBLIGATORIA prima di eseguire l'importazione.
 - Non menzionare mai nomi, cognomi, email o altri dati identificativi dei partecipanti dal contenuto del foglio.
-- Comunica solo conteggi aggregati (nuovi, duplicati, non validi).${memorySection}${persistentMemorySection}${glossarySection}`;
+- Comunica solo conteggi aggregati (nuovi, duplicati, non validi).${contextEventId
+    ? `\n\nCONTESTO ATTUALE: L'utente ha aperto l'evento con ID "${contextEventId}" in Synergy${contextPage ? ` (pagina: ${contextPage})` : ''}. Quando cerca documenti, task, budget o fornitori "di questo evento" o "qui" o simili riferimenti impliciti, usa SEMPRE questo event_id come filtro. Non chiedere di specificare l'evento \u2014 lo sai gi\u00e0.`
+    : contextPage
+    ? `\n\nCONTESTO ATTUALE: L'utente si trova nella pagina "${contextPage}" di Synergy.`
+    : ''}${memorySection}${persistentMemorySection}${glossarySection}`;
 
     // ─── BUILD MESSAGES WITH CONTEXT MANAGEMENT ─────────────────────────
     const messages: AnthropicMessage[] = [];

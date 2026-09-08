@@ -30,6 +30,7 @@ import { loadUser } from '@/lib/auth'
 import { loadWorkflowsFromStorage, loadEventsFromStorage, loadTasksFromStorage } from '@/lib/storage'
 import { daysLeft, fmtDate, fmtLong } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
+import { getFlyContext } from '@/lib/fly'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -646,7 +647,13 @@ function FlyChat({ question, onClose, onDragStart, isDragging }: {
           'Authorization': `Bearer ${token}`,
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ message: text.trim(), history: flyHistory.slice(-20) }),
+        body: JSON.stringify({
+            message: text.trim(),
+            history: flyHistory.slice(-20),
+            event_id: getFlyContext().eventId ?? null,
+            client_id: getFlyContext().clientId ?? null,
+            page: getFlyContext().page ?? null,
+          }),
         signal: controller.signal,
       })
 
