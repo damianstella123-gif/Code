@@ -612,6 +612,7 @@ function FlyChat({ question, onClose, onDragStart, isDragging }: {
   const [flyAnswer, setFlyAnswer] = useState('')
   const [flyLoading, setFlyLoading] = useState(false)
   const [flyError, setFlyError] = useState<string | null>(null)
+  const [flyHistory, setFlyHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [followUp, setFollowUp] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const followUpRef = useRef<HTMLInputElement>(null)
@@ -645,7 +646,7 @@ function FlyChat({ question, onClose, onDragStart, isDragging }: {
           'Authorization': `Bearer ${token}`,
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ message: text.trim() }),
+        body: JSON.stringify({ message: text.trim(), history: flyHistory.slice(-20) }),
         signal: controller.signal,
       })
 
@@ -684,14 +685,18 @@ function FlyChat({ question, onClose, onDragStart, isDragging }: {
         }
       }
 
-      if (!accumulated) setFlyAnswer('Fly non ha fornito una risposta.')
+      if (!accumulated) {
+        setFlyAnswer('Fly non ha fornito una risposta.')
+      } else {
+        setFlyHistory(prev => [...prev, { role: 'user' as const, content: text.trim() }, { role: 'assistant' as const, content: accumulated }])
+      }
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') return
       setFlyError(err instanceof Error ? err.message : 'Errore imprevisto')
     } finally {
       setFlyLoading(false)
     }
-  }, [flyLoading])
+  }, [flyLoading, flyHistory])
 
   useEffect(() => {
     askFly(question)

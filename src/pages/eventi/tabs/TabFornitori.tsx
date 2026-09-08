@@ -8,6 +8,7 @@ import { SupplierFormModal } from '@/pages/Fornitori'
 import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
 import { friendlyError } from '@/lib/format'
+import { createMinimalLine } from '@/lib/economic-lines-service'
 import { LINK_CATEGORIES, STATO_CONFERMA_CONFIG } from '../supplier-details-types'
 import { DistanceLogistics } from './fornitori/DistanceLogistics'
 import { AddSupplierPanel } from './fornitori/AddSupplierPanel'
@@ -55,16 +56,8 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
           .order('created_at', { ascending: true })
           .limit(1)
         const budgetVersionId = bvData?.[0]?.id ?? null
-        const record: Record<string, unknown> = {
-          id: crypto.randomUUID(),
-          event_id: event.id,
-          supplier_id: pendingLink,
-          budget_version_id: budgetVersionId,
-        }
-        if (detailTable === 'event_hotel_details') record.tipo = ''
-        if (detailTable === 'event_supplier_services') record.titolo = ''
-        const { error: insertErr } = await supabase.from(detailTable as any).insert(record)
-        if (insertErr) console.warn('[TabFornitori] starter row insert failed', insertErr)
+        const result = await createMinimalLine(detailTable, event.id, pendingLink!, budgetVersionId)
+        if (!result) console.warn('[TabFornitori] starter row insert failed')
       } catch (e) {
         console.warn('[TabFornitori] starter row insert error', e)
       }
@@ -127,7 +120,20 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
     setTimeout(() => setCreatedToast(null), 4000)
   }
 
-  const linkedSuppliers = suppliers.filter(s => linkedIds.includes(s.id))
+  const CATEGORY_SORT: Record<string, number> = {
+    hotel: 0, transfer: 1, ristorante: 2, experience: 3, catering: 4,
+    audio_video: 5, allestimenti: 6, staff_interno: 7, staff_esterno: 7,
+    grafica_stampa: 8, varie: 9,
+  }
+  const linkedSuppliers = suppliers
+    .filter(s => linkedIds.includes(s.id))
+    .sort((a, b) => {
+      const la = links.find(l => l.supplier_id === a.id)
+      const lb = links.find(l => l.supplier_id === b.id)
+      const oa = CATEGORY_SORT[la?.service_category ?? ''] ?? 99
+      const ob = CATEGORY_SORT[lb?.service_category ?? ''] ?? 99
+      return oa !== ob ? oa - ob : a.nome.localeCompare(b.nome, 'it')
+    })
   const availableSuppliers = suppliers.filter(s =>
     !linkedIds.includes(s.id) &&
     (search === '' || s.nome.toLowerCase().includes(search.toLowerCase()) || s.categoria.toLowerCase().includes(search.toLowerCase()))

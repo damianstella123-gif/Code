@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { ChevronDown, Edit3, Save, Euro, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, Clock, ShieldCheck, Lock, Plus, Pencil, Paperclip, Trash2, FileText, ExternalLink } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { loadUser } from '@/lib/auth'
+import { fetchProfile } from '@/lib/profiles'
 import { useToast } from '@/lib/toast'
 import { cloneBudgetVersion } from '@/lib/budget-versions-service'
 import { calcRowEconomics, normalizzaImporto, calcRowCommission, calcRowNetto } from '@/lib/event-economics'
-import { isSupportedTable, fetchLineRecord, recordToEditableData, saveLine, hasSupplierField } from '@/lib/economic-lines-service'
+import { isSupportedTable, fetchLineRecord, recordToEditableData, saveLine, hasSupplierField, createMinimalLine } from '@/lib/economic-lines-service'
 import type { EditableLineData } from '@/lib/economic-lines-service'
 import BudgetLineEditModal from '@/components/BudgetLineEditModal'
 import { fmtDate as fmtDateCentral, friendlyError } from '@/lib/format'
@@ -110,6 +111,8 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
   const [editingLine, setEditingLine] = useState<{ id: string; table: string; categoria: string } | null>(null)
   const [cloning, setCloning] = useState(false)
+  const [addingLine, setAddingLine] = useState<string | null>(null)
+  const [addLineDropdown, setAddLineDropdown] = useState<string | null>(null)
 
   // ─── Version attachments ──────────────────────────────────
   const [versionDocs, setVersionDocs] = useState<any[]>([])
@@ -676,10 +679,10 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
 
   const EXPORT_LABELS: Record<string, string> = {
-    'HOTEL': 'HOTEL', 'TRANSFER': 'TRASPORTI', 'RISTORANTE': 'RISTORANTI',
-    'LOCATION / EXPERIENCE': 'ATTIVITA\' / LOCATION', 'CATERING': 'CATERING',
+    'HOTEL': 'CAMERE', 'TRANSFER': 'TRASPORTI', 'RISTORANTE': 'RISTORANTI',
+    'LOCATION / EXPERIENCE': 'MEETING E SERVIZI F&B', 'CATERING': 'CATERING',
     'AUDIO VIDEO': 'AUDIO VIDEO', 'ALLESTIMENTI': 'ALLESTIMENTI',
-    'STAFF': 'STAFF', 'GRAFICA': 'GRAFICA / STAMPA', 'VARIE': 'VARIE + EXTRA',
+    'STAFF': 'STAFF ESTERNO', 'GRAFICA': 'GRAFICA E STAMPA', 'VARIE': 'VARIE ED EXTRA',
   }
 
   function sanitizeFilename(name: string): string {
@@ -712,11 +715,17 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   // ═══════════════════════════════════════════════════════════
   // PDF INTERNO
   // ═══════════════════════════════════════════════════════════
-  function exportPdfInterno() {
+  async function exportPdfInterno() {
     const doc = new jsPDF({ orientation: 'landscape' })
     const evName = event.nome || 'Evento'
     const clientName = getClientName()
     const exportGroups = getExportGroups()
+    const paxCount = event.partecipanti ?? 0
+    let responsabileName = ''
+    if (event.responsabile) {
+      const p = await fetchProfile(event.responsabile)
+      if (p) responsabileName = [p.first_name, p.last_name].filter(Boolean).join(' ')
+    }
 
     doc.setFontSize(9)
     doc.setTextColor(100)
@@ -734,10 +743,12 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     doc.text(evName, 14, 28)
     doc.setFontSize(9)
     doc.setTextColor(80)
-    if (clientName) doc.text(`Cliente: ${clientName}`, 14, 34)
-    doc.text(`Preventivo al ${fmtDateCentral(new Date().toISOString())}`, 14, clientName ? 40 : 34)
+    let headerY = 34
+    if (clientName) { doc.text(`Cliente: ${clientName}`, 14, headerY); headerY += 6 }
+    if (paxCount > 0) { doc.text(`${paxCount} partecipanti`, 14, headerY); headerY += 6 }
+    doc.text(`Preventivo al ${fmtDateCentral(new Date().toISOString())}`, 14, headerY)
 
-    let startY = clientName ? 46 : 40
+    let startY = headerY + 6
 
     for (const cat of exportGroups) {
       const catV = cat.items.reduce((s, i) => s + i.vendutoNetto, 0)
@@ -805,7 +816,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       return [cat.label, fmtN(cv), fmtN(cc), fmtN(cf), fmtN(cm)]
     })
     riepilogoBody.push([
-      { content: 'TOTALE EVENTO', styles: { fontStyle: 'bold' } },
+      { content: 'Sub-total (Venduto Servizi)', styles: { fontStyle: 'bold' } },
       { content: fmtN(totals.venduto), styles: { fontStyle: 'bold' } },
       { content: fmtN(totals.costo), styles: { fontStyle: 'bold' } },
       { content: fmtN(totals.fee), styles: { fontStyle: 'bold' } },
@@ -821,6 +832,18 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       ])
     }
 
+    const feeFinaleInterno = totals.venduto * feePct / 100
+    riepilogoBody.push([
+      { content: `SIMMETRIA Fee (${feePct}%)`, styles: { fontStyle: 'italic' } },
+      { content: fmtN(feeFinaleInterno), styles: {} },
+      '', '', '',
+    ])
+    riepilogoBody.push([
+      { content: 'Totale GENERALE', styles: { fontStyle: 'bold' } },
+      { content: fmtN(totals.venduto + feeFinaleInterno), styles: { fontStyle: 'bold' } },
+      '', '', '',
+    ])
+
     autoTable(doc, {
       startY: startY + 4,
       head: [['RIEPILOGO DEI SERVIZI (netto IVA)', 'Venduto netto', 'Costi netto', 'Fee', 'Margine']],
@@ -832,6 +855,38 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       margin: { left: 14, right: 14 },
     })
 
+    startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
+    const totaleGeneraleInterno = totals.venduto + feeFinaleInterno
+    const acconto30Interno = totaleGeneraleInterno * 0.3
+    const saldo70Interno = totaleGeneraleInterno * 0.7
+    doc.setFontSize(7.5)
+    doc.setTextColor(80)
+    doc.text('Tutti i costi si intendono IVA 22% non inclusa.', 14, startY)
+    doc.text('Si intendono escluse le spese extra impreviste e non conteggiate.', 14, startY + 4)
+    if (paxCount > 0) doc.text(`Tutti i servizi sono offerti per un minimo garantito di ${paxCount} persone.`, 14, startY + 8)
+    const footerOffset = paxCount > 0 ? 16 : 12
+    doc.setFontSize(8)
+    doc.setTextColor(0)
+    doc.text('Condizioni di pagamento:', 14, startY + footerOffset)
+    doc.setFontSize(7.5)
+    doc.setTextColor(80)
+    doc.text(`> acconto 30% all\u2019ordine: \u20AC ${fmtN(acconto30Interno)}`, 14, startY + footerOffset + 5)
+    doc.text(`> saldo ed eventuali extra a 60 gg data fattura fine evento: \u20AC ${fmtN(saldo70Interno)}`, 14, startY + footerOffset + 10)
+    const sigY = startY + footerOffset + 20
+    const todayStr = fmtDateCentral(new Date().toISOString())
+    doc.setFontSize(8)
+    doc.setTextColor(0)
+    doc.text(`Roma, ${todayStr}`, 14, sigY)
+    if (responsabileName) {
+      doc.text(responsabileName, 14, sigY + 5)
+      doc.text('Partner', 14, sigY + 10)
+    }
+    doc.setFontSize(7)
+    doc.setTextColor(100)
+    doc.text('Simmetria Immagine e Comunicazione Srl', 250, sigY, { align: 'right' })
+    doc.text('Viale Egeo 8, 00144 Roma', 250, sigY + 4, { align: 'right' })
+    doc.text('PI/CF: 03856751007 - SDI: M5UXCR1', 250, sigY + 8, { align: 'right' })
+
     const filename = `${sanitizeFilename(evName)}_${sanitizeFilename(clientName)}_Budget_Interno.pdf`
     doc.save(filename)
   }
@@ -839,11 +894,17 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   // ═══════════════════════════════════════════════════════════
   // PDF CLIENTE
   // ═══════════════════════════════════════════════════════════
-  function exportPdfCliente() {
+  async function exportPdfCliente() {
     const doc = new jsPDF()
     const evName = event.nome || 'Evento'
     const clientName = getClientName()
     const exportGroups = getExportGroups()
+    const paxCount = event.partecipanti ?? 0
+    let responsabileName = ''
+    if (event.responsabile) {
+      const p = await fetchProfile(event.responsabile)
+      if (p) responsabileName = [p.first_name, p.last_name].filter(Boolean).join(' ')
+    }
 
     doc.setFontSize(9)
     doc.setTextColor(100)
@@ -856,10 +917,12 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
 
     doc.setFontSize(9)
     doc.setTextColor(80)
-    if (clientName) doc.text(`Cliente: ${clientName}`, 14, 28)
-    doc.text(`Preventivo al ${fmtDateCentral(new Date().toISOString())}`, 14, clientName ? 34 : 28)
+    let hdrY = 28
+    if (clientName) { doc.text(`Cliente: ${clientName}`, 14, hdrY); hdrY += 6 }
+    if (paxCount > 0) { doc.text(`${paxCount} partecipanti`, 14, hdrY); hdrY += 6 }
+    doc.text(`Preventivo al ${fmtDateCentral(new Date().toISOString())}`, 14, hdrY)
 
-    let startY = clientName ? 40 : 34
+    let startY = hdrY + 6
 
     for (const cat of exportGroups) {
       const catV = cat.items.reduce((s, i) => s + i.venduto, 0)
@@ -890,9 +953,19 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       return [cat.label, `\u20AC ${fmtN(cv)}`]
     })
     const clientTotal = lines.reduce((s, l) => s + l.venduto, 0)
+    const feeCliente = clientTotal * feePct / 100
+    const totaleGeneraleCliente = clientTotal + feeCliente
     riepilogoBody.push([
-      { content: 'TOTALE', styles: { fontStyle: 'bold' } },
+      { content: 'Sub-total (Venduto Servizi)', styles: { fontStyle: 'bold' } },
       { content: `\u20AC ${fmtN(clientTotal)}`, styles: { fontStyle: 'bold' } },
+    ])
+    riepilogoBody.push([
+      { content: `SIMMETRIA Fee (${feePct}%)`, styles: { fontStyle: 'italic' } },
+      { content: `\u20AC ${fmtN(feeCliente)}`, styles: {} },
+    ])
+    riepilogoBody.push([
+      { content: 'Totale GENERALE', styles: { fontStyle: 'bold' } },
+      { content: `\u20AC ${fmtN(totaleGeneraleCliente)}`, styles: { fontStyle: 'bold' } },
     ])
 
     autoTable(doc, {
@@ -907,9 +980,35 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     })
 
     startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
+    const acconto30C = totaleGeneraleCliente * 0.3
+    const saldo70C = totaleGeneraleCliente * 0.7
+    doc.setFontSize(7.5)
+    doc.setTextColor(80)
+    doc.text('Tutti i costi si intendono IVA 22% non inclusa.', 14, startY)
+    doc.text('Si intendono escluse le spese extra impreviste e non conteggiate.', 14, startY + 4)
+    if (paxCount > 0) doc.text(`Tutti i servizi sono offerti per un minimo garantito di ${paxCount} persone.`, 14, startY + 8)
+    const footOffC = paxCount > 0 ? 16 : 12
     doc.setFontSize(8)
+    doc.setTextColor(0)
+    doc.text('Condizioni di pagamento:', 14, startY + footOffC)
+    doc.setFontSize(7.5)
+    doc.setTextColor(80)
+    doc.text(`> acconto 30% all\u2019ordine: \u20AC ${fmtN(acconto30C)}`, 14, startY + footOffC + 5)
+    doc.text(`> saldo ed eventuali extra a 60 gg data fattura fine evento: \u20AC ${fmtN(saldo70C)}`, 14, startY + footOffC + 10)
+    const sigYC = startY + footOffC + 20
+    const todayC = fmtDateCentral(new Date().toISOString())
+    doc.setFontSize(8)
+    doc.setTextColor(0)
+    doc.text(`Roma, ${todayC}`, 14, sigYC)
+    if (responsabileName) {
+      doc.text(responsabileName, 14, sigYC + 5)
+      doc.text('Partner', 14, sigYC + 10)
+    }
+    doc.setFontSize(7)
     doc.setTextColor(100)
-    doc.text('I prezzi indicati sono da intendersi IVA esclusa salvo diversa indicazione.', 14, startY)
+    doc.text('Simmetria Immagine e Comunicazione Srl', 196, sigYC, { align: 'right' })
+    doc.text('Viale Egeo 8, 00144 Roma', 196, sigYC + 4, { align: 'right' })
+    doc.text('PI/CF: 03856751007 - SDI: M5UXCR1', 196, sigYC + 8, { align: 'right' })
 
     const filename = `${sanitizeFilename(evName)}_${sanitizeFilename(clientName)}_Budget_Cliente.pdf`
     doc.save(filename)
@@ -918,10 +1017,16 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   // ═══════════════════════════════════════════════════════════
   // EXCEL INTERNO
   // ═══════════════════════════════════════════════════════════
-  function exportExcelInterno() {
+  async function exportExcelInterno() {
     const evName = event.nome || 'Evento'
     const clientName = getClientName()
     const exportGroups = getExportGroups()
+    const paxCount = event.partecipanti ?? 0
+    let responsabileName = ''
+    if (event.responsabile) {
+      const p = await fetchProfile(event.responsabile)
+      if (p) responsabileName = [p.first_name, p.last_name].filter(Boolean).join(' ')
+    }
 
     const rows: (string | number | null)[][] = []
     rows.push(['Simmetria Immagine e Comunicazione Srl'])
@@ -929,6 +1034,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     rows.push([])
     rows.push([evName.toUpperCase()])
     if (clientName) rows.push([`Cliente: ${clientName}`])
+    if (paxCount > 0) rows.push([`${paxCount} partecipanti`])
     rows.push([`Preventivo al ${fmtDateCentral(new Date().toISOString())}`])
     rows.push([])
     rows.push([])
@@ -969,13 +1075,32 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const cm = cv + cf + catComm - cc
       rows.push([cat.label, '', '', '', '', cv, '', '', cc, cm, ''])
     }
-    rows.push(['TOTALE EVENTO', '', '', '', '', totals.venduto, '', '', totals.costo, totals.margine, totals.marginePct / 100])
+    rows.push(['Sub-total (Venduto Servizi)', '', '', '', '', totals.venduto, '', '', totals.costo, totals.margine, totals.marginePct / 100])
     const feeFinale = totals.venduto * feePct / 100
     rows.push([`SIMMETRIA Fee (${feePct}%)`, '', '', '', '', feeFinale, '', '', '', '', ''])
-    rows.push(['TOTALE FINALE (Venduto + Fee)', '', '', '', '', totals.venduto + feeFinale, '', '', '', '', ''])
+    rows.push(['Totale GENERALE', '', '', '', '', totals.venduto + feeFinale, '', '', '', '', ''])
     if (totals.commissioni > 0) {
       rows.push(['COMMISSIONI (interno)', '', '', '', '', '', '', '', '', totals.commissioni, ''])
     }
+    rows.push([])
+    const totGenInt = totals.venduto + totals.venduto * feePct / 100
+    const acc30Int = totGenInt * 0.3
+    const sal70Int = totGenInt * 0.7
+    rows.push(['Tutti i costi si intendono IVA 22% non inclusa.'])
+    rows.push(['Si intendono escluse le spese extra impreviste e non conteggiate.'])
+    if (paxCount > 0) rows.push([`Tutti i servizi sono offerti per un minimo garantito di ${paxCount} persone.`])
+    rows.push([])
+    rows.push(['Condizioni di pagamento:'])
+    rows.push([`> acconto 30% all\u2019ordine: \u20AC ${fmtN(acc30Int)}`])
+    rows.push([`> saldo ed eventuali extra a 60 gg data fattura fine evento: \u20AC ${fmtN(sal70Int)}`])
+    rows.push([])
+    const todayInt = fmtDateCentral(new Date().toISOString())
+    rows.push([`Roma, ${todayInt}`, '', '', '', '', '', '', '', '', '', ''])
+    if (responsabileName) rows.push([responsabileName, '', '', '', '', '', '', '', '', 'Simmetria Immagine e Comunicazione Srl', ''])
+    if (responsabileName) rows.push(['Partner', '', '', '', '', '', '', '', '', 'Viale Egeo 8, 00144 Roma', ''])
+    if (!responsabileName) rows.push(['', '', '', '', '', '', '', '', '', 'Simmetria Immagine e Comunicazione Srl', ''])
+    if (!responsabileName) rows.push(['', '', '', '', '', '', '', '', '', 'Viale Egeo 8, 00144 Roma', ''])
+    rows.push(['', '', '', '', '', '', '', '', '', 'PI/CF: 03856751007 - SDI: M5UXCR1', ''])
 
     const ws = XLSX.utils.aoa_to_sheet(rows)
     ws['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }]
@@ -988,10 +1113,16 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   // ═══════════════════════════════════════════════════════════
   // EXCEL CLIENTE
   // ═══════════════════════════════════════════════════════════
-  function exportExcelCliente() {
+  async function exportExcelCliente() {
     const evName = event.nome || 'Evento'
     const clientName = getClientName()
     const exportGroups = getExportGroups()
+    const paxCount = event.partecipanti ?? 0
+    let responsabileName = ''
+    if (event.responsabile) {
+      const p = await fetchProfile(event.responsabile)
+      if (p) responsabileName = [p.first_name, p.last_name].filter(Boolean).join(' ')
+    }
 
     const rows: (string | number | null)[][] = []
     rows.push(['Simmetria Immagine e Comunicazione Srl'])
@@ -999,6 +1130,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     rows.push([])
     rows.push([evName.toUpperCase()])
     if (clientName) rows.push([`Cliente: ${clientName}`])
+    if (paxCount > 0) rows.push([`${paxCount} partecipanti`])
     rows.push([`Preventivo al ${fmtDateCentral(new Date().toISOString())}`])
     rows.push([])
     rows.push([])
@@ -1021,9 +1153,30 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       const cv = cat.items.reduce((s, i) => s + i.venduto, 0)
       rows.push([cat.label, '', '', '', cv])
     }
-    rows.push(['TOTALE', '', '', '', totals.venduto])
+    const clientTotalXls = lines.reduce((s, l) => s + l.venduto, 0)
+    const feeClienteXls = clientTotalXls * feePct / 100
+    const totGenClienteXls = clientTotalXls + feeClienteXls
+    rows.push(['Sub-total (Venduto Servizi)', '', '', '', clientTotalXls])
+    rows.push([`SIMMETRIA Fee (${feePct}%)`, '', '', '', feeClienteXls])
+    rows.push(['Totale GENERALE', '', '', '', totGenClienteXls])
     rows.push([])
-    rows.push(['I prezzi indicati sono da intendersi IVA esclusa salvo diversa indicazione.'])
+    const acc30Xls = totGenClienteXls * 0.3
+    const sal70Xls = totGenClienteXls * 0.7
+    rows.push(['Tutti i costi si intendono IVA 22% non inclusa.'])
+    rows.push(['Si intendono escluse le spese extra impreviste e non conteggiate.'])
+    if (paxCount > 0) rows.push([`Tutti i servizi sono offerti per un minimo garantito di ${paxCount} persone.`])
+    rows.push([])
+    rows.push(['Condizioni di pagamento:'])
+    rows.push([`> acconto 30% all\u2019ordine: \u20AC ${fmtN(acc30Xls)}`])
+    rows.push([`> saldo ed eventuali extra a 60 gg data fattura fine evento: \u20AC ${fmtN(sal70Xls)}`])
+    rows.push([])
+    const todayXls = fmtDateCentral(new Date().toISOString())
+    rows.push([`Roma, ${todayXls}`, '', '', '', ''])
+    if (responsabileName) rows.push([responsabileName, '', '', 'Simmetria Immagine e Comunicazione Srl', ''])
+    if (responsabileName) rows.push(['Partner', '', '', 'Viale Egeo 8, 00144 Roma', ''])
+    if (!responsabileName) rows.push(['', '', '', 'Simmetria Immagine e Comunicazione Srl', ''])
+    if (!responsabileName) rows.push(['', '', '', 'Viale Egeo 8, 00144 Roma', ''])
+    rows.push(['', '', '', 'PI/CF: 03856751007 - SDI: M5UXCR1', ''])
 
     const ws = XLSX.utils.aoa_to_sheet(rows)
     ws['!cols'] = [{ wch: 24 }, { wch: 50 }, { wch: 10 }, { wch: 18 }, { wch: 18 }]
@@ -1036,6 +1189,91 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
   // ═══════════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════════
+
+  const pendingNewLineRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (pendingNewLineRef.current) {
+      const found = lines.find(l => l.id === pendingNewLineRef.current)
+      if (found && isSupportedTable(found.table)) startInlineEdit(found)
+      pendingNewLineRef.current = null
+    }
+  }, [lines])
+
+  async function handleAddLine(catLabel: string, supplierId: string, table: string) {
+    setAddingLine(catLabel)
+    setAddLineDropdown(null)
+    try {
+      const result = await createMinimalLine(table, event.id, supplierId, activeVersion)
+      if (!result) {
+        showToast('Impossibile creare la voce', 'error')
+        setAddingLine(null)
+        return
+      }
+      pendingNewLineRef.current = result.id
+      await loadData()
+    } catch {
+      showToast('Errore nella creazione della voce', 'error')
+    }
+    setAddingLine(null)
+  }
+
+  function renderAddLineButton(cat: { label: string; items: BudgetLine[] }) {
+    const pairs = new Map<string, { supplierId: string; table: string; supplierName: string }>()
+    for (const item of cat.items) {
+      if (!item.supplierId) continue
+      const key = `${item.supplierId}::${item.table}`
+      if (!pairs.has(key)) pairs.set(key, { supplierId: item.supplierId, table: item.table, supplierName: item.fornitore || 'Fornitore' })
+    }
+    if (pairs.size === 0) return null
+    const isAdding = addingLine === cat.label
+    const entries = Array.from(pairs.values())
+
+    if (entries.length === 1) {
+      const { supplierId, table } = entries[0]
+      return (
+        <div className="px-4 py-2" style={{ borderTop: '1px solid var(--line)' }}>
+          <button
+            disabled={isAdding}
+            onClick={() => handleAddLine(cat.label, supplierId, table)}
+            className="flex items-center gap-1.5 text-xs font-medium transition-colors hover:opacity-80 disabled:opacity-40"
+            style={{ color: 'var(--accent)' }}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {isAdding ? 'Creazione...' : '+ Nuova voce'}
+          </button>
+        </div>
+      )
+    }
+
+    return (
+      <div className="px-4 py-2 relative" style={{ borderTop: '1px solid var(--line)' }}>
+        <button
+          disabled={isAdding}
+          onClick={() => setAddLineDropdown(prev => prev === cat.label ? null : cat.label)}
+          className="flex items-center gap-1.5 text-xs font-medium transition-colors hover:opacity-80 disabled:opacity-40"
+          style={{ color: 'var(--accent)' }}
+        >
+          <Plus className="w-3.5 h-3.5" />
+          {isAdding ? 'Creazione...' : '+ Nuova voce'}
+        </button>
+        {addLineDropdown === cat.label && (
+          <div className="absolute left-4 mt-1 z-30 rounded-lg shadow-lg py-1 min-w-[180px]" style={{ background: 'var(--panel2)', border: '1px solid var(--line)' }}>
+            {entries.map(({ supplierId, table, supplierName }) => (
+              <button
+                key={`${supplierId}-${table}`}
+                onClick={() => handleAddLine(cat.label, supplierId, table)}
+                className="w-full text-left px-3 py-1.5 text-xs hover:opacity-80 transition-colors"
+                style={{ color: 'var(--text)' }}
+              >
+                {supplierName}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   function renderBudgetLine(item: BudgetLine) {
     const isExpanded = expandedId === item.id
@@ -1372,8 +1610,8 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
           )}
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <Kpi label="Totale Venduto Servizi" value={fmt(totals.venduto)} color="var(--text)" />
-            <Kpi label="Totale con Fee (fatturato cliente)" value={fmt(totals.venduto + (totals.venduto * feePct / 100))} color="var(--text)" />
+            <Kpi label="Sub-total (Venduto Servizi)" value={fmt(totals.venduto)} color="var(--text)" />
+            <Kpi label="Totale GENERALE" value={fmt(totals.venduto + (totals.venduto * feePct / 100))} color="var(--text)" />
             <div className="text-center">
               <p className="text-xs flex items-center justify-center gap-1" style={{ color: 'var(--muted)' }}>
                 Fee Simmetria
@@ -1549,7 +1787,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
                 {/* Category header */}
                 <div className="px-4 py-3 flex items-center justify-between" style={{ background: 'var(--panel2)' }}>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold tracking-wide" style={{ color: 'var(--text)' }}>{cat.label}</p>
+                    <p className="text-sm font-bold tracking-wide" style={{ color: 'var(--text)' }}>{getExportLabel(cat.label)}</p>
                     {catStimati > 0 && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,194,75,0.15)', color: 'var(--yellow)' }}>
                         {catStimati} stimati
@@ -1611,6 +1849,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
                 ) : (
                   cat.items.map(item => renderBudgetLine(item))
                 )}
+                {renderAddLineButton(cat)}
               </div>
             )
           })}
@@ -1621,7 +1860,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
       {lines.length > 0 && (
         <div className="panel p-4">
           <div className="flex flex-wrap items-center justify-between gap-4 text-xs px-2">
-            <span className="font-bold tracking-wide" style={{ color: 'var(--text)' }}>TOTALE EVENTO</span>
+            <span className="font-bold tracking-wide" style={{ color: 'var(--text)' }}>Sub-total (Venduto Servizi)</span>
             <div className="flex items-center gap-5">
               <span style={{ color: 'var(--muted)' }}>Venduto: <strong style={{ color: 'var(--text)' }}>{fmt(totals.venduto)}</strong></span>
               <span style={{ color: 'var(--muted)' }}>Costi: <strong style={{ color: 'var(--yellow)' }}>{fmt(totals.costo)}</strong></span>

@@ -343,3 +343,23 @@ export async function saveLine(data: EditableLineData): Promise<SaveLineResult> 
   }
   return { success: true }
 }
+
+export async function createMinimalLine(
+  table: string,
+  eventId: string,
+  supplierId: string,
+  budgetVersionId: string | null,
+): Promise<{ id: string } | null> {
+  const id = crypto.randomUUID()
+  const record: Record<string, unknown> = {
+    id,
+    event_id: eventId,
+    supplier_id: supplierId,
+    budget_version_id: budgetVersionId,
+  }
+  if (table === 'event_hotel_details') record.tipo = ''
+  if (table === 'event_supplier_services') record.titolo = ''
+  const { error } = await supabase.from(table as any).insert(record)
+  if (error) return null
+  return { id }
+}

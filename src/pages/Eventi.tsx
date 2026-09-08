@@ -949,7 +949,12 @@ export default function Eventi() {
         e.location.toLowerCase().includes(search.toLowerCase())
       const matchStato = filterStato === 'Tutti' || e.stato === filterStato
       return matchSearch && matchStato
-    }).sort((a, b) => (a.dataInizio || '').localeCompare(b.dataInizio || ''))
+    }).sort((a, b) => {
+      if (showMyEvents) {
+        return (a.dataInizio || '').localeCompare(b.dataInizio || '')
+      }
+      return (a.eventNumber ?? 0) - (b.eventNumber ?? 0)
+    })
   }, [visibleEvents, search, filterStato, showMyEvents, currentUser])
 
   const overlays = (

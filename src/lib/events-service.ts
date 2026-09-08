@@ -478,19 +478,26 @@ export async function getEventROI(eventId: string, debug = false): Promise<Event
 
   if (debug) console.log('%c ROI Debug — ' + event.title, 'font-weight:bold;font-size:13px')
 
+  const { data: versions } = await supabase.from('budget_versions').select('id').eq('event_id', eventId).order('created_at', { ascending: false }).limit(1)
+  const currentVersionId = versions?.[0]?.id ?? null
+
+  function vq(q: any) {
+    return currentVersionId ? q.eq('budget_version_id', currentVersionId) : q
+  }
+
   const [hotels, restaurant, catering, staffInt, staffExt, varie, audioVideo, allestimenti, graficaStampa, experience, assicurazioni, agenziaViaggi, tasks] = await Promise.all([
-    supabase.from('event_hotel_details').select('costo_totale').eq('event_id', eventId),
-    supabase.from('event_restaurant_details').select('costo_totale_reale').eq('event_id', eventId),
-    supabase.from('event_catering_details').select('costo_totale').eq('event_id', eventId),
-    supabase.from('event_staff_interno_details').select('costo_totale').eq('event_id', eventId),
-    supabase.from('event_staff_esterno_details').select('costo_totale').eq('event_id', eventId),
-    supabase.from('event_varie_details').select('costo_totale').eq('event_id', eventId),
-    supabase.from('event_audio_video_details').select('costo_totale').eq('event_id', eventId),
-    supabase.from('event_allestimenti_details').select('costo_totale').eq('event_id', eventId),
-    supabase.from('event_grafica_stampa_details').select('costo_totale').eq('event_id', eventId),
-    supabase.from('event_experience_details').select('costo_totale').eq('event_id', eventId),
-    supabase.from('event_assicurazioni_details').select('costo_totale').eq('event_id', eventId),
-    supabase.from('event_agenzia_viaggi_details').select('costo_totale').eq('event_id', eventId),
+    vq(supabase.from('event_hotel_details').select('costo_totale, venduto_totale').eq('event_id', eventId)),
+    vq(supabase.from('event_restaurant_details').select('costo_totale_reale, venduto_totale').eq('event_id', eventId)),
+    vq(supabase.from('event_catering_details').select('costo_totale, venduto_totale').eq('event_id', eventId)),
+    vq(supabase.from('event_staff_interno_details').select('costo_totale, venduto_totale').eq('event_id', eventId)),
+    vq(supabase.from('event_staff_esterno_details').select('costo_totale, venduto_totale').eq('event_id', eventId)),
+    vq(supabase.from('event_varie_details').select('costo_totale, venduto_totale').eq('event_id', eventId)),
+    vq(supabase.from('event_audio_video_details').select('costo_totale, venduto_totale').eq('event_id', eventId)),
+    vq(supabase.from('event_allestimenti_details').select('costo_totale, venduto_totale').eq('event_id', eventId)),
+    vq(supabase.from('event_grafica_stampa_details').select('costo_totale, venduto_totale').eq('event_id', eventId)),
+    vq(supabase.from('event_experience_details').select('costo_totale, venduto_totale').eq('event_id', eventId)),
+    vq(supabase.from('event_assicurazioni_details').select('costo_totale, venduto_totale').eq('event_id', eventId)),
+    vq(supabase.from('event_agenzia_viaggi_details').select('costo_totale, venduto_totale').eq('event_id', eventId)),
     supabase.from('tasks').select('status').eq('event_id', eventId),
   ])
 
@@ -509,11 +516,27 @@ export async function getEventROI(eventId: string, debug = false): Promise<Event
   const costi_assicurazioni = sum(assicurazioni.data, 'costo_totale')
   const costi_agenzia = sum(agenziaViaggi.data, 'costo_totale')
 
+  const venduto_hotel = sum(hotels.data, 'venduto_totale')
+  const venduto_restaurant = sum(restaurant.data, 'venduto_totale')
+  const venduto_catering = sum(catering.data, 'venduto_totale') + venduto_restaurant
+  const venduto_staff_int = sum(staffInt.data, 'venduto_totale')
+  const venduto_staff_ext = sum(staffExt.data, 'venduto_totale')
+  const venduto_varie = sum(varie.data, 'venduto_totale')
+  const venduto_av = sum(audioVideo.data, 'venduto_totale')
+  const venduto_allestimenti = sum(allestimenti.data, 'venduto_totale')
+  const venduto_grafica = sum(graficaStampa.data, 'venduto_totale')
+  const venduto_experience = sum(experience.data, 'venduto_totale')
+  const venduto_assicurazioni = sum(assicurazioni.data, 'venduto_totale')
+  const venduto_agenzia = sum(agenziaViaggi.data, 'venduto_totale')
+
   const costi_fornitori = costi_av + costi_allestimenti + costi_grafica + costi_experience + costi_assicurazioni + costi_agenzia
   const costi_staff = costi_staff_int + costi_staff_ext
   const costi_totali = costi_hotel + costi_catering + costi_fornitori + costi_staff + costi_varie
 
-  const revenue = Number(event.ricavo_cliente) || 0
+  const venduto_totali = venduto_hotel + venduto_catering + (venduto_av + venduto_allestimenti + venduto_grafica + venduto_experience + venduto_assicurazioni + venduto_agenzia) + (venduto_staff_int + venduto_staff_ext) + venduto_varie
+  const feePct = event.fee_agenzia_pct ?? 6
+  const fee = venduto_totali * feePct / 100
+  const revenue = venduto_totali + fee
   const margine_eur = revenue - costi_totali
   const margine_pct = revenue > 0 ? (margine_eur / revenue) * 100 : 0
   const roi_pct = costi_totali > 0 ? (margine_eur / costi_totali) * 100 : 0
@@ -526,7 +549,9 @@ export async function getEventROI(eventId: string, debug = false): Promise<Event
 
   if (debug) {
     console.table({
-      'Revenue (ricavo_cliente)': `\u20AC${revenue.toLocaleString('it-IT')}`,
+      'Venduto totali': `\u20AC${venduto_totali.toLocaleString('it-IT')}`,
+      ['Fee ' + feePct + '%']: `\u20AC${fee.toLocaleString('it-IT')}`,
+      'Revenue (venduto + fee)': `\u20AC${revenue.toLocaleString('it-IT')}`,
       'Hotel': `\u20AC${costi_hotel.toLocaleString('it-IT')}`,
       'Restaurant': `\u20AC${costi_restaurant.toLocaleString('it-IT')}`,
       'Catering (incl. restaurant)': `\u20AC${costi_catering.toLocaleString('it-IT')}`,

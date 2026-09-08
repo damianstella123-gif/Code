@@ -354,6 +354,29 @@ function EventROISection() {
 // ─── Event Detail Modal ──────────────────────────────────────────────────────
 
 function EventDetailModal({ event: e, onClose }: { event: EventROI; onClose: () => void }) {
+  const [timeByUser, setTimeByUser] = useState<{ name: string; minutes: number }[]>([])
+  useEffect(() => {
+    async function loadTime() {
+      const { data } = await supabase
+        .from('event_time_heartbeats')
+        .select('user_id')
+        .eq('event_id', e.event_id)
+      if (!data || data.length === 0) { setTimeByUser([]); return }
+      const totals = new Map<string, number>()
+      for (const row of data) {
+        totals.set(row.user_id, (totals.get(row.user_id) || 0) + 1)
+      }
+      const userIds = Array.from(totals.keys())
+      const { data: profiles } = await supabase.from('profiles').select('id, nome').in('id', userIds)
+      const rows = userIds.map(id => ({
+        name: profiles?.find(p => p.id === id)?.nome || 'Utente sconosciuto',
+        minutes: totals.get(id) || 0,
+      })).sort((a, b) => b.minutes - a.minutes)
+      setTimeByUser(rows)
+    }
+    loadTime()
+  }, [e.event_id])
+
   const costRows = [
     { label: 'Hotel', value: e.costi_hotel },
     { label: 'Catering/Ristorante', value: e.costi_catering },
@@ -416,6 +439,25 @@ function EventDetailModal({ event: e, onClose }: { event: EventROI; onClose: () 
             </span>
           </div>
         )}
+
+        {/* Tempo attivo per persona */}
+        <div style={{ marginTop: 20 }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 10 }}>Tempo attivo su Synergy</p>
+          {timeByUser.length === 0 ? (
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', fontStyle: 'italic' }}>Nessun dato di utilizzo registrato ancora</p>
+          ) : (
+            <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
+              {timeByUser.map(r => (
+                <div key={r.name} className="flex items-center justify-between" style={{ padding: '8px 12px', borderBottom: '1px solid var(--line)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text)' }}>{r.name}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>
+                    {r.minutes >= 60 ? `${Math.floor(r.minutes / 60)}h ${r.minutes % 60}m` : `${r.minutes}m`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <button
           onClick={async () => {

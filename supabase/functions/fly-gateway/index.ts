@@ -2745,6 +2745,16 @@ Deno.serve(async (req: Request) => {
       persistentMemorySection = `\n\nMEMORIA PERSISTENTE (conoscenza organizzativa):\n${sections.join("\n\n")}`;
     }
 
+    let glossarySection = "";
+    const { data: glossaryRows } = await userClient
+      .from("fly_glossary")
+      .select("termine, definizione")
+      .eq("attivo", true)
+      .order("termine");
+    if (glossaryRows && glossaryRows.length > 0) {
+      glossarySection = "\n\nGLOSSARIO AZIENDALE:\n" + glossaryRows.map((g: { termine: string; definizione: string }) => `- ${g.termine}: ${g.definizione}`).join("\n");
+    }
+
     const today = new Date().toLocaleDateString("it-IT", {
       weekday: "long",
       day: "numeric",
@@ -2821,7 +2831,7 @@ REGOLE IMPORTAZIONE PARTECIPANTI:
 - Identifica evento, file e foglio prima di proporre l'importazione.
 - La conferma esplicita dell'utente e OBBLIGATORIA prima di eseguire l'importazione.
 - Non menzionare mai nomi, cognomi, email o altri dati identificativi dei partecipanti dal contenuto del foglio.
-- Comunica solo conteggi aggregati (nuovi, duplicati, non validi).${memorySection}${persistentMemorySection}`;
+- Comunica solo conteggi aggregati (nuovi, duplicati, non validi).${memorySection}${persistentMemorySection}${glossarySection}`;
 
     // ─── BUILD MESSAGES WITH CONTEXT MANAGEMENT ─────────────────────────
     const messages: AnthropicMessage[] = [];
