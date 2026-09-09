@@ -80,6 +80,17 @@ export default function ManageRegistration() {
 
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
+  
+  const [programma, setProgramma] = useState<{
+    id: string; titolo: string; categoria: string | null; data: string;
+    ora_inizio: string | null; ora_fine: string | null; luogo: string | null; note: string | null
+  }[]>([])
+
+  useEffect(() => {
+    if (!token) return
+    supabase.rpc('get_event_program_by_token', { p_token: token })
+      .then(({ data }) => { if (Array.isArray(data)) setProgramma(data) })
+  }, [token])
   const [error, setError] = useState<string | null>(null)
 
   // security headers via meta tags
