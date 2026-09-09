@@ -1,7 +1,7 @@
 import { Search, X, Plus, Truck } from 'lucide-react'
 import type { Supplier } from '@/data/suppliers'
 import type { CategoryType } from '@/components/TabOperativo'
-import { LINK_CATEGORIES } from '../../supplier-details-types'
+import { getCachedCategories } from '@/lib/supplier-categories'
 
 interface AddSupplierPanelProps {
   adding: boolean
@@ -91,13 +91,13 @@ export function AddSupplierPanel({
               Come verra utilizzato questo fornitore in questo evento?
             </p>
             <div className="grid grid-cols-2 gap-2 mb-4">
-              {LINK_CATEGORIES.map(cat => (
-                <button key={cat.value} onClick={() => setLinkCategory(cat.value)}
+              {getCachedCategories().map(cat => (
+                <button key={cat.key} onClick={() => setLinkCategory(cat.key as CategoryType)}
                   className="px-3 py-2 rounded-lg text-xs font-medium text-left transition-all"
                   style={{
-                    background: linkCategory === cat.value ? 'color-mix(in srgb, var(--red2) 15%, transparent)' : 'var(--panel2)',
-                    border: `1px solid ${linkCategory === cat.value ? 'var(--red2)' : 'var(--line)'}`,
-                    color: linkCategory === cat.value ? 'var(--red2)' : 'var(--text)',
+                    background: linkCategory === cat.key ? 'color-mix(in srgb, var(--red2) 15%, transparent)' : 'var(--panel2)',
+                    border: `1px solid ${linkCategory === cat.key ? 'var(--red2)' : 'var(--line)'}`,
+                    color: linkCategory === cat.key ? 'var(--red2)' : 'var(--text)',
                   }}>
                   {cat.label}
                 </button>

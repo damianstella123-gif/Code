@@ -1,5 +1,3 @@
-import type { CategoryType } from '@/components/TabOperativo'
-
 export const SVC_CATEGORIES = [
   { value: 'transfer', label: 'Transfer' },
   { value: 'hotel', label: 'Hotel' },
@@ -201,21 +199,6 @@ export interface VarieDetail {
   costo_totale: number | null
 }
 
-export const LINK_CATEGORIES: { value: CategoryType; label: string }[] = [
-  { value: 'hotel', label: 'Hotel' },
-  { value: 'transfer', label: 'Transfer' },
-  { value: 'ristorante', label: 'Ristorante' },
-  { value: 'experience', label: 'Location / Attivita' },
-  { value: 'catering', label: 'Catering' },
-  { value: 'audio_video', label: 'Audio Video' },
-  { value: 'allestimenti', label: 'Allestimenti' },
-  { value: 'staff_interno', label: 'Staff Simmetria' },
-  { value: 'staff_esterno', label: 'Staff Esterno' },
-  { value: 'grafica_stampa', label: 'Grafica / Stampa' },
-  { value: 'assicurazioni', label: 'Assicurazioni' },
-  { value: 'agenzia_viaggi', label: 'Agenzia di Viaggi' },
-  { value: 'varie', label: 'Varie' },
-]
 
 export const STATO_CONFERMA_CONFIG = {
   richiesto: { label: 'Richiesto', color: 'var(--yellow)', bg: 'color-mix(in srgb, var(--yellow) 12%, transparent)', border: 'var(--yellow)' },

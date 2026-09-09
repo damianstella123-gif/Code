@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Truck, AlertTriangle, User, Edit3, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useEventServices } from '@/lib/use-event-services'
@@ -9,7 +9,8 @@ import type { Event } from '@/data/events'
 import type { Supplier } from '@/data/suppliers'
 import { friendlyError } from '@/lib/format'
 import { createMinimalLine } from '@/lib/economic-lines-service'
-import { LINK_CATEGORIES, STATO_CONFERMA_CONFIG } from '../supplier-details-types'
+import { STATO_CONFERMA_CONFIG } from '../supplier-details-types'
+import { fetchSupplierCategories, getCachedCategories } from '@/lib/supplier-categories'
 import { DistanceLogistics } from './fornitori/DistanceLogistics'
 import { AddSupplierPanel } from './fornitori/AddSupplierPanel'
 
@@ -29,6 +30,9 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
   const [showNewSupplier, setShowNewSupplier] = useState(false)
   const [createdToast, setCreatedToast] = useState<string | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
+
+  const [dynCategories, setDynCategories] = useState(getCachedCategories())
+  useEffect(() => { fetchSupplierCategories().then(setDynCategories) }, [])
 
   const linkedIds = links.map(l => l.supplier_id)
 
@@ -120,18 +124,14 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
     setTimeout(() => setCreatedToast(null), 4000)
   }
 
-  const CATEGORY_SORT: Record<string, number> = {
-    hotel: 0, transfer: 1, ristorante: 2, experience: 3, catering: 4,
-    audio_video: 5, allestimenti: 6, staff_interno: 7, staff_esterno: 7,
-    grafica_stampa: 8, varie: 9,
-  }
+  const catSortMap = Object.fromEntries(dynCategories.map(c => [c.key, c.sort_order]))
   const linkedSuppliers = suppliers
     .filter(s => linkedIds.includes(s.id))
     .sort((a, b) => {
       const la = links.find(l => l.supplier_id === a.id)
       const lb = links.find(l => l.supplier_id === b.id)
-      const oa = CATEGORY_SORT[la?.service_category ?? ''] ?? 99
-      const ob = CATEGORY_SORT[lb?.service_category ?? ''] ?? 99
+      const oa = catSortMap[la?.service_category ?? ''] ?? 99
+      const ob = catSortMap[lb?.service_category ?? ''] ?? 99
       return oa !== ob ? oa - ob : a.nome.localeCompare(b.nome, 'it')
     })
   const availableSuppliers = suppliers.filter(s =>
@@ -278,7 +278,7 @@ export function TabFornitori({ event, suppliers, onSuppliersChanged }: { event: 
                       </div>
 
                       <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
-                        <span>{LINK_CATEGORIES.find(c => c.value === catType)?.label || sup.categoria}</span>
+                        <span>{dynCategories.find(c => c.key === catType)?.label || sup.categoria}</span>
                         {sup.location && <span>· {sup.location}</span>}
                         {totals.count > 0 && (
                           <>

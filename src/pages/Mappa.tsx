@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, MapPin, Phone, Mail } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { fetchSupplierCategories, categoryByLabel, type SupplierCategory } from '@/lib/supplier-categories'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
@@ -39,28 +40,6 @@ interface MapSupplier {
   details: { sale?: SaleRoom[]; [k: string]: unknown } | null
 }
 
-// ─── Category styles ──────────────────────────────────────────────────────
-
-const CATEGORY_STYLE: Record<string, { color: string; icon: string; label: string }> = {
-  'Hotel':             { color: '#e02040', icon: 'bed',      label: 'Hotel' },
-  'Location':          { color: '#7B3FE4', icon: 'building', label: 'Location' },
-  'Ristorante':        { color: '#2f9e68', icon: 'utensils', label: 'Ristorante' },
-  'Catering':          { color: '#12a594', icon: 'chef',     label: 'Catering' },
-  'Transfer':          { color: '#2f6fbe', icon: 'bus',      label: 'Transfer' },
-  'Audio Video':       { color: '#c98920', icon: 'speaker',  label: 'Audio Video' },
-  'Esperienze':        { color: '#e8590c', icon: 'sparkles', label: 'Esperienze' },
-  'Staff Esterno':     { color: '#0d9488', icon: 'users',    label: 'Staff' },
-  'Gadget':            { color: '#c026d3', icon: 'gift',     label: 'Gadget' },
-  'DMC':               { color: '#475569', icon: 'globe',    label: 'DMC' },
-  'Agenzia di Viaggi': { color: '#0891b2', icon: 'plane',    label: 'Agenzia Viaggi' },
-  'Assicurazioni':     { color: '#64748b', icon: 'shield',   label: 'Assicurazioni' },
-}
-const DEFAULT_STYLE = { color: '#5f666d', icon: 'dot', label: 'Altro' }
-
-function styleFor(category: string | null) {
-  return CATEGORY_STYLE[category ?? ''] ?? DEFAULT_STYLE
-}
-
 // ─── SVG glyphs (12x12, white on transparent) ────────────────────────────
 
 const SVG_GLYPHS: Record<string, string> = {
@@ -90,7 +69,7 @@ const iconCache = new Map<string, L.DivIcon>()
 function markerIcon(category: string | null): L.DivIcon {
   const key = category ?? '_default'
   if (!iconCache.has(key)) {
-    const s = styleFor(category)
+    const s = categoryByLabel(category ?? '')
     iconCache.set(key, L.divIcon({
       className: '',
       html: `<div style="width:28px;height:28px;border-radius:50%;background:${s.color};border:2px solid #fff;box-shadow:0 2px 8px rgba(38,41,46,0.3);display:flex;align-items:center;justify-content:center">${svgGlyph(s.icon)}</div>`,
@@ -109,15 +88,15 @@ function clusterIcon(cluster: { getChildCount(): number; getAllChildMarkers(): L
 
   const freq = new Map<string, number>()
   for (const m of cluster.getAllChildMarkers()) {
-    const cat = ((m.options as Record<string, unknown>).category as string) ?? '_default'
+    const cat = ((m.options as Record<string, unknown>).category as string) ?? ''
     freq.set(cat, (freq.get(cat) ?? 0) + 1)
   }
-  let topCat = '_default'
+  let topCat = ''
   let topCount = 0
   for (const [cat, n] of freq) {
     if (n > topCount) { topCat = cat; topCount = n }
   }
-  const color = styleFor(topCat === '_default' ? null : topCat).color
+  const color = categoryByLabel(topCat).color
 
   return L.divIcon({
     className: '',
@@ -132,6 +111,7 @@ function clusterIcon(cluster: { getChildCount(): number; getAllChildMarkers(): L
 export default function Mappa() {
   const navigate = useNavigate()
   const [suppliers, setSuppliers] = useState<MapSupplier[]>([])
+  const [catDefs, setCatDefs] = useState<SupplierCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -139,20 +119,19 @@ export default function Mappa() {
 
   useEffect(() => {
     ;(async () => {
-      const { data } = await supabase
-        .from('suppliers')
-        .select('id, name, category, city, country, address, phone, email, website, latitude, longitude, loc_capienza_teatro, loc_capienza_banquetto, loc_capienza_cocktail, loc_tipo, notes, details')
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null)
+      const [cats, { data }] = await Promise.all([
+        fetchSupplierCategories(),
+        supabase
+          .from('suppliers')
+          .select('id, name, category, city, country, address, phone, email, website, latitude, longitude, loc_capienza_teatro, loc_capienza_banquetto, loc_capienza_cocktail, loc_tipo, notes, details')
+          .not('latitude', 'is', null)
+          .not('longitude', 'is', null),
+      ])
+      setCatDefs(cats)
       setSuppliers((data as MapSupplier[]) ?? [])
       setLoading(false)
     })()
   }, [])
-
-  const categories = useMemo(
-    () => [...new Set(suppliers.map(s => s.category).filter(Boolean))].sort(),
-    [suppliers],
-  )
 
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>()
@@ -161,6 +140,11 @@ export default function Mappa() {
     }
     return counts
   }, [suppliers])
+
+  const presentCategories = useMemo(() => {
+    const present = new Set(suppliers.map(s => s.category).filter(Boolean))
+    return catDefs.filter(c => present.has(c.label))
+  }, [catDefs, suppliers])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -219,7 +203,7 @@ export default function Mappa() {
             }}
           >
             <option value="">Tutte le categorie</option>
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            {presentCategories.map(c => <option key={c.key} value={c.label}>{c.label}</option>)}
           </select>
           <input
             type="number"
@@ -237,31 +221,30 @@ export default function Mappa() {
         </div>
 
         {/* Legend */}
-        {categories.length > 0 && (
+        {presentCategories.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-            {categories.map(cat => {
-              const s = styleFor(cat)
-              const active = categoryFilter === cat
+            {presentCategories.map(cat => {
+              const active = categoryFilter === cat.label
               return (
                 <button
-                  key={cat}
-                  onClick={() => setCategoryFilter(active ? '' : cat)}
+                  key={cat.key}
+                  onClick={() => setCategoryFilter(active ? '' : cat.label)}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 5,
                     background: 'var(--panel-solid)',
-                    border: `1px solid ${active ? s.color : 'var(--line)'}`,
+                    border: `1px solid ${active ? cat.color : 'var(--line)'}`,
                     borderRadius: 999, padding: '4px 10px', fontSize: 12,
-                    color: active ? s.color : 'var(--muted)',
+                    color: active ? cat.color : 'var(--muted)',
                     cursor: 'pointer', fontFamily: 'inherit', fontWeight: active ? 500 : 400,
                     transition: 'all 150ms',
                   }}
                 >
                   <span style={{
                     width: 10, height: 10, borderRadius: '50%',
-                    background: s.color, flexShrink: 0,
+                    background: cat.color, flexShrink: 0,
                   }} />
-                  {s.label}
-                  <span style={{ opacity: 0.7 }}>{categoryCounts.get(cat) ?? 0}</span>
+                  {cat.label}
+                  <span style={{ opacity: 0.7 }}>{categoryCounts.get(cat.label) ?? 0}</span>
                 </button>
               )
             })}
@@ -313,7 +296,7 @@ function SupplierPopup({ s, onOpen }: { s: MapSupplier; onOpen: () => void }) {
   const [saleOpen, setSaleOpen] = useState(false)
   const sale = (s.details?.sale as SaleRoom[] | undefined) ?? []
   const hasCapacities = (s.loc_capienza_teatro ?? 0) > 0 || (s.loc_capienza_banquetto ?? 0) > 0 || (s.loc_capienza_cocktail ?? 0) > 0
-  const catStyle = styleFor(s.category)
+  const catStyle = categoryByLabel(s.category)
 
   return (
     <div style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 13 }}>

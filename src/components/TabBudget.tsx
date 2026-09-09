@@ -12,6 +12,7 @@ import BudgetLineEditModal from '@/components/BudgetLineEditModal'
 import { fmtDate as fmtDateCentral, friendlyError } from '@/lib/format'
 import AnimatedLaserBorder from '@/components/AnimatedLaserBorder'
 import type { Event } from '@/data/events'
+import { fetchSupplierCategories, getCachedCategories, type SupplierCategory } from '@/lib/supplier-categories'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
@@ -22,13 +23,13 @@ interface Supplier {
   categoria: string
 }
 
-const CATEGORY_ORDER = [
+const FALLBACK_CATEGORY_ORDER = [
   'HOTEL', 'TRANSFER', 'RISTORANTE', 'LOCATION / EXPERIENCE',
   'CATERING', 'AUDIO VIDEO', 'ALLESTIMENTI', 'STAFF',
   'GRAFICA', 'VARIE',
 ] as const
 
-const SERVICE_CAT_TO_BUDGET: Record<string, string> = {
+const FALLBACK_SERVICE_CAT_TO_BUDGET: Record<string, string> = {
   hotel: 'HOTEL',
   transfer: 'TRANSFER',
   ristorante: 'RISTORANTE',
@@ -40,6 +41,17 @@ const SERVICE_CAT_TO_BUDGET: Record<string, string> = {
   staff_esterno: 'STAFF',
   grafica_stampa: 'GRAFICA',
   varie: 'VARIE',
+}
+
+function deriveBudgetMaps(cats: SupplierCategory[]) {
+  const catToBudget: Record<string, string> = {}
+  const orderSet: string[] = []
+  const seen = new Set<string>()
+  for (const c of cats) {
+    catToBudget[c.key] = c.budget_key
+    if (!seen.has(c.budget_key)) { seen.add(c.budget_key); orderSet.push(c.budget_key) }
+  }
+  return { catToBudget, orderSet }
 }
 
 const SOTTO_LABELS: Record<string, string> = {
@@ -90,6 +102,10 @@ const STATO_CONFIG: Record<StatoConferma, { label: string; color: string; icon: 
 export default function TabBudget({ event, suppliers }: { event: Event; suppliers: Supplier[] }) {
   const [lines, setLines] = useState<BudgetLine[]>([])
   const [loading, setLoading] = useState(true)
+  const [budgetMaps, setBudgetMaps] = useState(() => deriveBudgetMaps(getCachedCategories()))
+  useEffect(() => { fetchSupplierCategories().then(cats => setBudgetMaps(deriveBudgetMaps(cats))) }, [])
+  const SERVICE_CAT_TO_BUDGET = budgetMaps.catToBudget
+  const CATEGORY_ORDER = budgetMaps.orderSet.length > 0 ? budgetMaps.orderSet : [...FALLBACK_CATEGORY_ORDER]
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const { showToast } = useToast()
@@ -367,7 +383,7 @@ export default function TabBudget({ event, suppliers }: { event: Event; supplier
     const statoMap: Record<string, StatoConferma> = {}
     for (const link of (linksRes.data ?? []) as { supplier_id: string; service_category: string; stato_conferma: string }[]) {
       if (link.service_category) {
-        catMap[link.supplier_id] = SERVICE_CAT_TO_BUDGET[link.service_category] || 'VARIE'
+        catMap[link.supplier_id] = (SERVICE_CAT_TO_BUDGET[link.service_category] || FALLBACK_SERVICE_CAT_TO_BUDGET[link.service_category]) || 'VARIE'
       }
       statoMap[link.supplier_id] = (link.stato_conferma as StatoConferma) || 'richiesto'
     }
