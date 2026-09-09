@@ -14,6 +14,8 @@ export interface PublicRegistrationField {
   sort_order: number
   section: string | null
   section_description: string | null
+    min_value: string | null
+  max_value: string | null
 }
 
 export interface PublicRegistrationSite {
