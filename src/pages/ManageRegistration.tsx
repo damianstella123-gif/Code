@@ -235,6 +235,36 @@ export default function ManageRegistration() {
 
   // ── form ────────────────────────────────────────────────────────
   return (
+    
+        {programma.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,.08)', padding: 24, marginBottom: 20 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111', marginBottom: 16 }}>Programma dell'evento</h2>
+            {Object.entries(
+              programma.reduce((acc, v) => {
+                (acc[v.data] ??= []).push(v)
+                return acc
+              }, {} as Record<string, typeof programma>)
+            ).map(([data, voci]) => (
+              <div key={data} style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8, textTransform: 'capitalize' }}>
+                  {new Date(data + 'T00:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </div>
+                {voci.map(v => (
+                  <div key={v.id} style={{ display: 'flex', gap: 12, fontSize: 13, marginBottom: 8 }}>
+                    <div style={{ width: 92, flexShrink: 0, color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
+                      {v.ora_inizio ? v.ora_inizio.slice(0, 5) : ''}
+                      {v.ora_fine ? `–${v.ora_fine.slice(0, 5)}` : ''}
+                    </div>
+                    <div>
+                      <div style={{ color: '#111' }}>{v.titolo}</div>
+                      {v.note && <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{v.note}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
     <div style={{ minHeight: '100vh', background: '#f9fafb', padding: '32px 16px' }}>
       <div style={{ maxWidth: 540, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
