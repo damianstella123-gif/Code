@@ -248,6 +248,34 @@ export default function ManageRegistration() {
               <div key={data} style={{ marginBottom: 18 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8, textTransform: 'capitalize' }}>
                   {new Date(data + 'T00:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
+                       {programma.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <button type="button" onClick={() => setTab('dati')}
+              style={{ flex: 1, padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                fontSize: 14, fontWeight: 600, boxShadow: '0 1px 3px rgba(0,0,0,.08)',
+                background: tab === 'dati' ? '#111' : '#fff', color: tab === 'dati' ? '#fff' : '#6b7280' }}>
+              I miei dati
+            </button>
+            <button type="button" onClick={() => setTab('programma')}
+              style={{ flex: 1, padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                fontSize: 14, fontWeight: 600, boxShadow: '0 1px 3px rgba(0,0,0,.08)',
+                background: tab === 'programma' ? '#111' : '#fff', color: tab === 'programma' ? '#fff' : '#6b7280' }}>
+              Programma
+            </button>
+          </div>
+        )}
+
+        {tab === 'programma' && (
+          <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,.08)', padding: 24 }}>
+            {Object.entries(
+              programma.reduce((acc, v) => {
+                (acc[v.data] ??= []).push(v)
+                return acc
+              }, {} as Record<string, typeof programma>)
+            ).map(([data, voci]) => (
+              <div key={data} style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8, textTransform: 'capitalize' }}>
+                  {new Date(data + 'T00:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </div>
                 {voci.map(v => (
                   <div key={v.id} style={{ display: 'flex', gap: 12, fontSize: 13, marginBottom: 8 }}>
@@ -265,18 +293,6 @@ export default function ManageRegistration() {
             ))}
           </div>
         )}
-    <div style={{ minHeight: '100vh', background: '#f9fafb', padding: '32px 16px' }}>
-      <div style={{ maxWidth: 540, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          {reg.site_logo_url && <img src={reg.site_logo_url} alt="" style={{ height: 48, margin: '0 auto 16px', objectFit: 'contain' }} />}
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 4 }}>{reg.event_title || reg.site_title}</h1>
-          <p style={{ fontSize: 14, color: '#6b7280' }}>Modifica i dati della tua registrazione</p>
-          {reg.manage_token_expires_at && (
-            <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
-              Possibilità di modifica fino al {formatExpiry(reg.manage_token_expires_at)}
-            </p>
-          )}
-        </div>
 
         <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,.08)', padding: '24px' }}>
           {error && (
