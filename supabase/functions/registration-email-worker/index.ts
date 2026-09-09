@@ -59,7 +59,7 @@ function buildManageBlock(url: string, expiry: string | null, color: string): st
     ? `<p style="margin:8px 0 0;font-size:12px;color:#6b7280;">Link valido fino al ${escapeHtml(expiry)}</p>`
     : "";
   return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 8px;"><tr><td align="center">
-<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 28px;background:${escapeHtml(color)};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;">Gestisci la tua iscrizione</a>
+<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 28px;background:${escapeHtml(color)};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;">Programma e gestione iscrizione</a>
 </td></tr></table>
 <p style="margin:4px 0 0;font-size:12px;color:#6b7280;text-align:center;">Usa questo link per modificare i tuoi dati di registrazione.</p>
 ${expiryLine}`;
