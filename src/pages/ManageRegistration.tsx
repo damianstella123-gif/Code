@@ -93,6 +93,7 @@ export default function ManageRegistration() {
       .then(({ data }) => { if (Array.isArray(data)) setProgramma(data) })
   }, [token])
   const [error, setError] = useState<string | null>(null)
+    const [tab, setTab] = useState<'dati' | 'programma'>('dati')
 
   // security headers via meta tags
   useEffect(() => {
