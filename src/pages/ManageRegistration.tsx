@@ -7,6 +7,7 @@ import {
   type EditableRegistrationField,
   type EditableRegistrationPatch,
 } from '../lib/public-registration-service'
+import { supabase } from '../lib/supabase'
 
 /* ── helpers ───────────────────────────────────────────────────── */
 
