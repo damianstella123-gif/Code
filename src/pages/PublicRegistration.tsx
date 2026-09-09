@@ -122,6 +122,8 @@ function DynamicField({
         onChange={(e) => onChange(field.field_key, e.target.value)}
         placeholder={field.placeholder || ''}
         className={baseInput}
+                {...(field.field_type === 'date' && field.min_value ? { min: field.min_value } : {})}
+        {...(field.field_type === 'date' && field.max_value ? { max: field.max_value } : {})}
       />
       {helpText}
     </div>
