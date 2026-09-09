@@ -42,6 +42,7 @@ import {
   TrendingUp,
   ClipboardList,
   Presentation,
+  MapPin as MapPinIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatNotificationsProvider, useChatNotifications } from '@/lib/chat-notifications'
@@ -61,6 +62,7 @@ const iconMap: Record<string, React.ElementType> = {
   '/dashboard': LayoutDashboard,
   '/eventi': Calendar,
   '/network': Users,
+  '/mappa': MapPinIcon,
   '/task': CheckSquare,
   '/calendario': CalendarDays,
   '/amministrazione': Settings,
@@ -84,7 +86,7 @@ const iconMap: Record<string, React.ElementType> = {
 const NAV_GROUPS: { label: string; paths: string[] }[] = [
   { label: '', paths: ['/dashboard', '/calendario'] },
   { label: 'Lavoro', paths: ['/eventi', '/task', '/riunioni', '/workflow'] },
-  { label: 'Business', paths: ['/network', '/comunicazioni', '/amministrazione'] },
+  { label: 'Business', paths: ['/network', '/mappa', '/comunicazioni', '/amministrazione'] },
   { label: 'Contenuti', paths: ['/creative-studio', '/presentazioni', '/dossier'] },
   { label: 'Persone', paths: ['/area-personale', '/performance'] },
   { label: 'Sistema', paths: ['/utenti', '/centro-sicurezza', '/ai-trasparenza', '/archivio', '/impostazioni', '/feedback-beta', '/aiuto'] },

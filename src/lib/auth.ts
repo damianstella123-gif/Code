@@ -100,6 +100,7 @@ const ALL_NAV: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard' },
   { name: 'Eventi', href: '/eventi' },
   { name: 'Network', href: '/network' },
+  { name: 'Mappa', href: '/mappa' },
   { name: 'Task', href: '/task' },
   { name: 'Calendario', href: '/calendario' },
   { name: 'Amministrazione', href: '/amministrazione' },

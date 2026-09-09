@@ -15,6 +15,7 @@ const CRM = lazy(() => import('./pages/CRM'))
 const Task = lazy(() => import('./pages/Task'))
 const Calendario = lazy(() => import('./pages/Calendario'))
 const Fornitori = lazy(() => import('./pages/Fornitori'))
+const Mappa = lazy(() => import('./pages/Mappa'))
 const Network = lazy(() => import('./pages/Network'))
 const Amministrazione = lazy(() => import('./pages/Amministrazione'))
 const Comunicazioni = lazy(() => import('./pages/Comunicazioni'))
@@ -229,6 +230,7 @@ export default function App() {
       </Route>
       <Route path="/crm" element={<Navigate to="/network/clienti" replace />} />
       <Route path="/fornitori" element={<Navigate to="/network/fornitori" replace />} />
+      <Route path="/mappa" element={<AuthGuard><Layout><LazyPage><Mappa /></LazyPage></Layout></AuthGuard>} />
       <Route path="/task" element={<AuthGuard><Layout><LazyPage><Task /></LazyPage></Layout></AuthGuard>} />
       <Route path="/calendario" element={<AuthGuard><Layout><LazyPage><Calendario /></LazyPage></Layout></AuthGuard>} />
       <Route path="/amministrazione" element={<AuthGuard><Layout><LazyPage><Amministrazione /></LazyPage></Layout></AuthGuard>} />
