@@ -366,6 +366,7 @@ export default function ManageRegistration() {
             {saving ? 'Salvataggio...' : 'Salva modifiche'}
           </button>
         </form>
+                          )}
       </div>
     </div>
   )
