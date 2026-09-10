@@ -465,18 +465,26 @@ async function executeTool(
     }
 
     case "get_suppliers": {
-      let q = supabase
-        .from("suppliers")
-        .select("id, name, category, categorie, city, rating, status, contract_status, contract_expiry, email, phone")
-        .order("name")
-        .limit(30);
-
-      if (input.ricerca) {
-        q = q.ilike("name", `%${input.ricerca}%`);
+      const { data, error } = await supabase.rpc("search_suppliers_advanced", {
+        p_ricerca: input.ricerca ?? null,
+        p_categoria: input.categoria ?? null,
+        p_citta: input.citta ?? null,
+        p_paese: input.paese ?? null,
+        p_allestimento: input.allestimento ?? null,
+        p_capienza_min: input.capienza_min ?? null,
+        p_sale_min: input.sale_min ?? null,
+        p_vicino_lat: input.vicino_lat ?? null,
+        p_vicino_lon: input.vicino_lon ?? null,
+        p_raggio_km: input.raggio_km ?? null,
+        p_limite: 15,
+      });
+      if (error) return JSON.stringify({ error: error.message });
+      const res = data as { totale_trovati?: number; risultati?: unknown[] };
+      if (!res?.risultati || res.risultati.length === 0) {
+        return "Nessun fornitore trovato con questi criteri.";
       }
-      if (input.categoria) {
-        q = q.contains("categorie", [input.categoria]);
-      }
+      return JSON.stringify(res);
+    }
 
       const { data, error } = await q;
       if (error) return JSON.stringify({ error: error.message });
