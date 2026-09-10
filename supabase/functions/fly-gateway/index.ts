@@ -92,23 +92,25 @@ const TOOLS = [
   },
   {
     name: "get_suppliers",
-    description: "Cerca fornitori per nome o categoria.",
+    description:
+      "Cerca fornitori con criteri avanzati: nome, categoria, citta, capienza per allestimento, numero di sale, vicinanza geografica. Usa questo tool per domande tipo 'hotel a Bologna con sala da 200 in teatro', 'location entro 20 km da Roma per 150 persone', 'ristoranti a Milano'. Restituisce anche le SALE SPECIFICHE che soddisfano la capienza richiesta.",
     input_schema: {
       type: "object" as const,
       properties: {
-        ricerca: {
-          type: "string",
-          description: "Testo di ricerca parziale sul nome.",
-        },
-        categoria: {
-          type: "string",
-          description: "Filtra per categoria fornitore.",
-        },
+        ricerca: { type: "string", description: "Testo parziale sul nome del fornitore." },
+        categoria: { type: "string", description: "Categoria esatta: Hotel, Location, Ristorante, Catering, Transfer, Audio Video, Allestimenti, Esperienze, Staff Esterno, Grafica e Stampa, Agenzia di Viaggi, DMC, Gadget, Assicurazioni." },
+        citta: { type: "string", description: "Citta o zona." },
+        paese: { type: "string", description: "Paese, es. Italy, Spain, Germany." },
+        allestimento: { type: "string", description: "Tipo di allestimento sala: teatro, banchetto, cocktail, cabaret. Usare insieme a capienza_min." },
+        capienza_min: { type: "number", description: "Numero minimo di persone che la sala deve ospitare." },
+        sale_min: { type: "number", description: "Numero minimo di sale meeting." },
+        vicino_lat: { type: "number", description: "Latitudine del punto di riferimento per la ricerca per distanza." },
+        vicino_lon: { type: "number", description: "Longitudine del punto di riferimento." },
+        raggio_km: { type: "number", description: "Raggio massimo in km dal punto di riferimento." },
       },
       required: [] as string[],
     },
   },
-  {
     name: "get_scadenze",
     description:
       "Vista unificata di tutto cio che scade nei prossimi N giorni: task, dossier, fatture.",
