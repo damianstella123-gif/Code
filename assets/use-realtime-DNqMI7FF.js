@@ -1,0 +1,1 @@
+import{r as c,s as r}from"./index-p6tNGCc1.js";let u=0;function l(e,n){const s=c.useRef(n);s.current=n,c.useEffect(()=>{const t=++u,a=r.channel(`realtime-${e}-${t}`).on("postgres_changes",{event:"*",schema:"public",table:e},()=>{s.current()}).subscribe();return()=>{r.removeChannel(a)}},[e])}export{l as u};
